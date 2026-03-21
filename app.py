@@ -2,19 +2,24 @@
 
 import glob
 import os
+import re
 import sqlite3
 import tempfile
+import time
 import uuid
 from datetime import datetime, timezone
 
 import requests
 import yt_dlp
 from flask import Flask, Response, g, jsonify, make_response, render_template, request
+from youtube_transcript_api import YouTubeTranscriptApi
 
 app = Flask(__name__)
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")
+APIFY_ACTOR_ID = os.environ.get("APIFY_ACTOR_ID", "streamers~youtube-video-downloader")
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "transcriptions.db")
 
 
@@ -71,6 +76,105 @@ def detect_platform(url: str) -> str:
     if "tiktok.com" in url:
         return "tiktok"
     return "otro"
+
+
+def extract_youtube_id(url: str) -> str | None:
+    """Extrae el video ID de una URL de YouTube."""
+    patterns = [
+        r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([a-zA-Z0-9_-]{11})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+
+def get_youtube_transcript(url: str, language: str | None = None) -> str | None:
+    """Intenta obtener subtítulos de YouTube directamente (sin descargar audio)."""
+    video_id = extract_youtube_id(url)
+    if not video_id:
+        return None
+    try:
+        ytt_api = YouTubeTranscriptApi()
+        if language:
+            transcript = ytt_api.fetch(video_id, languages=[language])
+        else:
+            transcript = ytt_api.fetch(video_id)
+        return " ".join(snippet.text for snippet in transcript.snippets)
+    except Exception:
+        return None
+
+
+def download_audio_apify(url: str, output_dir: str) -> str:
+    """Descarga audio de YouTube usando Apify como fallback."""
+    if not APIFY_API_TOKEN:
+        raise RuntimeError("APIFY_API_TOKEN no configurada. Necesaria para descargar vídeos de YouTube.")
+
+    # Iniciar el actor de Apify
+    run_url = f"https://api.apify.com/v2/acts/{APIFY_ACTOR_ID}/runs?token={APIFY_API_TOKEN}"
+    input_data = {
+        "urls": [url],
+        "format": "mp3",
+        "quality": "lowest",
+    }
+    resp = requests.post(run_url, json=input_data, timeout=30)
+    resp.raise_for_status()
+    run_data = resp.json()["data"]
+    run_id = run_data["id"]
+
+    # Esperar a que termine (polling con timeout de 120s)
+    status_url = f"https://api.apify.com/v2/actor-runs/{run_id}?token={APIFY_API_TOKEN}"
+    for _ in range(60):
+        time.sleep(2)
+        status_resp = requests.get(status_url, timeout=15)
+        status_resp.raise_for_status()
+        status = status_resp.json()["data"]["status"]
+        if status == "SUCCEEDED":
+            break
+        if status in ("FAILED", "ABORTED", "TIMED-OUT"):
+            raise RuntimeError(f"Apify actor terminó con estado: {status}")
+    else:
+        raise RuntimeError("Apify actor tardó demasiado")
+
+    # Obtener resultados del dataset
+    dataset_id = run_data["defaultDatasetId"]
+    items_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={APIFY_API_TOKEN}"
+    items_resp = requests.get(items_url, timeout=30)
+    items_resp.raise_for_status()
+    items = items_resp.json()
+
+    if not items:
+        raise RuntimeError("Apify no devolvió resultados")
+
+    # Buscar URL de descarga en el resultado
+    download_url = None
+    for item in items:
+        download_url = item.get("url") or item.get("downloadUrl") or item.get("mediaUrl") or item.get("audioUrl")
+        if download_url:
+            break
+
+    if not download_url:
+        # Intentar obtener del key-value store
+        kv_store_id = run_data["defaultKeyValueStoreId"]
+        kv_url = f"https://api.apify.com/v2/key-value-stores/{kv_store_id}/records/OUTPUT?token={APIFY_API_TOKEN}"
+        kv_resp = requests.get(kv_url, timeout=30)
+        if kv_resp.status_code == 200:
+            content_type = kv_resp.headers.get("content-type", "")
+            if "audio" in content_type or "octet-stream" in content_type:
+                audio_path = os.path.join(output_dir, "audio.mp3")
+                with open(audio_path, "wb") as f:
+                    f.write(kv_resp.content)
+                return audio_path
+        raise RuntimeError("No se encontró URL de descarga en los resultados de Apify")
+
+    # Descargar el archivo de audio
+    audio_resp = requests.get(download_url, timeout=120)
+    audio_resp.raise_for_status()
+    audio_path = os.path.join(output_dir, "audio.mp3")
+    with open(audio_path, "wb") as f:
+        f.write(audio_resp.content)
+    return audio_path
 
 
 def download_audio(url: str, output_dir: str) -> str:
@@ -142,12 +246,33 @@ def transcribe():
     if platform == "otro":
         return jsonify({"error": "Plataforma no soportada. Usa URLs de YouTube, Instagram o TikTok."}), 400
 
-    if not GROQ_API_KEY:
-        return jsonify({"error": "GROQ_API_KEY no configurada en el servidor"}), 500
-
     try:
+        # Para YouTube: intentar obtener subtítulos directamente (rápido y gratis)
+        if platform == "youtube":
+            text = get_youtube_transcript(url, language)
+            if text:
+                # Guardar en historial y devolver
+                sid = get_session_id()
+                if sid:
+                    db = get_db()
+                    db.execute(
+                        "INSERT INTO transcriptions (session_id, url, platform, language, text, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (sid, url, platform, language, text, datetime.now(timezone.utc).isoformat()),
+                    )
+                    db.commit()
+                return jsonify({"text": text, "platform": platform})
+
+        if not GROQ_API_KEY:
+            return jsonify({"error": "GROQ_API_KEY no configurada en el servidor"}), 500
+
+        # Descargar audio y transcribir con Groq
         with tempfile.TemporaryDirectory() as tmpdir:
-            audio_path = download_audio(url, tmpdir)
+            if platform == "youtube":
+                # Usar Apify para YouTube (yt-dlp bloqueado en servidores)
+                audio_path = download_audio_apify(url, tmpdir)
+            else:
+                # yt-dlp para Instagram/TikTok
+                audio_path = download_audio(url, tmpdir)
             text = transcribe_with_groq(audio_path, language)
     except yt_dlp.utils.DownloadError as e:
         return jsonify({"error": f"Error al descargar el vídeo: {e}"}), 400
