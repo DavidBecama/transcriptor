@@ -19,7 +19,7 @@ app = Flask(__name__)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")
-APIFY_ACTOR_ID = os.environ.get("APIFY_ACTOR_ID", "streamers~youtube-video-downloader")
+APIFY_ACTOR_ID = os.environ.get("APIFY_ACTOR_ID", "web.harvester~youtube-downloader")
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "transcriptions.db")
 
 
@@ -111,14 +111,20 @@ def download_audio_apify(url: str, output_dir: str) -> str:
     if not APIFY_API_TOKEN:
         raise RuntimeError("APIFY_API_TOKEN no configurada. Necesaria para descargar vídeos de YouTube.")
 
-    # Iniciar el actor de Apify
+    # Iniciar el actor de Apify (formato compatible con web.harvester~youtube-downloader)
     run_url = f"https://api.apify.com/v2/acts/{APIFY_ACTOR_ID}/runs?token={APIFY_API_TOKEN}"
     input_data = {
-        "videos": [url],
-        "preferredFormat": "mp3",
-        "preferredQuality": "144p",
+        "youtubeUrls": [url],
+        "maxRequestRetries": 2,
     }
     resp = requests.post(run_url, json=input_data, timeout=30)
+    if resp.status_code == 400:
+        # Si el actor no acepta este formato, intentar formato alternativo
+        input_data = {
+            "urls": [{"url": url}],
+            "audioOnly": True,
+        }
+        resp = requests.post(run_url, json=input_data, timeout=30)
     resp.raise_for_status()
     run_data = resp.json()["data"]
     run_id = run_data["id"]
@@ -133,7 +139,7 @@ def download_audio_apify(url: str, output_dir: str) -> str:
         if status == "SUCCEEDED":
             break
         if status in ("FAILED", "ABORTED", "TIMED-OUT"):
-            raise RuntimeError(f"Apify actor terminó con estado: {status}")
+            raise RuntimeError(f"Error de Apify: el actor terminó con estado {status}")
     else:
         raise RuntimeError("Apify actor tardó demasiado")
 
@@ -144,13 +150,15 @@ def download_audio_apify(url: str, output_dir: str) -> str:
     items_resp.raise_for_status()
     items = items_resp.json()
 
-    if not items:
-        raise RuntimeError("Apify no devolvió resultados")
-
-    # Buscar URL de descarga en el resultado
+    # Buscar URL de descarga en los resultados (los actores usan diferentes nombres de campo)
     download_url = None
-    for item in items:
-        download_url = item.get("url") or item.get("downloadUrl") or item.get("mediaUrl") or item.get("audioUrl")
+    url_fields = ["downloadUrl", "mediaUrl", "audioUrl", "url", "fileUrl", "link", "mp3Url", "videoUrl"]
+    for item in (items if items else []):
+        for field in url_fields:
+            candidate = item.get(field, "")
+            if candidate and candidate.startswith("http"):
+                download_url = candidate
+                break
         if download_url:
             break
 
@@ -161,19 +169,34 @@ def download_audio_apify(url: str, output_dir: str) -> str:
         kv_resp = requests.get(kv_url, timeout=30)
         if kv_resp.status_code == 200:
             content_type = kv_resp.headers.get("content-type", "")
-            if "audio" in content_type or "octet-stream" in content_type:
+            if "audio" in content_type or "video" in content_type or "octet-stream" in content_type:
                 audio_path = os.path.join(output_dir, "audio.mp3")
                 with open(audio_path, "wb") as f:
                     f.write(kv_resp.content)
                 return audio_path
+            # Puede ser JSON con la URL
+            try:
+                kv_data = kv_resp.json()
+                if isinstance(kv_data, dict):
+                    for field in url_fields:
+                        candidate = kv_data.get(field, "")
+                        if candidate and candidate.startswith("http"):
+                            download_url = candidate
+                            break
+            except ValueError:
+                pass
+
+    if not download_url:
+        app.logger.error("Apify items: %s", items)
         raise RuntimeError("No se encontró URL de descarga en los resultados de Apify")
 
-    # Descargar el archivo de audio
-    audio_resp = requests.get(download_url, timeout=120)
+    # Descargar el archivo de audio/video
+    audio_resp = requests.get(download_url, timeout=120, stream=True)
     audio_resp.raise_for_status()
     audio_path = os.path.join(output_dir, "audio.mp3")
     with open(audio_path, "wb") as f:
-        f.write(audio_resp.content)
+        for chunk in audio_resp.iter_content(chunk_size=8192):
+            f.write(chunk)
     return audio_path
 
 
