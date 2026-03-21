@@ -304,38 +304,127 @@
     .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
     .btn-primary:disabled::before { display: none; }
 
-    /* ── Spinner ──────────────────────────────────── */
+    /* ── Spinner (snowball) ─────────────────────────── */
 
     .spinner {
       display: none;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      margin-top: 24px;
+      gap: 18px;
+      margin-top: 28px;
+    }
+
+    .spinner.visible { display: flex; }
+
+    .spinner-text {
       font-size: .85rem;
       color: var(--text-secondary);
       font-weight: 500;
     }
 
-    .spinner.visible { display: flex; }
-
-    .spinner-bar {
-      width: 3px;
-      height: 16px;
-      background: var(--accent);
-      border-radius: 3px;
-      animation: bars .8s ease-in-out infinite;
+    .pl {
+      width: 6em;
+      height: 6em;
+      position: relative;
+      font-size: 20px;
     }
 
-    .spinner-bar:nth-child(2) { animation-delay: .15s; height: 22px; }
-    .spinner-bar:nth-child(3) { animation-delay: .3s; }
-    .spinner-bar:nth-child(4) { animation-delay: .45s; height: 20px; }
+    .pl__outer-ring,
+    .pl__inner-ring,
+    .pl__track-cover {
+      position: absolute;
+      border-radius: 50%;
+    }
 
-    .spinner-text { margin-left: 8px; }
+    .pl__outer-ring {
+      inset: 0;
+      border: .35em solid rgba(168,85,247,.15);
+    }
 
-    @keyframes bars {
-      0%, 100% { opacity: .3; transform: scaleY(.6); }
-      50% { opacity: 1; transform: scaleY(1); }
+    .pl__inner-ring {
+      inset: .7em;
+      border: .35em solid rgba(236,72,153,.1);
+    }
+
+    .pl__track-cover {
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: .35em solid transparent;
+      border-top-color: var(--accent);
+      border-right-color: var(--accent-pink);
+      animation: trackCover 1.8s linear infinite;
+      filter: drop-shadow(0 0 6px var(--glow));
+    }
+
+    .pl__ball {
+      position: absolute;
+      width: 1.2em;
+      height: 1.2em;
+      top: 50%;
+      left: 50%;
+      margin: -.6em 0 0 -.6em;
+      border-radius: 50%;
+      animation: ball 1.8s linear infinite;
+    }
+
+    .pl__ball-texture {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-pink) 50%, var(--accent-blue) 100%);
+      background-size: 200% 100%;
+      animation: ballTexture 1.8s linear infinite;
+    }
+
+    .pl__ball-outer-shadow {
+      position: absolute;
+      inset: -.15em;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, transparent 50%, rgba(0,0,0,.3) 100%);
+      animation: ballOuterShadow 1.8s linear infinite;
+    }
+
+    .pl__ball-inner-shadow {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 65% 35%, rgba(255,255,255,.4) 0%, transparent 50%);
+      animation: ballInnerShadow 1.8s linear infinite;
+    }
+
+    .pl__ball-side-shadows {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      box-shadow: inset .1em .1em .2em rgba(0,0,0,.2), inset -.05em -.05em .15em rgba(255,255,255,.1);
+    }
+
+    @keyframes ball {
+      from { transform: rotate(0) translateY(-2.15em); }
+      50% { transform: rotate(180deg) translateY(-1.85em); }
+      to { transform: rotate(360deg) translateY(-2.15em); }
+    }
+
+    @keyframes ballInnerShadow {
+      from { transform: rotate(0); }
+      to { transform: rotate(-360deg); }
+    }
+
+    @keyframes ballOuterShadow {
+      from { transform: rotate(20deg); }
+      to { transform: rotate(-340deg); }
+    }
+
+    @keyframes ballTexture {
+      from { transform: translateX(0); }
+      to { transform: translateX(50%); }
+    }
+
+    @keyframes trackCover {
+      from { transform: rotate(0); }
+      to { transform: rotate(360deg); }
     }
 
     /* ── Result ───────────────────────────────────── */
@@ -573,10 +662,17 @@
       </form>
 
       <div class="spinner" id="spinner">
-        <span class="spinner-bar"></span>
-        <span class="spinner-bar"></span>
-        <span class="spinner-bar"></span>
-        <span class="spinner-bar"></span>
+        <div class="pl">
+          <div class="pl__outer-ring"></div>
+          <div class="pl__inner-ring"></div>
+          <div class="pl__track-cover"></div>
+          <div class="pl__ball">
+            <div class="pl__ball-texture"></div>
+            <div class="pl__ball-outer-shadow"></div>
+            <div class="pl__ball-inner-shadow"></div>
+            <div class="pl__ball-side-shadows"></div>
+          </div>
+        </div>
         <span class="spinner-text">Transcribiendo...</span>
       </div>
 
