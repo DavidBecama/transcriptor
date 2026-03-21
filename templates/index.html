@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transcriptor de Reels</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      padding: 40px;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      text-align: center;
+      margin-bottom: 6px;
+      color: #1a1a2e;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #888;
+      font-size: .9rem;
+      margin-bottom: 28px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: .85rem;
+      color: #333;
+      margin-bottom: 6px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: .95rem;
+      transition: border-color .2s;
+      outline: none;
+      margin-bottom: 18px;
+    }
+
+    input:focus, select:focus { border-color: #667eea; }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s;
+    }
+
+    button:hover { opacity: .9; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .result {
+      margin-top: 24px;
+      padding: 16px;
+      background: #f7f7fb;
+      border-radius: 10px;
+      font-size: .95rem;
+      line-height: 1.6;
+      color: #222;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    .result.visible { display: block; }
+
+    .error {
+      background: #fff0f0;
+      color: #c0392b;
+    }
+
+    .spinner {
+      display: none;
+      text-align: center;
+      margin-top: 18px;
+      color: #667eea;
+      font-weight: 600;
+    }
+
+    .spinner.visible { display: block; }
+
+    .spinner::after {
+      content: "";
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 3px solid #667eea;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+
+    .copy-btn {
+      width: auto;
+      padding: 8px 16px;
+      font-size: .8rem;
+      margin-top: 10px;
+      background: #333;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Transcriptor de Reels</h1>
+    <p class="subtitle">Pega la URL de un reel de Instagram y obtén la transcripción</p>
+
+    <form id="form">
+      <label for="url">URL del Reel</label>
+      <input id="url" type="url" placeholder="https://www.instagram.com/reel/..." required />
+
+      <label for="language">Idioma (opcional)</label>
+      <select id="language">
+        <option value="">Detectar automáticamente</option>
+        <option value="es">Español</option>
+        <option value="en">Inglés</option>
+        <option value="fr">Francés</option>
+        <option value="pt">Portugués</option>
+        <option value="de">Alemán</option>
+        <option value="it">Italiano</option>
+      </select>
+
+      <button type="submit" id="btn">Transcribir</button>
+    </form>
+
+    <div class="spinner" id="spinner">Transcribiendo, espera unos segundos</div>
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("form");
+    const btn = document.getElementById("btn");
+    const spinner = document.getElementById("spinner");
+    const resultDiv = document.getElementById("result");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const url = document.getElementById("url").value.trim();
+      const language = document.getElementById("language").value;
+
+      btn.disabled = true;
+      spinner.classList.add("visible");
+      resultDiv.classList.remove("visible", "error");
+      resultDiv.innerHTML = "";
+
+      try {
+        const res = await fetch("/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, language }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          resultDiv.classList.add("error");
+          resultDiv.textContent = data.error || "Error desconocido";
+        } else {
+          resultDiv.textContent = data.text;
+          const copyBtn = document.createElement("button");
+          copyBtn.className = "copy-btn";
+          copyBtn.textContent = "Copiar texto";
+          copyBtn.addEventListener("click", () => {
+            navigator.clipboard.writeText(data.text);
+            copyBtn.textContent = "¡Copiado!";
+            setTimeout(() => (copyBtn.textContent = "Copiar texto"), 2000);
+          });
+          resultDiv.appendChild(copyBtn);
+        }
+      } catch {
+        resultDiv.classList.add("error");
+        resultDiv.textContent = "Error de conexión con el servidor";
+      }
+
+      resultDiv.classList.add("visible");
+      spinner.classList.remove("visible");
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>

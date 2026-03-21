@@ -1,11 +1,12 @@
 # Transcriptor de Reels de Instagram
 
-CLI que descarga reels de Instagram y los transcribe usando OpenAI Whisper.
+Web app que descarga reels de Instagram y los transcribe usando la API de Groq (Whisper).
 
 ## Requisitos
 
 - Python 3.10+
 - FFmpeg instalado en el sistema
+- API key de [Groq](https://console.groq.com/keys) (tier gratuito disponible)
 
 ## Instalación
 
@@ -25,25 +26,11 @@ brew install ffmpeg
 ## Uso
 
 ```bash
-# Uso básico
-python transcriptor.py https://www.instagram.com/reel/XXXXX/
+# Configura tu API key de Groq
+export GROQ_API_KEY="tu_api_key_aqui"
 
-# Elegir modelo de Whisper (tiny, base, small, medium, large)
-python transcriptor.py https://www.instagram.com/reel/XXXXX/ -m medium
-
-# Especificar idioma
-python transcriptor.py https://www.instagram.com/reel/XXXXX/ -l es
-
-# Guardar transcripción en archivo
-python transcriptor.py https://www.instagram.com/reel/XXXXX/ -o transcripcion.txt
+# Arranca el servidor
+python app.py
 ```
 
-## Modelos de Whisper
-
-| Modelo | Tamaño | Velocidad | Calidad |
-|--------|--------|-----------|---------|
-| tiny   | 39 MB  | Muy rápido | Baja |
-| base   | 74 MB  | Rápido    | Media |
-| small  | 244 MB | Medio     | Buena |
-| medium | 769 MB | Lento     | Muy buena |
-| large  | 1550 MB| Muy lento | Excelente |
+Abre http://localhost:5000 en tu navegador, pega la URL del reel y listo.
