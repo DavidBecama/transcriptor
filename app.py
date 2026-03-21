@@ -19,7 +19,7 @@ app = Flask(__name__)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")
-APIFY_ACTOR_ID = os.environ.get("APIFY_ACTOR_ID", "web.harvester~youtube-downloader")
+APIFY_ACTOR_ID = os.environ.get("APIFY_ACTOR_ID", "scrapearchitect~youtube-audio-mp3-downloader")
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "transcriptions.db")
 
 
@@ -113,17 +113,14 @@ def download_audio_apify(url: str, output_dir: str) -> str:
 
     # Iniciar el actor de Apify (formato compatible con web.harvester~youtube-downloader)
     run_url = f"https://api.apify.com/v2/acts/{APIFY_ACTOR_ID}/runs?token={APIFY_API_TOKEN}"
+    # Formato para scrapearchitect~youtube-audio-mp3-downloader
     input_data = {
-        "youtubeUrls": [url],
-        "maxRequestRetries": 2,
+        "video_urls": [{"url": url}],
     }
     resp = requests.post(run_url, json=input_data, timeout=30)
     if resp.status_code == 400:
-        # Si el actor no acepta este formato, intentar formato alternativo
-        input_data = {
-            "urls": [{"url": url}],
-            "audioOnly": True,
-        }
+        # Formato alternativo para otros actores
+        input_data = {"youtubeUrls": [url]}
         resp = requests.post(run_url, json=input_data, timeout=30)
     resp.raise_for_status()
     run_data = resp.json()["data"]
@@ -152,7 +149,7 @@ def download_audio_apify(url: str, output_dir: str) -> str:
 
     # Buscar URL de descarga en los resultados (los actores usan diferentes nombres de campo)
     download_url = None
-    url_fields = ["downloadUrl", "mediaUrl", "audioUrl", "url", "fileUrl", "link", "mp3Url", "videoUrl"]
+    url_fields = ["downloadable_audio_link", "downloadUrl", "mediaUrl", "audioUrl", "fileUrl", "link", "mp3Url", "merged_downloadable_link", "downloadable_video_link"]
     for item in (items if items else []):
         for field in url_fields:
             candidate = item.get(field, "")
