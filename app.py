@@ -114,9 +114,9 @@ def download_audio_apify(url: str, output_dir: str) -> str:
     # Iniciar el actor de Apify
     run_url = f"https://api.apify.com/v2/acts/{APIFY_ACTOR_ID}/runs?token={APIFY_API_TOKEN}"
     input_data = {
-        "urls": [url],
-        "format": "mp3",
-        "quality": "lowest",
+        "videos": [url],
+        "preferredFormat": "mp3",
+        "preferredQuality": "144p",
     }
     resp = requests.post(run_url, json=input_data, timeout=30)
     resp.raise_for_status()
@@ -277,9 +277,15 @@ def transcribe():
     except yt_dlp.utils.DownloadError as e:
         return jsonify({"error": f"Error al descargar el vídeo: {e}"}), 400
     except requests.HTTPError as e:
-        return jsonify({"error": f"Error de la API de Groq: {e}"}), 502
-    except Exception as e:
+        # No exponer URLs con tokens en el mensaje de error
+        status_code = e.response.status_code if e.response is not None else 0
+        if "groq" in str(e.request.url).lower() if e.request else False:
+            return jsonify({"error": f"Error de la API de Groq (HTTP {status_code})"}), 502
+        return jsonify({"error": f"Error al conectar con servicio externo (HTTP {status_code})"}), 502
+    except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": "Error interno del servidor"}), 500
 
     # Guardar en historial
     sid = get_session_id()
