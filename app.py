@@ -106,22 +106,46 @@ def get_youtube_transcript(url: str, language: str | None = None) -> str | None:
         return None
 
 
+def _try_apify_actor(actor_id: str, input_data: dict) -> requests.Response:
+    """Intenta iniciar un actor de Apify y retorna la respuesta."""
+    run_url = f"https://api.apify.com/v2/acts/{actor_id}/runs?token={APIFY_API_TOKEN}"
+    return requests.post(run_url, json=input_data, timeout=30)
+
+
+# Actores a intentar en orden de preferencia
+APIFY_ACTOR_CONFIGS = [
+    ("scrapearchitect~youtube-audio-mp3-downloader", lambda url: {"video_urls": [{"url": url}]}),
+    ("web.harvester~youtube-downloader", lambda url: {"youtubeUrls": [url]}),
+]
+
+
 def download_audio_apify(url: str, output_dir: str) -> str:
     """Descarga audio de YouTube usando Apify como fallback."""
     if not APIFY_API_TOKEN:
         raise RuntimeError("APIFY_API_TOKEN no configurada. Necesaria para descargar vídeos de YouTube.")
 
-    # Iniciar el actor de Apify (formato compatible con web.harvester~youtube-downloader)
-    run_url = f"https://api.apify.com/v2/acts/{APIFY_ACTOR_ID}/runs?token={APIFY_API_TOKEN}"
-    # Formato para scrapearchitect~youtube-audio-mp3-downloader
-    input_data = {
-        "video_urls": [{"url": url}],
-    }
-    resp = requests.post(run_url, json=input_data, timeout=30)
-    if resp.status_code == 400:
-        # Formato alternativo para otros actores
-        input_data = {"youtubeUrls": [url]}
-        resp = requests.post(run_url, json=input_data, timeout=30)
+    # Intentar actores en orden; si uno falla con 403/402 (sin acceso), probar el siguiente
+    actor_id = APIFY_ACTOR_ID
+    resp = None
+    actors_to_try = [(actor_id, lambda u, aid=actor_id: {"video_urls": [{"url": u}]})]
+    for cfg_actor, cfg_input_fn in APIFY_ACTOR_CONFIGS:
+        if cfg_actor != actor_id:
+            actors_to_try.append((cfg_actor, cfg_input_fn))
+
+    for try_actor, input_fn in actors_to_try:
+        input_data = input_fn(url)
+        resp = _try_apify_actor(try_actor, input_data)
+        if resp.status_code in (402, 403):
+            app.logger.warning("Actor %s retornó %s, intentando siguiente...", try_actor, resp.status_code)
+            continue
+        if resp.status_code == 400:
+            # Probar formato alternativo con el mismo actor
+            alt_data = {"video_urls": [{"url": url}]} if "youtubeUrls" in input_data else {"youtubeUrls": [url]}
+            resp = _try_apify_actor(try_actor, alt_data)
+        break
+
+    if resp is None or resp.status_code in (402, 403):
+        raise RuntimeError(f"Ningún actor de Apify disponible. Verifica tu APIFY_API_TOKEN y suscripción. Último status: {resp.status_code if resp else 'N/A'}")
     resp.raise_for_status()
     run_data = resp.json()["data"]
     run_id = run_data["id"]
