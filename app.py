@@ -1,20 +1,72 @@
-"""Transcriptor de Reels de Instagram — Web App."""
+"""Transcriptor de Reels y Vídeos — Web App."""
 
 import os
+import sqlite3
 import tempfile
+from datetime import datetime, timezone
 
 import requests
 import yt_dlp
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, g, jsonify, render_template, request
 
 app = Flask(__name__)
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "transcriptions.db")
 
 
-def download_reel_audio(url: str, output_dir: str) -> str:
-    """Descarga el audio de un reel de Instagram y devuelve la ruta del archivo."""
+# ── Database ────────────────────────────────────────────────────────────────
+
+
+def get_db() -> sqlite3.Connection:
+    if "db" not in g:
+        g.db = sqlite3.connect(DATABASE)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(_exc):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
+
+def init_db():
+    db = sqlite3.connect(DATABASE)
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS transcriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            language TEXT,
+            text TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    db.commit()
+    db.close()
+
+
+# ── Helpers ─────────────────────────────────────────────────────────────────
+
+
+def detect_platform(url: str) -> str:
+    """Detecta la plataforma a partir de la URL."""
+    if "instagram.com" in url:
+        return "instagram"
+    if "youtube.com" in url or "youtu.be" in url:
+        return "youtube"
+    if "tiktok.com" in url:
+        return "tiktok"
+    return "otro"
+
+
+def download_audio(url: str, output_dir: str) -> str:
+    """Descarga el audio de un vídeo y devuelve la ruta del archivo."""
     output_path = os.path.join(output_dir, "audio")
     ydl_opts = {
         "format": "bestaudio/best",
@@ -49,6 +101,9 @@ def transcribe_with_groq(audio_path: str, language: str | None = None) -> str:
     return resp.json()["text"]
 
 
+# ── Routes ──────────────────────────────────────────────────────────────────
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -66,19 +121,65 @@ def transcribe():
     if not GROQ_API_KEY:
         return jsonify({"error": "GROQ_API_KEY no configurada en el servidor"}), 500
 
+    platform = detect_platform(url)
+
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            audio_path = download_reel_audio(url, tmpdir)
+            audio_path = download_audio(url, tmpdir)
             text = transcribe_with_groq(audio_path, language)
     except yt_dlp.utils.DownloadError as e:
-        return jsonify({"error": f"Error al descargar el reel: {e}"}), 400
+        return jsonify({"error": f"Error al descargar el vídeo: {e}"}), 400
     except requests.HTTPError as e:
         return jsonify({"error": f"Error de la API de Groq: {e}"}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    return jsonify({"text": text})
+    # Guardar en historial
+    db = get_db()
+    db.execute(
+        "INSERT INTO transcriptions (url, platform, language, text, created_at) VALUES (?, ?, ?, ?, ?)",
+        (url, platform, language, text, datetime.now(timezone.utc).isoformat()),
+    )
+    db.commit()
 
+    return jsonify({"text": text, "platform": platform})
+
+
+@app.route("/history")
+def history():
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, url, platform, language, text, created_at FROM transcriptions ORDER BY id DESC LIMIT 50"
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/history/<int:tid>", methods=["DELETE"])
+def delete_transcription(tid: int):
+    db = get_db()
+    db.execute("DELETE FROM transcriptions WHERE id = ?", (tid,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/download/<int:tid>")
+def download_transcription(tid: int):
+    db = get_db()
+    row = db.execute("SELECT url, text, created_at FROM transcriptions WHERE id = ?", (tid,)).fetchone()
+    if not row:
+        return jsonify({"error": "No encontrado"}), 404
+
+    content = f"URL: {row['url']}\nFecha: {row['created_at']}\n\n{row['text']}"
+    return Response(
+        content,
+        mimetype="text/plain",
+        headers={"Content-Disposition": f"attachment; filename=transcripcion_{tid}.txt"},
+    )
+
+
+# ── Init ────────────────────────────────────────────────────────────────────
+
+init_db()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))

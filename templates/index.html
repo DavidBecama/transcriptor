@@ -3,161 +3,412 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Transcriptor de Reels</title>
+  <title>Transcriptor</title>
   <style>
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --card-shadow: 0 8px 32px rgba(0,0,0,.1);
+      --text: #1a1a2e;
+      --text-secondary: #6b7280;
+      --border: #e5e7eb;
+      --input-bg: #f9fafb;
+      --accent: #7c3aed;
+      --accent-light: #a78bfa;
+      --accent-gradient: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+      --result-bg: #f5f3ff;
+      --error-bg: #fef2f2;
+      --error-text: #dc2626;
+      --tag-ig: #e1306c;
+      --tag-yt: #ff0000;
+      --tag-other: #6b7280;
+      --hover: #f3f4f6;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f0f23;
+      --card: #1a1a2e;
+      --card-shadow: 0 8px 32px rgba(0,0,0,.4);
+      --text: #e5e7eb;
+      --text-secondary: #9ca3af;
+      --border: #374151;
+      --input-bg: #111827;
+      --result-bg: #1e1b4b;
+      --error-bg: #450a0a;
+      --error-text: #fca5a5;
+      --hover: #252540;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
+      transition: background .3s, color .3s;
+    }
+
+    /* ── Layout ─────────────────────────────────────── */
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .theme-toggle {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      font-size: 1.1rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      transition: background .2s, border-color .2s;
     }
+
+    .theme-toggle:hover { border-color: var(--accent); }
+
+    /* ── Card ────────────────────────────────────────── */
 
     .card {
-      background: #fff;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.25);
-      padding: 40px;
-      width: 100%;
-      max-width: 520px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--card-shadow);
+      padding: 32px;
+      margin-bottom: 24px;
+      transition: background .3s, border-color .3s;
     }
 
-    h1 {
-      font-size: 1.6rem;
-      text-align: center;
-      margin-bottom: 6px;
-      color: #1a1a2e;
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
     }
 
-    .subtitle {
-      text-align: center;
-      color: #888;
-      font-size: .9rem;
-      margin-bottom: 28px;
+    .card-subtitle {
+      color: var(--text-secondary);
+      font-size: .85rem;
+      margin-bottom: 24px;
     }
+
+    /* ── Form ────────────────────────────────────────── */
 
     label {
       display: block;
       font-weight: 600;
-      font-size: .85rem;
-      color: #333;
+      font-size: .8rem;
+      color: var(--text-secondary);
       margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
     }
 
     input, select {
       width: 100%;
       padding: 12px 14px;
-      border: 2px solid #e0e0e0;
+      background: var(--input-bg);
+      border: 1.5px solid var(--border);
       border-radius: 10px;
       font-size: .95rem;
-      transition: border-color .2s;
+      color: var(--text);
+      transition: border-color .2s, box-shadow .2s;
       outline: none;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
-    input:focus, select:focus { border-color: #667eea; }
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, .15);
+    }
 
-    button {
+    .btn-primary {
       width: 100%;
       padding: 14px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: var(--accent-gradient);
       color: #fff;
       border: none;
       border-radius: 10px;
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      transition: opacity .2s;
+      transition: opacity .2s, transform .1s;
     }
 
-    button:hover { opacity: .9; }
-    button:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary:hover { opacity: .9; }
+    .btn-primary:active { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
-    .result {
-      margin-top: 24px;
-      padding: 16px;
-      background: #f7f7fb;
-      border-radius: 10px;
-      font-size: .95rem;
-      line-height: 1.6;
-      color: #222;
-      white-space: pre-wrap;
-      display: none;
-    }
-
-    .result.visible { display: block; }
-
-    .error {
-      background: #fff0f0;
-      color: #c0392b;
-    }
+    /* ── Spinner ─────────────────────────────────────── */
 
     .spinner {
       display: none;
       text-align: center;
-      margin-top: 18px;
-      color: #667eea;
+      margin-top: 20px;
+      color: var(--accent);
       font-weight: 600;
+      font-size: .9rem;
     }
 
-    .spinner.visible { display: block; }
+    .spinner.visible { display: flex; align-items: center; justify-content: center; gap: 10px; }
 
-    .spinner::after {
-      content: "";
-      display: inline-block;
-      width: 18px;
-      height: 18px;
-      border: 3px solid #667eea;
-      border-top-color: transparent;
+    .spinner-dot {
+      width: 8px; height: 8px;
+      background: var(--accent);
       border-radius: 50%;
-      animation: spin .7s linear infinite;
-      vertical-align: middle;
-      margin-left: 8px;
+      animation: bounce .6s infinite alternate;
+    }
+    .spinner-dot:nth-child(2) { animation-delay: .2s; }
+    .spinner-dot:nth-child(3) { animation-delay: .4s; }
+
+    @keyframes bounce { to { opacity: .3; transform: translateY(-6px); } }
+
+    /* ── Result ──────────────────────────────────────── */
+
+    .result {
+      margin-top: 20px;
+      padding: 20px;
+      background: var(--result-bg);
+      border-radius: 12px;
+      font-size: .92rem;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      display: none;
+      word-break: break-word;
     }
 
-    .copy-btn {
-      width: auto;
+    .result.visible { display: block; }
+    .result.error { background: var(--error-bg); color: var(--error-text); }
+
+    .result-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn-small {
       padding: 8px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text);
       font-size: .8rem;
-      margin-top: 10px;
-      background: #333;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-small:hover { border-color: var(--accent); background: var(--hover); }
+
+    /* ── History ─────────────────────────────────────── */
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .history-header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .history-count {
+      background: var(--accent);
+      color: #fff;
+      font-size: .7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .history-list {
+      list-style: none;
+    }
+
+    .history-item {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    .history-item:last-child { border-bottom: none; }
+
+    .history-item-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .platform-tag {
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: #fff;
+    }
+
+    .platform-tag.instagram { background: var(--tag-ig); }
+    .platform-tag.youtube { background: var(--tag-yt); }
+    .platform-tag.otro { background: var(--tag-other); }
+    .platform-tag.tiktok { background: #010101; }
+
+    .history-date {
+      font-size: .75rem;
+      color: var(--text-secondary);
+    }
+
+    .history-preview {
+      font-size: .85rem;
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
+    .history-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .btn-icon {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: .75rem;
+      color: var(--text-secondary);
+      transition: border-color .2s, color .2s;
+    }
+
+    .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-icon.delete:hover { border-color: var(--error-text); color: var(--error-text); }
+
+    .empty-state {
+      text-align: center;
+      color: var(--text-secondary);
+      padding: 32px 0;
+      font-size: .9rem;
+    }
+
+    /* ── Footer ──────────────────────────────────────── */
+
+    footer {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: .75rem;
+      margin-top: 16px;
+    }
+
+    /* ── Responsive ──────────────────────────────────── */
+
+    @media (max-width: 480px) {
+      .container { padding: 16px 12px 40px; }
+      .card { padding: 20px; }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Transcriptor de Reels</h1>
-    <p class="subtitle">Pega la URL de un reel de Instagram y obtén la transcripción</p>
+  <div class="container">
+    <header>
+      <span class="logo">Transcriptor</span>
+      <button class="theme-toggle" id="themeToggle" title="Cambiar tema">&#127769;</button>
+    </header>
 
-    <form id="form">
-      <label for="url">URL del Reel</label>
-      <input id="url" type="url" placeholder="https://www.instagram.com/reel/..." required />
+    <!-- Transcription form -->
+    <div class="card">
+      <h1 class="card-title">Transcribir vídeo</h1>
+      <p class="card-subtitle">Pega la URL de un reel de Instagram o vídeo de YouTube</p>
 
-      <label for="language">Idioma (opcional)</label>
-      <select id="language">
-        <option value="">Detectar automáticamente</option>
-        <option value="es">Español</option>
-        <option value="en">Inglés</option>
-        <option value="fr">Francés</option>
-        <option value="pt">Portugués</option>
-        <option value="de">Alemán</option>
-        <option value="it">Italiano</option>
-      </select>
+      <form id="form">
+        <label for="url">URL del vídeo</label>
+        <input id="url" type="url" placeholder="https://www.instagram.com/reel/... o https://youtube.com/watch?v=..." required />
 
-      <button type="submit" id="btn">Transcribir</button>
-    </form>
+        <label for="language">Idioma (opcional)</label>
+        <select id="language">
+          <option value="">Detectar automáticamente</option>
+          <option value="es">Español</option>
+          <option value="en">Inglés</option>
+          <option value="fr">Francés</option>
+          <option value="pt">Portugués</option>
+          <option value="de">Alemán</option>
+          <option value="it">Italiano</option>
+        </select>
 
-    <div class="spinner" id="spinner">Transcribiendo, espera unos segundos</div>
-    <div class="result" id="result"></div>
+        <button type="submit" class="btn-primary" id="btn">Transcribir</button>
+      </form>
+
+      <div class="spinner" id="spinner">
+        <span class="spinner-dot"></span>
+        <span class="spinner-dot"></span>
+        <span class="spinner-dot"></span>
+        <span>Transcribiendo...</span>
+      </div>
+
+      <div class="result" id="result"></div>
+    </div>
+
+    <!-- History -->
+    <div class="card" id="historyCard">
+      <div class="history-header">
+        <h2>Historial</h2>
+        <span class="history-count" id="historyCount">0</span>
+      </div>
+      <ul class="history-list" id="historyList">
+        <li class="empty-state" id="emptyState">Aún no hay transcripciones</li>
+      </ul>
+    </div>
+
+    <footer>Transcriptor &mdash; Hecho con Flask, yt-dlp y Groq Whisper</footer>
   </div>
 
   <script>
+    // ── Theme ──────────────────────────────────────────
+    const themeToggle = document.getElementById("themeToggle");
+    const savedTheme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    themeToggle.textContent = savedTheme === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19";
+
+    themeToggle.addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme");
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      themeToggle.textContent = next === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19";
+    });
+
+    // ── Form ───────────────────────────────────────────
     const form = document.getElementById("form");
     const btn = document.getElementById("btn");
     const spinner = document.getElementById("spinner");
@@ -186,15 +437,24 @@
           resultDiv.textContent = data.error || "Error desconocido";
         } else {
           resultDiv.textContent = data.text;
+
+          const actions = document.createElement("div");
+          actions.className = "result-actions";
+
           const copyBtn = document.createElement("button");
-          copyBtn.className = "copy-btn";
-          copyBtn.textContent = "Copiar texto";
-          copyBtn.addEventListener("click", () => {
+          copyBtn.className = "btn-small";
+          copyBtn.textContent = "Copiar";
+          copyBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
             navigator.clipboard.writeText(data.text);
-            copyBtn.textContent = "¡Copiado!";
-            setTimeout(() => (copyBtn.textContent = "Copiar texto"), 2000);
+            copyBtn.textContent = "Copiado!";
+            setTimeout(() => (copyBtn.textContent = "Copiar"), 2000);
           });
-          resultDiv.appendChild(copyBtn);
+
+          actions.appendChild(copyBtn);
+          resultDiv.appendChild(actions);
+
+          loadHistory();
         }
       } catch {
         resultDiv.classList.add("error");
@@ -205,6 +465,81 @@
       spinner.classList.remove("visible");
       btn.disabled = false;
     });
+
+    // ── History ────────────────────────────────────────
+    const historyList = document.getElementById("historyList");
+    const historyCount = document.getElementById("historyCount");
+    const emptyState = document.getElementById("emptyState");
+
+    function formatDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString("es-ES", {
+        day: "numeric", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch("/history");
+        const items = await res.json();
+        historyCount.textContent = items.length;
+
+        if (items.length === 0) {
+          historyList.innerHTML = '<li class="empty-state">Aún no hay transcripciones</li>';
+          return;
+        }
+
+        historyList.innerHTML = items.map(item => `
+          <li class="history-item" data-id="${item.id}">
+            <div class="history-item-header">
+              <span class="platform-tag ${item.platform}">${item.platform}</span>
+              <span class="history-date">${formatDate(item.created_at)}</span>
+            </div>
+            <div class="history-preview">${escapeHtml(item.text.slice(0, 120))}${item.text.length > 120 ? '...' : ''}</div>
+            <div class="history-actions">
+              <button class="btn-icon" onclick="copyText(event, ${item.id})" title="Copiar">Copiar</button>
+              <button class="btn-icon" onclick="downloadItem(event, ${item.id})" title="Descargar">Descargar .txt</button>
+              <button class="btn-icon delete" onclick="deleteItem(event, ${item.id})" title="Eliminar">Eliminar</button>
+            </div>
+          </li>
+        `).join("");
+      } catch {
+        // silently fail
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function copyText(e, id) {
+      e.stopPropagation();
+      const res = await fetch("/history");
+      const items = await res.json();
+      const item = items.find(i => i.id === id);
+      if (item) {
+        navigator.clipboard.writeText(item.text);
+        e.target.textContent = "Copiado!";
+        setTimeout(() => (e.target.textContent = "Copiar"), 2000);
+      }
+    }
+
+    function downloadItem(e, id) {
+      e.stopPropagation();
+      window.open(`/download/${id}`, "_blank");
+    }
+
+    async function deleteItem(e, id) {
+      e.stopPropagation();
+      await fetch(`/history/${id}`, { method: "DELETE" });
+      loadHistory();
+    }
+
+    // Load history on page load
+    loadHistory();
   </script>
 </body>
 </html>
