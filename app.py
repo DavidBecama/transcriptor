@@ -3,11 +3,12 @@
 import os
 import sqlite3
 import tempfile
+import uuid
 from datetime import datetime, timezone
 
 import requests
 import yt_dlp
-from flask import Flask, Response, g, jsonify, render_template, request
+from flask import Flask, Response, g, jsonify, make_response, render_template, request
 
 app = Flask(__name__)
 
@@ -39,6 +40,7 @@ def init_db():
         """
         CREATE TABLE IF NOT EXISTS transcriptions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
             url TEXT NOT NULL,
             platform TEXT NOT NULL,
             language TEXT,
@@ -49,6 +51,11 @@ def init_db():
     )
     db.commit()
     db.close()
+
+
+def get_session_id() -> str:
+    """Devuelve el session_id de la cookie, o genera uno nuevo."""
+    return request.cookies.get("session_id", "")
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -106,7 +113,10 @@ def transcribe_with_groq(audio_path: str, language: str | None = None) -> str:
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    resp = make_response(render_template("index.html"))
+    if "session_id" not in request.cookies:
+        resp.set_cookie("session_id", uuid.uuid4().hex, max_age=60 * 60 * 24 * 365, httponly=True, samesite="Lax")
+    return resp
 
 
 @app.route("/transcribe", methods=["POST"])
@@ -135,37 +145,45 @@ def transcribe():
         return jsonify({"error": str(e)}), 500
 
     # Guardar en historial
-    db = get_db()
-    db.execute(
-        "INSERT INTO transcriptions (url, platform, language, text, created_at) VALUES (?, ?, ?, ?, ?)",
-        (url, platform, language, text, datetime.now(timezone.utc).isoformat()),
-    )
-    db.commit()
+    sid = get_session_id()
+    if sid:
+        db = get_db()
+        db.execute(
+            "INSERT INTO transcriptions (session_id, url, platform, language, text, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (sid, url, platform, language, text, datetime.now(timezone.utc).isoformat()),
+        )
+        db.commit()
 
     return jsonify({"text": text, "platform": platform})
 
 
 @app.route("/history")
 def history():
+    sid = get_session_id()
+    if not sid:
+        return jsonify([])
     db = get_db()
     rows = db.execute(
-        "SELECT id, url, platform, language, text, created_at FROM transcriptions ORDER BY id DESC LIMIT 50"
+        "SELECT id, url, platform, language, text, created_at FROM transcriptions WHERE session_id = ? ORDER BY id DESC LIMIT 50",
+        (sid,),
     ).fetchall()
     return jsonify([dict(r) for r in rows])
 
 
 @app.route("/history/<int:tid>", methods=["DELETE"])
 def delete_transcription(tid: int):
+    sid = get_session_id()
     db = get_db()
-    db.execute("DELETE FROM transcriptions WHERE id = ?", (tid,))
+    db.execute("DELETE FROM transcriptions WHERE id = ? AND session_id = ?", (tid, sid))
     db.commit()
     return jsonify({"ok": True})
 
 
 @app.route("/download/<int:tid>")
 def download_transcription(tid: int):
+    sid = get_session_id()
     db = get_db()
-    row = db.execute("SELECT url, text, created_at FROM transcriptions WHERE id = ?", (tid,)).fetchone()
+    row = db.execute("SELECT url, text, created_at FROM transcriptions WHERE id = ? AND session_id = ?", (tid, sid)).fetchone()
     if not row:
         return jsonify({"error": "No encontrado"}), 404
 
