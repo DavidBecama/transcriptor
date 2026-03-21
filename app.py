@@ -1,5 +1,6 @@
 """Transcriptor de Reels y Vídeos — Web App."""
 
+import glob
 import os
 import sqlite3
 import tempfile
@@ -91,7 +92,11 @@ def download_audio(url: str, output_dir: str) -> str:
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-    return output_path + ".mp3"
+    # Buscar el archivo generado (puede variar la extensión según el cliente)
+    candidates = glob.glob(os.path.join(output_dir, "audio.*"))
+    if not candidates:
+        raise FileNotFoundError("No se pudo generar el archivo de audio")
+    return candidates[0]
 
 
 def transcribe_with_groq(audio_path: str, language: str | None = None) -> str:
@@ -129,10 +134,16 @@ def transcribe():
     if not url:
         return jsonify({"error": "Debes proporcionar una URL"}), 400
 
+    platform = detect_platform(url)
+    if platform == "youtube" and not any(p in url for p in ["/watch", "youtu.be/", "/shorts/", "/reel"]):
+        return jsonify({"error": "URL no válida. Pega la URL de un vídeo específico de YouTube."}), 400
+    if platform == "instagram" and "/reel" not in url and "/p/" not in url:
+        return jsonify({"error": "URL no válida. Pega la URL de un reel o publicación de Instagram."}), 400
+    if platform == "otro":
+        return jsonify({"error": "Plataforma no soportada. Usa URLs de YouTube, Instagram o TikTok."}), 400
+
     if not GROQ_API_KEY:
         return jsonify({"error": "GROQ_API_KEY no configurada en el servidor"}), 500
-
-    platform = detect_platform(url)
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
