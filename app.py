@@ -590,6 +590,31 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "") -> str:
     return resp.json()["choices"][0]["message"]["content"].strip()
 
 
+@app.route("/saved-scripts")
+@require_auth
+def saved_scripts():
+    user = current_user()
+    rows = db.table("saved_scripts") \
+        .select("*") \
+        .eq("user_id", user["id"]) \
+        .order("created_at", desc=True) \
+        .limit(50) \
+        .execute()
+    return jsonify(rows.data)
+
+
+@app.route("/saved-scripts/<script_id>", methods=["DELETE"])
+@require_auth
+def delete_saved_script(script_id):
+    user = current_user()
+    db.table("saved_scripts") \
+        .delete() \
+        .eq("id", script_id) \
+        .eq("user_id", user["id"]) \
+        .execute()
+    return jsonify({"ok": True})
+
+
 @app.route("/save-script", methods=["POST"])
 def save_script():
     user = current_user()

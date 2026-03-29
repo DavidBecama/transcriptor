@@ -1212,6 +1212,117 @@
     }
     .drawer-logout:hover { border-color: #f87171; color: #f87171; }
 
+    /* ── Profile page (full overlay) ─────────────────────────── */
+    .profile-overlay {
+      display: none; position: fixed; inset: 0;
+      background: var(--bg); z-index: 300;
+      overflow-y: auto;
+      animation: prof-in .25s ease;
+    }
+    .profile-overlay.on { display: block; }
+    @keyframes prof-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+    .prof-inner {
+      max-width: 820px; margin: 0 auto;
+      padding: 32px 24px 60px;
+    }
+    .prof-top {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 28px;
+    }
+    .prof-back {
+      background: none; border: 1px solid var(--border); color: var(--text2);
+      width: 38px; height: 38px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all .2s; font-size: 1.1rem; flex-shrink: 0;
+    }
+    .prof-back:hover { background: var(--surf); border-color: var(--text3); }
+    .prof-title { font-size: 1.4rem; font-weight: 900; color: var(--text); }
+
+    .prof-header {
+      display: flex; align-items: center; gap: 20px;
+      padding: 24px; background: var(--surf);
+      border: 1px solid var(--border); border-radius: var(--r);
+      margin-bottom: 24px;
+    }
+    .prof-av {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--grad); display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; font-weight: 900; color: #fff; flex-shrink: 0;
+    }
+    .prof-info { flex: 1; min-width: 0; }
+    .prof-email { font-size: .95rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prof-meta { font-size: .78rem; color: var(--text3); margin-top: 3px; display: flex; gap: 16px; flex-wrap: wrap; }
+
+    .prof-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px; margin-bottom: 28px;
+    }
+    .prof-stat {
+      padding: 16px; background: var(--surf);
+      border: 1px solid var(--border); border-radius: var(--r);
+      text-align: center;
+    }
+    .prof-stat-num { font-size: 1.5rem; font-weight: 900; color: var(--text); }
+    .prof-stat-lbl { font-size: .72rem; color: var(--text3); margin-top: 3px; text-transform: uppercase; letter-spacing: .3px; }
+
+    .prof-tabs {
+      display: flex; gap: 4px; margin-bottom: 20px;
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: 12px; padding: 4px;
+    }
+    .prof-tab {
+      flex: 1; padding: 10px 16px; border: none; background: none;
+      border-radius: 9px; font-size: .82rem; font-weight: 700;
+      color: var(--text3); cursor: pointer; transition: all .2s;
+    }
+    .prof-tab.on { background: var(--grad); color: #fff; }
+
+    .prof-list { display: flex; flex-direction: column; gap: 8px; }
+    .prof-card {
+      padding: 16px 18px; background: var(--surf);
+      border: 1px solid var(--border); border-radius: var(--r);
+      transition: border-color .2s;
+    }
+    .prof-card:hover { border-color: var(--sc); }
+    .prof-card-top {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .prof-card-badge {
+      font-size: .68rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .4px; padding: 3px 8px;
+      border-radius: 6px; background: rgba(249,115,22,.15); color: var(--sc);
+    }
+    .prof-card-date { font-size: .72rem; color: var(--text3); margin-left: auto; }
+    .prof-card-text {
+      font-size: .88rem; line-height: 1.6; color: var(--text2);
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden; cursor: pointer;
+    }
+    .prof-card-text:hover { color: var(--text); }
+    .prof-card-acts {
+      display: flex; gap: 6px; margin-top: 10px;
+    }
+    .prof-card-acts button {
+      padding: 5px 12px; border: 1px solid var(--border); background: none;
+      border-radius: 7px; font-size: .72rem; font-weight: 600;
+      color: var(--text3); cursor: pointer; transition: all .2s;
+    }
+    .prof-card-acts button:hover { border-color: var(--text2); color: var(--text2); }
+    .prof-card-acts button.del:hover { border-color: #f87171; color: #f87171; }
+    .prof-empty {
+      text-align: center; padding: 40px 20px;
+      color: var(--text3); font-size: .9rem;
+    }
+    .prof-empty-icon { font-size: 2rem; margin-bottom: 8px; }
+
+    @media (max-width: 600px) {
+      .prof-stats { grid-template-columns: 1fr 1fr; }
+      .prof-header { flex-direction: column; text-align: center; }
+      .prof-meta { justify-content: center; }
+    }
+
     /* ── Toast ────────────────────────────────────────────────── */
     .toast {
       position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
@@ -1250,7 +1361,7 @@
   </div>
   <div class="nav-r">
     <button class="badge-bal" id="balBadge" onclick="openTopup()">⚡ <span id="balDisp">0 usos</span></button>
-    <div class="user-pill" id="userPill" onclick="openDrawer()" style="cursor:pointer" title="Ver perfil">
+    <div class="user-pill" id="userPill" onclick="openProfile()" style="cursor:pointer" title="Ver perfil">
       <div class="avatar" id="userAv">?</div>
       <span id="userEmail" style="font-size:.82rem;color:var(--text2)"></span>
     </div>
@@ -1716,6 +1827,52 @@ La IA adaptará el guión exactamente a lo que pidas.
 </div>
 
 
+<!-- ── PROFILE PAGE ──────────────────────────────────────────────────── -->
+<div class="profile-overlay" id="profilePage">
+  <div class="prof-inner">
+    <div class="prof-top">
+      <button class="prof-back" onclick="closeProfile()">←</button>
+      <div class="prof-title">Profile</div>
+    </div>
+
+    <div class="prof-header">
+      <div class="prof-av" id="profAv">?</div>
+      <div class="prof-info">
+        <div class="prof-email" id="profEmail">—</div>
+        <div class="prof-meta">
+          <span id="profUsos">⚡ 0 usos</span>
+          <span id="profFree">🎁 0/2 free today</span>
+        </div>
+      </div>
+      <button class="btn-topup-sm" onclick="closeProfile();openTopup()">+ Top up</button>
+    </div>
+
+    <div class="prof-stats">
+      <div class="prof-stat">
+        <div class="prof-stat-num" id="profStatTransc">0</div>
+        <div class="prof-stat-lbl">Transcriptions</div>
+      </div>
+      <div class="prof-stat">
+        <div class="prof-stat-num" id="profStatScripts">0</div>
+        <div class="prof-stat-lbl">Saved scripts</div>
+      </div>
+      <div class="prof-stat">
+        <div class="prof-stat-num" id="profStatUsos">0</div>
+        <div class="prof-stat-lbl">Uses left</div>
+      </div>
+    </div>
+
+    <div class="prof-tabs">
+      <button class="prof-tab on" onclick="profTab('transc')">📄 Transcriptions</button>
+      <button class="prof-tab" onclick="profTab('scripts')">✨ Saved scripts</button>
+    </div>
+
+    <div class="prof-list" id="profListTransc"></div>
+    <div class="prof-list" id="profListScripts" style="display:none"></div>
+  </div>
+</div>
+
+
 <!-- ── MODAL VER COMPLETO ─────────────────────────────────────────────── -->
 <div class="view-overlay" id="viewOverlay" onclick="if(event.target===this)closeView()">
   <div class="view-modal">
@@ -2012,6 +2169,129 @@ function closeDrawer() {
   document.getElementById("drawerOverlay").classList.remove("on");
   document.getElementById("profileDrawer").classList.remove("on");
   document.body.style.overflow = "";
+}
+
+// ── Profile page ──────────────────────────────────────────────────────────
+let scriptsCache = [];
+
+function openProfile() {
+  closeDrawer();
+  const page = document.getElementById("profilePage");
+  page.classList.add("on");
+  document.body.style.overflow = "hidden";
+
+  // Fill header
+  if (st.user) {
+    const initial = st.user.email.charAt(0).toUpperCase();
+    document.getElementById("profAv").textContent = initial;
+    document.getElementById("profEmail").textContent = st.user.email;
+    document.getElementById("profUsos").textContent = `⚡ ${usos(st.credits)}`;
+    document.getElementById("profFree").textContent = `🎁 ${st.freeUsed}/${st.freeLimit} free today`;
+    document.getElementById("profStatUsos").textContent = Math.floor(st.credits / 8);
+    document.getElementById("profStatTransc").textContent = histCache.length;
+  }
+  loadSavedScripts();
+  renderProfTransc();
+}
+
+function closeProfile() {
+  document.getElementById("profilePage").classList.remove("on");
+  document.body.style.overflow = "";
+}
+
+function profTab(tab) {
+  document.querySelectorAll(".prof-tab").forEach((b, i) => {
+    b.classList.toggle("on", (tab === "transc" && i === 0) || (tab === "scripts" && i === 1));
+  });
+  document.getElementById("profListTransc").style.display = tab === "transc" ? "" : "none";
+  document.getElementById("profListScripts").style.display = tab === "scripts" ? "" : "none";
+}
+
+function renderProfTransc() {
+  const el = document.getElementById("profListTransc");
+  if (!histCache.length) {
+    el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">📄</div>No transcriptions yet</div>';
+    return;
+  }
+  el.innerHTML = histCache.map(it => `
+    <div class="prof-card">
+      <div class="prof-card-top">
+        <span class="prof-card-badge">${esc(it.platform || "reel")}</span>
+        ${it.cost_cents > 0 ? `<span class="prof-card-badge" style="background:rgba(251,191,36,.15);color:#d97706">−${eur(it.cost_cents)}</span>` : ""}
+        <span class="prof-card-date">${fmtDate(it.created_at)}</span>
+      </div>
+      <div class="prof-card-text" onclick="viewItem(${it.id})">${esc(it.text.slice(0, 200))}${it.text.length > 200 ? "…" : ""}</div>
+      <div class="prof-card-acts">
+        <button onclick="cpHist(${it.id},this)">Copy</button>
+        <button onclick="viewItem(${it.id})">View</button>
+        <button onclick="profAdaptFromTransc(${it.id})">✨ Adapt</button>
+        <button class="del" onclick="delItem(${it.id},this);setTimeout(()=>{renderProfTransc();document.getElementById('profStatTransc').textContent=histCache.length},300)">Delete</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function loadSavedScripts() {
+  try {
+    const r = await fetch("/saved-scripts");
+    if (!r.ok) return;
+    scriptsCache = await r.json();
+    document.getElementById("profStatScripts").textContent = scriptsCache.length;
+    renderProfScripts();
+  } catch {}
+}
+
+function renderProfScripts() {
+  const el = document.getElementById("profListScripts");
+  if (!scriptsCache.length) {
+    el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">✨</div>No saved scripts yet.<br>Use 💾 Save after adapting a script.</div>';
+    return;
+  }
+  el.innerHTML = scriptsCache.map(it => `
+    <div class="prof-card">
+      <div class="prof-card-top">
+        <span class="prof-card-badge">${STYLE_LABELS[it.style] || it.style || "custom"}</span>
+        <span class="prof-card-date">${fmtDate(it.created_at)}</span>
+      </div>
+      <div class="prof-card-text" onclick="viewScript('${it.id}')">${esc(it.content.slice(0, 200))}${it.content.length > 200 ? "…" : ""}</div>
+      <div class="prof-card-acts">
+        <button onclick="cpScript('${it.id}',this)">Copy</button>
+        <button onclick="viewScript('${it.id}')">View</button>
+        <button class="del" onclick="delScript('${it.id}',this)">Delete</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function cpScript(id, btn) {
+  const item = scriptsCache.find(i => i.id === id);
+  if (!item) return;
+  navigator.clipboard.writeText(item.content);
+  btn.textContent = "Copied!";
+  setTimeout(() => (btn.textContent = "Copy"), 1500);
+}
+
+function viewScript(id) {
+  const item = scriptsCache.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById("viewTitle").textContent = `${STYLE_LABELS[item.style] || item.style || "Script"} · ${fmtDate(item.created_at)}`;
+  document.getElementById("viewBody").textContent = item.content;
+  document.getElementById("viewOverlay").classList.add("on");
+}
+
+async function delScript(id, btn) {
+  if (!confirm("Delete this script?")) return;
+  btn.disabled = true;
+  await fetch(`/saved-scripts/${id}`, { method: "DELETE" });
+  await loadSavedScripts();
+}
+
+function profAdaptFromTransc(id) {
+  const item = histCache.find(i => i.id === id);
+  if (!item) return;
+  closeProfile();
+  document.getElementById("adaptInput").value = item.text;
+  document.getElementById("adaptCard").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderLoggedOut() {
