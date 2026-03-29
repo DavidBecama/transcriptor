@@ -1371,7 +1371,7 @@
     </div>
     <button class="btn-nav" id="btnLogin" onclick="openAuth('login')" data-i18n="nav.login">Entrar</button>
     <button class="btn-nav hi" id="btnReg" onclick="openAuth('register')" data-i18n="nav.register">Gratis →</button>
-    <button class="theme-btn" id="themeBtn" title="Cambiar tema">🌙</button>
+    <button class="theme-btn" id="themeBtn" title="Theme: System">💻</button>
   </div>
 </nav>
 
@@ -1560,7 +1560,7 @@
 
     <!-- RIGHT: live preview -->
     <div class="adapt-right">
-      <div class="preview-label">Así quedaría tu guión →</div>
+      <div class="preview-label" data-i18n="preview.label">This is how your script would look →</div>
       <div class="preview-card" id="previewCard" data-active="viral">
         <div class="preview-top-bar"></div>
 
@@ -1582,87 +1582,22 @@
           <div class="preview-result-text" id="previewResultText"></div>
 
           <div class="preview-slide on" data-style="viral">
-            <div class="preview-text">
-<span class="ph">⚡ Nadie te cuenta esto sobre los reels...</span>
-
-Llevo 3 años publicando contenido y acabo de darme cuenta del error que me costó miles de seguidores.
-
-No es el algoritmo. No es la cámara. Es algo que haces <span class="ph">antes de grabar</span>.
-
-Y en los próximos 60 segundos te lo explico todo.
-
-→ <span class="ph">Guarda esto. Lo vas a necesitar.</span>
-            </div>
+            <div class="preview-text" data-i18n="ex.viral"></div>
           </div>
-
           <div class="preview-slide" data-style="divertido">
-            <div class="preview-text">
-😂 Intenté hacer un reel "serio" y me pasé 20 minutos mirando la pantalla en blanco.
-
-Así que hice lo de siempre: <span class="ph">empecé hablando como si fuera con un amigo.</span>
-
-Resultado: el vídeo más visto de mi cuenta.
-
-Moraleja: deja de intentar sonar importante. <span class="ph">Solo habla.</span>
-            </div>
+            <div class="preview-text" data-i18n="ex.divertido"></div>
           </div>
-
           <div class="preview-slide" data-style="linkedin">
-            <div class="preview-text">
-Llevo 3 años creando contenido digital.
-
-Y esto es lo que nadie te dice al empezar:
-
-<span class="ph">El contenido que más conecta no es el más producido.</span>
-Es el más honesto.
-
-He visto cuentas con peor cámara que la mía crecer 10x más rápido.
-La diferencia estaba en el guión.
-
-¿Qué aprendiste tú creando contenido?
-            </div>
+            <div class="preview-text" data-i18n="ex.linkedin"></div>
           </div>
-
           <div class="preview-slide" data-style="storytelling">
-            <div class="preview-text">
-Era 2021. Tenía 0 seguidores y grababa en el baño de mi casa para que nadie me oyera.
-
-<span class="ph">Cada vídeo tardaba 4 horas en editarse.</span> Cada uno tenía 12 vistas.
-
-Un día lo dejé todo. Durante 3 meses, no publiqué nada.
-
-Cuando volví, cambié solo una cosa: <span class="ph">el primer segundo.</span>
-
-Y todo cambió.
-            </div>
+            <div class="preview-text" data-i18n="ex.storytelling"></div>
           </div>
-
           <div class="preview-slide" data-style="hooks">
-            <div class="preview-text">
-<span class="ph">1.</span> ¿Sabías que el 90% de creadores comete este error en el primer segundo?
-
-<span class="ph">2.</span> El error que cometen todos los principiantes (y que yo también cometí)
-
-<span class="ph">3.</span> Lo que nadie te dice sobre crear contenido que realmente funciona
-
-<span class="ph">4.</span> Si hubiera sabido esto antes, tendría el doble de seguidores hoy
-
-<span class="ph">5.</span> Para cuando termines este vídeo, querrás regrabar todo lo que tienes
-            </div>
+            <div class="preview-text" data-i18n="ex.hooks"></div>
           </div>
-
           <div class="preview-slide" data-style="custom">
-            <div class="preview-text">
-<span class="ph">✍️ Tú tienes el control.</span>
-
-Escribe cualquier instrucción en el campo de texto:
-
-<span class="ph">"Escríbelo como carta de ventas"</span>
-<span class="ph">"Hazlo en formato pregunta-respuesta"</span>
-<span class="ph">"Tono motivacional, sin tecnicismos"</span>
-
-La IA adaptará el guión exactamente a lo que pidas.
-            </div>
+            <div class="preview-text" data-i18n="ex.custom"></div>
           </div>
 
         </div>
@@ -1972,6 +1907,13 @@ const LANGS = {
     "cta.sub": "Tu primer reel transcrito en menos de 10 segundos.",
     "cta.pill1": "2 gratis al día", "cta.pill2": "Sin suscripción", "cta.pill3": "Saldo sin caducidad",
     "cta.btn": "✦ Probar gratis ahora",
+    "preview.label": "Así quedaría tu guión →",
+    "ex.viral": '<span class="ph">⚡ Nadie te cuenta esto sobre los reels...</span>\n\nLlevo 3 años publicando contenido y acabo de darme cuenta del error que me costó miles de seguidores.\n\nNo es el algoritmo. No es la cámara. Es algo que haces <span class="ph">antes de grabar</span>.\n\nY en los próximos 60 segundos te lo explico todo.\n\n→ <span class="ph">Guarda esto. Lo vas a necesitar.</span>',
+    "ex.divertido": '😂 Intenté hacer un reel "serio" y me pasé 20 minutos mirando la pantalla en blanco.\n\nAsí que hice lo de siempre: <span class="ph">empecé hablando como si fuera con un amigo.</span>\n\nResultado: el vídeo más visto de mi cuenta.\n\nMoraleja: deja de intentar sonar importante. <span class="ph">Solo habla.</span>',
+    "ex.linkedin": 'Llevo 3 años creando contenido digital.\n\nY esto es lo que nadie te dice al empezar:\n\n<span class="ph">El contenido que más conecta no es el más producido.</span>\nEs el más honesto.\n\nHe visto cuentas con peor cámara que la mía crecer 10x más rápido.\nLa diferencia estaba en el guión.\n\n¿Qué aprendiste tú creando contenido?',
+    "ex.storytelling": 'Era 2021. Tenía 0 seguidores y grababa en el baño de mi casa para que nadie me oyera.\n\n<span class="ph">Cada vídeo tardaba 4 horas en editarse.</span> Cada uno tenía 12 vistas.\n\nUn día lo dejé todo. Durante 3 meses, no publiqué nada.\n\nCuando volví, cambié solo una cosa: <span class="ph">el primer segundo.</span>\n\nY todo cambió.',
+    "ex.hooks": '<span class="ph">1.</span> ¿Sabías que el 90% de creadores comete este error en el primer segundo?\n\n<span class="ph">2.</span> El error que cometen todos los principiantes (y que yo también cometí)\n\n<span class="ph">3.</span> Lo que nadie te dice sobre crear contenido que realmente funciona\n\n<span class="ph">4.</span> Si hubiera sabido esto antes, tendría el doble de seguidores hoy\n\n<span class="ph">5.</span> Para cuando termines este vídeo, querrás regrabar todo lo que tienes',
+    "ex.custom": '<span class="ph">✍️ Tú tienes el control.</span>\n\nEscribe cualquier instrucción en el campo de texto:\n\n<span class="ph">"Escríbelo como carta de ventas"</span>\n<span class="ph">"Hazlo en formato pregunta-respuesta"</span>\n<span class="ph">"Tono motivacional, sin tecnicismos"</span>\n\nLa IA adaptará el guión exactamente a lo que pidas.',
   },
   en: {
     "nav.login": "Log in", "nav.register": "Free →",
@@ -2007,6 +1949,13 @@ const LANGS = {
     "cta.sub": "Your first reel transcribed in under 10 seconds.",
     "cta.pill1": "2 free/day", "cta.pill2": "No subscription", "cta.pill3": "Balance never expires",
     "cta.btn": "✦ Try it free now",
+    "preview.label": "This is how your script would look →",
+    "ex.viral": '<span class="ph">⚡ Nobody tells you this about reels...</span>\n\nI\'ve been posting content for 3 years and just realized the mistake that cost me thousands of followers.\n\nIt\'s not the algorithm. It\'s not the camera. It\'s something you do <span class="ph">before you hit record</span>.\n\nAnd in the next 60 seconds I\'ll break it all down.\n\n→ <span class="ph">Save this. You\'ll need it.</span>',
+    "ex.divertido": '😂 I tried making a "serious" reel and spent 20 minutes staring at a blank screen.\n\nSo I did what I always do: <span class="ph">started talking like I was with a friend.</span>\n\nResult: the most viewed video on my account.\n\nLesson: stop trying to sound important. <span class="ph">Just talk.</span>',
+    "ex.linkedin": 'I\'ve been creating digital content for 3 years.\n\nAnd here\'s what nobody tells you when you start:\n\n<span class="ph">The content that connects most isn\'t the most polished.</span>\nIt\'s the most honest.\n\nI\'ve seen accounts with worse cameras than mine grow 10x faster.\nThe difference was in the script.\n\nWhat did you learn creating content?',
+    "ex.storytelling": 'It was 2021. I had 0 followers and recorded in my bathroom so nobody could hear me.\n\n<span class="ph">Each video took 4 hours to edit.</span> Each one got 12 views.\n\nOne day I quit. For 3 months, I posted nothing.\n\nWhen I came back, I changed just one thing: <span class="ph">the first second.</span>\n\nAnd everything changed.',
+    "ex.hooks": '<span class="ph">1.</span> Did you know 90% of creators make this mistake in the first second?\n\n<span class="ph">2.</span> The mistake every beginner makes (and I made it too)\n\n<span class="ph">3.</span> What nobody tells you about creating content that actually works\n\n<span class="ph">4.</span> If I\'d known this sooner, I\'d have twice the followers today\n\n<span class="ph">5.</span> By the time this video ends, you\'ll want to re-record everything you have',
+    "ex.custom": '<span class="ph">✍️ You\'re in control.</span>\n\nType any instruction in the text field:\n\n<span class="ph">"Write it as a sales letter"</span>\n<span class="ph">"Make it Q&A format"</span>\n<span class="ph">"Motivational tone, no jargon"</span>\n\nThe AI will adapt the script to exactly what you ask.',
   }
 };
 
@@ -2028,14 +1977,32 @@ function setLang(lang) {
 
 // ── Theme ─────────────────────────────────────────────────────────────────
 const themeBtn = document.getElementById("themeBtn");
-const savedTheme = localStorage.getItem("rs-theme") || "dark";
-document.documentElement.setAttribute("data-theme", savedTheme);
-themeBtn.textContent = savedTheme === "dark" ? "☀️" : "🌙";
+const themeIcons = { light: "☀️", dark: "🌙", system: "💻" };
+const themeCycle = ["system", "dark", "light"];
+
+function resolveTheme(pref) {
+  if (pref === "system") return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return pref;
+}
+
+function applyTheme(pref) {
+  document.documentElement.setAttribute("data-theme", resolveTheme(pref));
+  themeBtn.textContent = themeIcons[pref];
+  themeBtn.title = pref === "system" ? "Theme: System" : pref === "dark" ? "Theme: Dark" : "Theme: Light";
+}
+
+let themePref = localStorage.getItem("rs-theme") || "system";
+applyTheme(themePref);
+
 themeBtn.addEventListener("click", () => {
-  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", next);
-  localStorage.setItem("rs-theme", next);
-  themeBtn.textContent = next === "dark" ? "☀️" : "🌙";
+  const idx = themeCycle.indexOf(themePref);
+  themePref = themeCycle[(idx + 1) % themeCycle.length];
+  localStorage.setItem("rs-theme", themePref);
+  applyTheme(themePref);
+});
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (themePref === "system") applyTheme("system");
 });
 
 // ── State ─────────────────────────────────────────────────────────────────
