@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    restart: always
+    env_file: .env
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.reelscript.rule=Host(`reelscript.net`) || Host(`www.reelscript.net`)
+      - traefik.http.routers.reelscript.entrypoints=websecure
+      - traefik.http.routers.reelscript.tls.certresolver=le
+      - traefik.http.services.reelscript.loadbalancer.server.port=5555
+    networks:
+      - traefik-public
+
+networks:
+  traefik-public:
+    external: true
