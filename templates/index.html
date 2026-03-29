@@ -41,6 +41,7 @@
       --sh-lg:  0 16px 64px rgba(0,0,0,.12);
       --glow:   0 0 0 3px rgba(249,115,22,.2), 0 0 20px rgba(249,115,22,.15);
     }
+    [data-theme="light"] .hero-badge { color: #7c3a00; border-color: rgba(180,80,0,0.4); background: rgba(255,140,0,0.12); }
     [data-theme="light"] .blobs { opacity: .4; }
     [data-theme="light"] nav { background: rgba(250,250,250,.85); }
     [data-theme="light"] ::-webkit-scrollbar-track { background: var(--bg); }
@@ -383,7 +384,8 @@
     }
     .style-pill .sp-emoji { font-size: 1.5rem; line-height: 1; margin-bottom: 2px; }
     .style-pill .sp-name  { font-size: .74rem; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; color: var(--text2); transition: color .2s; }
-    .style-pill .sp-hint  { font-size: .67rem; color: var(--text3); line-height: 1.3; transition: color .2s; }
+    .style-pill .sp-hint  { font-size: .67rem; color: #aaa; line-height: 1.3; transition: color .2s; }
+    [data-theme="light"] .style-pill .sp-hint { color: #555; }
     .style-pill:hover .sp-name, .style-pill.act .sp-name { color: var(--sc); }
     .style-pill:hover .sp-hint, .style-pill.act .sp-hint { color: var(--text2); }
 
@@ -1272,7 +1274,7 @@
 
   <div class="hero-badge">
     <div class="badge-dot"></div>
-    <span data-i18n="hero.badge">4 gratis al mes · Sin tarjeta · Sin suscripción</span>
+    <span data-i18n="hero.badge">2 free/day · No card · No subscription</span>
   </div>
 
   <h1 class="hero-h1" data-i18n="hero.h1">
@@ -1557,6 +1559,7 @@ La IA adaptará el guión exactamente a lo que pidas.
           <div class="pf-dot"></div>
           <span id="previewFooterTxt">Ejemplo · El tuyo será único</span>
           <button class="pf-copy" id="pfCopyBtn" style="display:none" onclick="copyPreviewResult()">Copiar</button>
+          <button class="pf-copy" id="pfSaveBtn" style="display:none" onclick="saveScript()">💾 Guardar</button>
         </div>
       </div>
     </div>
@@ -1635,8 +1638,8 @@ La IA adaptará el guión exactamente a lo que pidas.
   <div class="pricing-cards">
     <div class="price-card">
       <div class="price-icon">✅</div>
-      <div class="price-title" data-i18n="pricing.c1.title">4 gratis al mes. Sin tarjeta. Sin trampa.</div>
-      <div class="price-desc" data-i18n="pricing.c1.desc">2 sin cuenta (por IP) y 2 más si te registras. Gratis de verdad.</div>
+      <div class="price-title" data-i18n="pricing.c1.title">2 free/day. No card. No tricks.</div>
+      <div class="price-desc" data-i18n="pricing.c1.desc">2/day without an account (by IP) + 2 more when you sign up. Actually free.</div>
     </div>
     <div class="price-card featured">
       <div class="price-icon">💳</div>
@@ -1657,7 +1660,7 @@ La IA adaptará el guión exactamente a lo que pidas.
   <h2 class="cta-h2" data-i18n="cta.h2">Empieza ahora.<br><span class="grad-txt">Es gratis.</span></h2>
   <p class="cta-sub" data-i18n="cta.sub">Tu primer reel transcrito en menos de 10 segundos.</p>
   <div class="cta-pills">
-    <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill1">4 gratis al mes</span></span>
+    <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill1">2 free/day</span></span>
     <span style="color:var(--text3)">·</span>
     <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill2">Sin suscripción</span></span>
     <span style="color:var(--text3)">·</span>
@@ -1780,7 +1783,7 @@ La IA adaptará el guión exactamente a lo que pidas.
 const LANGS = {
   es: {
     "nav.login": "Entrar", "nav.register": "Gratis →",
-    "hero.badge": "4 gratis al mes · Sin tarjeta · Sin suscripción",
+    "hero.badge": "2 gratis al día · Sin tarjeta · Sin suscripción",
     "hero.h1": 'Pega la URL.<br><span class="grad-txt">Obtén el guión.</span>',
     "hero.sub": "En 10 segundos tienes el texto de cualquier reel.<br>Luego lo conviertes en viral, LinkedIn, historia o 5 hooks — con un click.",
     "hero.btn": "✦ Transcribir ahora",
@@ -1802,20 +1805,20 @@ const LANGS = {
     "flow.n4.title": "Contenido listo", "flow.n4.desc": "Copia, pega y publica. Ya está.",
     "pricing.tag": "💸 Lo que te cuesta",
     "pricing.h2": 'Sin suscripciones. Sin hostias.<br><span class="grad-txt">Pagas lo que usas.</span>',
-    "pricing.c1.title": "4 gratis al mes. Sin tarjeta. Sin trampa.",
-    "pricing.c1.desc": "2 sin cuenta (por IP) y 2 más si te registras. Gratis de verdad.",
+    "pricing.c1.title": "2 gratis al día. Sin tarjeta. Sin trampa.",
+    "pricing.c1.desc": "2 al día sin cuenta (por IP) y 2 más si te registras. Gratis de verdad.",
     "pricing.c2.title": "Recarga cuando quieras",
     "pricing.c2.desc": "5€, 10€ o 20€. Cada uso cuesta €0.08. Sin sorpresas.",
     "pricing.c3.title": "Si no lo usas, el dinero es tuyo. Punto.",
     "pricing.c3.desc": "Tu saldo no caduca. Sin cobros automáticos. Sin letra pequeña.",
     "cta.h2": 'Empieza ahora.<br><span class="grad-txt">Es gratis.</span>',
     "cta.sub": "Tu primer reel transcrito en menos de 10 segundos.",
-    "cta.pill1": "4 gratis al mes", "cta.pill2": "Sin suscripción", "cta.pill3": "Saldo sin caducidad",
+    "cta.pill1": "2 gratis al día", "cta.pill2": "Sin suscripción", "cta.pill3": "Saldo sin caducidad",
     "cta.btn": "✦ Probar gratis ahora",
   },
   en: {
     "nav.login": "Log in", "nav.register": "Free →",
-    "hero.badge": "4 free per month · No card · No subscription",
+    "hero.badge": "2 free/day · No card · No subscription",
     "hero.h1": 'Paste the URL.<br><span class="grad-txt">Get the script.</span>',
     "hero.sub": "Transcribe any reel in 10 seconds.<br>Then turn it viral, LinkedIn, story, or 5 hooks — one click.",
     "hero.btn": "✦ Transcribe now",
@@ -1837,20 +1840,20 @@ const LANGS = {
     "flow.n4.title": "Content ready", "flow.n4.desc": "Copy, paste and publish. Done.",
     "pricing.tag": "💸 What it costs you",
     "pricing.h2": 'No subscriptions. No BS.<br><span class="grad-txt">Pay for what you use.</span>',
-    "pricing.c1.title": "4 free per month. No card. No tricks.",
-    "pricing.c1.desc": "2 without an account (by IP) + 2 more when you sign up. Actually free.",
+    "pricing.c1.title": "2 free/day. No card. No tricks.",
+    "pricing.c1.desc": "2/day without an account (by IP) + 2 more when you sign up. Actually free.",
     "pricing.c2.title": "Top up whenever you want",
     "pricing.c2.desc": "€5, €10 or €20. Each use costs €0.08. No surprises.",
     "pricing.c3.title": "If you don't use it, the money is yours. Period.",
     "pricing.c3.desc": "Balance doesn't expire. No auto-charges. No fine print.",
     "cta.h2": 'Start now.<br><span class="grad-txt">It\'s free.</span>',
     "cta.sub": "Your first reel transcribed in under 10 seconds.",
-    "cta.pill1": "4 free per month", "cta.pill2": "No subscription", "cta.pill3": "Balance never expires",
+    "cta.pill1": "2 free/day", "cta.pill2": "No subscription", "cta.pill3": "Balance never expires",
     "cta.btn": "✦ Try it free now",
   }
 };
 
-let currentLang = localStorage.getItem("rs-lang") || "es";
+let currentLang = localStorage.getItem("rs-lang") || "en";
 
 function setLang(lang) {
   currentLang = lang;
@@ -2276,6 +2279,7 @@ function previewStyle(s) {
   result && result.classList.remove("on");
   label && (label.textContent = "Ejemplo");
   copyBtn && (copyBtn.style.display = "none");
+  const saveBtn = document.getElementById("pfSaveBtn"); saveBtn && (saveBtn.style.display = "none");
   footTxt && (footTxt.textContent = "Ejemplo · El tuyo será único");
   document.querySelectorAll(".preview-slide").forEach(sl => {
     sl.classList.toggle("on", sl.dataset.style === s);
@@ -2311,6 +2315,7 @@ async function runAdapt() {
   previewSpinner.classList.add("on");
   previewResult.classList.remove("on");
   pfCopyBtn.style.display = "none";
+  document.getElementById("pfSaveBtn").style.display = "none";
   previewLabel.textContent = "Generando…";
 
   let lastResult = "";
@@ -2333,6 +2338,7 @@ async function runAdapt() {
       previewResult.classList.add("on");
       previewLabel.textContent = "Tu resultado";
       pfCopyBtn.style.display = "block";
+      if (st.user) document.getElementById("pfSaveBtn").style.display = "block";
       previewFooterTxt.textContent = d.cost_cents > 0
         ? `−${eur(d.cost_cents)} de saldo`
         : "Generado con IA · gratis";
@@ -2358,6 +2364,25 @@ function copyPreviewResult() {
   const btn = document.getElementById("pfCopyBtn");
   btn.textContent = "¡Copiado!";
   setTimeout(() => (btn.textContent = "Copiar"), 2000);
+}
+
+async function saveScript() {
+  if (!st.user) return;
+  const content = document.getElementById("previewResultText").textContent;
+  if (!content) return;
+  const res = await fetch("/save-script", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, style: activeStyle || "" }),
+  });
+  const btn = document.getElementById("pfSaveBtn");
+  if (res.ok) {
+    showToast("Guión guardado ✓");
+    btn.textContent = "✓ Guardado";
+    setTimeout(() => (btn.textContent = "💾 Guardar"), 2000);
+  } else {
+    showToast("Error al guardar");
+  }
 }
 
 // ── History ────────────────────────────────────────────────────────────────

@@ -590,6 +590,20 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "") -> str:
     return resp.json()["choices"][0]["message"]["content"].strip()
 
 
+@app.route("/save-script", methods=["POST"])
+def save_script():
+    user = current_user()
+    if not user:
+        return jsonify({"error": "No autenticado"}), 401
+    body = request.get_json()
+    db.table("saved_scripts").insert({
+        "user_id": user["id"],
+        "style": body.get("style", ""),
+        "content": body.get("content", ""),
+    }).execute()
+    return jsonify({"ok": True})
+
+
 @app.route("/adapt", methods=["POST"])
 def adapt():
     body          = request.get_json()
