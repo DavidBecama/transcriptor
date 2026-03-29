@@ -58,8 +58,21 @@ CREATE TABLE IF NOT EXISTS public.payments (
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Guiones guardados por el usuario
+CREATE TABLE IF NOT EXISTS public.saved_scripts (
+  id          UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id     UUID        REFERENCES auth.users(id) ON DELETE CASCADE,
+  style       TEXT,
+  content     TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- RLS activado (el backend usa service role, así que bypassa)
 ALTER TABLE public.profiles       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transcriptions  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ip_usage        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saved_scripts   ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users see own scripts" ON public.saved_scripts
+  FOR ALL USING (auth.uid() = user_id);
