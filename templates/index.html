@@ -856,7 +856,7 @@
     .form-err.on { display: block; }
 
     /* Topup */
-    .topup-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 20px 0; }
+    .topup-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin: 20px 0; }
     .topup-opt {
       border: 2px solid var(--border); border-radius: var(--rsm);
       padding: 16px 10px; text-align: center; cursor: pointer;
@@ -1247,7 +1247,7 @@
     <span class="logo">RS<span>ReelScript</span></span>
   </div>
   <div class="nav-r">
-    <button class="badge-bal" id="balBadge" onclick="openTopup()">💳 <span id="balDisp">€0.00</span></button>
+    <button class="badge-bal" id="balBadge" onclick="openTopup()">⚡ <span id="balDisp">0 usos</span></button>
     <div class="user-pill" id="userPill" onclick="openDrawer()" style="cursor:pointer" title="Ver perfil">
       <div class="avatar" id="userAv">?</div>
       <span id="userEmail" style="font-size:.82rem;color:var(--text2)"></span>
@@ -1682,8 +1682,8 @@ La IA adaptará el guión exactamente a lo que pidas.
 
   <div class="drawer-balance">
     <div>
-      <div class="drawer-balance-amt" id="drawerBal">€0.00</div>
-      <div class="drawer-balance-lbl">Saldo disponible</div>
+      <div class="drawer-balance-amt" id="drawerBal">0 usos</div>
+      <div class="drawer-balance-lbl">Usos restantes</div>
     </div>
     <button class="btn-topup-sm" onclick="closeDrawer();openTopup()">+ Recargar</button>
   </div>
@@ -1753,7 +1753,10 @@ La IA adaptará el guión exactamente a lo que pidas.
     <h2>Recargar saldo</h2>
     <p>Transcribe sin límite diario. €0.08 por transcripción o transformación. Tu saldo no caduca.</p>
     <div class="topup-grid">
-      <div class="topup-opt on" data-amt="500" onclick="pickTopup(this)">
+      <div class="topup-opt on" data-amt="100" onclick="pickTopup(this)">
+        <div class="topup-amt">1€</div><div class="topup-cred">~12 usos</div>
+      </div>
+      <div class="topup-opt" data-amt="500" onclick="pickTopup(this)">
         <div class="topup-amt">5€</div><div class="topup-cred">~62 usos</div>
       </div>
       <div class="topup-opt" data-amt="1000" onclick="pickTopup(this)">
@@ -1989,11 +1992,11 @@ function renderLoggedIn() {
   document.getElementById("userEmail").textContent = st.user.email;
   document.getElementById("userAv").textContent = initial;
   document.getElementById("balBadge").classList.add("on");
-  document.getElementById("balDisp").textContent = eur(st.credits);
+  document.getElementById("balDisp").textContent = usos(st.credits);
   // Drawer
   document.getElementById("drawerAv").textContent = initial;
   document.getElementById("drawerEmail").textContent = st.user.email;
-  document.getElementById("drawerBal").textContent = eur(st.credits);
+  document.getElementById("drawerBal").textContent = usos(st.credits);
   document.getElementById("statToday").textContent = `${st.freeUsed}/${st.freeLimit}`;
 }
 
@@ -2157,7 +2160,7 @@ async function doTranscribe() {
       txt.textContent = d.text;
       if (d.credits_cents !== undefined) {
         st.credits = d.credits_cents; st.freeUsed = d.free_used_today;
-        document.getElementById("balDisp").textContent = eur(d.credits_cents);
+        document.getElementById("balDisp").textContent = usos(d.credits_cents);
         renderFreeBar();
       } else renderFreeBar();
 
@@ -2236,7 +2239,7 @@ async function runInlineAdapt() {
       result.classList.add("on");
       if (d.credits_cents !== undefined) {
         st.credits = d.credits_cents; st.freeUsed = d.free_used_today;
-        document.getElementById("balDisp").textContent = eur(d.credits_cents);
+        document.getElementById("balDisp").textContent = usos(d.credits_cents);
         renderFreeBar();
       }
     }
@@ -2335,7 +2338,7 @@ async function runAdapt() {
         : "Generado con IA · gratis";
       if (d.credits_cents !== undefined) {
         st.credits = d.credits_cents; st.freeUsed = d.free_used_today;
-        document.getElementById("balDisp").textContent = eur(d.credits_cents);
+        document.getElementById("balDisp").textContent = usos(d.credits_cents);
         renderFreeBar();
       }
     }
@@ -2511,6 +2514,7 @@ function backdropClose(e, id) { if (e.target === document.getElementById(id)) cl
 
 // ── Utils ──────────────────────────────────────────────────────────────────
 function eur(c)  { return `€${(c/100).toFixed(2)}`; }
+function usos(c) { return `${Math.floor(c / 8)} usos`; }
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString("es-ES", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
