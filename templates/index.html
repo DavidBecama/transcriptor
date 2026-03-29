@@ -123,6 +123,7 @@
       padding: 80px 20px 60px;
       text-align: center;
     }
+    .hero > *:not(.blobs) { position: relative; z-index: 1; }
 
     /* Animated blobs */
     .blobs { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -549,14 +550,14 @@
     }
     .lang-btn.active { background: var(--purple); color: #fff; }
 
-    /* ── Light mode orange blobs — más visibles ─────────────────── */
-    [data-theme="light"] .blobs { opacity: 1; }
-    [data-theme="light"] .blob-1 { opacity: .45; filter: blur(60px); background: #FF6B00; }
-    [data-theme="light"] .blob-2 { opacity: .35; filter: blur(60px); background: #F59E0B; }
-    [data-theme="light"] .blob-3 { opacity: .28; filter: blur(70px); background: #F97316; }
+    /* ── Light mode orange blobs — sutiles ───────────────────────── */
+    [data-theme="light"] .blobs { opacity: .5; }
+    [data-theme="light"] .blob-1 { opacity: .18; filter: blur(80px); background: #FF6B00; }
+    [data-theme="light"] .blob-2 { opacity: .12; filter: blur(80px); background: #F59E0B; }
+    [data-theme="light"] .blob-3 { opacity: .10; filter: blur(90px); background: #F97316; }
     [data-theme="light"] .hero {
-      background: radial-gradient(ellipse at 18% 55%, rgba(255,107,0,.16) 0%, transparent 55%),
-                  radial-gradient(ellipse at 82% 28%, rgba(251,191,36,.13) 0%, transparent 50%),
+      background: radial-gradient(ellipse at 18% 55%, rgba(255,107,0,.06) 0%, transparent 55%),
+                  radial-gradient(ellipse at 82% 28%, rgba(251,191,36,.05) 0%, transparent 50%),
                   var(--bg);
     }
 
@@ -1369,8 +1370,8 @@
       <button class="lang-btn active" data-lang="es" onclick="setLang('es')">ES</button>
       <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
     </div>
-    <button class="btn-nav" id="btnLogin" onclick="openAuth('login')" data-i18n="nav.login">Entrar</button>
-    <button class="btn-nav hi" id="btnReg" onclick="openAuth('register')" data-i18n="nav.register">Gratis →</button>
+    <button class="btn-nav" id="btnLogin" onclick="openAuth('login')" data-i18n="nav.login">Log in</button>
+    <button class="btn-nav hi" id="btnReg" onclick="openAuth('register')" data-i18n="nav.register">Free →</button>
     <button class="theme-btn" id="themeBtn" title="Theme: System">💻</button>
   </div>
 </nav>
@@ -1389,13 +1390,13 @@
   </div>
 
   <h1 class="hero-h1" data-i18n="hero.h1">
-    Pega la URL.<br>
-    <span class="grad-txt">Obtén el guión.</span>
+    Paste the URL.<br>
+    <span class="grad-txt">Get the script.</span>
   </h1>
 
   <p class="hero-sub" style="margin-bottom:28px" data-i18n="hero.sub">
-    En 10 segundos tienes el texto de cualquier reel.<br>
-    Luego lo conviertes en viral, LinkedIn, historia o 5 hooks — con un click.
+    Transcribe any reel in 10 seconds.<br>
+    Then turn it viral, LinkedIn, story, or 5 hooks — one click.
   </p>
 
   <!-- Input -->
@@ -1410,16 +1411,16 @@
     <!-- Language row -->
     <div style="display:flex;gap:10px;margin-bottom:12px">
       <select id="language" style="flex:1;padding:10px 14px;background:var(--surf);border:1.5px solid var(--border);border-radius:var(--rsm);font-size:.85rem;color:var(--text);outline:none;transition:border-color .2s">
-        <option value="">Idioma automático</option>
-        <option value="es">Español</option>
-        <option value="en">Inglés</option>
-        <option value="fr">Francés</option>
-        <option value="pt">Portugués</option>
-        <option value="de">Alemán</option>
-        <option value="it">Italiano</option>
+        <option value="">Auto-detect language</option>
+        <option value="es">Spanish</option>
+        <option value="en">English</option>
+        <option value="fr">French</option>
+        <option value="pt">Portuguese</option>
+        <option value="de">German</option>
+        <option value="it">Italian</option>
       </select>
       <button class="btn-shimmer inactive" id="btnTranscribe" style="flex:2" onclick="doTranscribe()" data-i18n="hero.btn">
-        ✦ Transcribir ahora
+        ✦ Transcribe now
       </button>
     </div>
 
@@ -1828,16 +1829,16 @@
 <div class="overlay" id="authOverlay" onclick="backdropClose(event,'authOverlay')">
   <div class="modal">
     <button class="modal-x" onclick="closeModal('authOverlay')">✕</button>
-    <h2>Bienvenido a ReelScript</h2>
-    <p>Regístrate gratis y consigue 2 transcripciones al día adicionales.</p>
+    <h2 data-i18n="auth.title">Welcome to ReelScript</h2>
+    <p data-i18n="auth.sub">Sign up free and get 5 transcriptions + 5 adaptations per day.</p>
     <div class="tabs">
-      <button class="tab on" id="tabLogin" onclick="switchTab('login')">Entrar</button>
-      <button class="tab"    id="tabReg"   onclick="switchTab('register')">Crear cuenta</button>
+      <button class="tab on" id="tabLogin" onclick="switchTab('login')" data-i18n="auth.login">Log in</button>
+      <button class="tab"    id="tabReg"   onclick="switchTab('register')" data-i18n="auth.register">Create account</button>
     </div>
-    <div class="field"><label>Email</label><input type="email" id="authEmail" placeholder="tu@email.com" /></div>
-    <div class="field"><label>Contraseña</label><input type="password" id="authPass" placeholder="Mínimo 6 caracteres" /></div>
+    <div class="field"><label data-i18n="auth.email">Email</label><input type="email" id="authEmail" placeholder="you@email.com" /></div>
+    <div class="field"><label data-i18n="auth.pass">Password</label><input type="password" id="authPass" placeholder="Min 6 characters" /></div>
     <div class="form-err" id="authErr"></div>
-    <button class="btn-full" id="btnAuthOk" onclick="submitAuth()">Entrar</button>
+    <button class="btn-full" id="btnAuthOk" onclick="submitAuth()" data-i18n="auth.login">Log in</button>
   </div>
 </div>
 
@@ -1845,7 +1846,7 @@
 <div class="overlay" id="topupOverlay" onclick="backdropClose(event,'topupOverlay')">
   <div class="modal">
     <button class="modal-x" onclick="closeModal('topupOverlay')">✕</button>
-    <h2>Recargar saldo</h2>
+    <h2 data-i18n="topup.title">Top up balance</h2>
     <p>Transcribe sin límite diario. €0.08 por transcripción o transformación. Tu saldo no caduca.</p>
     <div class="topup-grid">
       <div class="topup-opt on" data-amt="100" onclick="pickTopup(this)">
@@ -1907,6 +1908,11 @@ const LANGS = {
     "cta.sub": "Tu primer reel transcrito en menos de 10 segundos.",
     "cta.pill1": "3 gratis al día", "cta.pill2": "Sin suscripción", "cta.pill3": "Saldo sin caducidad",
     "cta.btn": "✦ Probar gratis ahora",
+    "auth.title": "Bienvenido a ReelScript",
+    "auth.sub": "Regístrate gratis y consigue 5 transcripciones + 5 adaptaciones al día.",
+    "auth.login": "Entrar", "auth.register": "Crear cuenta",
+    "auth.email": "Email", "auth.pass": "Contraseña",
+    "topup.title": "Recargar saldo",
     "preview.label": "Así quedaría tu guión →",
     "ex.viral": '<span class="ph">⚡ Nadie te cuenta esto sobre los reels...</span>\n\nLlevo 3 años publicando contenido y acabo de darme cuenta del error que me costó miles de seguidores.\n\nNo es el algoritmo. No es la cámara. Es algo que haces <span class="ph">antes de grabar</span>.\n\nY en los próximos 60 segundos te lo explico todo.\n\n→ <span class="ph">Guarda esto. Lo vas a necesitar.</span>',
     "ex.divertido": '😂 Intenté hacer un reel "serio" y me pasé 20 minutos mirando la pantalla en blanco.\n\nAsí que hice lo de siempre: <span class="ph">empecé hablando como si fuera con un amigo.</span>\n\nResultado: el vídeo más visto de mi cuenta.\n\nMoraleja: deja de intentar sonar importante. <span class="ph">Solo habla.</span>',
@@ -1949,6 +1955,11 @@ const LANGS = {
     "cta.sub": "Your first reel transcribed in under 10 seconds.",
     "cta.pill1": "3 free/day", "cta.pill2": "No subscription", "cta.pill3": "Balance never expires",
     "cta.btn": "✦ Try it free now",
+    "auth.title": "Welcome to ReelScript",
+    "auth.sub": "Sign up free and get 5 transcriptions + 5 adaptations per day.",
+    "auth.login": "Log in", "auth.register": "Create account",
+    "auth.email": "Email", "auth.pass": "Password",
+    "topup.title": "Top up balance",
     "preview.label": "This is how your script would look →",
     "ex.viral": '<span class="ph">⚡ Nobody tells you this about reels...</span>\n\nI\'ve been posting content for 3 years and just realized the mistake that cost me thousands of followers.\n\nIt\'s not the algorithm. It\'s not the camera. It\'s something you do <span class="ph">before you hit record</span>.\n\nAnd in the next 60 seconds I\'ll break it all down.\n\n→ <span class="ph">Save this. You\'ll need it.</span>',
     "ex.divertido": '😂 I tried making a "serious" reel and spent 20 minutes staring at a blank screen.\n\nSo I did what I always do: <span class="ph">started talking like I was with a friend.</span>\n\nResult: the most viewed video on my account.\n\nLesson: stop trying to sound important. <span class="ph">Just talk.</span>',
@@ -2719,7 +2730,8 @@ function switchTab(mode) {
   authMode = mode;
   document.getElementById("tabLogin").classList.toggle("on", mode === "login");
   document.getElementById("tabReg").classList.toggle("on",   mode === "register");
-  document.getElementById("btnAuthOk").textContent = mode === "login" ? "Entrar" : "Crear cuenta";
+  const t = LANGS[currentLang] || LANGS.en;
+  document.getElementById("btnAuthOk").textContent = mode === "login" ? (t["auth.login"] || "Log in") : (t["auth.register"] || "Create account");
   document.getElementById("authPass").autocomplete = mode === "login" ? "current-password" : "new-password";
 }
 
@@ -2729,7 +2741,7 @@ async function submitAuth() {
   const btn   = document.getElementById("btnAuthOk");
   const err   = document.getElementById("authErr");
   err.classList.remove("on");
-  btn.disabled = true; btn.textContent = "Cargando…";
+  btn.disabled = true; btn.textContent = currentLang === "es" ? "Cargando…" : "Loading…";
 
   const res = await fetch(authMode === "login" ? "/auth/login" : "/auth/register", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -2738,12 +2750,14 @@ async function submitAuth() {
   const d = await res.json();
   if (!res.ok) {
     err.textContent = d.error; err.classList.add("on");
-    btn.disabled = false; btn.textContent = authMode === "login" ? "Entrar" : "Crear cuenta";
+    const t2 = LANGS[currentLang] || LANGS.en;
+    btn.disabled = false; btn.textContent = authMode === "login" ? (t2["auth.login"] || "Log in") : (t2["auth.register"] || "Create account");
     return;
   }
   closeModal("authOverlay");
   await refreshMe(); loadHistory();
-  showToast(authMode === "login" ? "¡Bienvenido!" : "¡Cuenta creada!");
+  const t3 = LANGS[currentLang] || LANGS.en;
+  showToast(authMode === "login" ? (currentLang === "es" ? "¡Bienvenido!" : "Welcome!") : (currentLang === "es" ? "¡Cuenta creada!" : "Account created!"));
 }
 
 document.addEventListener("keydown", e => {
