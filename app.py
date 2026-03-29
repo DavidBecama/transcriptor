@@ -40,7 +40,7 @@ COST_CENTS      = 8   # €0.08 por transcripción de pago
 UNLIMITED_EMAILS = {"davidmiragito@gmail.com"}  # sin límite ni coste
 
 # Opciones de recarga: clave → céntimos
-TOPUP_OPTIONS = {"500": 500, "1000": 1000, "2000": 2000}
+TOPUP_OPTIONS = {"100": 100, "500": 500, "1000": 1000, "2000": 2000}
 
 db: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -583,7 +583,7 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "") -> str:
             {"role": "user", "content": text},
         ],
         "temperature": 0.8,
-        "max_tokens": 1024,
+        "max_tokens": 20000,
     }
     resp = requests.post(url, headers=headers, json=payload, timeout=60)
     resp.raise_for_status()
