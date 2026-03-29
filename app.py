@@ -1,68 +1,110 @@
-"""Transcriptor de Reels y Vídeos — Web App."""
+"""Transcriptor — Flask app con Supabase, créditos y Apify."""
 
 import os
-import sqlite3
 import tempfile
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from functools import wraps
 
 import requests
 import yt_dlp
-from flask import Flask, Response, g, jsonify, make_response, render_template, request
+from dotenv import load_dotenv
+from flask import Flask, Response, jsonify, render_template, request, session
+
+load_dotenv()
+
+from supabase import create_client, Client  # noqa: E402 (after dotenv)
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", uuid.uuid4().hex)
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "transcriptions.db")
+# ── Config ───────────────────────────────────────────────────────────────────
 
+GROQ_API_KEY          = os.environ.get("GROQ_API_KEY", "")
+GROQ_URL              = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-# ── Database ────────────────────────────────────────────────────────────────
+# OpenRouter — para transformaciones de texto ("Hazlo tuyo")
+OPENROUTER_API_KEY    = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_URL        = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL      = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-pro-preview-03-25")
+SUPABASE_URL          = os.environ.get("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_KEY", "")
+APIFY_TOKEN           = os.environ.get("APIFY_TOKEN", "")
+STRIPE_SECRET_KEY     = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
+FREE_DAILY_ANON = 2   # transcripciones/día sin cuenta (por IP)
+FREE_DAILY_USER = 2   # transcripciones/día con cuenta gratuita
+COST_CENTS      = 8   # €0.08 por transcripción de pago
 
-def get_db() -> sqlite3.Connection:
-    if "db" not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
-    return g.db
+UNLIMITED_EMAILS = {"davidmiragito@gmail.com"}  # sin límite ni coste
 
+# Opciones de recarga: clave → céntimos
+TOPUP_OPTIONS = {"500": 500, "1000": 1000, "2000": 2000}
 
-@app.teardown_appcontext
-def close_db(_exc):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
+db: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-
-def init_db():
-    db = sqlite3.connect(DATABASE)
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS transcriptions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT NOT NULL,
-            url TEXT NOT NULL,
-            platform TEXT NOT NULL,
-            language TEXT,
-            text TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    db.commit()
-    db.close()
+try:
+    import stripe as stripe_lib
+    stripe_lib.api_key = STRIPE_SECRET_KEY
+    STRIPE_OK = bool(STRIPE_SECRET_KEY)
+except ImportError:
+    STRIPE_OK = False
 
 
-def get_session_id() -> str:
-    """Devuelve el session_id de la cookie, o genera uno nuevo."""
-    return request.cookies.get("session_id", "")
+# ── Auth helpers ──────────────────────────────────────────────────────────────
+
+def current_user() -> dict | None:
+    return session.get("user")
 
 
-# ── Helpers ─────────────────────────────────────────────────────────────────
+def require_auth(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not current_user():
+            return jsonify({"error": "No autenticado"}), 401
+        return f(*args, **kwargs)
+    return wrapper
 
+
+def get_profile(user_id: str) -> dict:
+    """Devuelve el perfil del usuario, reseteando el contador diario si hace falta."""
+    result = db.table("profiles").select("*").eq("id", user_id).execute()
+    if not result.data:
+        db.table("profiles").insert({"id": user_id}).execute()
+        return {"id": user_id, "credits_cents": 0, "free_used_today": 0,
+                "free_reset_date": str(date.today())}
+    profile = result.data[0]
+    if profile["free_reset_date"] != str(date.today()):
+        db.table("profiles").update({
+            "free_used_today": 0,
+            "free_reset_date": str(date.today()),
+        }).eq("id", user_id).execute()
+        profile["free_used_today"] = 0
+    return profile
+
+
+def get_client_ip() -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    return forwarded.split(",")[0].strip() if forwarded else (request.remote_addr or "unknown")
+
+
+def get_or_reset_ip_usage(ip: str) -> dict:
+    today = str(date.today())
+    result = db.table("ip_usage").select("*").eq("ip", ip).execute()
+    if not result.data:
+        db.table("ip_usage").insert({"ip": ip, "used_today": 0, "reset_date": today}).execute()
+        return {"ip": ip, "used_today": 0}
+    usage = result.data[0]
+    if usage["reset_date"] != today:
+        db.table("ip_usage").update({"used_today": 0, "reset_date": today}).eq("ip", ip).execute()
+        usage["used_today"] = 0
+    return usage
+
+
+# ── Download / transcription helpers ─────────────────────────────────────────
 
 def detect_platform(url: str) -> str:
-    """Detecta la plataforma a partir de la URL."""
     if "instagram.com" in url:
         return "instagram"
     if "youtube.com" in url or "youtu.be" in url:
@@ -72,70 +114,201 @@ def detect_platform(url: str) -> str:
     return "otro"
 
 
-def download_audio(url: str, output_dir: str) -> str:
-    """Descarga el audio de un vídeo y devuelve la ruta del archivo."""
-    output_path = os.path.join(output_dir, "audio")
-    ydl_opts = {
+def _ytdlp(url: str, output_dir: str) -> str:
+    out = os.path.join(output_dir, "audio")
+    opts = {
         "format": "bestaudio/best",
-        "outtmpl": output_path,
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }
-        ],
+        "outtmpl": out,
+        "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}],
         "quiet": True,
         "no_warnings": True,
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(opts) as ydl:
         ydl.download([url])
-    return output_path + ".mp3"
+    return out + ".mp3"
+
+
+def _apify_instagram(url: str, output_dir: str) -> str:
+    """Descarga un reel de Instagram vía Apify y devuelve la ruta del mp3."""
+    actor_url = (
+        f"https://api.apify.com/v2/acts/apify~instagram-scraper"
+        f"/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=256"
+    )
+    resp = requests.post(
+        actor_url,
+        json={"directUrls": [url], "resultsLimit": 1},
+        timeout=120,
+    )
+    resp.raise_for_status()
+    items = resp.json()
+    if not items:
+        raise ValueError("Apify no devolvió resultados para esta URL")
+
+    item = items[0]
+    video_url = item.get("videoUrl") or item.get("video_url")
+    if not video_url:
+        raise ValueError("No se encontró videoUrl en la respuesta de Apify")
+
+    video_path = os.path.join(output_dir, "video.mp4")
+    with requests.get(video_url, stream=True, timeout=60) as r:
+        r.raise_for_status()
+        with open(video_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+    mp3_path = os.path.join(output_dir, "audio.mp3")
+    ret = os.system(f'ffmpeg -i "{video_path}" -vn -ar 44100 -ac 2 -b:a 128k "{mp3_path}" -y -loglevel quiet')
+    if ret != 0 or not os.path.exists(mp3_path):
+        raise ValueError("Error al convertir vídeo a audio con FFmpeg")
+    return mp3_path
+
+
+def download_audio(url: str, output_dir: str, platform: str) -> str:
+    """Intenta Apify para Instagram; yt-dlp como fallback y para el resto."""
+    if platform == "instagram" and APIFY_TOKEN:
+        try:
+            return _apify_instagram(url, output_dir)
+        except Exception:
+            pass  # fallback silencioso
+    return _ytdlp(url, output_dir)
 
 
 def transcribe_with_groq(audio_path: str, language: str | None = None) -> str:
-    """Envía el audio a la API de Groq Whisper y devuelve el texto."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
     with open(audio_path, "rb") as f:
         files = {"file": ("audio.mp3", f, "audio/mpeg")}
         data = {"model": "whisper-large-v3", "response_format": "json"}
         if language:
             data["language"] = language
-        resp = requests.post(
-            GROQ_TRANSCRIPTION_URL, headers=headers, files=files, data=data, timeout=120
-        )
+        resp = requests.post(GROQ_URL, headers=headers, files=files, data=data, timeout=120)
     resp.raise_for_status()
     return resp.json()["text"]
 
 
-# ── Routes ──────────────────────────────────────────────────────────────────
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+@app.route("/auth/register", methods=["POST"])
+def auth_register():
+    body = request.get_json()
+    email    = (body.get("email") or "").strip().lower()
+    password = body.get("password", "")
+
+    if not email or not password:
+        return jsonify({"error": "Email y contraseña requeridos"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "La contraseña debe tener mínimo 6 caracteres"}), 400
+
+    try:
+        result = db.auth.admin.create_user({
+            "email": email,
+            "password": password,
+            "email_confirm": True,
+        })
+        user = result.user
+        session["user"] = {"id": str(user.id), "email": user.email}
+        return jsonify({"ok": True, "email": user.email})
+    except Exception as e:
+        msg = str(e).lower()
+        if "already registered" in msg or "already exists" in msg or "duplicate" in msg:
+            return jsonify({"error": "Este email ya está registrado"}), 409
+        return jsonify({"error": "Error al crear la cuenta"}), 500
 
 
-@app.route("/")
-def index():
-    resp = make_response(render_template("index.html"))
-    if "session_id" not in request.cookies:
-        resp.set_cookie("session_id", uuid.uuid4().hex, max_age=60 * 60 * 24 * 365, httponly=True, samesite="Lax")
-    return resp
+@app.route("/auth/login", methods=["POST"])
+def auth_login():
+    body = request.get_json()
+    email    = (body.get("email") or "").strip().lower()
+    password = body.get("password", "")
 
+    try:
+        # Llamada directa a la REST API de GoTrue (funciona con service role key)
+        resp = requests.post(
+            f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+            headers={"apikey": SUPABASE_SERVICE_KEY, "Content-Type": "application/json"},
+            json={"email": email, "password": password},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return jsonify({"error": "Email o contraseña incorrectos"}), 401
+        data = resp.json()
+        user = data["user"]
+        session["user"] = {"id": user["id"], "email": user["email"]}
+        return jsonify({"ok": True, "email": user["email"]})
+    except Exception:
+        return jsonify({"error": "Error de conexión"}), 500
+
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route("/auth/me")
+def auth_me():
+    user = current_user()
+    if not user:
+        return jsonify({"user": None, "free_daily_anon": FREE_DAILY_ANON})
+    profile = get_profile(user["id"])
+    return jsonify({
+        "user": user,
+        "credits_cents":   profile["credits_cents"],
+        "free_used_today": profile["free_used_today"],
+        "free_daily_limit": FREE_DAILY_USER,
+    })
+
+
+# ── Transcription route ───────────────────────────────────────────────────────
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
-    body = request.get_json()
-    url = body.get("url", "").strip()
-    language = body.get("language", "").strip() or None
+    body     = request.get_json()
+    url      = (body.get("url") or "").strip()
+    language = (body.get("language") or "").strip() or None
 
     if not url:
         return jsonify({"error": "Debes proporcionar una URL"}), 400
-
     if not GROQ_API_KEY:
         return jsonify({"error": "GROQ_API_KEY no configurada en el servidor"}), 500
 
     platform = detect_platform(url)
 
+    if platform == "youtube":
+        return jsonify({
+            "error": "YouTube estará disponible próximamente en el plan de pago. "
+                     "Por ahora, puedes transcribir reels de Instagram y vídeos de TikTok."
+        }), 400
+
+    user = current_user()
+    cost_cents = 0
+
+    # ── Comprobar límites / saldo ─────────────────────────────────────────────
+    if user and user.get("email", "").lower() in UNLIMITED_EMAILS:
+        pass  # sin límite ni coste para cuentas admin
+    elif user is None:
+        ip       = get_client_ip()
+        ip_usage = get_or_reset_ip_usage(ip)
+        if ip_usage["used_today"] >= FREE_DAILY_ANON:
+            return jsonify({
+                "error": f"Límite diario alcanzado ({FREE_DAILY_ANON} gratis/día sin cuenta). "
+                         "Regístrate para obtener más transcripciones gratuitas."
+            }), 429
+    else:
+        profile = get_profile(user["id"])
+        if profile["credits_cents"] >= COST_CENTS:
+            cost_cents = COST_CENTS  # se descuenta tras éxito
+        elif profile["free_used_today"] < FREE_DAILY_USER:
+            cost_cents = 0
+        else:
+            return jsonify({
+                "error": f"Has usado tus {FREE_DAILY_USER} transcripciones gratuitas de hoy. "
+                         "Recarga saldo para continuar sin límite."
+            }), 429
+
+    # ── Descargar y transcribir ───────────────────────────────────────────────
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            audio_path = download_audio(url, tmpdir)
+            audio_path = download_audio(url, tmpdir, platform)
             text = transcribe_with_groq(audio_path, language)
     except yt_dlp.utils.DownloadError as e:
         return jsonify({"error": f"Error al descargar el vídeo: {e}"}), 400
@@ -144,49 +317,80 @@ def transcribe():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    # Guardar en historial
-    sid = get_session_id()
-    if sid:
-        db = get_db()
-        db.execute(
-            "INSERT INTO transcriptions (session_id, url, platform, language, text, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (sid, url, platform, language, text, datetime.now(timezone.utc).isoformat()),
-        )
-        db.commit()
+    # ── Actualizar contadores / saldo ─────────────────────────────────────────
+    is_unlimited = user and user.get("email", "").lower() in UNLIMITED_EMAILS
+    if user is None:
+        db.table("ip_usage").update(
+            {"used_today": ip_usage["used_today"] + 1}
+        ).eq("ip", ip).execute()
+    elif not is_unlimited:
+        if cost_cents > 0:
+            db.table("profiles").update(
+                {"credits_cents": profile["credits_cents"] - cost_cents}
+            ).eq("id", user["id"]).execute()
+        else:
+            db.table("profiles").update(
+                {"free_used_today": profile["free_used_today"] + 1}
+            ).eq("id", user["id"]).execute()
 
-    return jsonify({"text": text, "platform": platform})
+    # ── Guardar en historial ──────────────────────────────────────────────────
+    db.table("transcriptions").insert({
+        "user_id":    user["id"] if user else None,
+        "ip":         get_client_ip() if not user else None,
+        "url":        url,
+        "platform":   platform,
+        "language":   language,
+        "text":       text,
+        "cost_cents": cost_cents,
+    }).execute()
 
+    payload: dict = {"text": text, "platform": platform, "cost_cents": cost_cents}
+    if user:
+        updated = get_profile(user["id"])
+        payload["credits_cents"]   = updated["credits_cents"]
+        payload["free_used_today"] = updated["free_used_today"]
+    return jsonify(payload)
+
+
+# ── History routes ────────────────────────────────────────────────────────────
 
 @app.route("/history")
+@require_auth
 def history():
-    sid = get_session_id()
-    if not sid:
-        return jsonify([])
-    db = get_db()
-    rows = db.execute(
-        "SELECT id, url, platform, language, text, created_at FROM transcriptions WHERE session_id = ? ORDER BY id DESC LIMIT 50",
-        (sid,),
-    ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    user = current_user()
+    rows = (
+        db.table("transcriptions")
+        .select("id, url, platform, language, text, cost_cents, created_at")
+        .eq("user_id", user["id"])
+        .order("id", desc=True)
+        .limit(50)
+        .execute()
+    )
+    return jsonify(rows.data)
 
 
 @app.route("/history/<int:tid>", methods=["DELETE"])
+@require_auth
 def delete_transcription(tid: int):
-    sid = get_session_id()
-    db = get_db()
-    db.execute("DELETE FROM transcriptions WHERE id = ? AND session_id = ?", (tid, sid))
-    db.commit()
+    user = current_user()
+    db.table("transcriptions").delete().eq("id", tid).eq("user_id", user["id"]).execute()
     return jsonify({"ok": True})
 
 
 @app.route("/download/<int:tid>")
+@require_auth
 def download_transcription(tid: int):
-    sid = get_session_id()
-    db = get_db()
-    row = db.execute("SELECT url, text, created_at FROM transcriptions WHERE id = ? AND session_id = ?", (tid, sid)).fetchone()
-    if not row:
+    user = current_user()
+    result = (
+        db.table("transcriptions")
+        .select("url, text, created_at")
+        .eq("id", tid)
+        .eq("user_id", user["id"])
+        .execute()
+    )
+    if not result.data:
         return jsonify({"error": "No encontrado"}), 404
-
+    row = result.data[0]
     content = f"URL: {row['url']}\nFecha: {row['created_at']}\n\n{row['text']}"
     return Response(
         content,
@@ -195,10 +399,273 @@ def download_transcription(tid: int):
     )
 
 
-# ── Init ────────────────────────────────────────────────────────────────────
+# ── Stripe / payments ─────────────────────────────────────────────────────────
 
-init_db()
+@app.route("/checkout", methods=["POST"])
+@require_auth
+def create_checkout():
+    if not STRIPE_OK:
+        return jsonify({"error": "El sistema de pagos aún no está disponible. Vuelve pronto."}), 503
+
+    body        = request.get_json()
+    amount_key  = str(body.get("amount", "500"))
+    amount_cents = TOPUP_OPTIONS.get(amount_key)
+    if not amount_cents:
+        return jsonify({"error": "Cantidad no válida"}), 400
+
+    user = current_user()
+    try:
+        checkout_session = stripe_lib.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "eur",
+                    "product_data": {"name": f"Saldo Transcriptor — {amount_cents // 100}€"},
+                    "unit_amount": amount_cents,
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            success_url=request.host_url + "?topup=success",
+            cancel_url=request.host_url + "?topup=cancel",
+            metadata={"user_id": user["id"], "amount_cents": str(amount_cents)},
+        )
+        db.table("payments").insert({
+            "user_id":          user["id"],
+            "stripe_session_id": checkout_session.id,
+            "amount_cents":     amount_cents,
+            "status":           "pending",
+        }).execute()
+        return jsonify({"url": checkout_session.url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/stripe-webhook", methods=["POST"])
+def stripe_webhook():
+    if not STRIPE_OK or not STRIPE_WEBHOOK_SECRET:
+        return "", 200
+
+    payload    = request.get_data()
+    sig_header = request.headers.get("Stripe-Signature", "")
+
+    try:
+        event = stripe_lib.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except Exception:
+        return "", 400
+
+    if event["type"] == "checkout.session.completed":
+        obj               = event["data"]["object"]
+        stripe_session_id = obj["id"]
+        user_id           = obj["metadata"]["user_id"]
+        amount_cents      = int(obj["metadata"]["amount_cents"])
+
+        db.table("payments").update({
+            "status":                "completed",
+            "stripe_payment_intent": obj.get("payment_intent"),
+        }).eq("stripe_session_id", stripe_session_id).execute()
+
+        profile = get_profile(user_id)
+        db.table("profiles").update({
+            "credits_cents": profile["credits_cents"] + amount_cents
+        }).eq("id", user_id).execute()
+
+    return "", 200
+
+
+# ── Adapt route ───────────────────────────────────────────────────────────────
+
+STYLE_PROMPTS = {
+
+    "viral": (
+        "Eres un guionista de reels. Tu trabajo es reescribir este guión para máximo impacto. "
+        "Reglas: el hook tiene que parar el scroll en los primeros 3 segundos — sin preámbulo, sin 'hola', sin contexto. "
+        "El valor empieza de golpe después del hook, nunca hay transición. "
+        "La tensión se mantiene hasta el final desvelando el insight de forma progresiva, nunca de golpe. "
+        "Frases de máximo 15 palabras. Cierre contundente que ancla, sin CTA explícito. "
+        "Nunca uses: 'increíble', 'brutal', 'chicos', 'os va a flipar', 'en el panorama actual', "
+        "'es fundamental entender que', 'descubre cómo', 'cree en ti'. "
+        "El resultado tiene que poder leerse frase por frase con viñetas (▸). "
+        "Si lo lees en voz alta y no para el scroll en los primeros 3 segundos, reescríbelo. "
+        "Devuelve ÚNICAMENTE el guión reescrito, nada más."
+    ),
+
+    "divertido": (
+        "Eres un guionista de reels. Reescribe este guión con el tono de alguien que cuenta algo en un bar a un colega — sin filtro, sin pose. "
+        "Reglas: incluye muletillas naturales donde salgan solas, no forzadas. "
+        "Mete al menos un momento de ironía seca o humor que salga de la situación, nunca un chiste preparado. "
+        "Si hay un error propio que contar, cuéntalo dentro del desarrollo, nunca al principio. "
+        "Las frases incompletas que se corrigen son bienvenidas: 'Es como si... bueno, te lo explico de otra forma.' "
+        "Nunca uses entusiasmo artificial, emojis, exclamaciones ni motivacional. "
+        "El guión tiene que sonar exactamente igual que un audio de WhatsApp a un colega. "
+        "Si lo lees en voz alta y suena raro o artificial, reescríbelo. "
+        "Devuelve ÚNICAMENTE el guión reescrito, nada más."
+    ),
+
+    "linkedin": (
+        "Eres un guionista de contenido. Reescribe este guión en formato LinkedIn: tono profesional pero directo, sin distancia. "
+        "Primera persona siempre. Una sola idea, desarrollada con lógica clara. "
+        "Datos concretos si los hay — ningún dato inventado. "
+        "Párrafos de máximo 2-3 líneas con espacio entre ellos. "
+        "Sin frases vacías ('en el panorama actual', 'es fundamental', 'cabe destacar', 'valor añadido', 'solución integral'). "
+        "Sin motivacional. Cierre que deja una pregunta abierta o una afirmación que genera reacción — nunca una conclusión envuelta en papel de regalo. "
+        "El lector tiene que terminar pensando, no sintiéndose inspirado. "
+        "Devuelve ÚNICAMENTE el texto listo para publicar, nada más."
+    ),
+
+    "storytelling": (
+        "Eres un guionista de reels. Reescribe este guión como una historia real con escena concreta. "
+        "Reglas: empieza en el momento exacto donde ocurre algo — no con contexto ni presentación. "
+        "Muestra el error o el problema desde dentro: qué pensabas en ese momento, qué hiciste, qué pasó. "
+        "El insight tiene que salir de la historia de forma natural, nunca explicado por encima como moraleja. "
+        "Tensión narrativa: el lector tiene que querer saber qué pasó después. "
+        "Sin 'y esto me enseñó que...', sin conclusiones explícitas, sin motivacional. "
+        "El cierre es una frase corta que deja el peso de la historia caer. "
+        "Si la historia no genera tensión, no es una historia — es un resumen. Reescríbela. "
+        "Devuelve ÚNICAMENTE la historia, nada más."
+    ),
+
+    "hooks": (
+        "Eres un guionista de reels. Dame exactamente 5 hooks para este guión, uno de cada tipo. "
+        "Reglas para todos: tienen que incluir términos específicos del nicho para filtrar a la audiencia correcta desde el primer segundo. "
+        "Ningún hook puede dar el valor completo — si el viewer puede llevarse el insight sin ver el vídeo, el hook falla. "
+        "Formato: [TIPO] 'hook'. "
+        "Los 5 tipos — "
+        "TRANSFORMACIÓN: salto de A a B con dato concreto y creíble. "
+        "NEGATIVO: ataca una creencia instalada en el nicho. "
+        "ENEMIGO: el error que sigue cometiendo la audiencia. "
+        "CURIOSIDAD: abre una puerta sin revelar nada, obliga a seguir para entender. "
+        "PROMESA: resultado concreto y específico con condición real. "
+        "Devuelve ÚNICAMENTE los 5 hooks con su etiqueta, nada más."
+    ),
+
+}
+
+# Instrucciones base para el estilo Custom (se anteponen a las instrucciones del usuario)
+CUSTOM_BASE = (
+    "Eres un guionista de reels. "
+    "Reglas que aplican siempre independientemente de las instrucciones custom: "
+    "nunca 'chicos', 'increíble', 'brutal', 'en el panorama actual', 'es fundamental entender que', "
+    "'descubre cómo', 'cree en ti', 'todo es posible'. "
+    "Nunca empezar con 'Hola', 'En este vídeo' o 'Hoy vamos a hablar de'. "
+    "El guión va frase por frase con viñetas (▸). Cada frase máximo 15 palabras. "
+    "El valor empieza después del hook sin transición. "
+    "Momentos personales van dentro del desarrollo, nunca al principio. "
+    "Si lo lees en voz alta y suena a texto escrito, reescríbelo. "
+    "Devuelve ÚNICAMENTE el guión reescrito, nada más. "
+    "Ahora aplica estas instrucciones adicionales:\n"
+)
+
+
+def adapt_with_ai(text: str, style: str, custom_prompt: str = "") -> str:
+    if style == "custom":
+        if not custom_prompt:
+            raise ValueError("Escribe tus instrucciones en el campo Custom")
+        system = CUSTOM_BASE + custom_prompt
+    else:
+        system = STYLE_PROMPTS.get(style)
+        if not system:
+            raise ValueError("Estilo no válido")
+
+    api_key = OPENROUTER_API_KEY or GROQ_API_KEY
+    url     = OPENROUTER_URL if OPENROUTER_API_KEY else "https://api.groq.com/openai/v1/chat/completions"
+    model   = OPENROUTER_MODEL if OPENROUTER_API_KEY else "llama-3.3-70b-versatile"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        **({"HTTP-Referer": "https://reelscript.net", "X-Title": "ReelScript"} if OPENROUTER_API_KEY else {}),
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": text},
+        ],
+        "temperature": 0.8,
+        "max_tokens": 1024,
+    }
+    resp = requests.post(url, headers=headers, json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
+@app.route("/adapt", methods=["POST"])
+def adapt():
+    body          = request.get_json()
+    text          = (body.get("text") or "").strip()
+    style         = (body.get("style") or "").strip()
+    custom_prompt = (body.get("custom_prompt") or "").strip()
+
+    if not text:
+        return jsonify({"error": "Debes proporcionar un guión"}), 400
+    if not GROQ_API_KEY:
+        return jsonify({"error": "GROQ_API_KEY no configurada"}), 500
+    if not style and not custom_prompt:
+        return jsonify({"error": "Selecciona un estilo"}), 400
+
+    user = current_user()
+    cost_cents = 0
+
+    # Misma lógica de límites que /transcribe
+    if user and user.get("email", "").lower() in UNLIMITED_EMAILS:
+        pass  # sin límite ni coste para cuentas admin
+    elif user is None:
+        ip       = get_client_ip()
+        ip_usage = get_or_reset_ip_usage(ip)
+        if ip_usage["used_today"] >= FREE_DAILY_ANON:
+            return jsonify({
+                "error": f"Límite diario alcanzado. Regístrate para obtener más usos gratuitos."
+            }), 429
+    else:
+        profile = get_profile(user["id"])
+        if profile["credits_cents"] >= COST_CENTS:
+            cost_cents = COST_CENTS
+        elif profile["free_used_today"] < FREE_DAILY_USER:
+            cost_cents = 0
+        else:
+            return jsonify({
+                "error": "Has usado tus transcripciones gratuitas de hoy. Recarga saldo para continuar."
+            }), 429
+
+    try:
+        result = adapt_with_ai(text, style, custom_prompt)
+    except requests.HTTPError as e:
+        return jsonify({"error": f"Error de la API: {e}"}), 502
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    # Actualizar contadores
+    is_unlimited = user and user.get("email", "").lower() in UNLIMITED_EMAILS
+    if user is None:
+        db.table("ip_usage").update(
+            {"used_today": ip_usage["used_today"] + 1}
+        ).eq("ip", ip).execute()
+    elif not is_unlimited:
+        if cost_cents > 0:
+            db.table("profiles").update(
+                {"credits_cents": profile["credits_cents"] - cost_cents}
+            ).eq("id", user["id"]).execute()
+        else:
+            db.table("profiles").update(
+                {"free_used_today": profile["free_used_today"] + 1}
+            ).eq("id", user["id"]).execute()
+
+    payload: dict = {"result": result, "cost_cents": cost_cents}
+    if user:
+        updated = get_profile(user["id"])
+        payload["credits_cents"]   = updated["credits_cents"]
+        payload["free_used_today"] = updated["free_used_today"]
+    return jsonify(payload)
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 5555))
     app.run(debug=True, host="0.0.0.0", port=port)

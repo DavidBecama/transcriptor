@@ -1,3 +1,6 @@
 flask>=3.0
 yt-dlp>=2024.1.0
 requests>=2.31
+supabase>=2.0.0
+stripe>=8.0.0
+python-dotenv>=1.0.0
