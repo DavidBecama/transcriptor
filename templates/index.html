@@ -2054,42 +2054,11 @@ function animateCounter() {
   }, 10000 + Math.random() * 5000);
 }
 
-// ── Marquee ───────────────────────────────────────────────────────────────
-function initMarquee() {
-  const items = [
-    ["🎯", "Saqué el guión completo de mi competencia en 10 segundos"],
-    ["🔥", "Convertí una transcripción en 5 hooks de LinkedIn"],
-    ["😂", "Transformé un reel aburrido en contenido divertidísimo"],
-    ["📖", "Generé una historia completa desde un vídeo de 30 segundos"],
-    ["💼", "Adapté contenido viral para mi perfil profesional"],
-    ["🪝", "Conseguí 5 ideas de hooks distintos de un solo reel"],
-    ["⚡", "Transcripción lista antes de que terminara el café"],
-    ["🎬", "Analicé los 10 mejores reels de mi sector en una tarde"],
-    ["✍️", "Reescribí el guión en tono informal y triplicó el engagement"],
-    ["📈", "De reel a hilo de Twitter en menos de un minuto"],
-  ];
-  const track = document.getElementById("marqueeTrack");
-  const doubled = [...items, ...items];
-  track.innerHTML = doubled.map(([icon, txt]) =>
-    `<div class="marquee-item"><span>${icon}</span>${txt}</div>`
-  ).join("");
-}
+// ── Marquee (removed) ─────────────────────────────────────────────────────
 
 // ── Demo animation ────────────────────────────────────────────────────────
 async function initDemo() {
-  await delay(800);
-  const text = "Llevo 3 años creando contenido y nadie me había contado esto. La diferencia entre los creadores que crecen y los que se estancan no es el talento, es saber reutilizar lo que ya funciona.";
-  const el = document.getElementById("demoTranscript");
-  el.innerHTML = '<span class="cursor"></span>';
-  for (const ch of text) {
-    el.innerHTML = el.innerHTML.replace('<span class="cursor"></span>', '') + ch + '<span class="cursor"></span>';
-    await delay(28);
-  }
-  // Reveal style cards
-  await delay(600);
-  document.querySelectorAll(".style-card").forEach((card) => {
-    setTimeout(() => card.classList.add("reveal"), parseInt(card.dataset.delay));
-  });
+  // Demo transcript element was removed — noop
 }
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -2396,7 +2365,6 @@ async function doTranscribe() {
   if (!url) { showToast("Pega una URL primero"); return; }
 
   const btn     = document.getElementById("btnTranscribe");
-  const spinner = document.getElementById("spinner");
   const box     = document.getElementById("resultBox");
   const txt     = document.getElementById("resultTxt");
   const acts    = document.getElementById("resultActs");
