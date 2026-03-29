@@ -5,12 +5,19 @@
 
 -- Perfiles: saldo + contador gratuito diario
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id               UUID    PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  credits_cents    INTEGER NOT NULL DEFAULT 0,
-  free_used_today  INTEGER NOT NULL DEFAULT 0,
-  free_reset_date  DATE    NOT NULL DEFAULT CURRENT_DATE,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                      UUID    PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  credits_cents           INTEGER NOT NULL DEFAULT 0,
+  free_used_today         INTEGER NOT NULL DEFAULT 0,
+  free_reset_date         DATE    NOT NULL DEFAULT CURRENT_DATE,
+  free_adapt_used_today   INTEGER NOT NULL DEFAULT 0,
+  free_adapt_reset_date   DATE    NOT NULL DEFAULT CURRENT_DATE,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migración: añadir columnas a tabla existente
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS free_adapt_used_today INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS free_adapt_reset_date DATE NOT NULL DEFAULT CURRENT_DATE;
 
 -- Trigger: crear perfil automáticamente al registrarse
 CREATE OR REPLACE FUNCTION public.handle_new_user()

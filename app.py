@@ -33,9 +33,10 @@ APIFY_TOKEN           = os.environ.get("APIFY_TOKEN", "")
 STRIPE_SECRET_KEY     = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
-FREE_DAILY_ANON = 2   # transcripciones/día sin cuenta (por IP)
-FREE_DAILY_USER = 2   # transcripciones/día con cuenta gratuita
-COST_CENTS      = 8   # €0.08 por transcripción de pago
+FREE_DAILY_ANON  = 3   # transcripciones gratis para anónimos
+FREE_DAILY_USER  = 5   # transcripciones gratis para registrados
+FREE_DAILY_ADAPT = 5   # adaptaciones gratis para registrados (hazlo tuyo)
+COST_CENTS       = 8   # €0.08 por uso de pago
 
 UNLIMITED_EMAILS = {"davidmiragito@gmail.com"}  # sin límite ni coste
 
@@ -68,19 +69,29 @@ def require_auth(f):
 
 
 def get_profile(user_id: str) -> dict:
-    """Devuelve el perfil del usuario, reseteando el contador diario si hace falta."""
+    """Devuelve el perfil del usuario, reseteando los contadores diarios si hace falta."""
     result = db.table("profiles").select("*").eq("id", user_id).execute()
     if not result.data:
         db.table("profiles").insert({"id": user_id}).execute()
-        return {"id": user_id, "credits_cents": 0, "free_used_today": 0,
-                "free_reset_date": str(date.today())}
+        return {"id": user_id, "credits_cents": 0,
+                "free_used_today": 0, "free_adapt_used_today": 0,
+                "free_reset_date": str(date.today()),
+                "free_adapt_reset_date": str(date.today())}
     profile = result.data[0]
-    if profile["free_reset_date"] != str(date.today()):
-        db.table("profiles").update({
-            "free_used_today": 0,
-            "free_reset_date": str(date.today()),
-        }).eq("id", user_id).execute()
+    updates = {}
+    if profile.get("free_reset_date") != str(date.today()):
+        updates["free_used_today"] = 0
+        updates["free_reset_date"] = str(date.today())
         profile["free_used_today"] = 0
+    if profile.get("free_adapt_reset_date") != str(date.today()):
+        updates["free_adapt_used_today"] = 0
+        updates["free_adapt_reset_date"] = str(date.today())
+        profile["free_adapt_used_today"] = 0
+    if updates:
+        db.table("profiles").update(updates).eq("id", user_id).execute()
+    # Garantizar que los campos existen aunque la columna sea nueva
+    profile.setdefault("free_adapt_used_today", 0)
+    profile.setdefault("free_adapt_reset_date", str(date.today()))
     return profile
 
 
@@ -290,19 +301,19 @@ def transcribe():
         ip_usage = get_or_reset_ip_usage(ip)
         if ip_usage["used_today"] >= FREE_DAILY_ANON:
             return jsonify({
-                "error": f"Límite diario alcanzado ({FREE_DAILY_ANON} gratis/día sin cuenta). "
-                         "Regístrate para obtener más transcripciones gratuitas."
+                "error": f"Has usado tus {FREE_DAILY_ANON} transcripciones gratuitas de hoy. "
+                         f"Regístrate para conseguir {FREE_DAILY_USER} al día."
             }), 429
     else:
         profile = get_profile(user["id"])
         if profile["credits_cents"] >= COST_CENTS:
-            cost_cents = COST_CENTS  # se descuenta tras éxito
+            cost_cents = COST_CENTS
         elif profile["free_used_today"] < FREE_DAILY_USER:
             cost_cents = 0
         else:
             return jsonify({
                 "error": f"Has usado tus {FREE_DAILY_USER} transcripciones gratuitas de hoy. "
-                         "Recarga saldo para continuar sin límite."
+                         "Recarga saldo para continuar."
             }), 429
 
     # ── Descargar y transcribir ───────────────────────────────────────────────
@@ -646,25 +657,23 @@ def adapt():
     user = current_user()
     cost_cents = 0
 
-    # Misma lógica de límites que /transcribe
+    # ── Comprobar límites / saldo (adapt usa free_adapt_used_today) ──────────
     if user and user.get("email", "").lower() in UNLIMITED_EMAILS:
         pass  # sin límite ni coste para cuentas admin
     elif user is None:
-        ip       = get_client_ip()
-        ip_usage = get_or_reset_ip_usage(ip)
-        if ip_usage["used_today"] >= FREE_DAILY_ANON:
-            return jsonify({
-                "error": f"Límite diario alcanzado. Regístrate para obtener más usos gratuitos."
-            }), 429
+        return jsonify({
+            "error": "Regístrate gratis para usar Hazlo tuyo."
+        }), 429
     else:
         profile = get_profile(user["id"])
         if profile["credits_cents"] >= COST_CENTS:
             cost_cents = COST_CENTS
-        elif profile["free_used_today"] < FREE_DAILY_USER:
+        elif profile.get("free_adapt_used_today", 0) < FREE_DAILY_ADAPT:
             cost_cents = 0
         else:
             return jsonify({
-                "error": "Has usado tus transcripciones gratuitas de hoy. Recarga saldo para continuar."
+                "error": f"Has usado tus {FREE_DAILY_ADAPT} adaptaciones gratuitas de hoy. "
+                         "Recarga saldo para continuar."
             }), 429
 
     try:
@@ -676,18 +685,14 @@ def adapt():
 
     # Actualizar contadores
     is_unlimited = user and user.get("email", "").lower() in UNLIMITED_EMAILS
-    if user is None:
-        db.table("ip_usage").update(
-            {"used_today": ip_usage["used_today"] + 1}
-        ).eq("ip", ip).execute()
-    elif not is_unlimited:
+    if not is_unlimited and user:
         if cost_cents > 0:
             db.table("profiles").update(
                 {"credits_cents": profile["credits_cents"] - cost_cents}
             ).eq("id", user["id"]).execute()
         else:
             db.table("profiles").update(
-                {"free_used_today": profile["free_used_today"] + 1}
+                {"free_adapt_used_today": profile.get("free_adapt_used_today", 0) + 1}
             ).eq("id", user["id"]).execute()
 
     payload: dict = {"result": result, "cost_cents": cost_cents}
