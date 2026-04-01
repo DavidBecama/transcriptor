@@ -14,7 +14,6 @@ from flask import Flask, Response, jsonify, render_template, request, session
 load_dotenv()
 
 from supabase import create_client, Client  # noqa: E402 (after dotenv)
-from tasks import transcribe_task  # noqa: E402
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", uuid.uuid4().hex)
@@ -271,6 +270,8 @@ def auth_me():
 
 
 # ── Transcription route ───────────────────────────────────────────────────────
+
+from tasks import transcribe_task  # noqa: E402
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
