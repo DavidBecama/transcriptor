@@ -2364,10 +2364,10 @@ async function doTranscribe() {
   const lang = document.getElementById("language").value;
   if (!url) { showToast("Pega una URL primero"); return; }
 
-  const btn     = document.getElementById("btnTranscribe");
-  const box     = document.getElementById("resultBox");
-  const txt     = document.getElementById("resultTxt");
-  const acts    = document.getElementById("resultActs");
+  const btn  = document.getElementById("btnTranscribe");
+  const box  = document.getElementById("resultBox");
+  const txt  = document.getElementById("resultTxt");
+  const acts = document.getElementById("resultActs");
 
   btn.disabled = true;
   showLoading();
@@ -2376,8 +2376,10 @@ async function doTranscribe() {
   acts.innerHTML = "";
 
   try {
+    // 1. Encolar tarea
     const res = await fetch("/transcribe", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, language: lang }),
     });
     const d = await res.json();
@@ -2385,32 +2387,75 @@ async function doTranscribe() {
     if (!res.ok) {
       txt.classList.add("err");
       txt.textContent = d.error || "Error desconocido";
+      hideLoading(false);
+      box.classList.add("on");
+      btn.disabled = false;
+      return;
+    }
+
+    const taskId = d.task_id;
+
+    // 2. Polling hasta que termine
+    const result = await new Promise((resolve) => {
+      const interval = setInterval(async () => {
+        try {
+          const r = await fetch(`/task/${taskId}`);
+          const s = await r.json();
+
+          if (s.state === "progress" || s.state === "pending") {
+            const msg = document.getElementById("loadingMsg");
+            if (msg && s.step) msg.textContent = s.step;
+            return;
+          }
+
+          clearInterval(interval);
+          resolve(s);
+        } catch {
+          clearInterval(interval);
+          resolve({ state: "error", error: "Error de conexión." });
+        }
+      }, 2000);
+    });
+
+    // 3. Mostrar resultado
+    if (result.state === "error") {
+      txt.classList.add("err");
+      txt.textContent = result.error || "Error desconocido";
     } else {
-      txt.textContent = d.text;
-      if (d.credits_cents !== undefined) {
-        st.credits = d.credits_cents; st.freeUsed = d.free_used_today;
-        document.getElementById("balDisp").textContent = usos(d.credits_cents);
+      txt.textContent = result.text;
+      if (result.credits_cents !== undefined) {
+        st.credits = result.credits_cents;
+        st.freeUsed = result.free_used_today;
+        document.getElementById("balDisp").textContent = usos(result.credits_cents);
         renderFreeBar();
       } else renderFreeBar();
 
       acts.appendChild(mkBtn("Copiar texto", b => {
-        navigator.clipboard.writeText(d.text);
-        b.textContent = "¡Copiado!"; setTimeout(() => (b.textContent = "Copiar texto"), 2000);
+        navigator.clipboard.writeText(result.text);
+        b.textContent = "¡Copiado!";
+        setTimeout(() => (b.textContent = "Copiar texto"), 2000);
       }));
-      // Show inline transform section
+
       document.getElementById("transformSection").style.display = "block";
       document.getElementById("transformResult").classList.remove("on");
       document.getElementById("inlineSpinner").classList.remove("on");
       document.querySelectorAll(".style-chip").forEach(c => c.classList.remove("act"));
       document.getElementById("customChipRow").classList.remove("on");
+
       if (d.cost_cents > 0) {
         const t = document.createElement("span");
-        t.className = "cost-tag"; t.textContent = `−${eur(d.cost_cents)} de saldo`;
+        t.className = "cost-tag";
+        t.textContent = `−${eur(d.cost_cents)} de saldo`;
         acts.appendChild(t);
       }
+
       if (st.user) loadHistory();
     }
-  } catch { txt.classList.add("err"); txt.textContent = "Error de conexión."; }
+
+  } catch {
+    txt.classList.add("err");
+    txt.textContent = "Error de conexión.";
+  }
 
   hideLoading(!txt.classList.contains("err"));
   box.classList.add("on");

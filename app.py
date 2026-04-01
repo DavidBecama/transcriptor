@@ -14,6 +14,7 @@ from flask import Flask, Response, jsonify, render_template, request, session
 load_dotenv()
 
 from supabase import create_client, Client  # noqa: E402 (after dotenv)
+from tasks import transcribe_task  # noqa: E402
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", uuid.uuid4().hex)
@@ -273,8 +274,8 @@ def auth_me():
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
-    body     = request.get_json()
-    url      = (body.get("url") or "").strip()
+    body = request.get_json()
+    url = (body.get("url") or "").strip()
     language = (body.get("language") or "").strip() or None
 
     if not url:
@@ -283,7 +284,6 @@ def transcribe():
         return jsonify({"error": "GROQ_API_KEY no configurada en el servidor"}), 500
 
     platform = detect_platform(url)
-
     if platform == "youtube":
         return jsonify({
             "error": "YouTube estará disponible próximamente en el plan de pago. "
@@ -291,51 +291,42 @@ def transcribe():
         }), 400
 
     user = current_user()
-    cost_cents = 0
 
-    # ── Comprobar límites / saldo ─────────────────────────────────────────────
+    # ── Comprobar límites / saldo ─────────────────────────────────────────
     if user and user.get("email", "").lower() in UNLIMITED_EMAILS:
-        pass  # sin límite ni coste para cuentas admin
+        pass
     elif user is None:
-        ip       = get_client_ip()
+        ip = get_client_ip()
         ip_usage = get_or_reset_ip_usage(ip)
         if ip_usage["used_today"] >= FREE_DAILY_ANON:
             return jsonify({
-                "error": f"Has usado tus {FREE_DAILY_ANON} transcripciones gratuitas de hoy. "
-                         f"Regístrate para conseguir {FREE_DAILY_USER} al día."
+                "error": f"Límite diario alcanzado ({FREE_DAILY_ANON} gratis/día sin cuenta). "
+                         "Regístrate para obtener más transcripciones gratuitas."
             }), 429
     else:
         profile = get_profile(user["id"])
         if profile["credits_cents"] >= COST_CENTS:
-            cost_cents = COST_CENTS
+            pass
         elif profile["free_used_today"] < FREE_DAILY_USER:
-            cost_cents = 0
+            pass
         else:
             return jsonify({
                 "error": f"Has usado tus {FREE_DAILY_USER} transcripciones gratuitas de hoy. "
-                         "Recarga saldo para continuar."
+                         "Recarga saldo para continuar sin límite."
             }), 429
 
-    # ── Descargar y transcribir ───────────────────────────────────────────────
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            audio_path = download_audio(url, tmpdir, platform)
-            text = transcribe_with_groq(audio_path, language)
-    except yt_dlp.utils.DownloadError as e:
-        return jsonify({"error": f"Error al descargar el vídeo: {e}"}), 400
-    except requests.HTTPError as e:
-        return jsonify({"error": f"Error de la API de Groq: {e}"}), 502
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-    # ── Actualizar contadores / saldo ─────────────────────────────────────────
+    # ── Actualizar contador antes de encolar ──────────────────────────────
     is_unlimited = user and user.get("email", "").lower() in UNLIMITED_EMAILS
+    cost_cents = 0
+
     if user is None:
         db.table("ip_usage").update(
             {"used_today": ip_usage["used_today"] + 1}
         ).eq("ip", ip).execute()
     elif not is_unlimited:
-        if cost_cents > 0:
+        profile = get_profile(user["id"])
+        if profile["credits_cents"] >= COST_CENTS:
+            cost_cents = COST_CENTS
             db.table("profiles").update(
                 {"credits_cents": profile["credits_cents"] - cost_cents}
             ).eq("id", user["id"]).execute()
@@ -344,23 +335,40 @@ def transcribe():
                 {"free_used_today": profile["free_used_today"] + 1}
             ).eq("id", user["id"]).execute()
 
-    # ── Guardar en historial ──────────────────────────────────────────────────
-    db.table("transcriptions").insert({
-        "user_id":    user["id"] if user else None,
-        "ip":         get_client_ip() if not user else None,
-        "url":        url,
-        "platform":   platform,
-        "language":   language,
-        "text":       text,
-        "cost_cents": cost_cents,
-    }).execute()
+    # ── Encolar tarea ─────────────────────────────────────────────────────
+    task = transcribe_task.delay(
+        url,
+        language,
+        user["id"] if user else None,
+        get_client_ip() if not user else None,
+    )
 
-    payload: dict = {"text": text, "platform": platform, "cost_cents": cost_cents}
-    if user:
-        updated = get_profile(user["id"])
-        payload["credits_cents"]   = updated["credits_cents"]
-        payload["free_used_today"] = updated["free_used_today"]
-    return jsonify(payload)
+    return jsonify({"task_id": task.id, "cost_cents": cost_cents})
+
+
+@app.route("/task/<task_id>")
+def task_status(task_id):
+    task = transcribe_task.AsyncResult(task_id)
+
+    if task.state == "PENDING":
+        return jsonify({"state": "pending", "step": "En cola..."})
+    elif task.state == "PROGRESS":
+        return jsonify({"state": "progress", "step": task.info.get("step", "Procesando...")})
+    elif task.state == "SUCCESS":
+        result = task.result
+        if not result.get("ok"):
+            return jsonify({"state": "error", "error": result.get("error", "Error desconocido")})
+        payload = {"state": "success", "text": result["text"], "platform": result["platform"]}
+        user = current_user()
+        if user:
+            updated = get_profile(user["id"])
+            payload["credits_cents"] = updated["credits_cents"]
+            payload["free_used_today"] = updated["free_used_today"]
+        return jsonify(payload)
+    elif task.state == "FAILURE":
+        return jsonify({"state": "error", "error": str(task.info)})
+    else:
+        return jsonify({"state": "progress", "step": "Procesando..."})
 
 
 # ── History routes ────────────────────────────────────────────────────────────

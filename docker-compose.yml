@@ -1,14 +1,36 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    networks:
+      - traefik-public
+
   app:
     build: .
     restart: always
     env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
     labels:
       - traefik.enable=true
       - traefik.http.routers.reelscript.rule=Host(`reelscript.net`) || Host(`www.reelscript.net`)
       - traefik.http.routers.reelscript.entrypoints=websecure
       - traefik.http.routers.reelscript.tls.certresolver=le
       - traefik.http.services.reelscript.loadbalancer.server.port=5555
+    networks:
+      - traefik-public
+
+  worker:
+    build: .
+    restart: always
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    command: celery -A tasks worker --loglevel=info --concurrency=4
     networks:
       - traefik-public
 
