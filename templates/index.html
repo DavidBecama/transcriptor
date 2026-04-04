@@ -1361,6 +1361,94 @@
       .adapt-section { padding: 60px 16px; }
       .hist-inner  { padding: 20px 16px; }
     }
+
+    /* ── Onboarding Tour ─────────────────────────────────────── */
+    .tour-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.6);
+      z-index: 10000; transition: opacity .25s;
+    }
+    .tour-highlight {
+      position: relative; z-index: 10001;
+      box-shadow: 0 0 0 4px rgba(249,115,22,.5), 0 0 24px rgba(249,115,22,.25);
+      border-radius: var(--rsm); transition: box-shadow .3s;
+    }
+    .tour-tooltip {
+      position: absolute; z-index: 10002;
+      background: var(--surf); border: 1.5px solid var(--border);
+      border-radius: var(--r); padding: 20px 22px 16px;
+      max-width: 340px; width: max-content;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+      font-size: .9rem; color: var(--text); line-height: 1.55;
+    }
+    .tour-tooltip::before {
+      content: ""; position: absolute; width: 12px; height: 12px;
+      background: var(--surf); border: 1.5px solid var(--border);
+      transform: rotate(45deg);
+    }
+    .tour-tooltip[data-pos="bottom"]::before { top: -7px; left: 24px; border-right: none; border-bottom: none; }
+    .tour-tooltip[data-pos="top"]::before { bottom: -7px; left: 24px; border-left: none; border-top: none; }
+    .tour-step-count { font-size: .75rem; color: var(--text3); margin-bottom: 8px; }
+    .tour-text { margin-bottom: 16px; }
+    .tour-btns { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .tour-btn {
+      padding: 7px 16px; border-radius: var(--rsm); font-size: .82rem;
+      font-weight: 700; cursor: pointer; border: none; transition: opacity .2s;
+    }
+    .tour-btn:hover { opacity: .85; }
+    .tour-btn-skip { background: transparent; color: var(--text3); }
+    .tour-btn-prev { background: var(--surf2); color: var(--text); border: 1px solid var(--border); }
+    .tour-btn-next { background: var(--grad); color: #fff; }
+    .tour-progress { display: flex; gap: 5px; margin-right: auto; }
+    .tour-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--border); transition: background .2s;
+    }
+    .tour-dot.active { background: var(--purple); }
+
+    /* Tutorial button */
+    .btn-tutorial {
+      position: fixed; bottom: 16px; right: 16px; z-index: 200;
+      background: var(--surf); border: 1px solid var(--border);
+      color: var(--text3); font-size: .78rem; padding: 7px 14px;
+      border-radius: var(--rsm); cursor: pointer; transition: all .2s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .btn-tutorial:hover { color: var(--text); border-color: var(--purple); }
+
+    /* Tutorial modal */
+    .tut-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      z-index: 10500; display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .tut-modal-overlay.on { display: flex; }
+    .tut-modal {
+      background: var(--surf); border-radius: var(--r); width: 100%; max-width: 680px;
+      overflow: hidden; position: relative; border: 1px solid var(--border);
+    }
+    .tut-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .tut-modal-header h3 { font-size: 1rem; font-weight: 800; margin: 0; }
+    .tut-modal-x {
+      background: none; border: none; color: var(--text3); font-size: 1.2rem;
+      cursor: pointer; padding: 4px;
+    }
+    .tut-modal-x:hover { color: var(--text); }
+    .tut-video-wrap {
+      position: relative; width: 100%; padding-bottom: 56.25%; background: #000;
+    }
+    .tut-video-wrap iframe {
+      position: absolute; inset: 0; width: 100%; height: 100%; border: none;
+    }
+    .tut-modal-footer {
+      padding: 14px 20px; text-align: center; border-top: 1px solid var(--border);
+    }
+    .tut-modal-footer button {
+      background: none; border: none; color: var(--purple);
+      font-size: .85rem; font-weight: 700; cursor: pointer; text-decoration: underline;
+    }
+    .tut-modal-footer button:hover { opacity: .8; }
   </style>
 </head>
 <body>
@@ -1412,7 +1500,7 @@
   <!-- Input -->
   <div class="hero-input-wrap">
     <div class="input-glow-wrap">
-      <input id="urlInput" type="url"
+      <input id="urlInput" type="url" data-tour="url-input"
         placeholder="🔗 Pega aquí tu reel de Instagram o TikTok..."
         autocomplete="off" spellcheck="false" />
       <span class="input-plat-icon" id="platIcon"></span>
@@ -1429,7 +1517,7 @@
         <option value="de">German</option>
         <option value="it">Italian</option>
       </select>
-      <button class="btn-shimmer inactive" id="btnTranscribe" style="flex:2" onclick="doTranscribe()" data-i18n="hero.btn">
+      <button class="btn-shimmer inactive" id="btnTranscribe" style="flex:2" onclick="doTranscribe()" data-i18n="hero.btn" data-tour="transcribe-button">
         ✦ Transcribe now
       </button>
     </div>
@@ -1456,7 +1544,7 @@
     </div>
 
     <!-- Result (with inline transform) -->
-    <div class="result-box" id="resultBox">
+    <div class="result-box" id="resultBox" data-tour="transcription-output">
       <div class="result-text" id="resultTxt"></div>
       <div class="result-actions" id="resultActs"></div>
 
@@ -1517,7 +1605,7 @@
       <textarea id="adaptInput" class="script-ta"
         placeholder="Pega aquí el guión o la transcripción que quieres transformar…"></textarea>
 
-      <div class="style-grid">
+      <div class="style-grid" data-tour="script-generator">
         <button class="style-pill" data-s="viral"
           onclick="selectStyle(this)" onmouseenter="previewStyle('viral')">
           <span class="sp-emoji">🔥</span>
@@ -1616,7 +1704,7 @@
           <div class="pf-dot"></div>
           <span id="previewFooterTxt">Ejemplo · El tuyo será único</span>
           <button class="pf-copy" id="pfCopyBtn" style="display:none" onclick="copyPreviewResult()">Copiar</button>
-          <button class="pf-copy" id="pfSaveBtn" style="display:none" onclick="saveScript()">💾 Guardar</button>
+          <button class="pf-copy" id="pfSaveBtn" style="display:none" onclick="saveScript()" data-tour="save-button">💾 Guardar</button>
         </div>
       </div>
     </div>
@@ -3057,6 +3145,185 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add("on");
   setTimeout(() => t.classList.remove("on"), 3000);
 }
+
+// ── Onboarding Tour ──────────────────────────────────────────────────────
+const TUTORIAL_VIDEO_URL = "https://www.youtube.com/embed/PLACEHOLDER";
+
+const TOUR_STEPS = [
+  { target: '[data-tour="url-input"]',            text: "Paste your Instagram reel link here to get started." },
+  { target: '[data-tour="transcribe-button"]',     text: "Hit transcribe and we'll extract the full audio text in seconds." },
+  { target: '[data-tour="transcription-output"]',  text: "Your transcription appears here. This is the raw text from the reel." },
+  { target: '[data-tour="script-generator"]',      text: "Choose a style and turn the transcription into your own script." },
+  { target: '[data-tour="save-button"]',           text: "Save your script to your profile and access it anytime." },
+];
+
+let tourStep = 0;
+let tourActive = false;
+let tourOverlay = null;
+let tourTooltip = null;
+
+function startTour() {
+  tourStep = 0;
+  tourActive = true;
+  // Create overlay
+  if (!tourOverlay) {
+    tourOverlay = document.createElement("div");
+    tourOverlay.className = "tour-overlay";
+    tourOverlay.addEventListener("click", skipTour);
+    document.body.appendChild(tourOverlay);
+  }
+  tourOverlay.style.display = "block";
+  // Create tooltip
+  if (!tourTooltip) {
+    tourTooltip = document.createElement("div");
+    tourTooltip.className = "tour-tooltip";
+    document.body.appendChild(tourTooltip);
+  }
+  showTourStep();
+}
+
+function showTourStep() {
+  const step = TOUR_STEPS[tourStep];
+  const el = document.querySelector(step.target);
+
+  // Remove previous highlight
+  document.querySelectorAll(".tour-highlight").forEach(e => e.classList.remove("tour-highlight"));
+
+  if (!el) { nextTourStep(); return; }
+
+  // Scroll into view & highlight
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.add("tour-highlight");
+
+  // Dots
+  const dots = TOUR_STEPS.map((_, i) =>
+    `<div class="tour-dot ${i === tourStep ? "active" : ""}"></div>`
+  ).join("");
+
+  // Buttons
+  const skipBtn = `<button class="tour-btn tour-btn-skip" onclick="skipTour()">Skip</button>`;
+  const prevBtn = tourStep > 0 ? `<button class="tour-btn tour-btn-prev" onclick="prevTourStep()">Back</button>` : "";
+  const nextLabel = tourStep === TOUR_STEPS.length - 1 ? "Done" : "Next";
+  const nextBtn = `<button class="tour-btn tour-btn-next" onclick="nextTourStep()">${nextLabel}</button>`;
+
+  tourTooltip.innerHTML = `
+    <div class="tour-step-count">Step ${tourStep + 1} of ${TOUR_STEPS.length}</div>
+    <div class="tour-text">${step.text}</div>
+    <div class="tour-btns">
+      <div class="tour-progress">${dots}</div>
+      ${skipBtn}${prevBtn}${nextBtn}
+    </div>
+  `;
+  tourTooltip.style.display = "block";
+
+  // Position tooltip
+  requestAnimationFrame(() => positionTooltip(el));
+}
+
+function positionTooltip(el) {
+  const r = el.getBoundingClientRect();
+  const tt = tourTooltip;
+  const gap = 14;
+
+  // Default: below the element
+  let top = r.bottom + gap + window.scrollY;
+  let left = r.left + window.scrollX;
+  let pos = "bottom";
+
+  // If not enough space below, show above
+  if (r.bottom + gap + 160 > window.innerHeight) {
+    top = r.top - gap + window.scrollY - tt.offsetHeight;
+    pos = "top";
+  }
+
+  // Keep within viewport horizontally
+  const maxLeft = window.innerWidth - tt.offsetWidth - 16;
+  if (left > maxLeft) left = maxLeft;
+  if (left < 16) left = 16;
+
+  tt.style.top = top + "px";
+  tt.style.left = left + "px";
+  tt.setAttribute("data-pos", pos);
+}
+
+function nextTourStep() {
+  if (tourStep >= TOUR_STEPS.length - 1) { endTour(); return; }
+  tourStep++;
+  showTourStep();
+}
+
+function prevTourStep() {
+  if (tourStep <= 0) return;
+  tourStep--;
+  showTourStep();
+}
+
+function skipTour() {
+  endTour();
+}
+
+function endTour() {
+  tourActive = false;
+  document.querySelectorAll(".tour-highlight").forEach(e => e.classList.remove("tour-highlight"));
+  if (tourOverlay) tourOverlay.style.display = "none";
+  if (tourTooltip) tourTooltip.style.display = "none";
+  localStorage.setItem("onboarding_completed", "true");
+}
+
+// Auto-start on first visit
+window.addEventListener("DOMContentLoaded", () => {
+  if (!localStorage.getItem("onboarding_completed")) {
+    setTimeout(startTour, 800);
+  }
+});
+
+// Tutorial modal
+function openTutorial() {
+  document.getElementById("tutorialOverlay").classList.add("on");
+}
+function closeTutorial() {
+  document.getElementById("tutorialOverlay").classList.remove("on");
+}
+function tutorialBackdrop(e) {
+  if (e.target === document.getElementById("tutorialOverlay")) closeTutorial();
+}
+function startTourFromModal() {
+  closeTutorial();
+  setTimeout(startTour, 200);
+}
+</script>
+
+<!-- Tutorial button -->
+<button class="btn-tutorial" onclick="openTutorial()">? Tutorial</button>
+
+<!-- Tutorial modal -->
+<div class="tut-modal-overlay" id="tutorialOverlay" onclick="tutorialBackdrop(event)">
+  <div class="tut-modal">
+    <div class="tut-modal-header">
+      <h3>How to use ReelScript</h3>
+      <button class="tut-modal-x" onclick="closeTutorial()">&#10005;</button>
+    </div>
+    <div class="tut-video-wrap">
+      <iframe src="" id="tutorialIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+    <div class="tut-modal-footer">
+      <button onclick="startTourFromModal()">Take the interactive tour instead</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Load video only when modal opens to avoid autoplay
+const _origOpenTut = openTutorial;
+openTutorial = function() {
+  document.getElementById("tutorialIframe").src = TUTORIAL_VIDEO_URL;
+  _origOpenTut();
+};
+const _origCloseTut = closeTutorial;
+closeTutorial = function() {
+  document.getElementById("tutorialIframe").src = "";
+  _origCloseTut();
+};
 </script>
 </body>
 </html>
