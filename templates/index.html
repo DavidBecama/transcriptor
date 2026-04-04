@@ -1528,6 +1528,99 @@
     }
     .proj-card-acts { display: flex; gap: 6px; margin-top: 10px; }
 
+    /* ── Project detail view ───────────────────────────── */
+    .proj-detail-overlay {
+      position: fixed; inset: 0; background: var(--bg); z-index: 310;
+      overflow-y: auto; display: none;
+    }
+    .proj-detail-overlay.on { display: block; }
+    .proj-detail-inner {
+      max-width: 900px; margin: 0 auto; padding: 24px 20px 60px;
+    }
+    .proj-detail-top {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+    }
+    .proj-detail-back {
+      background: none; border: 1px solid var(--border); color: var(--text2);
+      padding: 6px 12px; border-radius: var(--rsm); cursor: pointer; font-size: .85rem;
+    }
+    .proj-detail-back:hover { border-color: var(--purple); color: var(--text); }
+    .proj-detail-name {
+      font-size: 1.3rem; font-weight: 900; color: var(--text);
+      background: none; border: none; border-bottom: 2px solid transparent;
+      outline: none; flex: 1; min-width: 0;
+    }
+    .proj-detail-name:focus { border-bottom-color: var(--purple); }
+    .proj-detail-del {
+      background: none; border: 1px solid rgba(239,68,68,.3); color: #f87171;
+      padding: 6px 14px; border-radius: var(--rsm); cursor: pointer; font-size: .8rem;
+    }
+    .proj-detail-del:hover { background: rgba(239,68,68,.1); }
+    .proj-detail-style {
+      margin-bottom: 20px;
+    }
+    .proj-detail-style label {
+      font-size: .78rem; color: var(--text3); font-weight: 600; display: block; margin-bottom: 6px;
+    }
+    .proj-detail-style textarea {
+      width: 100%; padding: 10px 14px; background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--rsm); color: var(--text); font-size: .85rem; resize: vertical;
+      min-height: 60px; outline: none;
+    }
+    .proj-detail-style textarea:focus { border-color: var(--purple); }
+    .proj-detail-toolbar {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .proj-detail-toolbar select {
+      padding: 7px 12px; background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--rsm); color: var(--text); font-size: .8rem; outline: none;
+    }
+    .proj-detail-toolbar .count { font-size: .8rem; color: var(--text3); margin-left: auto; }
+
+    /* Script cards in project */
+    .script-grid { display: flex; flex-direction: column; gap: 12px; }
+    .script-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); overflow: hidden; transition: border-color .2s;
+    }
+    .script-card:hover { border-color: rgba(249,115,22,.3); }
+    .script-card-head {
+      display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+      cursor: pointer;
+    }
+    .script-card-title { flex: 1; font-weight: 700; font-size: .9rem; color: var(--text); }
+    .script-card-date { font-size: .72rem; color: var(--text3); }
+    .script-card-toggle { color: var(--text3); font-size: .7rem; transition: transform .2s; }
+    .script-card.collapsed .script-card-toggle { transform: rotate(-90deg); }
+    .script-card-preview {
+      padding: 0 16px 12px; font-size: .82rem; color: var(--text2);
+      line-height: 1.5; white-space: pre-wrap;
+    }
+    .script-card.collapsed .script-card-preview,
+    .script-card.collapsed .script-card-perf,
+    .script-card.collapsed .script-card-acts { display: none; }
+    .script-card-perf {
+      padding: 0 16px 12px; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+    }
+    .script-card-perf .perf-field { display: flex; flex-direction: column; gap: 3px; }
+    .script-card-perf .perf-field label { font-size: .68rem; color: var(--text3); font-weight: 600; }
+    .script-card-perf .perf-field input,
+    .script-card-perf .perf-field textarea {
+      padding: 6px 10px; background: var(--surf2); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text); font-size: .8rem; outline: none;
+    }
+    .script-card-perf .perf-field input { width: 90px; }
+    .script-card-perf .perf-field textarea { width: 220px; min-height: 40px; resize: vertical; }
+    .script-card-perf .perf-field input:focus,
+    .script-card-perf .perf-field textarea:focus { border-color: var(--purple); }
+    .perf-save {
+      padding: 5px 12px; background: var(--grad); border: none; color: #fff;
+      border-radius: 4px; font-size: .75rem; font-weight: 700; cursor: pointer;
+    }
+    .script-card-acts {
+      padding: 0 16px 14px; display: flex; gap: 6px;
+    }
+
     /* Team members list */
     .team-list { display: flex; flex-direction: column; gap: 8px; }
     .team-member {
@@ -2299,6 +2392,30 @@
   </div>
 </div>
 
+<!-- ── PROJECT DETAIL VIEW ────────────────────────────────────────────── -->
+<div class="proj-detail-overlay" id="projDetailOverlay">
+  <div class="proj-detail-inner">
+    <div class="proj-detail-top">
+      <button class="proj-detail-back" onclick="closeProjDetail()">← Back</button>
+      <input class="proj-detail-name" id="projDetailName" onblur="saveProjName()" />
+      <button class="proj-detail-del" onclick="delProjFromDetail()">Delete project</button>
+    </div>
+    <div class="proj-detail-style">
+      <label>Default style prompt (auto-applies when generating scripts in this project)</label>
+      <textarea id="projDetailStyle" placeholder="e.g. Rewrite as a viral reel script with strong hook..." onblur="saveProjStyle()"></textarea>
+    </div>
+    <div class="proj-detail-toolbar">
+      <select id="projScriptSort" onchange="sortProjScripts()">
+        <option value="recent">Most recent</option>
+        <option value="views">Most viewed</option>
+        <option value="engagement">Best engagement</option>
+      </select>
+      <span class="count" id="projScriptCount">0 scripts</span>
+    </div>
+    <div class="script-grid" id="projScriptGrid"></div>
+  </div>
+</div>
+
 <!-- ── MODAL AUTH ─────────────────────────────────────────────────────── -->
 <div class="overlay" id="authOverlay" onclick="backdropClose(event,'authOverlay')">
   <div class="modal">
@@ -2993,14 +3110,15 @@ function renderProfProjects() {
   }
   empty.style.display = "none";
   grid.innerHTML = projectsCache.map(p => `
-    <div class="proj-card" onclick="filterScriptsByProject('${p.id}','${esc(p.name)}')">
+    <div class="proj-card" onclick="openProjDetail('${p.id}')">
       <div class="proj-card-name">📁 ${esc(p.name)}</div>
       <div class="proj-card-meta">
         <span>${fmtDate(p.created_at)}</span>
+        ${p.script_count != null ? `<span>${p.script_count} scripts</span>` : ""}
       </div>
       ${p.style_prompt ? `<div class="proj-card-style">${esc(p.style_prompt.slice(0, 80))}</div>` : ""}
       <div class="proj-card-acts" onclick="event.stopPropagation()">
-        <button class="btn-sm" onclick="filterScriptsByProject('${p.id}','${esc(p.name)}')">View scripts</button>
+        <button class="btn-sm" onclick="openProjDetail('${p.id}')">Open</button>
         <button class="btn-sm del" onclick="delProject('${p.id}')">Delete</button>
       </div>
     </div>
@@ -3062,6 +3180,164 @@ async function filterScriptsByProject(projectId, name) {
     renderProfScripts();
     showToast(`Showing scripts in "${name}"`);
   } catch {}
+}
+
+// ── Project detail view ───────────────────────────────────────────────────
+let currentProjId = null;
+let projScripts = [];
+
+async function openProjDetail(projectId) {
+  currentProjId = projectId;
+  const proj = projectsCache.find(p => p.id === projectId);
+  if (!proj) return;
+
+  document.getElementById("projDetailName").value = proj.name;
+  document.getElementById("projDetailStyle").value = proj.style_prompt || "";
+  document.getElementById("projDetailOverlay").classList.add("on");
+  document.body.style.overflow = "hidden";
+
+  // Load scripts for this project
+  try {
+    const r = await fetch(`/scripts?project_id=${projectId}`);
+    if (r.ok) projScripts = await r.json();
+    else projScripts = [];
+  } catch { projScripts = []; }
+
+  document.getElementById("projScriptSort").value = "recent";
+  renderProjScripts();
+}
+
+function closeProjDetail() {
+  document.getElementById("projDetailOverlay").classList.remove("on");
+  document.body.style.overflow = "";
+  currentProjId = null;
+}
+
+async function saveProjName() {
+  if (!currentProjId) return;
+  const name = document.getElementById("projDetailName").value.trim();
+  if (!name) return;
+  await fetch(`/projects/${currentProjId}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const p = projectsCache.find(p => p.id === currentProjId);
+  if (p) p.name = name;
+  renderProfProjects();
+}
+
+async function saveProjStyle() {
+  if (!currentProjId) return;
+  const style = document.getElementById("projDetailStyle").value.trim();
+  await fetch(`/projects/${currentProjId}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ style_prompt: style }),
+  });
+  const p = projectsCache.find(p => p.id === currentProjId);
+  if (p) p.style_prompt = style;
+}
+
+async function delProjFromDetail() {
+  if (!confirm("Delete this project and all its scripts?")) return;
+  await fetch(`/projects/${currentProjId}`, { method: "DELETE" });
+  closeProjDetail();
+  await loadProjects();
+  showToast("Project deleted");
+}
+
+function sortProjScripts() {
+  const sort = document.getElementById("projScriptSort").value;
+  if (sort === "views") projScripts.sort((a, b) => (b.views_count || 0) - (a.views_count || 0));
+  else if (sort === "engagement") projScripts.sort((a, b) => (b.engagement_rate || 0) - (a.engagement_rate || 0));
+  else projScripts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  renderProjScripts();
+}
+
+function renderProjScripts() {
+  const grid = document.getElementById("projScriptGrid");
+  const count = document.getElementById("projScriptCount");
+  count.textContent = `${projScripts.length} script${projScripts.length !== 1 ? "s" : ""}`;
+
+  if (!projScripts.length) {
+    grid.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">📝</div>No scripts in this project yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = projScripts.map((s, i) => {
+    const text = s.script || s.transcription || "";
+    const preview = text.split("\n").slice(0, 2).join("\n").slice(0, 150);
+    return `
+    <div class="script-card" id="sc-${i}">
+      <div class="script-card-head" onclick="document.getElementById('sc-${i}').classList.toggle('collapsed')">
+        <span class="script-card-toggle">▼</span>
+        <span class="script-card-title">${esc(s.title || "Untitled")}</span>
+        <span class="script-card-date">${fmtDate(s.created_at)}</span>
+      </div>
+      <div class="script-card-preview">${esc(preview)}${text.length > 150 ? "…" : ""}</div>
+      <div class="script-card-perf">
+        <div class="perf-field">
+          <label>Views</label>
+          <input type="number" id="perf-views-${i}" value="${s.views_count || ""}" placeholder="0" />
+        </div>
+        <div class="perf-field">
+          <label>Engagement %</label>
+          <input type="number" step="0.01" id="perf-eng-${i}" value="${s.engagement_rate || ""}" placeholder="0.00" />
+        </div>
+        <div class="perf-field">
+          <label>Notes</label>
+          <textarea id="perf-notes-${i}" placeholder="Performance notes...">${esc(s.performance_notes || "")}</textarea>
+        </div>
+        <button class="perf-save" onclick="savePerfData('${s.id}', ${i})">Save</button>
+      </div>
+      <div class="script-card-acts">
+        <button class="btn-sm" onclick="viewProjScript(${i})">View full</button>
+        <button class="btn-sm" onclick="copyProjScript(${i}, this)">Copy</button>
+        <button class="btn-sm del" onclick="delProjScript('${s.id}', ${i})">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function savePerfData(scriptId, idx) {
+  const views = parseInt(document.getElementById(`perf-views-${idx}`).value) || null;
+  const eng = parseFloat(document.getElementById(`perf-eng-${idx}`).value) || null;
+  const notes = document.getElementById(`perf-notes-${idx}`).value.trim() || null;
+
+  const res = await fetch(`/scripts/${scriptId}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ views_count: views, engagement_rate: eng, performance_notes: notes }),
+  });
+  if (res.ok) {
+    projScripts[idx].views_count = views;
+    projScripts[idx].engagement_rate = eng;
+    projScripts[idx].performance_notes = notes;
+    showToast("Performance saved");
+  } else showToast("Error saving");
+}
+
+function viewProjScript(idx) {
+  const s = projScripts[idx];
+  if (!s) return;
+  const text = s.script || s.transcription || "";
+  document.getElementById("viewTitle").textContent = `${s.title || "Script"} · ${fmtDate(s.created_at)}`;
+  document.getElementById("viewBody").textContent = text;
+  document.getElementById("viewOverlay").classList.add("on");
+}
+
+function copyProjScript(idx, btn) {
+  const s = projScripts[idx];
+  if (!s) return;
+  navigator.clipboard.writeText(s.script || s.transcription || "");
+  btn.textContent = "Copied!";
+  setTimeout(() => (btn.textContent = "Copy"), 1500);
+}
+
+async function delProjScript(scriptId, idx) {
+  if (!confirm("Delete this script?")) return;
+  await fetch(`/scripts/${scriptId}`, { method: "DELETE" });
+  projScripts.splice(idx, 1);
+  renderProjScripts();
+  showToast("Script deleted");
 }
 
 // ── Team (agency) ─────────────────────────────────────────────────────────
