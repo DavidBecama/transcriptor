@@ -312,6 +312,7 @@ def auth_me():
         "plan": plan,
         "monthly_usage": profile.get("monthly_usage", 0),
         "monthly_limit": PLAN_LIMITS.get(plan),
+        "avatar_seed": profile.get("avatar_seed", "default"),
     })
 
 
@@ -890,9 +891,6 @@ def list_scripts():
 @require_auth
 def create_script():
     user = current_user()
-    profile = get_profile(user["id"])
-    if profile.get("plan", "free") not in ("pro", "agency"):
-        return jsonify({"error": "Tu plan no incluye guardar guiones. Mejora a Pro."}), 403
     body = request.get_json()
     row = db.table("scripts").insert({
         "user_id": user["id"],
@@ -943,6 +941,165 @@ def delete_project(project_id):
     user = current_user()
     db.table("projects").delete().eq("id", project_id).eq("user_id", user["id"]).execute()
     return jsonify({"ok": True})
+
+
+# ── Avatar ────────────────────────────────────────────────────────────────────
+
+@app.route("/profile/avatar", methods=["POST"])
+@require_auth
+def update_avatar():
+    user = current_user()
+    body = request.get_json()
+    seed = body.get("seed", "default")
+    allowed = {"shadow","reel","script","pixel","ninja","ghost","robot","alien","wizard","punk","hacker","glitch"}
+    if seed not in allowed:
+        return jsonify({"error": "Invalid seed"}), 400
+    db.table("profiles").update({"avatar_seed": seed}).eq("id", user["id"]).execute()
+    return jsonify({"ok": True, "avatar_seed": seed})
+
+
+# ── Projects (PATCH) ─────────────────────────────────────────────────────────
+
+@app.route("/projects/<project_id>", methods=["PATCH"])
+@require_auth
+def update_project(project_id):
+    user = current_user()
+    body = request.get_json()
+    updates = {}
+    if "name" in body:
+        updates["name"] = body["name"]
+    if "style_prompt" in body:
+        updates["style_prompt"] = body["style_prompt"]
+    if not updates:
+        return jsonify({"error": "Nothing to update"}), 400
+    db.table("projects").update(updates).eq("id", project_id).eq("user_id", user["id"]).execute()
+    return jsonify({"ok": True})
+
+
+# ── Scripts (PATCH for performance) ──────────────────────────────────────────
+
+@app.route("/scripts/<script_id>", methods=["PATCH"])
+@require_auth
+def update_script(script_id):
+    user = current_user()
+    body = request.get_json()
+    updates = {}
+    for key in ("title", "performance_notes", "views_count", "engagement_rate"):
+        if key in body:
+            updates[key] = body[key]
+    if not updates:
+        return jsonify({"error": "Nothing to update"}), 400
+    db.table("scripts").update(updates).eq("id", script_id).eq("user_id", user["id"]).execute()
+    return jsonify({"ok": True})
+
+
+# ── Agency ───────────────────────────────────────────────────────────────────
+
+@app.route("/agency/invite", methods=["POST"])
+@require_auth
+def invite_member():
+    user = current_user()
+    profile = get_profile(user["id"])
+    if profile.get("plan") != "agency":
+        return jsonify({"error": "Agency plan required"}), 403
+
+    body = request.get_json()
+    email = (body.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "Email required"}), 400
+
+    result = db.table("agency_members").insert({
+        "agency_owner_id": user["id"],
+        "invited_email": email,
+        "status": "pending",
+    }).execute()
+
+    token = result.data[0]["invite_token"] if result.data else None
+    invite_url = f"{request.host_url}join?token={token}"
+    return jsonify({"invite_url": invite_url, "token": token})
+
+
+@app.route("/agency/join", methods=["POST"])
+def join_agency():
+    user = current_user()
+    if not user:
+        return jsonify({"error": "Login required"}), 401
+
+    body = request.get_json()
+    token = body.get("token", "")
+    if not token:
+        return jsonify({"error": "Token required"}), 400
+
+    result = db.table("agency_members").select("*").eq("invite_token", token).eq("status", "pending").execute()
+    if not result.data:
+        return jsonify({"error": "Invalid or expired invite"}), 404
+
+    invite = result.data[0]
+    db.table("agency_members").update({
+        "member_id": user["id"],
+        "status": "active",
+    }).eq("invite_token", token).execute()
+
+    return jsonify({"ok": True, "agency_owner_id": invite["agency_owner_id"]})
+
+
+@app.route("/agency/members")
+@require_auth
+def get_members():
+    user = current_user()
+    rows = db.table("agency_members").select("*").eq("agency_owner_id", user["id"]).execute()
+    # Enrich with profile data for active members
+    members = []
+    for row in rows.data:
+        member = dict(row)
+        if row.get("member_id"):
+            prof = db.table("profiles").select("avatar_seed, monthly_usage").eq("id", row["member_id"]).execute()
+            if prof.data:
+                member["avatar_seed"] = prof.data[0].get("avatar_seed", "default")
+                member["monthly_usage"] = prof.data[0].get("monthly_usage", 0)
+        members.append(member)
+    return jsonify(members)
+
+
+@app.route("/agency/members/<member_id>", methods=["DELETE"])
+@require_auth
+def remove_member(member_id):
+    user = current_user()
+    db.table("agency_members").delete().eq("agency_owner_id", user["id"]).eq("id", member_id).execute()
+    return jsonify({"ok": True})
+
+
+# ── Profile data (extended) ──────────────────────────────────────────────────
+
+@app.route("/profile/data")
+@require_auth
+def profile_data():
+    """Full profile data for the profile hub."""
+    user = current_user()
+    profile = get_profile(user["id"])
+    plan = profile.get("plan", "free")
+
+    data = {
+        "email": user["email"],
+        "plan": plan,
+        "avatar_seed": profile.get("avatar_seed", "default"),
+        "credits_cents": profile["credits_cents"],
+        "monthly_usage": profile.get("monthly_usage", 0),
+        "monthly_limit": PLAN_LIMITS.get(plan),
+    }
+
+    # Projects + script counts (pro/agency)
+    if plan in ("pro", "agency"):
+        projects = db.table("projects").select("*").eq("user_id", user["id"]).order("created_at", desc=True).execute()
+        for p in projects.data:
+            count = db.table("scripts").select("id", count="exact").eq("project_id", p["id"]).execute()
+            p["script_count"] = count.count if hasattr(count, "count") else 0
+        data["projects"] = projects.data
+
+        recent = db.table("scripts").select("id, title, project_id, created_at").eq("user_id", user["id"]).order("created_at", desc=True).limit(5).execute()
+        data["recent_scripts"] = recent.data
+
+    return jsonify(data)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

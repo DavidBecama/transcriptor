@@ -96,7 +96,7 @@
     .avatar {
       width: 28px; height: 28px; border-radius: 50%;
       background: var(--grad); display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: .7rem; font-weight: 800;
+      color: #fff; font-size: .7rem; font-weight: 800; overflow: hidden;
     }
     .btn-ghost {
       background: none; border: none; color: var(--text3);
@@ -226,6 +226,33 @@
       box-shadow: 0 0 0 4px rgba(249,115,22,.35), 0 0 40px rgba(249,115,22,.25);
       background: #16153a;
     }
+    .btn-queue-add {
+      width: 52px; flex-shrink: 0;
+      background: var(--surf); border: 1.5px solid var(--border);
+      border-radius: var(--r); color: var(--purple);
+      font-size: 1.5rem; font-weight: 700; cursor: pointer;
+      transition: all .2s; display: flex; align-items: center; justify-content: center;
+    }
+    .btn-queue-add:hover { border-color: var(--purple); background: rgba(249,115,22,.1); }
+    .queue-list {
+      display: flex; flex-direction: column; gap: 6px;
+      margin-bottom: 12px; max-height: 160px; overflow-y: auto;
+    }
+    .queue-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; background: var(--surf);
+      border: 1px solid var(--border); border-radius: var(--rsm);
+      font-size: .82rem; color: var(--text2);
+    }
+    .queue-item-url { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .queue-item-status { font-size: .75rem; color: var(--text3); white-space: nowrap; }
+    .queue-item-status.done { color: #22c55e; }
+    .queue-item-status.err { color: #ef4444; }
+    .queue-item-rm {
+      background: none; border: none; color: var(--text3);
+      cursor: pointer; font-size: .9rem; padding: 0 2px;
+    }
+    .queue-item-rm:hover { color: #ef4444; }
     [data-theme="light"] .input-glow-wrap input:focus { background: #ede8ff; }
     .input-plat-icon {
       position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
@@ -268,7 +295,7 @@
     .dot-b:nth-child(3) { animation-delay: .36s; background: var(--orange); }
     @keyframes bounce { to { opacity:.2; transform: translateY(-6px); } }
 
-    /* Result box */
+    /* Result box (legacy, hidden when feed is active) */
     .result-box { display: none; margin-top: 16px; text-align: left; }
     .result-box.on { display: block; }
     .result-text {
@@ -286,6 +313,89 @@
     }
     .btn-sm:hover { border-color: var(--purple); color: #fed7aa; }
     .cost-tag { margin-left: auto; font-size: .75rem; color: var(--text3); display: flex; align-items: center; }
+
+    /* ── Result panel (appears beside input after transcription) ─ */
+    .hero-input-wrap.has-result {
+      max-width: 1100px;
+      display: flex; gap: 24px; align-items: flex-start;
+    }
+    .hero-input-wrap.has-result .hero-input-left { flex: 0 0 480px; }
+
+    .hero-result-panel {
+      display: none; flex: 1; min-width: 0;
+      flex-direction: column; gap: 14px;
+    }
+    .hero-input-wrap.has-result .hero-result-panel { display: flex; }
+
+    /* Result card */
+    .rs-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); overflow: hidden;
+      animation: rs-in .3s ease both;
+    }
+    @keyframes rs-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .rs-card-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px 0;
+    }
+    .rs-card-plat {
+      background: rgba(249,115,22,.1); color: var(--purple);
+      font-size: .65rem; font-weight: 700; padding: 3px 9px;
+      border-radius: 4px; text-transform: uppercase; flex-shrink: 0;
+    }
+    .rs-card-title {
+      flex: 1; font-size: .88rem; font-weight: 700; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .rs-card-copy {
+      background: none; border: none; color: var(--text3);
+      cursor: pointer; padding: 4px 6px; border-radius: var(--rsm);
+      transition: all .2s; flex-shrink: 0; position: relative;
+    }
+    .rs-card-copy:hover { color: var(--purple); background: rgba(249,115,22,.08); }
+    .rs-card-copy.ok { color: #22c55e; }
+    .rs-card-copy .rs-tip {
+      position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      background: var(--surf2); color: var(--text); font-size: .68rem; font-weight: 600;
+      padding: 3px 8px; border-radius: 4px; white-space: nowrap;
+      opacity: 0; pointer-events: none; transition: opacity .15s;
+    }
+    .rs-card-copy:hover .rs-tip { opacity: 1; }
+    .rs-card-body {
+      padding: 12px 16px; font-size: .86rem; line-height: 1.7;
+      color: var(--text); white-space: pre-wrap; word-break: break-word;
+      max-height: 350px; overflow-y: auto;
+    }
+    .rs-card-body::-webkit-scrollbar { width: 3px; }
+    .rs-card-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .rs-card.collapsed .rs-card-body,
+    .rs-card.collapsed .rs-card-actions { display: none; }
+    .rs-card-head { cursor: pointer; }
+    .rs-card-toggle {
+      color: var(--text3); font-size: .7rem; transition: transform .2s; margin-right: 4px;
+    }
+    .rs-card.collapsed .rs-card-toggle { transform: rotate(-90deg); }
+    .rs-card-actions {
+      padding: 0 16px 14px; display: flex; gap: 8px;
+    }
+    .rs-card-act {
+      padding: 6px 14px; border-radius: var(--rsm); font-size: .75rem; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); background: var(--surf);
+      color: var(--text2); transition: all .2s;
+    }
+    .rs-card-act:hover { border-color: var(--purple); color: #fed7aa; }
+
+    /* Loading card */
+    .rs-card-loading {
+      padding: 20px 16px; display: flex; align-items: center; gap: 12px;
+    }
+    .rs-card-loading .dot-b { width: 5px; height: 5px; }
+    .rs-card-loading-msg { color: var(--text2); font-size: .84rem; }
+
+    @media (max-width: 768px) {
+      .hero-input-wrap.has-result { flex-direction: column; }
+      .hero-input-wrap.has-result .hero-input-left { flex: none; width: 100%; }
+    }
 
     /* Free bar */
     .free-bar {
@@ -1161,7 +1271,7 @@
     .drawer-av {
       width: 52px; height: 52px; border-radius: 50%;
       background: var(--grad); display: flex; align-items: center; justify-content: center;
-      font-size: 1.3rem; font-weight: 900; color: #fff; flex-shrink: 0;
+      font-size: 1.3rem; font-weight: 900; color: #fff; flex-shrink: 0; overflow: hidden;
     }
     .drawer-user-info { flex: 1; min-width: 0; }
     .drawer-email { font-size: .88rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1254,16 +1364,84 @@
       display: flex; align-items: center; gap: 20px;
       padding: 24px; background: var(--surf);
       border: 1px solid var(--border); border-radius: var(--r);
-      margin-bottom: 24px;
+      margin-bottom: 24px; position: relative;
     }
+
+    /* DiceBear avatar in profile */
     .prof-av {
-      width: 56px; height: 56px; border-radius: 50%;
-      background: var(--grad); display: flex; align-items: center; justify-content: center;
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--surf2); border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
       font-size: 1.4rem; font-weight: 900; color: #fff; flex-shrink: 0;
+      cursor: pointer; transition: border-color .2s, box-shadow .2s; overflow: hidden;
+      position: relative;
     }
+    .prof-av:hover { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(249,115,22,.2); }
+    .prof-av img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .prof-av-edit {
+      position: absolute; inset: 0; border-radius: 50%;
+      background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity .2s; font-size: .7rem; color: #fff; font-weight: 700;
+      pointer-events: none;
+    }
+    .prof-av:hover .prof-av-edit { opacity: 1; }
+
+    /* Avatar picker grid */
+    .avatar-picker {
+      display: none; position: absolute; top: calc(100% + 10px); left: 0;
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px; z-index: 10;
+      box-shadow: var(--sh-lg); animation: modal-in .15s ease;
+    }
+    .avatar-picker.on { display: block; }
+    .avatar-picker-title {
+      font-size: .72rem; font-weight: 700; color: var(--text3);
+      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px;
+    }
+    .avatar-picker-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    }
+    .avatar-option {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 2px solid var(--border); cursor: pointer;
+      transition: border-color .2s, transform .2s; overflow: hidden;
+      background: var(--surf2);
+    }
+    .avatar-option img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-option:hover { border-color: var(--purple); transform: scale(1.1); }
+    .avatar-option.selected { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(249,115,22,.3); }
+
+    /* Plan badge */
+    .plan-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .plan-badge.free     { background: rgba(148,163,184,.15); color: var(--text3); border: 1px solid var(--border); }
+    .plan-badge.basic    { background: rgba(59,130,246,.15);  color: #60a5fa; border: 1px solid rgba(59,130,246,.3); }
+    .plan-badge.pro      { background: rgba(249,115,22,.15);  color: #fed7aa; border: 1px solid rgba(249,115,22,.3); }
+    .plan-badge.agency   { background: rgba(167,139,250,.15); color: #a78bfa; border: 1px solid rgba(167,139,250,.3); }
+
+    /* Usage bar */
+    .usage-bar-wrap {
+      margin-top: 10px;
+    }
+    .usage-bar-label {
+      font-size: .75rem; color: var(--text3); margin-bottom: 5px;
+      display: flex; justify-content: space-between;
+    }
+    .usage-bar-track {
+      height: 5px; background: var(--surf2); border-radius: 3px; overflow: hidden;
+    }
+    .usage-bar-fill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, var(--purple), var(--pink));
+      transition: width .4s ease;
+    }
+
     .prof-info { flex: 1; min-width: 0; }
     .prof-email { font-size: .95rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .prof-meta { font-size: .78rem; color: var(--text3); margin-top: 3px; display: flex; gap: 16px; flex-wrap: wrap; }
+    .prof-meta { font-size: .78rem; color: var(--text3); margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
     .prof-stats {
       display: grid; grid-template-columns: repeat(3, 1fr);
@@ -1295,7 +1473,7 @@
       border: 1px solid var(--border); border-radius: var(--r);
       transition: border-color .2s;
     }
-    .prof-card:hover { border-color: var(--sc); }
+    .prof-card:hover { border-color: var(--purple); }
     .prof-card-top {
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 8px;
@@ -1303,7 +1481,7 @@
     .prof-card-badge {
       font-size: .68rem; font-weight: 800; text-transform: uppercase;
       letter-spacing: .4px; padding: 3px 8px;
-      border-radius: 6px; background: rgba(249,115,22,.15); color: var(--sc);
+      border-radius: 6px; background: rgba(249,115,22,.15); color: var(--purple);
     }
     .prof-card-date { font-size: .72rem; color: var(--text3); margin-left: auto; }
     .prof-card-text {
@@ -1328,10 +1506,83 @@
     }
     .prof-empty-icon { font-size: 2rem; margin-bottom: 8px; }
 
+    /* Project cards grid */
+    .proj-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+      margin-top: 12px;
+    }
+    .proj-card {
+      padding: 16px; background: var(--surf);
+      border: 1.5px solid var(--border); border-radius: var(--r);
+      cursor: pointer; transition: border-color .2s, transform .2s;
+    }
+    .proj-card:hover { border-color: var(--purple); transform: translateY(-2px); }
+    .proj-card-name {
+      font-size: .92rem; font-weight: 800; color: var(--text); margin-bottom: 5px;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .proj-card-meta { font-size: .75rem; color: var(--text3); display: flex; gap: 12px; margin-bottom: 8px; }
+    .proj-card-style {
+      font-size: .78rem; color: var(--text2); line-height: 1.4;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .proj-card-acts { display: flex; gap: 6px; margin-top: 10px; }
+
+    /* Team members list */
+    .team-list { display: flex; flex-direction: column; gap: 8px; }
+    .team-member {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; background: var(--surf);
+      border: 1px solid var(--border); border-radius: var(--r);
+    }
+    .team-member-av {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--surf2); border: 1px solid var(--border);
+      overflow: hidden; flex-shrink: 0;
+    }
+    .team-member-av img { width: 100%; height: 100%; object-fit: cover; }
+    .team-member-info { flex: 1; min-width: 0; }
+    .team-member-email { font-size: .88rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-member-meta { font-size: .72rem; color: var(--text3); display: flex; gap: 10px; align-items: center; margin-top: 2px; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 8px; border-radius: 10px; font-size: .65rem; font-weight: 700;
+    }
+    .status-badge.active  { background: rgba(34,197,94,.15); color: #4ade80; }
+    .status-badge.pending { background: rgba(251,191,36,.15); color: #fbbf24; }
+    .status-badge.owner   { background: rgba(249,115,22,.15); color: #fed7aa; }
+
+    /* Recent scripts list in overview */
+    .recent-scripts-list { display: flex; flex-direction: column; gap: 8px; }
+    .recent-script-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; background: var(--surf);
+      border: 1px solid var(--border); border-radius: var(--rsm);
+      transition: border-color .2s; cursor: pointer;
+    }
+    .recent-script-item:hover { border-color: var(--purple); }
+    .rsi-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .rsi-info { flex: 1; min-width: 0; }
+    .rsi-title { font-size: .88rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rsi-meta  { font-size: .72rem; color: var(--text3); margin-top: 2px; }
+    .rsi-link  { font-size: .75rem; color: var(--purple); font-weight: 600; flex-shrink: 0; text-decoration: none; }
+    .rsi-link:hover { text-decoration: underline; }
+
+    /* Upgrade banner in profile */
+    .prof-upgrade-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 18px; background: linear-gradient(135deg, rgba(249,115,22,.12), rgba(251,191,36,.08));
+      border: 1px solid rgba(249,115,22,.25); border-radius: var(--r);
+      margin-bottom: 20px;
+    }
+    .prof-upgrade-banner p { font-size: .85rem; color: var(--text2); }
+    .prof-upgrade-banner strong { color: #fed7aa; }
+
     @media (max-width: 600px) {
       .prof-stats { grid-template-columns: 1fr 1fr; }
       .prof-header { flex-direction: column; text-align: center; }
       .prof-meta { justify-content: center; }
+      .proj-grid { grid-template-columns: 1fr; }
     }
 
     /* ── Toast ────────────────────────────────────────────────── */
@@ -1460,8 +1711,8 @@
   </div>
   <div class="nav-r">
     <button class="badge-bal" id="balBadge" onclick="openTopup()">⚡ <span id="balDisp">0 usos</span></button>
-    <div class="user-pill" id="userPill" onclick="openProfile()" style="cursor:pointer" title="Ver perfil">
-      <div class="avatar" id="userAv">?</div>
+    <div class="user-pill" id="userPill" onclick="openProfile()" style="cursor:pointer" title="Ver perfil" data-tour="user-profile">
+      <div class="avatar" id="userAv" style="overflow:hidden;padding:0"></div>
       <span id="userEmail" style="font-size:.82rem;color:var(--text2)"></span>
     </div>
     <div class="lang-switch">
@@ -1497,83 +1748,92 @@
     Then turn it viral, LinkedIn, story, or 5 hooks — one click.
   </p>
 
-  <!-- Input -->
-  <div class="hero-input-wrap">
-    <div class="input-glow-wrap">
-      <input id="urlInput" type="url" data-tour="url-input"
-        placeholder="🔗 Pega aquí tu reel de Instagram o TikTok..."
-        autocomplete="off" spellcheck="false" />
-      <span class="input-plat-icon" id="platIcon"></span>
-    </div>
-
-    <!-- Language row -->
-    <div style="display:flex;gap:10px;margin-bottom:12px">
-      <select id="language" style="flex:1;padding:10px 14px;background:var(--surf);border:1.5px solid var(--border);border-radius:var(--rsm);font-size:.85rem;color:var(--text);outline:none;transition:border-color .2s">
-        <option value="">Auto-detect language</option>
-        <option value="es">Spanish</option>
-        <option value="en">English</option>
-        <option value="fr">French</option>
-        <option value="pt">Portuguese</option>
-        <option value="de">German</option>
-        <option value="it">Italian</option>
-      </select>
-      <button class="btn-shimmer inactive" id="btnTranscribe" style="flex:2" onclick="doTranscribe()" data-i18n="hero.btn" data-tour="transcribe-button">
-        ✦ Transcribe now
-      </button>
-    </div>
-
-    <!-- Inline loading indicator -->
-    <div class="inline-loading" id="inlineLoading">
-      <div class="sq-loader">
-        <div class="sq-el sq-el1"></div>
-        <div class="sq-el sq-el2"></div>
+  <!-- Input + Results -->
+  <div class="hero-input-wrap" id="heroInputWrap">
+    <div class="hero-input-left">
+      <div style="display:flex;gap:8px;align-items:stretch">
+        <div class="input-glow-wrap" style="flex:1">
+          <input id="urlInput" type="url" data-tour="url-input"
+            placeholder="🔗 Pega aquí tu reel de Instagram o TikTok..."
+            autocomplete="off" spellcheck="false" />
+          <span class="input-plat-icon" id="platIcon"></span>
+        </div>
+        <button class="btn-queue-add" id="btnQueueAdd" onclick="addToQueue()" title="Add to queue">+</button>
       </div>
-      <div style="flex:1;min-width:0">
-        <div class="loading-msg" id="loadingMsg">Descargando el audio del reel...</div>
-        <div class="loading-progress-wrap" style="margin-top:6px">
-          <div class="loading-progress-bar" id="progressBar"></div>
-        </div>
+
+      <!-- Queue list -->
+      <div class="queue-list" id="queueList" style="display:none"></div>
+
+      <!-- Language row -->
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <select id="language" style="flex:1;padding:10px 14px;background:var(--surf);border:1.5px solid var(--border);border-radius:var(--rsm);font-size:.85rem;color:var(--text);outline:none;transition:border-color .2s">
+          <option value="">Auto-detect language</option>
+          <option value="es">Spanish</option>
+          <option value="en">English</option>
+          <option value="fr">French</option>
+          <option value="pt">Portuguese</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+        </select>
+        <button class="btn-shimmer inactive" id="btnTranscribe" style="flex:2" onclick="doTranscribe()" data-i18n="hero.btn">
+          ✦ Transcribe now
+        </button>
       </div>
-      <span class="loading-pct" id="progressPct">0%</span>
-    </div>
 
-    <!-- Free bar -->
-    <div class="free-bar" id="freeBar">
-      <div style="display:flex;gap:3px" id="freeDots"></div>
-      <span id="freeBarTxt"></span>
-    </div>
-
-    <!-- Result (with inline transform) -->
-    <div class="result-box" id="resultBox" data-tour="transcription-output">
-      <div class="result-text" id="resultTxt"></div>
-      <div class="result-actions" id="resultActs"></div>
-
-      <!-- Inline transform — aparece sólo tras una transcripción exitosa -->
-      <div class="transform-section" id="transformSection" style="display:none">
-        <div class="transform-divider"><span>✨ Ahora transfórmalo</span></div>
-        <div class="style-chips">
-          <button class="style-chip" data-s="viral"        data-preview="Gancho fuerte, frases cortas, máximo impacto" onclick="pickChip(this)">🔥 Viral</button>
-          <button class="style-chip" data-s="divertido"    data-preview="Tono informal con humor y chispa"            onclick="pickChip(this)">😂 Divertido</button>
-          <button class="style-chip" data-s="linkedin"     data-preview="Reflexivo y profesional, para tu red"        onclick="pickChip(this)">💼 LinkedIn</button>
-          <button class="style-chip" data-s="storytelling" data-preview="Narrativa con inicio, tensión y cierre"      onclick="pickChip(this)">📖 Historia</button>
-          <button class="style-chip" data-s="hooks"        data-preview="Cinco ideas de apertura distintas"           onclick="pickChip(this)">🪝 5 Hooks</button>
-          <button class="style-chip" data-s="custom"       data-preview="Tú decides el tono y el estilo"              onclick="pickChip(this)">✍️ Custom</button>
+      <!-- Inline loading indicator -->
+      <div class="inline-loading" id="inlineLoading">
+        <div class="sq-loader">
+          <div class="sq-el sq-el1"></div>
+          <div class="sq-el sq-el2"></div>
         </div>
-        <div class="custom-chip-row" id="customChipRow">
-          <input type="text" id="customChipPrompt" placeholder="¿Cómo quieres que suene?" />
-          <button class="btn-grad" onclick="runInlineAdapt()">→</button>
-        </div>
-        <div class="inline-spinner" id="inlineSpinner">
-          <div class="dot-b"></div><div class="dot-b"></div><div class="dot-b"></div>
-          <span>Transformando…</span>
-        </div>
-        <div class="transform-result" id="transformResult">
-          <div class="transform-result-label">
-            <span id="transformLabel">Resultado</span>
-            <button class="btn-ico" onclick="copyTransform()">Copiar</button>
+        <div style="flex:1;min-width:0">
+          <div class="loading-msg" id="loadingMsg">Descargando el audio del reel...</div>
+          <div class="loading-progress-wrap" style="margin-top:6px">
+            <div class="loading-progress-bar" id="progressBar"></div>
           </div>
-          <div class="transform-result-body" id="transformBody"></div>
         </div>
+        <span class="loading-pct" id="progressPct">0%</span>
+      </div>
+
+      <!-- Free bar -->
+      <div class="free-bar" id="freeBar">
+        <div style="display:flex;gap:3px" id="freeDots"></div>
+        <span id="freeBarTxt"></span>
+      </div>
+    </div>
+
+    <!-- Result panel (right side) -->
+    <div class="hero-result-panel" id="resultPanel"></div>
+  </div>
+
+  <!-- Legacy result box (hidden, used by adapt section) -->
+  <div class="result-box" id="resultBox" data-tour="transcription-output" style="display:none">
+    <div class="result-text" id="resultTxt"></div>
+    <div class="result-actions" id="resultActs"></div>
+    <div class="transform-section" id="transformSection" style="display:none">
+      <div class="transform-divider" data-tour="transform-section"><span>✨ Ahora transfórmalo</span></div>
+      <div class="style-chips">
+        <button class="style-chip" data-s="viral" data-preview="Gancho fuerte, frases cortas, máximo impacto" onclick="pickChip(this)">🔥 Viral</button>
+        <button class="style-chip" data-s="divertido" data-preview="Tono informal con humor y chispa" onclick="pickChip(this)">😂 Divertido</button>
+        <button class="style-chip" data-s="linkedin" data-preview="Reflexivo y profesional, para tu red" onclick="pickChip(this)">💼 LinkedIn</button>
+        <button class="style-chip" data-s="storytelling" data-preview="Narrativa con inicio, tensión y cierre" onclick="pickChip(this)">📖 Historia</button>
+        <button class="style-chip" data-s="hooks" data-preview="Cinco ideas de apertura distintas" onclick="pickChip(this)">🪝 5 Hooks</button>
+        <button class="style-chip" data-s="custom" data-preview="Tú decides el tono y el estilo" onclick="pickChip(this)">✍️ Custom</button>
+      </div>
+      <div class="custom-chip-row" id="customChipRow">
+        <input type="text" id="customChipPrompt" placeholder="¿Cómo quieres que suene?" />
+        <button class="btn-grad" onclick="runInlineAdapt()">→</button>
+      </div>
+      <div class="inline-spinner" id="inlineSpinner">
+        <div class="dot-b"></div><div class="dot-b"></div><div class="dot-b"></div>
+        <span>Transformando…</span>
+      </div>
+      <div class="transform-result" id="transformResult">
+        <div class="transform-result-label">
+          <span id="transformLabel">Resultado</span>
+          <button class="btn-ico" onclick="copyTransform()">Copiar</button>
+        </div>
+        <div class="transform-result-body" id="transformBody"></div>
       </div>
     </div>
   </div>
@@ -1605,7 +1865,7 @@
       <textarea id="adaptInput" class="script-ta"
         placeholder="Pega aquí el guión o la transcripción que quieres transformar…"></textarea>
 
-      <div class="style-grid" data-tour="script-generator">
+      <div class="style-grid">
         <button class="style-pill" data-s="viral"
           onclick="selectStyle(this)" onmouseenter="previewStyle('viral')">
           <span class="sp-emoji">🔥</span>
@@ -1704,7 +1964,7 @@
           <div class="pf-dot"></div>
           <span id="previewFooterTxt">Ejemplo · El tuyo será único</span>
           <button class="pf-copy" id="pfCopyBtn" style="display:none" onclick="copyPreviewResult()">Copiar</button>
-          <button class="pf-copy" id="pfSaveBtn" style="display:none" onclick="saveScript()" data-tour="save-button">💾 Guardar</button>
+          <button class="pf-copy" id="pfSaveBtn" style="display:none" onclick="saveScript()">💾 Guardar</button>
         </div>
       </div>
     </div>
@@ -1834,7 +2094,7 @@
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="profileDrawer">
   <div class="drawer-head">
-    <div class="drawer-av" id="drawerAv">?</div>
+    <div class="drawer-av" id="drawerAv" style="overflow:hidden;padding:0"></div>
     <div class="drawer-user-info">
       <div class="drawer-email" id="drawerEmail">—</div>
       <div class="drawer-since">Cuenta ReelScript</div>
@@ -1880,21 +2140,48 @@
   <div class="prof-inner">
     <div class="prof-top">
       <button class="prof-back" onclick="closeProfile()">←</button>
-      <div class="prof-title">Profile</div>
+      <div class="prof-title">Profile Hub</div>
     </div>
 
-    <div class="prof-header">
-      <div class="prof-av" id="profAv">?</div>
+    <!-- Header: avatar + info + usage -->
+    <div class="prof-header" id="profHeader">
+      <!-- Avatar (clickable → picker) -->
+      <div class="prof-av" id="profAv" onclick="toggleAvatarPicker(event)" title="Change avatar">
+        <div class="prof-av-edit">Edit</div>
+      </div>
+      <!-- Avatar picker grid -->
+      <div class="avatar-picker" id="avatarPicker">
+        <div class="avatar-picker-title">Choose your avatar</div>
+        <div class="avatar-picker-grid" id="avatarPickerGrid"></div>
+      </div>
+
       <div class="prof-info">
         <div class="prof-email" id="profEmail">—</div>
         <div class="prof-meta">
-          <span id="profUsos">⚡ 0 usos</span>
-          <span id="profFree">🎁 0/2 free today</span>
+          <span class="plan-badge free" id="profPlanBadge">Free</span>
+          <span id="profFree" style="display:none"></span>
+        </div>
+        <!-- Usage bar -->
+        <div class="usage-bar-wrap" id="profUsageWrap" style="display:none">
+          <div class="usage-bar-label">
+            <span id="profUsageLabel">0 / 0 used this month</span>
+          </div>
+          <div class="usage-bar-track">
+            <div class="usage-bar-fill" id="profUsageFill" style="width:0%"></div>
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-topup-sm" id="profUpgradeBtn"
+            onclick="closeProfile();document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'})">
+            Upgrade plan
+          </button>
+          <button class="btn-topup-sm" style="background:var(--surf2);border:1px solid var(--border);color:var(--text2)"
+            onclick="closeProfile();openTopup()">+ Top up</button>
         </div>
       </div>
-      <button class="btn-topup-sm" onclick="closeProfile();openTopup()">+ Top up</button>
     </div>
 
+    <!-- Stats row -->
     <div class="prof-stats">
       <div class="prof-stat">
         <div class="prof-stat-num" id="profStatTransc">0</div>
@@ -1910,15 +2197,88 @@
       </div>
     </div>
 
-    <div class="prof-tabs">
-      <button class="prof-tab on" onclick="profTab('transc')">📄 Transcriptions</button>
-      <button class="prof-tab" onclick="profTab('scripts')">✨ Saved scripts</button>
-      <button class="prof-tab" id="profTabProjects" style="display:none" onclick="profTab('projects')">📁 Projects</button>
+    <!-- Tabs: Overview | Projects | Team -->
+    <div class="prof-tabs" id="profTabsRow">
+      <button class="prof-tab on" id="profTabOverview"  onclick="profTab('overview')">Overview</button>
+      <button class="prof-tab"    id="profTabScripts"   onclick="profTab('scripts')">Saved scripts</button>
+      <button class="prof-tab"    id="profTabTransc"    onclick="profTab('transc')">Transcriptions</button>
+      <button class="prof-tab"    id="profTabProjects"  onclick="profTab('projects')" style="display:none">Projects</button>
+      <button class="prof-tab"    id="profTabTeam"      onclick="profTab('team')"     style="display:none">Team</button>
     </div>
 
-    <div class="prof-list" id="profListTransc"></div>
-    <div class="prof-list" id="profListScripts" style="display:none"></div>
-    <div class="prof-list" id="profListProjects" style="display:none"></div>
+    <!-- Overview tab -->
+    <div id="profPanelOverview">
+      <div style="font-size:.82rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Recent scripts</div>
+      <div class="recent-scripts-list" id="profRecentScripts"></div>
+    </div>
+
+    <!-- Saved scripts tab -->
+    <div id="profPanelScripts" style="display:none">
+      <div class="prof-list" id="profListScripts"></div>
+    </div>
+
+    <!-- Transcriptions tab -->
+    <div id="profPanelTransc" style="display:none">
+      <div class="prof-list" id="profListTransc"></div>
+    </div>
+
+    <!-- Projects tab (pro/agency) -->
+    <div id="profPanelProjects" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn-topup-sm" onclick="openNewProjectModal()">+ New Project</button>
+      </div>
+      <div class="proj-grid" id="profProjGrid"></div>
+      <div class="prof-empty" id="profProjEmpty" style="display:none">
+        <div class="prof-empty-icon">📁</div>No projects yet. Create your first one.
+      </div>
+    </div>
+
+    <!-- Team tab (agency) -->
+    <div id="profPanelTeam" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <span style="font-size:.82rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Team members</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn-topup-sm" onclick="openInviteModal()">+ Invite member</button>
+          <button class="btn-sm" onclick="copyInviteLink()">Copy invite link</button>
+        </div>
+      </div>
+      <div class="team-list" id="profTeamList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- New Project modal -->
+<div class="overlay" id="newProjectOverlay" onclick="if(event.target===this)closeModal('newProjectOverlay')">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('newProjectOverlay')">✕</button>
+    <h2>New Project</h2>
+    <p>Organize your scripts into projects with a custom style.</p>
+    <div class="field">
+      <label>Project name</label>
+      <input type="text" id="newProjName" placeholder="e.g. Instagram Content" />
+    </div>
+    <div class="field">
+      <label>Default style prompt (optional)</label>
+      <textarea id="newProjStyle" class="script-ta" style="min-height:80px;font-size:.88rem"
+        placeholder="e.g. Viral hooks with high-energy CTA..."></textarea>
+    </div>
+    <div class="form-err" id="newProjErr"></div>
+    <button class="btn-full" onclick="submitNewProject()">Create project</button>
+  </div>
+</div>
+
+<!-- Invite member modal -->
+<div class="overlay" id="inviteOverlay" onclick="if(event.target===this)closeModal('inviteOverlay')">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('inviteOverlay')">✕</button>
+    <h2>Invite team member</h2>
+    <p>Send an invitation to join your agency workspace.</p>
+    <div class="field">
+      <label>Email address</label>
+      <input type="email" id="inviteEmail" placeholder="colleague@email.com" />
+    </div>
+    <div class="form-err" id="inviteErr"></div>
+    <button class="btn-full" onclick="submitInvite()">Send invitation</button>
   </div>
 </div>
 
@@ -2167,6 +2527,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   initDemo();
   initScrollReveal();
 
+  // Enter to transcribe in URL input
+  document.getElementById("urlInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doTranscribe(); } });
+
   const p = new URLSearchParams(location.search);
   const ref = p.get("ref");
   if (ref) localStorage.setItem("affiliate_ref", ref);
@@ -2174,6 +2537,26 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (p.get("topup") === "cancel")   { showToast("Pago cancelado."); history.replaceState({}, "", "/"); }
   if (p.get("subscribed") === "true") { showToast("✅ ¡Suscripción activada!"); history.replaceState({}, "", "/"); await refreshMe(); }
   if (p.get("sub_cancel") === "true") { showToast("Suscripción cancelada."); history.replaceState({}, "", "/"); }
+
+  // Agency join flow: check for ?token= in URL
+  const token = p.get("token");
+  if (token) {
+    if (!st.user) {
+      // Must be logged in to join — open auth then join
+      showToast("Please log in or create an account to join the team.");
+      openAuth("login");
+      localStorage.setItem("pending_agency_token", token);
+      history.replaceState({}, "", "/");
+    } else {
+      await joinAgency(token);
+    }
+  }
+  // After login, check if there's a pending agency token
+  const pendingToken = localStorage.getItem("pending_agency_token");
+  if (pendingToken && st.user) {
+    localStorage.removeItem("pending_agency_token");
+    await joinAgency(pendingToken);
+  }
 });
 
 // ── Counter animation ─────────────────────────────────────────────────────
@@ -2222,6 +2605,8 @@ async function refreshMe() {
   const res = await fetch("/auth/me");
   const d = await res.json();
   if (d.user) {
+    // Ensure avatar_seed is stored on the user object
+    if (d.avatar_seed !== undefined) d.user.avatar_seed = d.avatar_seed;
     st = { user: d.user, credits: d.credits_cents, freeUsed: d.free_used_today, freeLimit: d.free_daily_limit, freeDailyAnon: 3, plan: d.plan || "free", monthlyUsage: d.monthly_usage || 0, monthlyLimit: d.monthly_limit || null };
     renderLoggedIn();
   } else {
@@ -2233,19 +2618,30 @@ async function refreshMe() {
 }
 
 function renderLoggedIn() {
+  const seed = st.user.avatar_seed || null;
   const initial = st.user.email[0].toUpperCase();
   document.getElementById("btnLogin").style.display = "none";
   document.getElementById("btnReg").style.display = "none";
   document.getElementById("userPill").classList.add("on");
   document.getElementById("userEmail").textContent = st.user.email;
-  document.getElementById("userAv").textContent = initial;
   document.getElementById("balBadge").classList.add("on");
   document.getElementById("balDisp").textContent = usos(st.credits);
   // Drawer
-  document.getElementById("drawerAv").textContent = initial;
   document.getElementById("drawerEmail").textContent = st.user.email;
   document.getElementById("drawerBal").textContent = usos(st.credits);
   document.getElementById("statToday").textContent = `${st.freeUsed}/${st.freeLimit}`;
+
+  // Avatar: DiceBear if seed, else initial letter
+  const navAv = document.getElementById("userAv");
+  const drawerAv = document.getElementById("drawerAv");
+  if (seed) {
+    const url = dicebearUrl(seed);
+    navAv.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" />`;
+    drawerAv.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" />`;
+  } else {
+    navAv.textContent = initial;
+    drawerAv.textContent = initial;
+  }
 }
 
 function openDrawer() {
@@ -2259,6 +2655,30 @@ function closeDrawer() {
   document.body.style.overflow = "";
 }
 
+// ── DiceBear avatar helpers ───────────────────────────────────────────────
+const AVATAR_SEEDS = ["shadow","reel","script","pixel","ninja","ghost","robot","alien","wizard","punk","hacker","glitch"];
+
+function dicebearUrl(seed) {
+  return `https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(seed)}&backgroundColor=b6e3f4`;
+}
+
+function avatarImgEl(seed, size) {
+  const img = document.createElement("img");
+  img.src = dicebearUrl(seed);
+  img.width = size; img.height = size;
+  img.style.cssText = `width:100%;height:100%;object-fit:cover;border-radius:50%`;
+  return img;
+}
+
+// Render avatar into a container element (replaces children)
+function renderAvatarInto(el, seed) {
+  if (seed) {
+    el.innerHTML = "";
+    el.appendChild(avatarImgEl(seed, 40));
+  }
+  // If no seed, leave as-is (initial letter or empty)
+}
+
 // ── Profile page ──────────────────────────────────────────────────────────
 let scriptsCache = [];
 
@@ -2267,37 +2687,189 @@ function openProfile() {
   const page = document.getElementById("profilePage");
   page.classList.add("on");
   document.body.style.overflow = "hidden";
+  closeAvatarPicker();
 
-  // Fill header
   if (st.user) {
-    const initial = st.user.email.charAt(0).toUpperCase();
-    document.getElementById("profAv").textContent = initial;
-    document.getElementById("profEmail").textContent = st.user.email;
-    document.getElementById("profUsos").textContent = `⚡ ${usos(st.credits)}`;
-    document.getElementById("profFree").textContent = `🎁 ${st.freeUsed}/${st.freeLimit} free today`;
-    document.getElementById("profStatUsos").textContent = Math.floor(st.credits / 8);
-    document.getElementById("profStatTransc").textContent = histCache.length;
+    renderProfileHub();
   }
-  // Mostrar tabs de pro/agency
-  const isPro = st.plan === "pro" || st.plan === "agency";
+}
+
+function renderProfileHub() {
+  const seed = st.user.avatar_seed || null;
+
+  // Avatar
+  const profAv = document.getElementById("profAv");
+  profAv.innerHTML = '<div class="prof-av-edit">Edit</div>';
+  if (seed) {
+    const img = avatarImgEl(seed, 72);
+    img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;inset:0";
+    profAv.prepend(img);
+  }
+
+  // Build avatar picker grid
+  const grid = document.getElementById("avatarPickerGrid");
+  grid.innerHTML = AVATAR_SEEDS.map(s => `
+    <div class="avatar-option ${s === seed ? 'selected' : ''}" onclick="selectAvatar('${s}')" title="${s}">
+      <img src="${dicebearUrl(s)}" alt="${s}" loading="lazy" />
+    </div>
+  `).join("");
+
+  document.getElementById("profEmail").textContent = st.user.email;
+
+  // Plan badge
+  const plan = st.plan || "free";
+  const planLabels = { free: "Free", basic: "Basic", pro: "Pro", agency: "Agency" };
+  const badge = document.getElementById("profPlanBadge");
+  badge.textContent = planLabels[plan] || plan;
+  badge.className = `plan-badge ${plan}`;
+
+  // Hide upgrade btn if already on top plan
+  document.getElementById("profUpgradeBtn").style.display = plan === "agency" ? "none" : "";
+
+  // Usage bar
+  const usageWrap = document.getElementById("profUsageWrap");
+  const usageFill = document.getElementById("profUsageFill");
+  const usageLabel = document.getElementById("profUsageLabel");
+  if (st.monthlyLimit) {
+    usageWrap.style.display = "";
+    const pct = Math.min(100, Math.round(st.monthlyUsage / st.monthlyLimit * 100));
+    usageFill.style.width = pct + "%";
+    usageLabel.textContent = `${st.monthlyUsage} / ${st.monthlyLimit} used this month`;
+  } else if (plan === "free") {
+    usageWrap.style.display = "";
+    usageFill.style.width = "0%";
+    usageLabel.textContent = "Unlimited (credit-based)";
+  } else {
+    usageWrap.style.display = "none";
+  }
+
+  // Stats
+  document.getElementById("profStatTransc").textContent = histCache.length;
+  document.getElementById("profStatUsos").textContent = Math.floor(st.credits / 18);
+
+  // Tabs visibility
+  const isPro = plan === "pro" || plan === "agency";
+  const isAgency = plan === "agency";
   document.getElementById("profTabProjects").style.display = isPro ? "" : "none";
+  document.getElementById("profTabTeam").style.display = isAgency ? "" : "none";
+
+  // Load data
   loadSavedScripts();
   if (isPro) loadProjects();
+  if (isAgency) loadTeamMembers();
   renderProfTransc();
+  renderProfOverview();
+
+  // Default tab
+  profTab("overview");
 }
 
 function closeProfile() {
   document.getElementById("profilePage").classList.remove("on");
   document.body.style.overflow = "";
+  closeAvatarPicker();
+}
+
+// ── Avatar picker ─────────────────────────────────────────────────────────
+function toggleAvatarPicker(e) {
+  e.stopPropagation();
+  const picker = document.getElementById("avatarPicker");
+  picker.classList.toggle("on");
+}
+
+function closeAvatarPicker() {
+  const picker = document.getElementById("avatarPicker");
+  if (picker) picker.classList.remove("on");
+}
+
+// Close picker when clicking outside
+document.addEventListener("click", (e) => {
+  const profAv = document.getElementById("profAv");
+  const picker = document.getElementById("avatarPicker");
+  if (picker && picker.classList.contains("on") && !profAv.contains(e.target) && !picker.contains(e.target)) {
+    closeAvatarPicker();
+  }
+});
+
+async function selectAvatar(seed) {
+  try {
+    const res = await fetch("/profile/avatar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seed }),
+    });
+    if (!res.ok) { showToast("Could not save avatar"); return; }
+    // Update local state
+    if (st.user) st.user.avatar_seed = seed;
+    // Update all avatar elements
+    updateAllAvatars(seed);
+    // Update picker grid selection
+    document.querySelectorAll(".avatar-option").forEach(el => {
+      el.classList.toggle("selected", el.title === seed);
+    });
+    closeAvatarPicker();
+    showToast("Avatar updated");
+  } catch { showToast("Connection error"); }
+}
+
+function updateAllAvatars(seed) {
+  const url = dicebearUrl(seed);
+  // Nav user pill
+  const navAv = document.getElementById("userAv");
+  if (navAv) { navAv.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" />`; }
+  // Drawer
+  const drawerAv = document.getElementById("drawerAv");
+  if (drawerAv) { drawerAv.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" />`; }
+  // Profile page avatar
+  const profAv = document.getElementById("profAv");
+  if (profAv) {
+    profAv.innerHTML = `<div class="prof-av-edit">Edit</div>`;
+    const img = document.createElement("img");
+    img.src = url;
+    img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;inset:0";
+    profAv.prepend(img);
+  }
 }
 
 function profTab(tab) {
-  document.querySelectorAll(".prof-tab").forEach((b, i) => {
-    b.classList.toggle("on", (tab === "transc" && i === 0) || (tab === "scripts" && i === 1) || (tab === "projects" && i === 2));
+  // Map tab name → panel id
+  const panels = { overview: "profPanelOverview", scripts: "profPanelScripts", transc: "profPanelTransc", projects: "profPanelProjects", team: "profPanelTeam" };
+  Object.entries(panels).forEach(([k, pid]) => {
+    const panel = document.getElementById(pid);
+    if (panel) panel.style.display = k === tab ? "" : "none";
   });
-  document.getElementById("profListTransc").style.display = tab === "transc" ? "" : "none";
-  document.getElementById("profListScripts").style.display = tab === "scripts" ? "" : "none";
-  document.getElementById("profListProjects").style.display = tab === "projects" ? "" : "none";
+  // Highlight correct tab button
+  const tabIds = { overview: "profTabOverview", scripts: "profTabScripts", transc: "profTabTransc", projects: "profTabProjects", team: "profTabTeam" };
+  Object.entries(tabIds).forEach(([k, bid]) => {
+    const btn = document.getElementById(bid);
+    if (btn) btn.classList.toggle("on", k === tab);
+  });
+}
+
+function renderProfOverview() {
+  const el = document.getElementById("profRecentScripts");
+  const all = [...histCache.slice(0, 5), ...scriptsCache.slice(0, 5)]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 8);
+
+  if (!all.length) {
+    el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">📄</div>No scripts yet. Transcribe your first reel!</div>';
+    return;
+  }
+  el.innerHTML = all.map(it => {
+    const isTransc = !it._src || it._src === "transc";
+    const text = it.text || it.content || it.script || "";
+    const title = isTransc ? `${it.platform || "Reel"} · ${fmtDate(it.created_at)}` : (STYLE_LABELS[it.style] || it.title || "Script");
+    const icon = isTransc ? "📄" : "✨";
+    return `<div class="recent-script-item" onclick="${isTransc ? `viewItem(${it.id})` : `viewScript('${it.id}')`}">
+      <span class="rsi-icon">${icon}</span>
+      <div class="rsi-info">
+        <div class="rsi-title">${esc(title)}</div>
+        <div class="rsi-meta">${esc(text.slice(0, 80))}${text.length > 80 ? "…" : ""}</div>
+      </div>
+      <span class="rsi-link">View →</span>
+    </div>`;
+  }).join("");
 }
 
 function renderProfTransc() {
@@ -2318,7 +2890,7 @@ function renderProfTransc() {
         <button onclick="cpHist(${it.id},this)">Copy</button>
         <button onclick="viewItem(${it.id})">View</button>
         <button onclick="profAdaptFromTransc(${it.id})">✨ Adapt</button>
-        <button class="del" onclick="delItem(${it.id},this);setTimeout(()=>{renderProfTransc();document.getElementById('profStatTransc').textContent=histCache.length},300)">Delete</button>
+        <button class="del" onclick="delItem(${it.id},this);setTimeout(()=>{renderProfTransc();renderProfOverview();document.getElementById('profStatTransc').textContent=histCache.length},300)">Delete</button>
       </div>
     </div>
   `).join("");
@@ -2342,6 +2914,7 @@ async function loadSavedScripts() {
     }
     document.getElementById("profStatScripts").textContent = scriptsCache.length;
     renderProfScripts();
+    renderProfOverview();
   } catch {}
 }
 
@@ -2411,43 +2984,70 @@ async function loadProjects() {
 }
 
 function renderProfProjects() {
-  const el = document.getElementById("profListProjects");
-  let html = '<div style="padding:12px;text-align:right"><button class="btn-topup-sm" onclick="promptNewProject()">+ Nuevo proyecto</button></div>';
+  const grid = document.getElementById("profProjGrid");
+  const empty = document.getElementById("profProjEmpty");
   if (!projectsCache.length) {
-    html += '<div class="prof-empty"><div class="prof-empty-icon">📁</div>No projects yet.</div>';
-  } else {
-    html += projectsCache.map(p => `
-      <div class="prof-card">
-        <div class="prof-card-top">
-          <span class="prof-card-badge">📁 ${esc(p.name)}</span>
-          <span class="prof-card-date">${fmtDate(p.created_at)}</span>
-        </div>
-        ${p.style_prompt ? `<div class="prof-card-text" style="font-size:.8rem;color:var(--text3)">${esc(p.style_prompt.slice(0, 120))}</div>` : ""}
-        <div class="prof-card-acts">
-          <button onclick="filterScriptsByProject('${p.id}','${esc(p.name)}')">View scripts</button>
-          <button class="del" onclick="delProject('${p.id}')">Delete</button>
-        </div>
-      </div>
-    `).join("");
+    grid.innerHTML = "";
+    empty.style.display = "";
+    return;
   }
-  el.innerHTML = html;
+  empty.style.display = "none";
+  grid.innerHTML = projectsCache.map(p => `
+    <div class="proj-card" onclick="filterScriptsByProject('${p.id}','${esc(p.name)}')">
+      <div class="proj-card-name">📁 ${esc(p.name)}</div>
+      <div class="proj-card-meta">
+        <span>${fmtDate(p.created_at)}</span>
+      </div>
+      ${p.style_prompt ? `<div class="proj-card-style">${esc(p.style_prompt.slice(0, 80))}</div>` : ""}
+      <div class="proj-card-acts" onclick="event.stopPropagation()">
+        <button class="btn-sm" onclick="filterScriptsByProject('${p.id}','${esc(p.name)}')">View scripts</button>
+        <button class="btn-sm del" onclick="delProject('${p.id}')">Delete</button>
+      </div>
+    </div>
+  `).join("");
 }
 
-async function promptNewProject() {
-  const name = prompt("Nombre del proyecto:");
-  if (!name) return;
-  const style = prompt("Estilo predefinido (opcional):", "");
+function openNewProjectModal() {
+  document.getElementById("newProjName").value = "";
+  document.getElementById("newProjStyle").value = "";
+  document.getElementById("newProjErr").classList.remove("on");
+  openModal("newProjectOverlay");
+  setTimeout(() => document.getElementById("newProjName").focus(), 100);
+}
+
+async function submitNewProject() {
+  const name = document.getElementById("newProjName").value.trim();
+  const style = document.getElementById("newProjStyle").value.trim();
+  const err = document.getElementById("newProjErr");
+  err.classList.remove("on");
+  if (!name) { err.textContent = "Project name is required"; err.classList.add("on"); return; }
   const res = await fetch("/projects", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, style_prompt: style || "" }),
+    body: JSON.stringify({ name, style_prompt: style }),
   });
-  if (!res.ok) { const d = await res.json(); showToast(d.error || "Error"); return; }
-  showToast("Proyecto creado");
+  if (!res.ok) { const d = await res.json(); err.textContent = d.error || "Error creating project"; err.classList.add("on"); return; }
+  closeModal("newProjectOverlay");
+  showToast("Project created");
   await loadProjects();
 }
 
+// Alias for backward compat
+async function promptNewProject() { openNewProjectModal(); }
+
+async function createProject(name, stylePrompt) {
+  const res = await fetch("/projects", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, style_prompt: stylePrompt || "" }),
+  });
+  if (!res.ok) { const d = await res.json(); showToast(d.error || "Error"); return null; }
+  const p = await res.json();
+  showToast("Project created");
+  await loadProjects();
+  return p;
+}
+
 async function delProject(id) {
-  if (!confirm("¿Eliminar este proyecto?")) return;
+  if (!confirm("Delete this project?")) return;
   await fetch(`/projects/${id}`, { method: "DELETE" });
   await loadProjects();
 }
@@ -2460,8 +3060,121 @@ async function filterScriptsByProject(projectId, name) {
     scriptsCache = await r.json();
     document.getElementById("profStatScripts").textContent = scriptsCache.length;
     renderProfScripts();
-    showToast(`Mostrando guiones de "${name}"`);
+    showToast(`Showing scripts in "${name}"`);
   } catch {}
+}
+
+// ── Team (agency) ─────────────────────────────────────────────────────────
+let teamCache = [];
+
+async function loadTeamMembers() {
+  try {
+    const r = await fetch("/agency/members");
+    if (!r.ok) return;
+    teamCache = await r.json();
+    renderTeamMembers();
+  } catch {}
+}
+
+function renderTeamMembers() {
+  const el = document.getElementById("profTeamList");
+  if (!teamCache.length) {
+    el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">👥</div>No team members yet. Invite your first one!</div>';
+    return;
+  }
+  el.innerHTML = teamCache.map(m => {
+    const seed = m.avatar_seed;
+    const avatarHtml = seed
+      ? `<img src="${dicebearUrl(seed)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" />`
+      : `<div style="width:100%;height:100%;background:var(--grad);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:.85rem">${(m.email||"?")[0].toUpperCase()}</div>`;
+    const statusClass = m.role === "owner" ? "owner" : (m.status === "active" ? "active" : "pending");
+    const statusLabel = m.role === "owner" ? "Owner" : (m.status === "active" ? "Active" : "Pending");
+    return `<div class="team-member">
+      <div class="team-member-av">${avatarHtml}</div>
+      <div class="team-member-info">
+        <div class="team-member-email">${esc(m.email || "—")}</div>
+        <div class="team-member-meta">
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+          ${m.monthly_usage !== undefined ? `<span>${m.monthly_usage} uses this month</span>` : ""}
+        </div>
+      </div>
+      ${m.role !== "owner" ? `<button class="btn-sm del" onclick="removeMember('${m.id}')">Remove</button>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function openInviteModal() {
+  document.getElementById("inviteEmail").value = "";
+  document.getElementById("inviteErr").classList.remove("on");
+  openModal("inviteOverlay");
+  setTimeout(() => document.getElementById("inviteEmail").focus(), 100);
+}
+
+async function submitInvite() {
+  const email = document.getElementById("inviteEmail").value.trim();
+  const err = document.getElementById("inviteErr");
+  err.classList.remove("on");
+  if (!email) { err.textContent = "Email is required"; err.classList.add("on"); return; }
+  await inviteMember(email);
+}
+
+async function inviteMember(email) {
+  const err = document.getElementById("inviteErr");
+  try {
+    const res = await fetch("/agency/invite", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const d = await res.json();
+    if (!res.ok) {
+      if (err) { err.textContent = d.error || "Could not send invite"; err.classList.add("on"); }
+      else showToast(d.error || "Could not send invite");
+      return;
+    }
+    closeModal("inviteOverlay");
+    showToast("Invitation sent to " + email);
+    await loadTeamMembers();
+  } catch { showToast("Connection error"); }
+}
+
+async function removeMember(memberId) {
+  if (!confirm("Remove this member from your team?")) return;
+  try {
+    const res = await fetch(`/agency/members/${memberId}`, { method: "DELETE" });
+    if (!res.ok) { const d = await res.json(); showToast(d.error || "Error"); return; }
+    showToast("Member removed");
+    await loadTeamMembers();
+  } catch { showToast("Connection error"); }
+}
+
+async function copyInviteLink() {
+  try {
+    const res = await fetch("/agency/invite-link");
+    const d = await res.json();
+    if (res.ok && d.link) {
+      navigator.clipboard.writeText(d.link);
+      showToast("Invite link copied!");
+    } else {
+      showToast(d.error || "Could not get invite link");
+    }
+  } catch { showToast("Connection error"); }
+}
+
+async function joinAgency(token) {
+  try {
+    const res = await fetch("/agency/join", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      showToast("You have joined the team!");
+      history.replaceState({}, "", "/");
+      await refreshMe();
+    } else {
+      showToast(d.error || "Invalid or expired invite link");
+    }
+  } catch { showToast("Connection error"); }
 }
 
 function profAdaptFromTransc(id) {
@@ -2601,123 +3314,164 @@ function hideLoading(success = true) {
   }, success ? 600 : 0);
 }
 
-// ── Transcribe ────────────────────────────────────────────────────────────
-async function doTranscribe() {
-  const url  = urlInput.value.trim();
+// ── Result panel system ───────────────────────────────────────────────────
+let rsResults = [];
+let rsPending = [];
+let rsProcessing = false;
+
+function rsShowPanel() {
+  document.getElementById("heroInputWrap").classList.add("has-result");
+}
+
+function rsToggleCard(head) {
+  head.closest(".rs-card").classList.toggle("collapsed");
+}
+
+function rsCopyResult(btn, idx) {
+  navigator.clipboard.writeText(rsResults[idx].text);
+  const tip = btn.querySelector(".rs-tip");
+  tip.textContent = "Copied!";
+  btn.classList.add("ok");
+  setTimeout(() => { btn.classList.remove("ok"); tip.textContent = "Copy"; }, 1500);
+}
+
+function rsUseInAdapt(idx) {
+  const text = rsResults[idx].text;
+  const adaptInput = document.getElementById("adaptInput");
+  if (adaptInput) {
+    adaptInput.value = text;
+    adaptInput.scrollIntoView({ behavior: "smooth", block: "center" });
+    showToast("Copied to Make it yours");
+  }
+}
+
+function rsRenderQueue() {
+  const list = document.getElementById("queueList");
+  if (!rsPending.length) { list.style.display = "none"; return; }
+  list.style.display = "flex";
+  list.innerHTML = rsPending.map((url, i) => {
+    const short = url.replace(/^https?:\/\/(www\.)?/, "").substring(0, 45);
+    return `<div class="queue-item">
+      <span class="queue-item-url">${esc(short)}</span>
+      <button class="queue-item-rm" onclick="rsRemovePending(${i})">✕</button>
+    </div>`;
+  }).join("");
+}
+
+function rsRemovePending(idx) {
+  rsPending.splice(idx, 1);
+  rsRenderQueue();
+}
+
+async function rsProcessQueue() {
+  if (rsProcessing || !rsPending.length) return;
+  rsProcessing = true;
+  while (rsPending.length) {
+    const url = rsPending.shift();
+    rsRenderQueue();
+    await rsTranscribeOne(url);
+  }
+  rsProcessing = false;
+  if (st.user) loadHistory();
+}
+
+async function rsTranscribeOne(url) {
   const lang = document.getElementById("language").value;
-  if (!url) { showToast("Pega una URL primero"); return; }
+  const panel = document.getElementById("resultPanel");
 
-  const btn  = document.getElementById("btnTranscribe");
-  const box  = document.getElementById("resultBox");
-  const txt  = document.getElementById("resultTxt");
-  const acts = document.getElementById("resultActs");
+  rsShowPanel();
 
-  btn.disabled = true;
-  showLoading();
-  box.classList.remove("on");
-  txt.className = "result-text";
-  acts.innerHTML = "";
+  // Loading card
+  const loader = document.createElement("div");
+  loader.className = "rs-card";
+  const shortUrl = url.replace(/^https?:\/\/(www\.)?/, "").substring(0, 40);
+  loader.innerHTML = `<div class="rs-card-loading">
+    <div class="dot-b"></div><div class="dot-b"></div><div class="dot-b"></div>
+    <span class="rs-card-loading-msg">${esc(shortUrl)}</span>
+  </div>`;
+  panel.prepend(loader);
 
   try {
-    // 1. Encolar tarea
     const res = await fetch("/transcribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, language: lang }),
     });
     const d = await res.json();
+    if (!res.ok) { loader.remove(); showToast(d.error || "Error"); return; }
 
-    if (!res.ok) {
-      txt.classList.add("err");
-      txt.textContent = d.error || "Error desconocido";
-      hideLoading(false);
-      box.classList.add("on");
-      btn.disabled = false;
-      return;
-    }
-
-    const taskId = d.task_id;
-
-    // 2. Polling hasta que termine
     const result = await new Promise((resolve) => {
       const interval = setInterval(async () => {
         try {
-          const r = await fetch(`/task/${taskId}`);
+          const r = await fetch(`/task/${d.task_id}`);
           const s = await r.json();
-
-          if (s.state === "progress" || s.state === "pending") {
-            const msg = document.getElementById("loadingMsg");
-            if (msg && s.step) msg.textContent = s.step;
-            return;
-          }
-
+          if (s.state === "progress" || s.state === "pending") return;
           clearInterval(interval);
           resolve(s);
-        } catch {
-          clearInterval(interval);
-          resolve({ state: "error", error: "Error de conexión." });
-        }
+        } catch { clearInterval(interval); resolve({ state: "error", error: "Connection error" }); }
       }, 2000);
     });
 
-    // 3. Mostrar resultado
-    if (result.state === "error") {
-      txt.classList.add("err");
-      txt.textContent = result.error || "Error desconocido";
-    } else {
-      txt.textContent = result.text;
-      if (result.credits_cents !== undefined) {
-        st.credits = result.credits_cents;
-        st.freeUsed = result.free_used_today;
-        document.getElementById("balDisp").textContent = usos(result.credits_cents);
-      }
-      if (st.monthlyLimit) st.monthlyUsage++;
-      renderFreeBar();
+    loader.remove();
+    if (result.state === "error") { showToast(result.error || "Failed"); return; }
 
-      acts.appendChild(mkBtn("Copiar texto", b => {
-        navigator.clipboard.writeText(result.text);
-        b.textContent = "¡Copiado!";
-        setTimeout(() => (b.textContent = "Copiar texto"), 2000);
-      }));
+    // Title from URL
+    const plat = url.includes("instagram") ? "Instagram" : url.includes("tiktok") ? "TikTok" : "Reel";
+    const slug = url.match(/\/(?:reel|p|video)\/([\w-]+)/)?.[1] || new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+    const title = `${plat} · ${slug}`;
 
-      if (st.plan === "pro" || st.plan === "agency") {
-        acts.appendChild(mkBtn("💾 Guardar guion", async b => {
-          const title = prompt("Título del guion:", url.split("/").pop() || new Date().toLocaleDateString());
-          if (!title) return;
-          b.disabled = true;
-          const r = await fetch("/scripts", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title, transcription: result.text, reel_url: url }),
-          });
-          if (r.ok) { b.textContent = "✓ Guardado"; showToast("Guion guardado"); }
-          else { b.disabled = false; showToast("Error al guardar"); }
-        }));
-      }
+    const idx = rsResults.length;
+    rsResults.push({ url, text: result.text, platform: plat });
 
-      document.getElementById("transformSection").style.display = "block";
-      document.getElementById("transformResult").classList.remove("on");
-      document.getElementById("inlineSpinner").classList.remove("on");
-      document.querySelectorAll(".style-chip").forEach(c => c.classList.remove("act"));
-      document.getElementById("customChipRow").classList.remove("on");
+    // Also set in legacy resultTxt for adapt section compatibility
+    document.getElementById("resultTxt").textContent = result.text;
 
-      if (d.cost_cents > 0) {
-        const t = document.createElement("span");
-        t.className = "cost-tag";
-        t.textContent = `−${eur(d.cost_cents)} de saldo`;
-        acts.appendChild(t);
-      }
+    const card = document.createElement("div");
+    card.className = "rs-card";
+    card.innerHTML = `
+      <div class="rs-card-head" onclick="rsToggleCard(this)">
+        <span class="rs-card-toggle">▼</span>
+        <span class="rs-card-plat">${esc(plat)}</span>
+        <span class="rs-card-title">${esc(title)}</span>
+        <button class="rs-card-copy" onclick="event.stopPropagation();rsCopyResult(this, ${idx})">
+          <span class="rs-tip">Copy</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+      <div class="rs-card-body">${esc(result.text)}</div>
+      <div class="rs-card-actions">
+        <button class="rs-card-act" onclick="rsUseInAdapt(${idx})">✨ Make it yours</button>
+      </div>
+    `;
+    // Collapse previous cards
+    panel.querySelectorAll(".rs-card").forEach(c => c.classList.add("collapsed"));
+    panel.prepend(card);
 
-      if (st.user) loadHistory();
+    if (result.credits_cents !== undefined) {
+      st.credits = result.credits_cents;
+      st.freeUsed = result.free_used_today;
+      document.getElementById("balDisp").textContent = usos(result.credits_cents);
     }
+    if (st.monthlyLimit) st.monthlyUsage++;
+    renderFreeBar();
 
-  } catch {
-    txt.classList.add("err");
-    txt.textContent = "Error de conexión.";
-  }
+  } catch { loader.remove(); showToast("Connection error"); }
+}
 
-  hideLoading(!txt.classList.contains("err"));
-  box.classList.add("on");
-  btn.disabled = false;
+// Transcribe button — sends current URL to queue
+function doTranscribe() {
+  const input = document.getElementById("urlInput");
+  const url = input.value.trim();
+  if (!url) { showToast("Paste a URL first"); return; }
+  rsPending.push(url);
+  input.value = "";
+  input.dispatchEvent(new Event("input"));
+  rsRenderQueue();
+  if (!rsProcessing) rsProcessQueue();
+}
+
+// "+" button — same as transcribe
+function addToQueue() {
+  doTranscribe();
 }
 
 // ── Inline transform (chips in result) ────────────────────────────────────
@@ -3151,10 +3905,9 @@ const TUTORIAL_VIDEO_URL = "https://www.youtube.com/embed/PLACEHOLDER";
 
 const TOUR_STEPS = [
   { target: '[data-tour="url-input"]',            text: "Paste your Instagram reel link here to get started." },
-  { target: '[data-tour="transcribe-button"]',     text: "Hit transcribe and we'll extract the full audio text in seconds." },
   { target: '[data-tour="transcription-output"]',  text: "Your transcription appears here. This is the raw text from the reel." },
-  { target: '[data-tour="script-generator"]',      text: "Choose a style and turn the transcription into your own script." },
-  { target: '[data-tour="save-button"]',           text: "Save your script to your profile and access it anytime." },
+  { target: '[data-tour="transform-section"]',     text: "Choose a style and turn the transcription into your own viral script." },
+  { target: '[data-tour="user-profile"]',          text: "All your transcriptions and scripts are saved here in your profile." },
 ];
 
 let tourStep = 0;
