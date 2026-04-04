@@ -47,7 +47,7 @@
       --glow:   0 0 0 3px rgba(249,115,22,.2), 0 0 20px rgba(249,115,22,.15);
     }
     [data-theme="light"] .hero-badge { color: #7c3a00; border-color: rgba(180,80,0,0.4); background: rgba(255,140,0,0.12); }
-    [data-theme="light"] .aurora-canvas { opacity: .8; }
+    [data-theme="light"] .aurora-canvas { opacity: 1; }
     [data-theme="light"] nav { background: rgba(250,250,250,.85); }
     [data-theme="light"] ::-webkit-scrollbar-track { background: var(--bg); }
     [data-theme="light"] ::-webkit-scrollbar-thumb { background: var(--border); }
@@ -441,7 +441,7 @@
     /* ── Hazlo tuyo — full viewport ────────────────────────────── */
     .adapt-section {
       min-height: 100vh;
-      background: var(--bg);
+      background: transparent;
       position: relative; overflow: hidden;
       display: flex; align-items: center;
       padding: 80px 24px;
@@ -700,16 +700,8 @@
     /* ── Flow diagram ───────────────────────────────────────────── */
     .flow-section {
       padding: 80px 24px;
-      background: linear-gradient(to bottom,
-        var(--bg)   0%,
-        var(--bg)   100%
-      );
-      position: relative;
-    }
-    .flow-section::before {
-      content: ""; pointer-events: none;
-      position: absolute; top: 0; left: 0; right: 0; height: 80px;
-      background: linear-gradient(to bottom, var(--surf), transparent);
+      background: transparent;
+      position: relative; overflow: hidden;
     }
     .flow-container { max-width: 980px; margin: 0 auto; }
     .flow-header { text-align: center; margin-bottom: 56px; }
@@ -938,7 +930,8 @@
     .cta-section {
       padding: 96px 24px;
       text-align: center;
-      background: radial-gradient(ellipse at center, rgba(249,115,22,.12) 0%, transparent 70%);
+      background: transparent;
+      position: relative; overflow: hidden;
     }
     .cta-h2 { font-size: clamp(1.8rem,4vw,2.8rem); font-weight: 900; letter-spacing: -1px; margin-bottom: 12px; }
     .cta-sub { color: var(--text2); font-size: 1.05rem; margin-bottom: 32px; }
@@ -1984,7 +1977,7 @@
 
 <!-- ── HAZLO TUYO ─────────────────────────────────────────────────────── -->
 <div class="adapt-section">
-  <canvas class="aurora-canvas" id="adaptAurora" style="opacity:.25"></canvas>
+  <canvas class="aurora-canvas" id="adaptAurora" style="opacity:.5"></canvas>
   <div class="adapt-inner fade-in" id="adaptCard">
 
     <!-- LEFT: input + style grid -->
@@ -2109,7 +2102,8 @@
 
 <!-- ── FLUJO DE PASOS ──────────────────────────────────────────────────── -->
 <div class="flow-section fade-in">
-  <div class="flow-container">
+  <canvas class="aurora-canvas" id="flowAurora" style="opacity:.4"></canvas>
+  <div class="flow-container" style="position:relative;z-index:1">
     <div class="flow-header">
       <h2 class="s-title" data-i18n="flow.h2">Cómo funciona esto.<br><span class="grad-txt">Sin humo.</span></h2>
       <p class="s-sub" style="margin:0 auto" data-i18n="flow.sub">Spoiler: es exactamente tan fácil como parece.</p>
@@ -2171,7 +2165,7 @@
 
 <!-- ── PRICING ────────────────────────────────────────────────────────── -->
 <div class="section-sm fade-in" id="pricingSection" style="position:relative;overflow:hidden">
-  <canvas class="aurora-canvas" id="pricingAurora" style="opacity:.35"></canvas>
+  <canvas class="aurora-canvas" id="pricingAurora" style="opacity:.5"></canvas>
   <div style="text-align:center;margin-bottom:8px;position:relative;z-index:1">
     <div class="s-label" data-i18n="pricing.tag">PLANS</div>
     <h2 class="s-title" data-i18n="pricing.h2">Choose your plan.<br><span class="grad-txt" style="font-style:italic">Start free, scale when ready.</span></h2>
@@ -2212,16 +2206,17 @@
 
 <!-- ── CTA FINAL ──────────────────────────────────────────────────────── -->
 <div class="cta-section fade-in">
-  <h2 class="cta-h2" data-i18n="cta.h2">Empieza ahora.<br><span class="grad-txt">Es gratis.</span></h2>
-  <p class="cta-sub" data-i18n="cta.sub">Tu primer reel transcrito en menos de 10 segundos.</p>
-  <div class="cta-pills">
+  <canvas class="aurora-canvas" id="ctaAurora" style="opacity:.45"></canvas>
+  <h2 class="cta-h2" style="position:relative;z-index:1" data-i18n="cta.h2">Empieza ahora.<br><span class="grad-txt">Es gratis.</span></h2>
+  <p class="cta-sub" style="position:relative;z-index:1" data-i18n="cta.sub">Tu primer reel transcrito en menos de 10 segundos.</p>
+  <div class="cta-pills" style="position:relative;z-index:1">
     <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill1">3 free/day</span></span>
     <span style="color:var(--text3)">·</span>
     <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill2">Sin suscripción</span></span>
     <span style="color:var(--text3)">·</span>
     <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill3">Saldo sin caducidad</span></span>
   </div>
-  <button class="btn-shimmer" style="max-width:320px;margin:0 auto;display:block" onclick="document.getElementById('urlInput').focus();window.scrollTo({top:0,behavior:'smooth'})" data-i18n="cta.btn">
+  <button class="btn-shimmer" style="max-width:320px;margin:0 auto;display:block;position:relative;z-index:1" onclick="document.getElementById('urlInput').focus();window.scrollTo({top:0,behavior:'smooth'})" data-i18n="cta.btn">
     ✦ Probar gratis ahora
   </button>
 </div>
@@ -4290,7 +4285,9 @@ function createAurora(canvasId) {
 }
 createAurora("auroraCanvas");
 createAurora("adaptAurora");
+createAurora("flowAurora");
 createAurora("pricingAurora");
+createAurora("ctaAurora");
 
 // ── Onboarding Tour ──────────────────────────────────────────────────────
 const TUTORIAL_VIDEO_URL = "https://www.youtube.com/embed/PLACEHOLDER";
