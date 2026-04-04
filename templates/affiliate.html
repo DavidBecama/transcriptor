@@ -169,8 +169,8 @@
       text-align: center; padding: 40px 0; display: none;
     }
     .form-success.on { display: block; }
-    .form-success h3 { font-family: var(--font-display); font-size: 1.4rem; margin-bottom: 8px; font-weight: 400; }
-    .form-success p { color: var(--text2); font-weight: 300; }
+    .form-success h3 { font-family: var(--font-display); font-size: 1.6rem; margin-bottom: 8px; font-weight: 400; }
+    .form-success p { color: var(--text2); font-weight: 300; font-size: .88rem; }
 
     /* Footer */
     .footer {
@@ -207,8 +207,8 @@
   <div class="steps">
     <div class="step">
       <div class="step-num">1</div>
-      <h3>Apply</h3>
-      <p>Fill in the form below. We review and approve within 24h.</p>
+      <h3>Sign up</h3>
+      <p>Fill in the form below and get your unique link instantly.</p>
     </div>
     <div class="step">
       <div class="step-num">2</div>
@@ -277,7 +277,7 @@
 <!-- APPLICATION FORM -->
 <section class="form-section" id="apply">
   <h2>Ready to start earning?</h2>
-  <p>Apply below. We'll review and send your unique link within 24 hours.</p>
+  <p>Apply below and get your unique affiliate link instantly.</p>
 
   <form id="affiliateForm" onsubmit="submitAffiliate(event)">
     <div class="form-group">
@@ -302,13 +302,19 @@
         <option value="100k+">100k+</option>
       </select>
     </div>
-    <button type="submit" class="btn-submit" id="affSubmitBtn">Apply to become an affiliate &rarr;</button>
+    <button type="submit" class="btn-submit" id="affSubmitBtn">Get your affiliate link &rarr;</button>
     <div class="form-err" id="affErr"></div>
   </form>
 
   <div class="form-success" id="affSuccess">
-    <h3>You're in the queue.</h3>
-    <p>We'll reach out to <strong id="affSuccessEmail"></strong> within 24 hours.</p>
+    <div style="width:52px;height:52px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:22px;color:var(--accent)">&#10003;</div>
+    <h3 id="affSuccessTitle">You're in.</h3>
+    <p id="affSuccessDesc">Your affiliate link is live. Start sharing and earning 30% on every sale.</p>
+    <div style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 16px">
+      <span id="affLink" style="font-size:.82rem;color:var(--accent);word-break:break-all;text-align:left"></span>
+      <button onclick="copyAffLink()" id="affCopyBtn" style="flex-shrink:0;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);padding:8px 16px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s">Copy</button>
+    </div>
+    <p style="font-size:.75rem;color:var(--text3)">Share this link anywhere. Every paying customer earns you 30%.</p>
   </div>
 </section>
 
@@ -382,13 +388,33 @@ async function submitAffiliate(e) {
     err.textContent = d.error || "Error submitting";
     err.classList.add("on");
     btn.disabled = false;
-    btn.textContent = "Apply to become an affiliate \u2192";
+    btn.textContent = "Get your affiliate link \u2192";
     return;
   }
 
   document.getElementById("affiliateForm").style.display = "none";
-  document.getElementById("affSuccessEmail").textContent = d.email;
+  document.getElementById("affLink").textContent = d.link;
+  if (d.already_exists) {
+    document.getElementById("affSuccessTitle").textContent = "Welcome back!";
+    document.getElementById("affSuccessDesc").textContent = "Your affiliate link is ready to share.";
+  }
   document.getElementById("affSuccess").classList.add("on");
+}
+
+function copyAffLink() {
+  const link = document.getElementById("affLink").textContent;
+  const btn = document.getElementById("affCopyBtn");
+  navigator.clipboard.writeText(link);
+  btn.textContent = "\u2713 Copied!";
+  btn.style.background = "rgba(34,197,94,.15)";
+  btn.style.borderColor = "rgba(34,197,94,.4)";
+  btn.style.color = "#22c55e";
+  setTimeout(() => {
+    btn.textContent = "Copy";
+    btn.style.background = "";
+    btn.style.borderColor = "";
+    btn.style.color = "";
+  }, 2000);
 }
 </script>
 </body>

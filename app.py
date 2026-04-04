@@ -1130,6 +1130,7 @@ def profile_data():
 
 @app.route("/affiliate/apply", methods=["POST"])
 def affiliate_apply():
+    import re
     body = request.get_json()
     name = (body.get("name") or "").strip()
     email = (body.get("email") or "").strip().lower()
@@ -1139,15 +1140,38 @@ def affiliate_apply():
     if not name or not email:
         return jsonify({"error": "Name and email required"}), 400
 
-    # Check duplicate
-    existing = db.table("affiliate_applications").select("id").eq("email", email).execute()
+    # Check if already an affiliate
+    existing = db.table("affiliates").select("code, status").eq("email", email).execute()
     if existing.data:
-        return jsonify({"error": "This email is already registered. Check your inbox."}), 409
+        code = existing.data[0]["code"]
+        return jsonify({
+            "ok": True, "already_exists": True,
+            "code": code, "link": f"{request.host_url}?ref={code}",
+        })
 
-    db.table("affiliate_applications").insert({
-        "name": name, "email": email, "handle": handle, "audience_size": audience,
+    # Generate unique code from handle or name
+    base = re.sub(r"[^a-z0-9]", "", (handle or name).lower())[:12]
+    if not base:
+        base = "creator"
+    code = base
+    suffix = 1
+    while True:
+        check = db.table("affiliates").select("id").eq("code", code).execute()
+        if not check.data:
+            break
+        code = f"{base}{suffix}"
+        suffix += 1
+
+    db.table("affiliates").insert({
+        "name": name, "email": email, "code": code,
+        "handle": handle, "audience_size": audience,
+        "commission_pct": 30, "status": "active",
     }).execute()
-    return jsonify({"ok": True, "email": email})
+
+    return jsonify({
+        "ok": True, "already_exists": False,
+        "code": code, "link": f"{request.host_url}?ref={code}",
+    })
 
 
 @app.route("/affiliate/click", methods=["POST"])
