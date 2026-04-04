@@ -47,7 +47,7 @@
       --glow:   0 0 0 3px rgba(249,115,22,.2), 0 0 20px rgba(249,115,22,.15);
     }
     [data-theme="light"] .hero-badge { color: #7c3a00; border-color: rgba(180,80,0,0.4); background: rgba(255,140,0,0.12); }
-    [data-theme="light"] .aurora-canvas { opacity: 1; }
+    /* (light aurora handled by #globalAurora rule) */
     [data-theme="light"] nav { background: rgba(250,250,250,.85); }
     [data-theme="light"] ::-webkit-scrollbar-track { background: var(--bg); }
     [data-theme="light"] ::-webkit-scrollbar-thumb { background: var(--border); }
@@ -139,13 +139,14 @@
       padding: 80px 20px 60px;
       text-align: center;
     }
-    .hero > *:not(.aurora-canvas) { position: relative; z-index: 1; }
+    .hero > * { position: relative; z-index: 1; }
 
-    /* Aurora canvas */
-    .aurora-canvas {
-      position: absolute; inset: 0; width: 100%; height: 100%;
+    /* Global aurora canvas — single fixed layer behind everything */
+    #globalAurora {
+      position: fixed; inset: 0; width: 100vw; height: 100vh;
       pointer-events: none; z-index: 0;
     }
+    [data-theme="light"] #globalAurora { opacity: .8; }
 
     /* Badge */
     .hero-badge {
@@ -1848,6 +1849,9 @@
 </head>
 <body>
 
+<!-- Global aurora background -->
+<canvas id="globalAurora"></canvas>
+
 <!-- ── TOP BAR ─────────────────────────────────────────────────────────── -->
 <div style="background:rgba(249,115,22,.03);border-bottom:1px solid rgba(255,255,255,.04);text-align:center;padding:5px 0;font-size:.68rem;color:var(--text3);font-family:var(--font-body);letter-spacing:.3px">
   made by <a href="https://instagram.com/__davidayala" target="_blank" style="color:var(--purple);font-weight:600;text-decoration:none">@__davidayala</a>
@@ -1877,7 +1881,6 @@
 
 <!-- ── HERO ─────────────────────────────────────────────────────────────── -->
 <section class="hero">
-  <canvas class="aurora-canvas" id="auroraCanvas"></canvas>
 
   <div class="hero-badge">
     <div class="badge-dot"></div>
@@ -1991,10 +1994,10 @@
     <span data-i18n="hero.counter_suffix">reels transcritos hoy</span>
   </div>
 </section>
+<div style="height:1px;background:linear-gradient(90deg,transparent,rgba(249,115,22,.12),transparent);max-width:600px;margin:0 auto"></div>
 
 <!-- ── HAZLO TUYO ─────────────────────────────────────────────────────── -->
 <div class="adapt-section">
-  <canvas class="aurora-canvas" id="adaptAurora" style="opacity:.5"></canvas>
   <div class="adapt-inner fade-in" id="adaptCard">
 
     <!-- LEFT: input + style grid -->
@@ -2117,10 +2120,11 @@
   </div>
 </div>
 
+<div style="height:1px;background:linear-gradient(90deg,transparent,rgba(249,115,22,.12),transparent);max-width:600px;margin:0 auto"></div>
+
 <!-- ── FLUJO DE PASOS ──────────────────────────────────────────────────── -->
 <div class="flow-section fade-in">
-  <canvas class="aurora-canvas" id="flowAurora" style="opacity:.4"></canvas>
-  <div class="flow-container" style="position:relative;z-index:1">
+  <div class="flow-container">
     <div class="flow-header">
       <h2 class="s-title" data-i18n="flow.h2">Cómo funciona esto.<br><span class="grad-txt">Sin humo.</span></h2>
       <p class="s-sub" style="margin:0 auto" data-i18n="flow.sub">Spoiler: es exactamente tan fácil como parece.</p>
@@ -2180,14 +2184,15 @@
   </div>
 </div>
 
+<div style="height:1px;background:linear-gradient(90deg,transparent,rgba(249,115,22,.12),transparent);max-width:600px;margin:0 auto"></div>
+
 <!-- ── PRICING ────────────────────────────────────────────────────────── -->
-<div class="section-sm fade-in" id="pricingSection" style="position:relative;overflow:hidden">
-  <canvas class="aurora-canvas" id="pricingAurora" style="opacity:.5"></canvas>
+<div class="section-sm fade-in" id="pricingSection">
   <div style="text-align:center;margin-bottom:8px;position:relative;z-index:1">
     <div class="s-label" data-i18n="pricing.tag">PLANS</div>
     <h2 class="s-title" data-i18n="pricing.h2">Choose your plan.<br><span class="grad-txt" style="font-style:italic">Start free, scale when ready.</span></h2>
   </div>
-  <div class="pricing-cards" style="grid-template-columns:repeat(4,1fr);position:relative;z-index:1">
+  <div class="pricing-cards" style="grid-template-columns:repeat(4,1fr)">
     <div class="price-card" id="planCard-free">
       <div class="price-icon">✅</div>
       <div class="price-title">Free</div>
@@ -2217,23 +2222,24 @@
       <button class="btn-plan" onclick="subscribePlan(PLAN_PRICES.agency)">Elegir Agencia</button>
     </div>
   </div>
-  <p style="text-align:center;margin-top:20px;color:var(--text3);font-size:.82rem;position:relative;z-index:1" id="topupCta"></p>
+  <p style="text-align:center;margin-top:20px;color:var(--text3);font-size:.82rem" id="topupCta"></p>
 </div>
 
 
+<div style="height:1px;background:linear-gradient(90deg,transparent,rgba(249,115,22,.12),transparent);max-width:600px;margin:0 auto"></div>
+
 <!-- ── CTA FINAL ──────────────────────────────────────────────────────── -->
 <div class="cta-section fade-in">
-  <canvas class="aurora-canvas" id="ctaAurora" style="opacity:.45"></canvas>
-  <h2 class="cta-h2" style="position:relative;z-index:1" data-i18n="cta.h2">Empieza ahora.<br><span class="grad-txt">Es gratis.</span></h2>
-  <p class="cta-sub" style="position:relative;z-index:1" data-i18n="cta.sub">Tu primer reel transcrito en menos de 10 segundos.</p>
-  <div class="cta-pills" style="position:relative;z-index:1">
+  <h2 class="cta-h2" data-i18n="cta.h2">Empieza ahora.<br><span class="grad-txt">Es gratis.</span></h2>
+  <p class="cta-sub" data-i18n="cta.sub">Tu primer reel transcrito en menos de 10 segundos.</p>
+  <div class="cta-pills">
     <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill1">3 free/day</span></span>
     <span style="color:var(--text3)">·</span>
     <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill2">Sin suscripción</span></span>
     <span style="color:var(--text3)">·</span>
     <span class="cta-pill"><span class="ck">✓</span> <span data-i18n="cta.pill3">Saldo sin caducidad</span></span>
   </div>
-  <button class="btn-shimmer" style="max-width:320px;margin:0 auto;display:block;position:relative;z-index:1" onclick="document.getElementById('urlInput').focus();window.scrollTo({top:0,behavior:'smooth'})" data-i18n="cta.btn">
+  <button class="btn-shimmer" style="max-width:320px;margin:0 auto;display:block" onclick="document.getElementById('urlInput').focus();window.scrollTo({top:0,behavior:'smooth'})" data-i18n="cta.btn">
     ✦ Probar gratis ahora
   </button>
 </div>
@@ -4249,42 +4255,51 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove("on"), 3000);
 }
 
-// ── Aurora canvas ─────────────────────────────────────────────────────────
-function createAurora(canvasId) {
-  const canvas = document.getElementById(canvasId);
+// ── Global aurora background ──────────────────────────────────────────────
+(function initGlobalAurora() {
+  const canvas = document.getElementById("globalAurora");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
   let t = 0;
-  const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+  const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
   resize();
   window.addEventListener("resize", resize);
 
   const waves = [
-    { yRatio: 0.35, color: "rgba(249,115,22,0.12)", amp: 28, freq: 0.018, speed: 0.002 },
-    { yRatio: 0.55, color: "rgba(139,92,246,0.08)", amp: 20, freq: 0.022, speed: 0.003 },
-    { yRatio: 0.70, color: "rgba(249,115,22,0.07)", amp: 35, freq: 0.014, speed: 0.0015 },
-    { yRatio: 0.42, color: "rgba(180,60,0,0.06)",   amp: 22, freq: 0.020, speed: 0.0025 },
+    { yRatio: 0.20, color: "rgba(249,115,22,0.10)", amp: 40, freq: 0.016, speed: 0.002 },
+    { yRatio: 0.40, color: "rgba(139,92,246,0.06)", amp: 30, freq: 0.020, speed: 0.003 },
+    { yRatio: 0.60, color: "rgba(249,115,22,0.07)", amp: 50, freq: 0.013, speed: 0.0015 },
+    { yRatio: 0.78, color: "rgba(180,60,0,0.05)",   amp: 25, freq: 0.018, speed: 0.0025 },
+    { yRatio: 0.92, color: "rgba(139,92,246,0.04)", amp: 35, freq: 0.015, speed: 0.002 },
   ];
 
   function draw() {
     const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0b0f";
+    ctx.fillRect(0, 0, w, h);
+
+    // Top glow
+    const topGlow = ctx.createRadialGradient(w * 0.5, 0, 0, w * 0.5, 0, w * 0.6);
+    topGlow.addColorStop(0, "rgba(249,115,22,0.06)");
+    topGlow.addColorStop(1, "transparent");
+    ctx.fillStyle = topGlow;
+    ctx.fillRect(0, 0, w, h);
 
     waves.forEach((wave, i) => {
       const baseY = h * wave.yRatio;
-      const grad = ctx.createLinearGradient(0, baseY - 60, 0, baseY + 60);
+      const grad = ctx.createLinearGradient(0, baseY - 80, 0, baseY + 80);
       grad.addColorStop(0, "transparent");
       grad.addColorStop(0.5, wave.color);
       grad.addColorStop(1, "transparent");
 
       ctx.beginPath();
       ctx.moveTo(0, h);
-      for (let x = 0; x <= w; x += 8) {
+      for (let x = 0; x <= w; x += 6) {
         const y = baseY
-          + Math.sin(x * wave.freq + t * wave.speed * 60 + i) * wave.amp
-          + Math.sin(x * wave.freq * 0.5 + t * wave.speed * 40) * (wave.amp * 0.4);
+          + Math.sin(x * wave.freq + t * wave.speed * 60 + i * 1.2) * wave.amp
+          + Math.sin(x * wave.freq * 0.5 + t * wave.speed * 35 + i) * (wave.amp * 0.35);
         ctx.lineTo(x, y);
       }
       ctx.lineTo(w, h);
@@ -4293,22 +4308,11 @@ function createAurora(canvasId) {
       ctx.fill();
     });
 
-    const glow = ctx.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.45, w * 0.4);
-    glow.addColorStop(0, "rgba(249,115,22,0.04)");
-    glow.addColorStop(1, "transparent");
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, w, h);
-
     t++;
     requestAnimationFrame(draw);
   }
   draw();
-}
-createAurora("auroraCanvas");
-createAurora("adaptAurora");
-createAurora("flowAurora");
-createAurora("pricingAurora");
-createAurora("ctaAurora");
+})();
 
 // ── Onboarding Tour ──────────────────────────────────────────────────────
 const TUTORIAL_VIDEO_URL = "https://www.youtube.com/embed/PLACEHOLDER";
