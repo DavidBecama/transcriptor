@@ -441,22 +441,11 @@
     /* ── Hazlo tuyo — full viewport ────────────────────────────── */
     .adapt-section {
       min-height: 100vh;
-      background: linear-gradient(to bottom,
-        var(--bg)   0%,
-        var(--surf) 7%,
-        var(--surf) 93%,
-        var(--bg)   100%
-      );
+      background: var(--bg);
       position: relative; overflow: hidden;
       display: flex; align-items: center;
       padding: 80px 24px;
     }
-    .as-blob1, .as-blob2 {
-      position: absolute; border-radius: 50%;
-      filter: blur(100px); pointer-events: none; z-index: 0;
-    }
-    .as-blob1 { width: 520px; height: 520px; background: rgba(249,115,22,.08); top: -140px; left: -100px; }
-    .as-blob2 { width: 420px; height: 420px; background: rgba(139,92,246,.06); bottom: -80px; right: -80px; }
 
     .adapt-inner {
       max-width: 1200px; width: 100%; margin: 0 auto;
@@ -467,18 +456,19 @@
 
     /* Left column */
     .adapt-header { margin-bottom: 28px; }
-    .adapt-header h2 { font-size: clamp(1.8rem,3.5vw,2.6rem); font-weight: 900; letter-spacing: -.8px; margin-bottom: 10px; line-height: 1.1; }
-    .adapt-header p  { color: var(--text2); font-size: .95rem; line-height: 1.6; }
+    .adapt-header h2 { font-family: var(--font-display); font-size: clamp(1.8rem,3.5vw,2.6rem); font-weight: 400; letter-spacing: -.5px; margin-bottom: 10px; line-height: 1.1; }
+    .adapt-header h2 span { font-style: italic; }
+    .adapt-header p  { color: var(--text2); font-size: .92rem; line-height: 1.6; font-weight: 300; max-width: 420px; }
 
     .script-ta {
       width: 100%; min-height: 200px;
-      padding: 18px; background: var(--bg);
-      border: 1.5px solid var(--border); border-radius: var(--r);
-      font-size: .95rem; color: var(--text); resize: vertical; outline: none;
-      font-family: inherit; line-height: 1.7;
-      transition: border-color .2s, box-shadow .2s;
+      padding: 16px; background: var(--surf2);
+      border: 1px solid var(--border); border-radius: 12px;
+      font-size: .9rem; color: var(--text); resize: vertical; outline: none;
+      font-family: var(--font-body); line-height: 1.7;
+      transition: border-color .2s;
     }
-    .script-ta:focus { border-color: var(--purple); box-shadow: var(--glow); }
+    .script-ta:focus { border-color: var(--purple); }
     .script-ta::placeholder { color: var(--text3); }
 
     /* Style grid */
@@ -488,31 +478,44 @@
     }
     .style-pill {
       display: flex; flex-direction: column; align-items: flex-start;
-      gap: 6px; padding: 18px 18px 16px;
+      gap: 10px; padding: 20px 18px;
       border-radius: var(--r); border: 1px solid var(--border);
       background: var(--surf); cursor: pointer;
-      transition: all .2s ease;
-      text-align: left; min-height: 100px;
+      transition: all .18s ease;
+      text-align: left; min-height: 110px;
+      position: relative; overflow: hidden;
     }
     .style-pill[data-s="viral"]        { --sc: #ef4444; --scr: 239,68,68; }
-    .style-pill[data-s="divertido"]    { --sc: #fbbf24; --scr: 251,191,36; }
+    .style-pill[data-s="divertido"]    { --sc: #eab308; --scr: 234,179,8; }
     .style-pill[data-s="linkedin"]     { --sc: #3b82f6; --scr: 59,130,246; }
-    .style-pill[data-s="storytelling"] { --sc: #22c55e; --scr: 34,197,94; }
-    .style-pill[data-s="hooks"]        { --sc: #a78bfa; --scr: 167,139,250; }
-    .style-pill[data-s="custom"]       { --sc: #94a3b8; --scr: 148,163,184; }
+    .style-pill[data-s="storytelling"] { --sc: #a855f7; --scr: 168,85,247; }
+    .style-pill[data-s="hooks"]        { --sc: #f97316; --scr: 249,115,22; }
+    .style-pill[data-s="custom"]       { --sc: #14b8a6; --scr: 20,184,166; }
     .style-pill:hover {
-      border-color: rgba(var(--scr), .35);
+      border-color: rgba(var(--scr), .3);
       background: var(--surf2);
-      transform: scale(1.02);
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: var(--sh);
     }
     .style-pill.act {
       border-color: var(--sc);
-      background: rgba(var(--scr), .08);
+      background: var(--surf2);
       box-shadow: 0 0 20px rgba(var(--scr), .15);
     }
-    .style-pill .sp-emoji { font-size: 1.8rem; line-height: 1; margin-bottom: 2px; }
-    .style-pill .sp-name  { font-family: var(--font-display); font-size: .72rem; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text2); transition: color .2s; }
-    .style-pill .sp-hint  { font-size: .68rem; font-weight: 300; color: var(--text3); line-height: 1.4; transition: color .2s; }
+    .style-pill.act::after {
+      content: ""; position: absolute; top: 0; right: 0;
+      width: 60px; height: 60px;
+      background: radial-gradient(circle at top right, rgba(var(--scr), .2), transparent 70%);
+      pointer-events: none;
+    }
+    .style-pill .sp-emoji {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: rgba(var(--scr), .12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; line-height: 1;
+    }
+    .style-pill .sp-name  { font-family: var(--font-display); font-size: .82rem; font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: var(--text); transition: color .2s; }
+    .style-pill .sp-hint  { font-size: .72rem; font-weight: 300; color: var(--text3); line-height: 1.4; transition: color .2s; }
     [data-theme="light"] .style-pill .sp-hint { color: #555; }
     .style-pill:hover .sp-name, .style-pill.act .sp-name { color: var(--sc); }
     .style-pill:hover .sp-hint, .style-pill.act .sp-hint { color: var(--text2); }
@@ -558,15 +561,15 @@
     /* Right column — live preview */
     .adapt-right { position: sticky; top: 80px; }
     .preview-label {
-      font-size: .72rem; font-weight: 700; color: var(--text3);
-      text-transform: uppercase; letter-spacing: .8px;
+      font-family: var(--font-body); font-size: .68rem; font-weight: 500; color: var(--text3);
+      text-transform: uppercase; letter-spacing: .1em;
       margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
     }
     .preview-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
     .preview-card {
-      background: var(--bg); border: 1.5px solid var(--border);
-      border-radius: 20px; padding: 28px 28px 24px;
+      background: var(--surf); border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px; padding: 24px;
       transition: border-color .35s ease, box-shadow .35s ease;
       min-height: 420px; display: flex; flex-direction: column;
       position: relative; overflow: hidden;
@@ -594,7 +597,7 @@
     .pc-badge {
       display: inline-flex; align-items: center; gap: 5px;
       padding: 4px 12px; border-radius: 20px;
-      font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+      font-family: var(--font-body); font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
       border: 1px solid var(--border); color: var(--text3);
       transition: all .3s;
     }
@@ -606,6 +609,11 @@
     .pc-badge[data-s="custom"]       { background: rgba(148,163,184,.15); color: #94a3b8; border-color: rgba(148,163,184,.3); }
 
     .preview-content { flex: 1; position: relative; min-height: 280px; }
+    .preview-content::after {
+      content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 60px;
+      background: linear-gradient(transparent, var(--surf));
+      pointer-events: none; z-index: 2;
+    }
     .preview-slide {
       position: absolute; inset: 0;
       opacity: 0; transform: translateY(10px);
@@ -616,11 +624,12 @@
       opacity: 1; transform: translateY(0);
       pointer-events: auto; position: relative;
     }
-    .preview-text { font-size: .93rem; line-height: 1.85; color: var(--text2); white-space: pre-line; }
-    .preview-text .ph { color: var(--text); font-weight: 700; }
+    .preview-text { font-family: var(--font-body); font-size: .92rem; line-height: 1.8; color: var(--text); white-space: pre-line; }
+    .preview-text .ph { color: var(--text); font-weight: 600; }
     .preview-footer {
       margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
-      font-size: .75rem; color: var(--text3); display: flex; align-items: center; gap: 8px;
+      font-size: .72rem; color: var(--text3); display: flex; align-items: center; gap: 8px;
+      font-weight: 300; position: relative; z-index: 3;
     }
     .pf-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
     .pf-copy {
@@ -1841,7 +1850,7 @@
     <span class="logo">RS<span>ReelScript</span></span>
   </div>
   <div class="nav-r">
-    <button class="badge-bal" id="balBadge" onclick="openTopup()">⚡ <span id="balDisp">0 usos</span></button>
+    <button class="badge-bal" id="balBadge" onclick="document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'})">⚡ <span id="balDisp">0 usos</span></button>
     <div class="user-pill" id="userPill" onclick="openProfile()" style="cursor:pointer" title="Ver perfil" data-tour="user-profile">
       <div class="avatar" id="userAv" style="overflow:hidden;padding:0"></div>
       <span id="userEmail" style="font-size:.82rem;color:var(--text2)"></span>
@@ -1975,8 +1984,7 @@
 
 <!-- ── HAZLO TUYO ─────────────────────────────────────────────────────── -->
 <div class="adapt-section">
-  <div class="as-blob1"></div>
-  <div class="as-blob2"></div>
+  <canvas class="aurora-canvas" id="adaptAurora" style="opacity:.25"></canvas>
   <div class="adapt-inner fade-in" id="adaptCard">
 
     <!-- LEFT: input + style grid -->
@@ -2303,6 +2311,8 @@
             onclick="closeProfile();document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'})">
             Upgrade plan
           </button>
+          <button class="btn-topup-sm" id="profManageSub" style="display:none;background:var(--surf2);border:1px solid var(--border);color:var(--text2)"
+            onclick="manageSub()">Manage subscription</button>
           <button class="btn-topup-sm" style="background:var(--surf2);border:1px solid var(--border);color:var(--text2)"
             onclick="closeProfile();openTopup()">+ Top up</button>
         </div>
@@ -2877,6 +2887,9 @@ function renderProfileHub() {
 
   // Hide upgrade btn if already on top plan
   document.getElementById("profUpgradeBtn").style.display = plan === "agency" ? "none" : "";
+
+  // Show manage subscription if on a paid plan
+  document.getElementById("profManageSub").style.display = ["basic","pro","agency"].includes(plan) ? "" : "none";
 
   // Usage bar
   const usageWrap = document.getElementById("profUsageWrap");
@@ -4146,6 +4159,15 @@ async function subscribePlan(priceId) {
   window.location.href = d.url;
 }
 
+async function manageSub() {
+  const res = await fetch("/manage-subscription", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+  });
+  const d = await res.json();
+  if (!res.ok) { showToast(d.error || "Error"); return; }
+  window.location.href = d.url;
+}
+
 async function cancelSubscription() {
   if (!confirm("¿Cancelar tu suscripción? Seguirá activa hasta fin de período.")) return;
   const res = await fetch("/cancel-subscription", {
@@ -4267,6 +4289,7 @@ function createAurora(canvasId) {
   draw();
 }
 createAurora("auroraCanvas");
+createAurora("adaptAurora");
 createAurora("pricingAurora");
 
 // ── Onboarding Tour ──────────────────────────────────────────────────────

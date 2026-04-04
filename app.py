@@ -625,6 +625,30 @@ def create_subscription_checkout():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/manage-subscription", methods=["POST"])
+@require_auth
+def manage_subscription():
+    """Create a Stripe Customer Portal session so users can manage/cancel."""
+    if not STRIPE_OK:
+        return jsonify({"error": "Payments unavailable"}), 503
+
+    user = current_user()
+    profile = get_profile(user["id"])
+    sub_id = profile.get("stripe_subscription_id")
+    if not sub_id:
+        return jsonify({"error": "No active subscription"}), 400
+
+    try:
+        sub = stripe_lib.Subscription.retrieve(sub_id)
+        portal = stripe_lib.billing_portal.Session.create(
+            customer=sub.customer,
+            return_url=request.host_url,
+        )
+        return jsonify({"url": portal.url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/cancel-subscription", methods=["POST"])
 @require_auth
 def cancel_subscription():
