@@ -702,6 +702,16 @@
     .price-icon { font-size: 2rem; margin-bottom: 14px; }
     .price-title { font-size: 1.05rem; font-weight: 800; margin-bottom: 8px; }
     .price-desc  { font-size: .85rem; color: var(--text2); line-height: 1.6; }
+    .price-amount { font-size: 1.6rem; font-weight: 900; margin-bottom: 8px; }
+    .btn-plan {
+      margin-top: 14px; width: 100%; padding: 10px; border: none; border-radius: 8px;
+      background: var(--purple); color: #fff; font-weight: 700; font-size: .9rem;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-plan:hover { opacity: .85; }
+    .btn-plan:disabled { cursor: default; background: var(--border); color: var(--text3); }
+    .btn-plan.active { background: #22c55e; }
+    .btn-plan.active:disabled { background: #22c55e; color: #fff; opacity: .9; }
     .price-card.featured {
       border-color: rgba(249,115,22,.4);
       background: rgba(249,115,22,.06);
@@ -1343,7 +1353,7 @@
     @media (max-width: 768px) {
       nav { padding: 0 16px; }
       .demo-grid   { grid-template-columns: 1fr; }
-      .pricing-cards { grid-template-columns: 1fr; }
+      .pricing-cards { grid-template-columns: repeat(2,1fr) !important; }
       .testi-grid  { grid-template-columns: 1fr; }
       .steps       { grid-template-columns: 1fr; gap: 32px; }
       .steps::before { display: none; }
@@ -1677,28 +1687,42 @@
 </div>
 
 <!-- ── PRICING ────────────────────────────────────────────────────────── -->
-<div class="section-sm fade-in">
+<div class="section-sm fade-in" id="pricingSection">
   <div style="text-align:center;margin-bottom:8px">
     <div class="s-label" data-i18n="pricing.tag">💸 Lo que te cuesta</div>
-    <h2 class="s-title" data-i18n="pricing.h2">Sin suscripciones. Sin hostias.<br><span class="grad-txt">Pagas lo que usas.</span></h2>
+    <h2 class="s-title" data-i18n="pricing.h2">Elige tu plan.<br><span class="grad-txt">Empieza gratis, escala cuando quieras.</span></h2>
   </div>
-  <div class="pricing-cards">
-    <div class="price-card">
+  <div class="pricing-cards" style="grid-template-columns:repeat(4,1fr)">
+    <div class="price-card" id="planCard-free">
       <div class="price-icon">✅</div>
-      <div class="price-title" data-i18n="pricing.c1.title">Free to start. No card.</div>
-      <div class="price-desc" data-i18n="pricing.c1.desc">3 transcriptions/day without an account · Sign up for 5 transcriptions + 5 adaptations/day.</div>
+      <div class="price-title">Free</div>
+      <div class="price-amount" data-price-eur="0" data-price-usd="0"></div>
+      <div class="price-desc" data-i18n="pricing.free.desc">5 transcripciones + 5 adaptaciones/día. Sin tarjeta.</div>
+      <button class="btn-plan" id="btnPlanFree" disabled style="opacity:.5">Plan actual</button>
     </div>
-    <div class="price-card featured">
-      <div class="price-icon">💳</div>
-      <div class="price-title" data-i18n="pricing.c2.title">Top up whenever you want</div>
-      <div class="price-desc" data-i18n="pricing.c2.desc">€1, €5, €10 or €20. Each use costs €0.08. No daily limit. No surprises.</div>
+    <div class="price-card" id="planCard-basic">
+      <div class="price-icon">⚡</div>
+      <div class="price-title">Básico</div>
+      <div class="price-amount" data-price-eur="499" data-price-usd="599"></div>
+      <div class="price-desc" data-i18n="pricing.basic.desc">Transcripciones y adaptaciones ilimitadas.</div>
+      <button class="btn-plan" onclick="subscribePlan(PLAN_PRICES.basic)">Elegir Básico</button>
     </div>
-    <div class="price-card">
-      <div class="price-icon">🚫</div>
-      <div class="price-title" data-i18n="pricing.c3.title">Si no lo usas, el dinero es tuyo. Punto.</div>
-      <div class="price-desc" data-i18n="pricing.c3.desc">Tu saldo no caduca. Sin cobros automáticos. Sin letra pequeña.</div>
+    <div class="price-card featured" id="planCard-pro">
+      <div class="price-icon">🚀</div>
+      <div class="price-title">Pro</div>
+      <div class="price-amount" data-price-eur="999" data-price-usd="1199"></div>
+      <div class="price-desc" data-i18n="pricing.pro.desc">Todo lo del Básico + prioridad + próximas funciones.</div>
+      <button class="btn-plan" onclick="subscribePlan(PLAN_PRICES.pro)">Elegir Pro</button>
+    </div>
+    <div class="price-card" id="planCard-agency">
+      <div class="price-icon">🏢</div>
+      <div class="price-title">Agencia</div>
+      <div class="price-amount" data-price-eur="1999" data-price-usd="2499"></div>
+      <div class="price-desc" data-i18n="pricing.agency.desc">Todo lo del Pro + asientos para tu equipo.</div>
+      <button class="btn-plan" onclick="subscribePlan(PLAN_PRICES.agency)">Elegir Agencia</button>
     </div>
   </div>
+  <p style="text-align:center;margin-top:16px;color:var(--text3);font-size:.85rem" id="topupCta"></p>
 </div>
 
 
@@ -1801,10 +1825,12 @@
     <div class="prof-tabs">
       <button class="prof-tab on" onclick="profTab('transc')">📄 Transcriptions</button>
       <button class="prof-tab" onclick="profTab('scripts')">✨ Saved scripts</button>
+      <button class="prof-tab" id="profTabProjects" style="display:none" onclick="profTab('projects')">📁 Projects</button>
     </div>
 
     <div class="prof-list" id="profListTransc"></div>
     <div class="prof-list" id="profListScripts" style="display:none"></div>
+    <div class="prof-list" id="profListProjects" style="display:none"></div>
   </div>
 </div>
 
@@ -1847,19 +1873,10 @@
   <div class="modal">
     <button class="modal-x" onclick="closeModal('topupOverlay')">✕</button>
     <h2 data-i18n="topup.title">Top up balance</h2>
-    <p>Transcribe sin límite diario. €0.08 por transcripción o transformación. Tu saldo no caduca.</p>
-    <div class="topup-grid">
-      <div class="topup-opt on" data-amt="100" onclick="pickTopup(this)">
-        <div class="topup-amt">1€</div><div class="topup-cred">~12 usos</div>
-      </div>
-      <div class="topup-opt" data-amt="500" onclick="pickTopup(this)">
-        <div class="topup-amt">5€</div><div class="topup-cred">~62 usos</div>
-      </div>
-      <div class="topup-opt" data-amt="1000" onclick="pickTopup(this)">
-        <div class="topup-amt">10€</div><div class="topup-cred">~125 usos</div>
-      </div>
-      <div class="topup-opt" data-amt="2000" onclick="pickTopup(this)">
-        <div class="topup-amt">20€</div><div class="topup-cred">~250 usos</div>
+    <p id="topupSubtitle"></p>
+    <div class="topup-grid" style="grid-template-columns:1fr">
+      <div class="topup-opt on">
+        <div class="topup-amt" id="topupPrice"></div><div class="topup-cred">7 usos</div>
       </div>
     </div>
     <p class="topup-note">Pago seguro con tarjeta vía Stripe · Sin suscripción</p>
@@ -1896,14 +1913,12 @@ const LANGS = {
     "flow.n2.title": "Transcripción", "flow.n2.desc": "Groq Whisper convierte el audio en texto en segundos.",
     "flow.n3.title": "Elige estilo", "flow.n3.desc": "Viral, LinkedIn, historia, 5 hooks. Un click, la IA lo reescribe.",
     "flow.n4.title": "Contenido listo", "flow.n4.desc": "Copia, pega y publica. Ya está.",
-    "pricing.tag": "💸 Lo que te cuesta",
-    "pricing.h2": 'Sin suscripciones. Sin hostias.<br><span class="grad-txt">Pagas lo que usas.</span>',
-    "pricing.c1.title": "Gratis para empezar. Sin tarjeta.",
-    "pricing.c1.desc": "3 transcripciones/día sin cuenta · Regístrate y sube a 5 transcripciones + 5 adaptaciones/día.",
-    "pricing.c2.title": "Recarga cuando quieras",
-    "pricing.c2.desc": "1€, 5€, 10€ o 20€. Cada uso cuesta €0.08. Sin límite diario. Sin sorpresas.",
-    "pricing.c3.title": "Si no lo usas, el dinero es tuyo. Punto.",
-    "pricing.c3.desc": "Tu saldo no caduca. Sin cobros automáticos. Sin letra pequeña.",
+    "pricing.tag": "💸 Planes",
+    "pricing.h2": 'Elige tu plan.<br><span class="grad-txt">Empieza gratis, escala cuando quieras.</span>',
+    "pricing.free.desc": "5 transcripciones + 5 adaptaciones/día. Sin tarjeta.",
+    "pricing.basic.desc": "Transcripciones y adaptaciones ilimitadas.",
+    "pricing.pro.desc": "Todo lo del Básico + prioridad + próximas funciones.",
+    "pricing.agency.desc": "Todo lo del Pro + asientos para tu equipo.",
     "cta.h2": 'Empieza ahora.<br><span class="grad-txt">Es gratis.</span>',
     "cta.sub": "Tu primer reel transcrito en menos de 10 segundos.",
     "cta.pill1": "3 gratis al día", "cta.pill2": "Sin suscripción", "cta.pill3": "Saldo sin caducidad",
@@ -1943,14 +1958,12 @@ const LANGS = {
     "flow.n2.title": "Transcription", "flow.n2.desc": "Groq Whisper turns the audio into text in seconds.",
     "flow.n3.title": "Pick a style", "flow.n3.desc": "Viral, LinkedIn, story, 5 hooks. One click, AI rewrites it.",
     "flow.n4.title": "Content ready", "flow.n4.desc": "Copy, paste and publish. Done.",
-    "pricing.tag": "💸 What it costs you",
-    "pricing.h2": 'No subscriptions. No BS.<br><span class="grad-txt">Pay for what you use.</span>',
-    "pricing.c1.title": "Free to start. No card.",
-    "pricing.c1.desc": "3 transcriptions/day without an account · Sign up for 5 transcriptions + 5 adaptations/day.",
-    "pricing.c2.title": "Top up whenever you want",
-    "pricing.c2.desc": "€1, €5, €10 or €20. Each use costs €0.08. No daily limit. No surprises.",
-    "pricing.c3.title": "If you don't use it, the money is yours. Period.",
-    "pricing.c3.desc": "Balance doesn't expire. No auto-charges. No fine print.",
+    "pricing.tag": "💸 Plans",
+    "pricing.h2": 'Choose your plan.<br><span class="grad-txt">Start free, scale when ready.</span>',
+    "pricing.free.desc": "5 transcriptions + 5 adaptations/day. No card required.",
+    "pricing.basic.desc": "Unlimited transcriptions and adaptations.",
+    "pricing.pro.desc": "Everything in Basic + priority + upcoming features.",
+    "pricing.agency.desc": "Everything in Pro + team seats.",
     "cta.h2": 'Start now.<br><span class="grad-txt">It\'s free.</span>',
     "cta.sub": "Your first reel transcribed in under 10 seconds.",
     "cta.pill1": "3 free/day", "cta.pill2": "No subscription", "cta.pill3": "Balance never expires",
@@ -1984,6 +1997,7 @@ function setLang(lang) {
   // placeholder
   const urlInput = document.getElementById("urlInput");
   if (urlInput) urlInput.placeholder = lang === "en" ? "🔗 Paste your Instagram or TikTok reel here..." : "🔗 Pega aquí tu reel de Instagram o TikTok...";
+  if (typeof initPrices === "function") initPrices();
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────
@@ -2016,15 +2030,49 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   if (themePref === "system") applyTheme("system");
 });
 
+// ── Currency detection (EUR for Spain, USD everywhere else) ──────────────
+const _tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+const isEUR = _tz === "Europe/Madrid" || _tz.startsWith("Atlantic/Canary");
+const CUR = isEUR ? "eur" : "usd";
+const SYM = isEUR ? "€" : "$";
+function curr(c) { return isEUR ? `${(c/100).toFixed(2).replace(".",",")}€` : `$${(c/100).toFixed(2)}`; }
+
 // ── State ─────────────────────────────────────────────────────────────────
 let st = { user: null, credits: 0, freeUsed: 0, freeLimit: 5, freeDailyAnon: 3 };
-let topupAmt = "500";
+let topupAmt = "129";
 let authMode = "login";
 let activeStyle = null;
 
 // ── Init ─────────────────────────────────────────────────────────────────
+function initPrices() {
+  // Pricing cards
+  document.querySelectorAll(".price-amount[data-price-eur]").forEach(el => {
+    const c = parseInt(isEUR ? el.dataset.priceEur : el.dataset.priceUsd);
+    const per = currentLang === "es" ? "/mes" : "/mo";
+    el.innerHTML = `${curr(c)}<span style="font-size:.75rem;color:var(--text3)">${per}</span>`;
+  });
+  // Topup price
+  const tp = document.getElementById("topupPrice");
+  if (tp) tp.textContent = isEUR ? "1€" : "$1.29";
+  // Topup subtitle
+  const sub = document.getElementById("topupSubtitle");
+  if (sub) sub.textContent = currentLang === "es"
+    ? "Transcribe sin límite diario. Tu saldo no caduca."
+    : "Transcribe without daily limits. Your balance never expires.";
+  // CTA bajo pricing cards
+  const cta = document.getElementById("topupCta");
+  if (cta) {
+    const price = isEUR ? "1€" : "$1.29";
+    const label = currentLang === "es"
+      ? `¿Prefieres pagar por uso? <a href="#" onclick="openTopup();return false" style="color:var(--purple);font-weight:700;text-decoration:none">7 usos por ${price} →</a>`
+      : `Prefer pay-per-use? <a href="#" onclick="openTopup();return false" style="color:var(--purple);font-weight:700;text-decoration:none">7 uses for ${price} →</a>`;
+    cta.innerHTML = label;
+  }
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   setLang(currentLang);
+  initPrices();
   await refreshMe();
   if (st.user) loadHistory();
   animateCounter();
@@ -2032,8 +2080,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   initScrollReveal();
 
   const p = new URLSearchParams(location.search);
-  if (p.get("topup") === "success") { showToast("✅ ¡Saldo añadido!"); history.replaceState({}, "", "/"); await refreshMe(); }
-  if (p.get("topup") === "cancel")  { showToast("Pago cancelado."); history.replaceState({}, "", "/"); }
+  const ref = p.get("ref");
+  if (ref) localStorage.setItem("affiliate_ref", ref);
+  if (p.get("topup") === "success")  { showToast("✅ ¡Saldo añadido!"); history.replaceState({}, "", "/"); await refreshMe(); }
+  if (p.get("topup") === "cancel")   { showToast("Pago cancelado."); history.replaceState({}, "", "/"); }
+  if (p.get("subscribed") === "true") { showToast("✅ ¡Suscripción activada!"); history.replaceState({}, "", "/"); await refreshMe(); }
+  if (p.get("sub_cancel") === "true") { showToast("Suscripción cancelada."); history.replaceState({}, "", "/"); }
 });
 
 // ── Counter animation ─────────────────────────────────────────────────────
@@ -2082,13 +2134,14 @@ async function refreshMe() {
   const res = await fetch("/auth/me");
   const d = await res.json();
   if (d.user) {
-    st = { user: d.user, credits: d.credits_cents, freeUsed: d.free_used_today, freeLimit: d.free_daily_limit, freeDailyAnon: 3 };
+    st = { user: d.user, credits: d.credits_cents, freeUsed: d.free_used_today, freeLimit: d.free_daily_limit, freeDailyAnon: 3, plan: d.plan || "free", monthlyUsage: d.monthly_usage || 0, monthlyLimit: d.monthly_limit || null };
     renderLoggedIn();
   } else {
-    st = { user: null, credits: 0, freeUsed: 0, freeLimit: 5, freeDailyAnon: d.free_daily_anon ?? 3 };
+    st = { user: null, credits: 0, freeUsed: 0, freeLimit: 5, freeDailyAnon: d.free_daily_anon ?? 3, plan: "free" };
     renderLoggedOut();
   }
   renderFreeBar();
+  renderPlanCards();
 }
 
 function renderLoggedIn() {
@@ -2137,7 +2190,11 @@ function openProfile() {
     document.getElementById("profStatUsos").textContent = Math.floor(st.credits / 8);
     document.getElementById("profStatTransc").textContent = histCache.length;
   }
+  // Mostrar tabs de pro/agency
+  const isPro = st.plan === "pro" || st.plan === "agency";
+  document.getElementById("profTabProjects").style.display = isPro ? "" : "none";
   loadSavedScripts();
+  if (isPro) loadProjects();
   renderProfTransc();
 }
 
@@ -2148,10 +2205,11 @@ function closeProfile() {
 
 function profTab(tab) {
   document.querySelectorAll(".prof-tab").forEach((b, i) => {
-    b.classList.toggle("on", (tab === "transc" && i === 0) || (tab === "scripts" && i === 1));
+    b.classList.toggle("on", (tab === "transc" && i === 0) || (tab === "scripts" && i === 1) || (tab === "projects" && i === 2));
   });
   document.getElementById("profListTransc").style.display = tab === "transc" ? "" : "none";
   document.getElementById("profListScripts").style.display = tab === "scripts" ? "" : "none";
+  document.getElementById("profListProjects").style.display = tab === "projects" ? "" : "none";
 }
 
 function renderProfTransc() {
@@ -2180,9 +2238,20 @@ function renderProfTransc() {
 
 async function loadSavedScripts() {
   try {
+    // Cargar saved_scripts (adapt) siempre
     const r = await fetch("/saved-scripts");
-    if (!r.ok) return;
-    scriptsCache = await r.json();
+    if (r.ok) {
+      const legacy = await r.json();
+      scriptsCache = legacy.map(s => ({ ...s, _src: "saved" }));
+    }
+    // Para pro/agency, también cargar scripts (transcripciones guardadas)
+    if (st.plan === "pro" || st.plan === "agency") {
+      const r2 = await fetch("/scripts");
+      if (r2.ok) {
+        const newer = await r2.json();
+        scriptsCache = [...newer.map(s => ({ ...s, _src: "script" })), ...scriptsCache];
+      }
+    }
     document.getElementById("profStatScripts").textContent = scriptsCache.length;
     renderProfScripts();
   } catch {}
@@ -2191,29 +2260,33 @@ async function loadSavedScripts() {
 function renderProfScripts() {
   const el = document.getElementById("profListScripts");
   if (!scriptsCache.length) {
-    el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">✨</div>No saved scripts yet.<br>Use 💾 Save after adapting a script.</div>';
+    el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">✨</div>No saved scripts yet.<br>Use 💾 Save after adapting or transcribing.</div>';
     return;
   }
-  el.innerHTML = scriptsCache.map(it => `
+  el.innerHTML = scriptsCache.map(it => {
+    const text = it._src === "script" ? (it.script || it.transcription || "") : (it.content || "");
+    const badge = it._src === "script" ? (it.title || "Guion") : (STYLE_LABELS[it.style] || it.style || "custom");
+    return `
     <div class="prof-card">
       <div class="prof-card-top">
-        <span class="prof-card-badge">${STYLE_LABELS[it.style] || it.style || "custom"}</span>
+        <span class="prof-card-badge">${esc(badge)}</span>
         <span class="prof-card-date">${fmtDate(it.created_at)}</span>
       </div>
-      <div class="prof-card-text" onclick="viewScript('${it.id}')">${esc(it.content.slice(0, 200))}${it.content.length > 200 ? "…" : ""}</div>
+      <div class="prof-card-text" onclick="viewScript('${it.id}')">${esc(text.slice(0, 200))}${text.length > 200 ? "…" : ""}</div>
       <div class="prof-card-acts">
         <button onclick="cpScript('${it.id}',this)">Copy</button>
         <button onclick="viewScript('${it.id}')">View</button>
         <button class="del" onclick="delScript('${it.id}',this)">Delete</button>
       </div>
-    </div>
-  `).join("");
+    </div>`;
+  }).join("");
 }
 
 function cpScript(id, btn) {
   const item = scriptsCache.find(i => i.id === id);
   if (!item) return;
-  navigator.clipboard.writeText(item.content);
+  const text = item._src === "script" ? (item.script || item.transcription || "") : (item.content || "");
+  navigator.clipboard.writeText(text);
   btn.textContent = "Copied!";
   setTimeout(() => (btn.textContent = "Copy"), 1500);
 }
@@ -2221,16 +2294,86 @@ function cpScript(id, btn) {
 function viewScript(id) {
   const item = scriptsCache.find(i => i.id === id);
   if (!item) return;
-  document.getElementById("viewTitle").textContent = `${STYLE_LABELS[item.style] || item.style || "Script"} · ${fmtDate(item.created_at)}`;
-  document.getElementById("viewBody").textContent = item.content;
+  const text = item._src === "script" ? (item.script || item.transcription || "") : (item.content || "");
+  const title = item._src === "script" ? (item.title || "Guion") : (STYLE_LABELS[item.style] || item.style || "Script");
+  document.getElementById("viewTitle").textContent = `${title} · ${fmtDate(item.created_at)}`;
+  document.getElementById("viewBody").textContent = text;
   document.getElementById("viewOverlay").classList.add("on");
 }
 
 async function delScript(id, btn) {
   if (!confirm("Delete this script?")) return;
   btn.disabled = true;
-  await fetch(`/saved-scripts/${id}`, { method: "DELETE" });
+  const item = scriptsCache.find(i => i.id === id);
+  const endpoint = item && item._src === "script" ? `/scripts/${id}` : `/saved-scripts/${id}`;
+  await fetch(endpoint, { method: "DELETE" });
   await loadSavedScripts();
+}
+
+// ── Projects (pro/agency) ────────────────────────────────────────────────
+let projectsCache = [];
+
+async function loadProjects() {
+  try {
+    const r = await fetch("/projects");
+    if (!r.ok) return;
+    projectsCache = await r.json();
+    renderProfProjects();
+  } catch {}
+}
+
+function renderProfProjects() {
+  const el = document.getElementById("profListProjects");
+  let html = '<div style="padding:12px;text-align:right"><button class="btn-topup-sm" onclick="promptNewProject()">+ Nuevo proyecto</button></div>';
+  if (!projectsCache.length) {
+    html += '<div class="prof-empty"><div class="prof-empty-icon">📁</div>No projects yet.</div>';
+  } else {
+    html += projectsCache.map(p => `
+      <div class="prof-card">
+        <div class="prof-card-top">
+          <span class="prof-card-badge">📁 ${esc(p.name)}</span>
+          <span class="prof-card-date">${fmtDate(p.created_at)}</span>
+        </div>
+        ${p.style_prompt ? `<div class="prof-card-text" style="font-size:.8rem;color:var(--text3)">${esc(p.style_prompt.slice(0, 120))}</div>` : ""}
+        <div class="prof-card-acts">
+          <button onclick="filterScriptsByProject('${p.id}','${esc(p.name)}')">View scripts</button>
+          <button class="del" onclick="delProject('${p.id}')">Delete</button>
+        </div>
+      </div>
+    `).join("");
+  }
+  el.innerHTML = html;
+}
+
+async function promptNewProject() {
+  const name = prompt("Nombre del proyecto:");
+  if (!name) return;
+  const style = prompt("Estilo predefinido (opcional):", "");
+  const res = await fetch("/projects", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, style_prompt: style || "" }),
+  });
+  if (!res.ok) { const d = await res.json(); showToast(d.error || "Error"); return; }
+  showToast("Proyecto creado");
+  await loadProjects();
+}
+
+async function delProject(id) {
+  if (!confirm("¿Eliminar este proyecto?")) return;
+  await fetch(`/projects/${id}`, { method: "DELETE" });
+  await loadProjects();
+}
+
+async function filterScriptsByProject(projectId, name) {
+  profTab("scripts");
+  try {
+    const r = await fetch(`/scripts?project_id=${projectId}`);
+    if (!r.ok) return;
+    scriptsCache = await r.json();
+    document.getElementById("profStatScripts").textContent = scriptsCache.length;
+    renderProfScripts();
+    showToast(`Mostrando guiones de "${name}"`);
+  } catch {}
 }
 
 function profAdaptFromTransc(id) {
@@ -2250,6 +2393,18 @@ function renderLoggedOut() {
 
 function renderFreeBar() {
   const bar = document.getElementById("freeBar");
+  // Planes de pago: mostrar contador mensual
+  if (st.user && st.monthlyLimit) {
+    bar.classList.add("on");
+    const rem = st.monthlyLimit - st.monthlyUsage;
+    const dots = Array.from({length: Math.min(st.monthlyLimit, 20)}, (_, i) =>
+      `<div class="fdot ${i < Math.min(st.monthlyUsage, 20) ? 'u' : ''}"></div>`).join("");
+    document.getElementById("freeDots").innerHTML = dots;
+    document.getElementById("freeBarTxt").innerHTML = rem > 0
+      ? `${st.monthlyUsage}/${st.monthlyLimit} usados este mes`
+      : 'Límite mensual alcanzado · <a href="#pricingSection" style="color:#fed7aa;font-weight:700;text-decoration:none">Mejorar plan</a>';
+    return;
+  }
   if (st.user && st.credits >= 8) { bar.classList.remove("on"); return; }
   bar.classList.add("on");
   const limit = st.user ? st.freeLimit : st.freeDailyAnon;
@@ -2427,14 +2582,29 @@ async function doTranscribe() {
         st.credits = result.credits_cents;
         st.freeUsed = result.free_used_today;
         document.getElementById("balDisp").textContent = usos(result.credits_cents);
-        renderFreeBar();
-      } else renderFreeBar();
+      }
+      if (st.monthlyLimit) st.monthlyUsage++;
+      renderFreeBar();
 
       acts.appendChild(mkBtn("Copiar texto", b => {
         navigator.clipboard.writeText(result.text);
         b.textContent = "¡Copiado!";
         setTimeout(() => (b.textContent = "Copiar texto"), 2000);
       }));
+
+      if (st.plan === "pro" || st.plan === "agency") {
+        acts.appendChild(mkBtn("💾 Guardar guion", async b => {
+          const title = prompt("Título del guion:", url.split("/").pop() || new Date().toLocaleDateString());
+          if (!title) return;
+          b.disabled = true;
+          const r = await fetch("/scripts", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title, transcription: result.text, reel_url: url }),
+          });
+          if (r.ok) { b.textContent = "✓ Guardado"; showToast("Guion guardado"); }
+          else { b.disabled = false; showToast("Error al guardar"); }
+        }));
+      }
 
       document.getElementById("transformSection").style.display = "block";
       document.getElementById("transformResult").classList.remove("on");
@@ -2756,9 +2926,14 @@ async function submitAuth() {
   err.classList.remove("on");
   btn.disabled = true; btn.textContent = currentLang === "es" ? "Cargando…" : "Loading…";
 
+  const authBody = { email, password: pass };
+  if (authMode === "register") {
+    const aRef = localStorage.getItem("affiliate_ref");
+    if (aRef) authBody.affiliate_ref = aRef;
+  }
   const res = await fetch(authMode === "login" ? "/auth/login" : "/auth/register", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password: pass }),
+    body: JSON.stringify(authBody),
   });
   const d = await res.json();
   if (!res.ok) {
@@ -2779,8 +2954,8 @@ document.addEventListener("keydown", e => {
 
 async function logout() {
   await fetch("/auth/logout", { method: "POST" });
-  st = { user: null, credits: 0, freeUsed: 0, freeLimit: 5, freeDailyAnon: 3 };
-  renderLoggedOut(); renderFreeBar(); showToast("Sesión cerrada.");
+  st = { user: null, credits: 0, freeUsed: 0, freeLimit: 5, freeDailyAnon: 3, plan: "free" };
+  renderLoggedOut(); renderFreeBar(); renderPlanCards(); showToast("Sesión cerrada.");
 }
 
 // ── Topup ──────────────────────────────────────────────────────────────────
@@ -2799,11 +2974,65 @@ async function submitTopup() {
   err.classList.remove("on"); btn.disabled = true; btn.textContent = "Redirigiendo…";
   const res = await fetch("/checkout", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount: topupAmt }),
+    body: JSON.stringify({ currency: CUR }),
   });
   const d = await res.json();
   if (!res.ok) { err.textContent = d.error; err.classList.add("on"); btn.disabled = false; btn.textContent = "Ir al pago →"; return; }
   window.location.href = d.url;
+}
+
+// ── Subscriptions ─────────────────────────────────────────────────────────
+async function subscribePlan(priceId) {
+  if (!st.user) { openAuth("register"); return; }
+  const res = await fetch("/create-subscription-checkout", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ price_id: priceId, currency: CUR }),
+  });
+  const d = await res.json();
+  if (!res.ok) { showToast(d.error || "Error"); return; }
+  window.location.href = d.url;
+}
+
+async function cancelSubscription() {
+  if (!confirm("¿Cancelar tu suscripción? Seguirá activa hasta fin de período.")) return;
+  const res = await fetch("/cancel-subscription", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+  });
+  const d = await res.json();
+  if (!res.ok) { showToast(d.error || "Error"); return; }
+  showToast("Suscripción cancelada. Activa hasta fin de período.");
+}
+
+const PLAN_PRICES = {
+  basic: "price_1TI14pCWQn5Tis1WycY83MrR",
+  pro: "price_1TI15ACWQn5Tis1WKNbdhFW1",
+  agency: "price_1TI15NCWQn5Tis1WwIIb1TX1",
+};
+
+function renderPlanCards() {
+  const plan = st.plan || "free";
+  ["free","basic","pro","agency"].forEach(p => {
+    const card = document.getElementById("planCard-" + p);
+    const btn = card ? card.querySelector(".btn-plan") : null;
+    if (!btn) return;
+    if (p === plan) {
+      btn.textContent = "Plan actual";
+      btn.disabled = true;
+      btn.classList.add("active");
+      btn.onclick = null;
+    } else if (p === "free") {
+      btn.textContent = plan === "free" ? "Plan actual" : "Plan Free";
+      btn.disabled = plan === "free";
+      btn.classList.toggle("active", plan === "free");
+      btn.onclick = null;
+    } else {
+      const labels = { basic: "Elegir Básico", pro: "Elegir Pro", agency: "Elegir Agencia" };
+      btn.textContent = labels[p];
+      btn.disabled = false;
+      btn.classList.remove("active");
+      btn.onclick = () => subscribePlan(PLAN_PRICES[p]);
+    }
+  });
 }
 
 // ── Modal helpers ──────────────────────────────────────────────────────────
@@ -2812,8 +3041,8 @@ function closeModal(id) { document.getElementById(id).classList.remove("on"); }
 function backdropClose(e, id) { if (e.target === document.getElementById(id)) closeModal(id); }
 
 // ── Utils ──────────────────────────────────────────────────────────────────
-function eur(c)  { return `€${(c/100).toFixed(2)}`; }
-function usos(c) { return `${Math.floor(c / 8)} usos`; }
+function eur(c)  { return curr(c); }
+function usos(c) { return `${Math.floor(c / 18)} usos`; }
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString("es-ES", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }

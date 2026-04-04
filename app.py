@@ -3,7 +3,7 @@
 import os
 import tempfile
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 
 import requests
@@ -36,12 +36,15 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 FREE_DAILY_ANON  = 3   # transcripciones gratis para anónimos
 FREE_DAILY_USER  = 5   # transcripciones gratis para registrados
 FREE_DAILY_ADAPT = 5   # adaptaciones gratis para registrados (hazlo tuyo)
-COST_CENTS       = 8   # €0.08 por uso de pago
+COST_CENTS       = 18   # $0.18 por uso de pago (~7 usos por $1.29)
 
 UNLIMITED_EMAILS = {"davidmiragito@gmail.com"}  # sin límite ni coste
 
-# Opciones de recarga: clave → céntimos
-TOPUP_OPTIONS = {"100": 100, "500": 500, "1000": 1000, "2000": 2000}
+# Límites mensuales por plan (None = usa créditos/gratis diarios)
+PLAN_LIMITS = {"free": None, "basic": 30, "pro": 100, "agency": 250}
+
+# Topup: price ID de Stripe (one-time, multi-currency)
+STRIPE_TOPUP_PRICE = os.environ.get("STRIPE_TOPUP_PRICE", "")
 
 db: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -111,6 +114,39 @@ def get_or_reset_ip_usage(ip: str) -> dict:
         db.table("ip_usage").update({"used_today": 0, "reset_date": today}).eq("ip", ip).execute()
         usage["used_today"] = 0
     return usage
+
+
+def check_monthly_limit(profile: dict) -> tuple[bool, str | None]:
+    """Comprueba si el usuario con plan de pago ha superado su límite mensual.
+    Resetea el contador si toca. Devuelve (ok, error_msg)."""
+    plan = profile.get("plan", "free")
+    limit = PLAN_LIMITS.get(plan)
+    if limit is None:
+        return True, None  # plan free usa otro sistema
+
+    # Resetear si toca
+    now = datetime.now(timezone.utc)
+    reset_at = profile.get("usage_reset_at")
+    if reset_at:
+        if isinstance(reset_at, str):
+            try:
+                reset_dt = datetime.fromisoformat(reset_at.replace("Z", "+00:00"))
+            except ValueError:
+                reset_dt = now
+        else:
+            reset_dt = reset_at
+        if now >= reset_dt:
+            next_reset = (now.replace(day=1) + timedelta(days=32)).replace(day=1, hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=timezone.utc)
+            db.table("profiles").update({
+                "monthly_usage": 0,
+                "usage_reset_at": next_reset.isoformat(),
+            }).eq("id", profile["id"]).execute()
+            profile["monthly_usage"] = 0
+
+    usage = profile.get("monthly_usage", 0)
+    if usage >= limit:
+        return False, f"Has alcanzado el límite de {limit} transcripciones/mes de tu plan. Mejora tu plan para continuar."
+    return True, None
 
 
 # ── Download / transcription helpers ─────────────────────────────────────────
@@ -217,6 +253,12 @@ def auth_register():
         })
         user = result.user
         session["user"] = {"id": str(user.id), "email": user.email}
+        # Guardar referencia de afiliado si viene
+        affiliate_ref = body.get("affiliate_ref", "").strip()
+        if affiliate_ref:
+            db.table("profiles").upsert({
+                "id": str(user.id), "affiliate_ref": affiliate_ref
+            }).execute()
         return jsonify({"ok": True, "email": user.email})
     except Exception as e:
         msg = str(e).lower()
@@ -261,11 +303,15 @@ def auth_me():
     if not user:
         return jsonify({"user": None, "free_daily_anon": FREE_DAILY_ANON})
     profile = get_profile(user["id"])
+    plan = profile.get("plan", "free")
     return jsonify({
         "user": user,
         "credits_cents":   profile["credits_cents"],
         "free_used_today": profile["free_used_today"],
         "free_daily_limit": FREE_DAILY_USER,
+        "plan": plan,
+        "monthly_usage": profile.get("monthly_usage", 0),
+        "monthly_limit": PLAN_LIMITS.get(plan),
     })
 
 
@@ -306,7 +352,12 @@ def transcribe():
             }), 429
     else:
         profile = get_profile(user["id"])
-        if profile["credits_cents"] >= COST_CENTS:
+        user_plan = profile.get("plan", "free")
+        if user_plan in ("basic", "pro", "agency"):
+            ok, err_msg = check_monthly_limit(profile)
+            if not ok:
+                return jsonify({"error": err_msg}), 429
+        elif profile["credits_cents"] >= COST_CENTS:
             pass
         elif profile["free_used_today"] < FREE_DAILY_USER:
             pass
@@ -326,7 +377,13 @@ def transcribe():
         ).eq("ip", ip).execute()
     elif not is_unlimited:
         profile = get_profile(user["id"])
-        if profile["credits_cents"] >= COST_CENTS:
+        user_plan = profile.get("plan", "free")
+        if user_plan in ("basic", "pro", "agency"):
+            # Incrementar uso mensual
+            db.table("profiles").update({
+                "monthly_usage": profile.get("monthly_usage", 0) + 1
+            }).eq("id", user["id"]).execute()
+        elif profile["credits_cents"] >= COST_CENTS:
             cost_cents = COST_CENTS
             db.table("profiles").update(
                 {"credits_cents": profile["credits_cents"] - cost_cents}
@@ -427,24 +484,23 @@ def create_checkout():
     if not STRIPE_OK:
         return jsonify({"error": "El sistema de pagos aún no está disponible. Vuelve pronto."}), 503
 
-    body        = request.get_json()
-    amount_key  = str(body.get("amount", "500"))
-    amount_cents = TOPUP_OPTIONS.get(amount_key)
-    if not amount_cents:
-        return jsonify({"error": "Cantidad no válida"}), 400
+    if not STRIPE_TOPUP_PRICE:
+        return jsonify({"error": "Topup no configurado"}), 500
+
+    body = request.get_json()
+    currency = body.get("currency", "usd").lower()
+    if currency not in ("usd", "eur"):
+        currency = "usd"
+
+    # Ambas divisas dan 7 usos (7 × 18 = 126 cents de saldo)
+    amount_cents = 126
 
     user = current_user()
     try:
         checkout_session = stripe_lib.checkout.Session.create(
             payment_method_types=["card"],
-            line_items=[{
-                "price_data": {
-                    "currency": "eur",
-                    "product_data": {"name": f"Saldo Transcriptor — {amount_cents // 100}€"},
-                    "unit_amount": amount_cents,
-                },
-                "quantity": 1,
-            }],
+            currency=currency,
+            line_items=[{"price": STRIPE_TOPUP_PRICE, "quantity": 1}],
             mode="payment",
             success_url=request.host_url + "?topup=success",
             cancel_url=request.host_url + "?topup=cancel",
@@ -478,19 +534,113 @@ def stripe_webhook():
         obj               = event["data"]["object"]
         stripe_session_id = obj["id"]
         user_id           = obj["metadata"]["user_id"]
-        amount_cents      = int(obj["metadata"]["amount_cents"])
 
-        db.table("payments").update({
-            "status":                "completed",
-            "stripe_payment_intent": obj.get("payment_intent"),
-        }).eq("stripe_session_id", stripe_session_id).execute()
+        if obj["metadata"].get("type") == "subscription":
+            # ── Suscripción ──────────────────────────────────────────
+            line_items = stripe_lib.checkout.Session.list_line_items(stripe_session_id)
+            price_id = line_items.data[0].price.id if line_items.data else None
+            plan = PRICE_TO_PLAN.get(price_id, "basic")
+            db.table("profiles").update({
+                "plan": plan,
+                "stripe_subscription_id": obj.get("subscription"),
+            }).eq("id", user_id).execute()
+        else:
+            # ── Recarga de créditos (flujo existente) ────────────────
+            amount_cents = int(obj["metadata"]["amount_cents"])
 
-        profile = get_profile(user_id)
+            db.table("payments").update({
+                "status":                "completed",
+                "stripe_payment_intent": obj.get("payment_intent"),
+            }).eq("stripe_session_id", stripe_session_id).execute()
+
+            profile = get_profile(user_id)
+            db.table("profiles").update({
+                "credits_cents": profile["credits_cents"] + amount_cents
+            }).eq("id", user_id).execute()
+
+            # ── Registrar conversión de afiliado ─────────────────────
+            ref_result = db.table("profiles").select("affiliate_ref").eq("id", user_id).single().execute()
+            ref = ref_result.data.get("affiliate_ref") if ref_result.data else None
+            if ref:
+                affiliate = db.table("affiliates").select("commission_pct").eq("code", ref).single().execute()
+                if affiliate.data:
+                    pct = affiliate.data["commission_pct"]
+                    commission = int(amount_cents * pct / 100)
+                    db.table("affiliate_conversions").insert({
+                        "affiliate_code": ref,
+                        "user_id": user_id,
+                        "amount_cents": amount_cents,
+                        "commission_cents": commission,
+                        "stripe_session_id": stripe_session_id,
+                    }).execute()
+
+    elif event["type"] == "customer.subscription.deleted":
+        sub = event["data"]["object"]
         db.table("profiles").update({
-            "credits_cents": profile["credits_cents"] + amount_cents
-        }).eq("id", user_id).execute()
+            "plan": "free",
+            "stripe_subscription_id": None,
+        }).eq("stripe_subscription_id", sub["id"]).execute()
 
     return "", 200
+
+
+# ── Subscription endpoints ───────────────────────────────────────────────────
+
+PRICE_TO_PLAN = {
+    "price_1TI14pCWQn5Tis1WycY83MrR": "basic",
+    "price_1TI15ACWQn5Tis1WKNbdhFW1": "pro",
+    "price_1TI15NCWQn5Tis1WwIIb1TX1": "agency",
+}
+
+
+@app.route("/create-subscription-checkout", methods=["POST"])
+@require_auth
+def create_subscription_checkout():
+    if not STRIPE_OK:
+        return jsonify({"error": "Pagos no disponibles"}), 503
+
+    body = request.get_json()
+    price_id = body.get("price_id", "")
+    if price_id not in PRICE_TO_PLAN:
+        return jsonify({"error": "Price ID no válido"}), 400
+
+    currency = body.get("currency", "usd").lower()
+    if currency not in ("usd", "eur"):
+        currency = "usd"
+
+    user = current_user()
+    try:
+        checkout_session = stripe_lib.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="subscription",
+            currency=currency,
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=request.host_url + "?subscribed=true",
+            cancel_url=request.host_url + "?sub_cancel=true",
+            metadata={"user_id": user["id"], "type": "subscription"},
+        )
+        return jsonify({"url": checkout_session.url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/cancel-subscription", methods=["POST"])
+@require_auth
+def cancel_subscription():
+    if not STRIPE_OK:
+        return jsonify({"error": "Pagos no disponibles"}), 503
+
+    user = current_user()
+    profile = get_profile(user["id"])
+    sub_id = profile.get("stripe_subscription_id")
+    if not sub_id:
+        return jsonify({"error": "No tienes suscripción activa"}), 400
+
+    try:
+        stripe_lib.Subscription.modify(sub_id, cancel_at_period_end=True)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Adapt route ───────────────────────────────────────────────────────────────
@@ -675,7 +825,13 @@ def adapt():
         }), 429
     else:
         profile = get_profile(user["id"])
-        if profile["credits_cents"] >= COST_CENTS:
+        user_plan = profile.get("plan", "free")
+        if user_plan in ("basic", "pro", "agency"):
+            ok, err_msg = check_monthly_limit(profile)
+            if not ok:
+                return jsonify({"error": err_msg}), 429
+            cost_cents = 0
+        elif profile["credits_cents"] >= COST_CENTS:
             cost_cents = COST_CENTS
         elif profile.get("free_adapt_used_today", 0) < FREE_DAILY_ADAPT:
             cost_cents = 0
@@ -695,7 +851,11 @@ def adapt():
     # Actualizar contadores
     is_unlimited = user and user.get("email", "").lower() in UNLIMITED_EMAILS
     if not is_unlimited and user:
-        if cost_cents > 0:
+        if profile.get("plan", "free") in ("basic", "pro", "agency"):
+            db.table("profiles").update({
+                "monthly_usage": profile.get("monthly_usage", 0) + 1
+            }).eq("id", user["id"]).execute()
+        elif cost_cents > 0:
             db.table("profiles").update(
                 {"credits_cents": profile["credits_cents"] - cost_cents}
             ).eq("id", user["id"]).execute()
@@ -710,6 +870,79 @@ def adapt():
         payload["credits_cents"]   = updated["credits_cents"]
         payload["free_used_today"] = updated["free_used_today"]
     return jsonify(payload)
+
+
+# ── Scripts & Projects (pro/agency) ──────────────────────────────────────────
+
+@app.route("/scripts", methods=["GET"])
+@require_auth
+def list_scripts():
+    user = current_user()
+    project_id = request.args.get("project_id")
+    q = db.table("scripts").select("*").eq("user_id", user["id"])
+    if project_id:
+        q = q.eq("project_id", project_id)
+    rows = q.order("created_at", desc=True).limit(100).execute()
+    return jsonify(rows.data)
+
+
+@app.route("/scripts", methods=["POST"])
+@require_auth
+def create_script():
+    user = current_user()
+    profile = get_profile(user["id"])
+    if profile.get("plan", "free") not in ("pro", "agency"):
+        return jsonify({"error": "Tu plan no incluye guardar guiones. Mejora a Pro."}), 403
+    body = request.get_json()
+    row = db.table("scripts").insert({
+        "user_id": user["id"],
+        "title": body.get("title", "Sin título"),
+        "transcription": body.get("transcription"),
+        "script": body.get("script"),
+        "reel_url": body.get("reel_url"),
+        "project_id": body.get("project_id"),
+    }).execute()
+    return jsonify(row.data[0] if row.data else {"ok": True})
+
+
+@app.route("/scripts/<script_id>", methods=["DELETE"])
+@require_auth
+def delete_script(script_id):
+    user = current_user()
+    db.table("scripts").delete().eq("id", script_id).eq("user_id", user["id"]).execute()
+    return jsonify({"ok": True})
+
+
+@app.route("/projects", methods=["GET"])
+@require_auth
+def list_projects():
+    user = current_user()
+    rows = db.table("projects").select("*").eq("user_id", user["id"]).order("created_at", desc=True).execute()
+    return jsonify(rows.data)
+
+
+@app.route("/projects", methods=["POST"])
+@require_auth
+def create_project():
+    user = current_user()
+    profile = get_profile(user["id"])
+    if profile.get("plan", "free") not in ("pro", "agency"):
+        return jsonify({"error": "Tu plan no incluye proyectos. Mejora a Pro."}), 403
+    body = request.get_json()
+    row = db.table("projects").insert({
+        "user_id": user["id"],
+        "name": body.get("name", "Sin nombre"),
+        "style_prompt": body.get("style_prompt", ""),
+    }).execute()
+    return jsonify(row.data[0] if row.data else {"ok": True})
+
+
+@app.route("/projects/<project_id>", methods=["DELETE"])
+@require_auth
+def delete_project(project_id):
+    user = current_user()
+    db.table("projects").delete().eq("id", project_id).eq("user_id", user["id"]).execute()
+    return jsonify({"ok": True})
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
