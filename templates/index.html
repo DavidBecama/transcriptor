@@ -3904,10 +3904,9 @@ function showToast(msg) {
 const TUTORIAL_VIDEO_URL = "https://www.youtube.com/embed/PLACEHOLDER";
 
 const TOUR_STEPS = [
-  { target: '[data-tour="url-input"]',            text: "Paste your Instagram reel link here to get started." },
-  { target: '[data-tour="transcription-output"]',  text: "Your transcription appears here. This is the raw text from the reel." },
-  { target: '[data-tour="transform-section"]',     text: "Choose a style and turn the transcription into your own viral script." },
-  { target: '[data-tour="user-profile"]',          text: "All your transcriptions and scripts are saved here in your profile." },
+  { target: '#heroInputWrap',  text: "Paste any Instagram or TikTok link here and hit Transcribe. Your transcription appears right next to it." },
+  { target: '#adaptCard',      text: "Scroll down to transform your script — viral, LinkedIn, storytelling, or your own custom style." },
+  { target: '#userPill',       text: "Your profile: all your transcriptions, saved scripts, and projects live here." },
 ];
 
 let tourStep = 0;
