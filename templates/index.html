@@ -1852,6 +1852,7 @@
       <button class="lang-btn active" data-lang="es" onclick="setLang('es')">ES</button>
       <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
     </div>
+    <a href="/affiliate" id="navAffiliate" style="display:none;color:var(--text3);font-size:.78rem;font-weight:500;text-decoration:none;transition:color .2s" onmouseover="this.style.color='var(--purple)'" onmouseout="this.style.color='var(--text3)'">Earn 30% &rarr;</a>
     <button class="btn-nav" id="btnLogin" onclick="openAuth('login')" data-i18n="nav.login">Log in</button>
     <button class="btn-nav hi" id="btnReg" onclick="openAuth('register')" data-i18n="nav.register">Free →</button>
     <button class="theme-btn" id="themeBtn" title="Theme: System">💻</button>
@@ -2689,7 +2690,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   const p = new URLSearchParams(location.search);
   const ref = p.get("ref");
-  if (ref) localStorage.setItem("affiliate_ref", ref);
+  if (ref) {
+    localStorage.setItem("affiliate_ref", ref);
+    fetch("/affiliate/click", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: ref }) }).catch(() => {});
+  }
   if (p.get("topup") === "success")  { showToast("✅ ¡Saldo añadido!"); history.replaceState({}, "", "/"); await refreshMe(); }
   if (p.get("topup") === "cancel")   { showToast("Pago cancelado."); history.replaceState({}, "", "/"); }
   if (p.get("subscribed") === "true") { showToast("✅ ¡Suscripción activada!"); history.replaceState({}, "", "/"); await refreshMe(); }
@@ -2779,6 +2783,7 @@ function renderLoggedIn() {
   const initial = st.user.email[0].toUpperCase();
   document.getElementById("btnLogin").style.display = "none";
   document.getElementById("btnReg").style.display = "none";
+  document.getElementById("navAffiliate").style.display = "";
   document.getElementById("userPill").classList.add("on");
   document.getElementById("userEmail").textContent = st.user.email;
   document.getElementById("balBadge").classList.add("on");

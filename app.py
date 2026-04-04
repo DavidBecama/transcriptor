@@ -1126,11 +1126,90 @@ def profile_data():
     return jsonify(data)
 
 
+# ── Affiliate program ────────────────────────────────────────────────────────
+
+@app.route("/affiliate/apply", methods=["POST"])
+def affiliate_apply():
+    body = request.get_json()
+    name = (body.get("name") or "").strip()
+    email = (body.get("email") or "").strip().lower()
+    handle = (body.get("handle") or "").strip()
+    audience = body.get("audience_size", "")
+
+    if not name or not email:
+        return jsonify({"error": "Name and email required"}), 400
+
+    # Check duplicate
+    existing = db.table("affiliate_applications").select("id").eq("email", email).execute()
+    if existing.data:
+        return jsonify({"error": "This email is already registered. Check your inbox."}), 409
+
+    db.table("affiliate_applications").insert({
+        "name": name, "email": email, "handle": handle, "audience_size": audience,
+    }).execute()
+    return jsonify({"ok": True, "email": email})
+
+
+@app.route("/affiliate/click", methods=["POST"])
+def affiliate_click():
+    body = request.get_json()
+    code = (body.get("code") or "").strip()
+    if not code:
+        return jsonify({"ok": False}), 400
+    # Increment click count
+    aff = db.table("affiliates").select("id, total_clicks").eq("code", code).execute()
+    if aff.data:
+        db.table("affiliates").update({
+            "total_clicks": (aff.data[0].get("total_clicks") or 0) + 1
+        }).eq("code", code).execute()
+    return jsonify({"ok": True})
+
+
+@app.route("/affiliate/dashboard")
+@require_auth
+def affiliate_dashboard_data():
+    user = current_user()
+    aff = db.table("affiliates").select("*").eq("user_id", user["id"]).execute()
+    if not aff.data:
+        return jsonify({"error": "Not an affiliate"}), 404
+
+    affiliate = aff.data[0]
+    conversions = db.table("affiliate_conversions").select("*").eq(
+        "affiliate_code", affiliate["code"]
+    ).order("created_at", desc=True).execute()
+
+    total_earned = sum(c.get("commission_cents", 0) for c in conversions.data)
+    total_conversions = len(conversions.data)
+    total_clicks = affiliate.get("total_clicks", 0)
+    conv_rate = round(total_conversions / total_clicks * 100, 1) if total_clicks > 0 else 0
+
+    return jsonify({
+        "affiliate": {
+            "code": affiliate["code"],
+            "name": affiliate.get("name"),
+            "status": affiliate.get("status", "active"),
+            "commission_pct": affiliate.get("commission_pct", 30),
+        },
+        "stats": {
+            "total_clicks": total_clicks,
+            "total_conversions": total_conversions,
+            "conversion_rate": conv_rate,
+            "total_earned_cents": total_earned,
+        },
+        "conversions": conversions.data,
+    })
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/affiliate")
+def affiliate_page():
+    return render_template("affiliate.html")
 
 
 if __name__ == "__main__":
