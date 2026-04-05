@@ -1369,40 +1369,219 @@
     }
     .drawer-logout:hover { border-color: #f87171; color: #f87171; }
 
-    /* ── Profile page (full overlay) ─────────────────────────── */
+    /* ── Profile Hub — full width sidebar + content ───────────── */
     .profile-overlay {
       display: none; position: fixed; inset: 0;
-      background: rgba(10,11,15,.92); z-index: 300;
-      overflow-y: auto;
-      animation: prof-in .25s ease;
-      backdrop-filter: blur(20px);
+      background: rgba(10,11,15,.95); z-index: 300;
+      overflow: hidden; backdrop-filter: blur(20px);
     }
     .profile-overlay.on { display: block; }
-    @keyframes prof-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
-    .prof-inner {
-      max-width: 820px; margin: 0 auto;
-      padding: 32px 24px 60px;
+    .prof-layout {
+      display: grid; grid-template-columns: 260px 1fr;
+      height: 100vh; overflow: hidden;
     }
-    .prof-top {
-      display: flex; align-items: center; gap: 16px;
-      margin-bottom: 28px;
+
+    /* Sidebar */
+    .prof-sidebar {
+      background: rgba(10,11,15,.8); backdrop-filter: blur(12px);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      height: 100vh; overflow-y: auto;
     }
-    .prof-back {
-      background: none; border: 1px solid var(--border); color: var(--text2);
-      width: 38px; height: 38px; border-radius: 10px;
+    .prof-sidebar-identity {
+      padding: 28px 20px 20px;
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    .prof-sidebar-nav {
+      padding: 12px 12px; flex: 1;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .prof-sidebar-footer {
+      padding: 12px 12px 20px;
+      border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+
+    /* Nav items */
+    .prof-nav-item {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 10px 14px; border-radius: 10px;
+      background: transparent; border: 1px solid transparent;
+      color: var(--text2); font-size: .82rem; font-weight: 400;
+      cursor: pointer; transition: all .15s; text-align: left;
+      font-family: var(--font-body);
+    }
+    .prof-nav-item:hover { background: var(--surf); }
+    .prof-nav-item.on {
+      background: rgba(249,115,22,.08); border-color: rgba(249,115,22,.15);
+      color: var(--purple); font-weight: 500;
+    }
+    .prof-nav-count {
+      margin-left: auto; font-size: .68rem;
+      background: var(--surf2); padding: 1px 7px;
+      border-radius: 10px; color: var(--text3);
+    }
+
+    /* Main content area */
+    .prof-main {
+      overflow-y: auto; padding: 28px 36px 60px;
+    }
+    .prof-main::-webkit-scrollbar { width: 4px; }
+    .prof-main::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 3px; }
+
+    /* Stats cards */
+    .prof-stats-row {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 14px; margin-bottom: 28px;
+    }
+    .prof-stat-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; display: flex;
+      align-items: flex-start; gap: 14px;
+    }
+    .prof-stat-icon {
+      width: 40px; height: 40px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      cursor: pointer; transition: all .2s; font-size: 1.1rem; flex-shrink: 0;
+      font-size: 1.1rem; flex-shrink: 0;
     }
-    .prof-back:hover { background: var(--surf); border-color: rgba(249,115,22,.3); color: var(--text); }
-    .prof-title { font-family: var(--font-display); font-size: 1.4rem; font-weight: 400; color: var(--text); }
+    .prof-stat-icon.orange { background: rgba(249,115,22,.1); color: #f97316; }
+    .prof-stat-icon.purple { background: rgba(167,139,250,.1); color: #a78bfa; }
+    .prof-stat-icon.green  { background: rgba(34,197,94,.1);  color: #22c55e; }
+    .prof-stat-val {
+      font-family: var(--font-display); font-size: 1.8rem; font-weight: 400;
+      line-height: 1; margin-bottom: 4px;
+    }
+    .prof-stat-label {
+      font-size: .68rem; color: var(--text3); text-transform: uppercase;
+      letter-spacing: .05em; font-weight: 500;
+    }
 
-    .prof-header {
-      display: flex; align-items: center; gap: 20px;
-      padding: 24px; background: rgba(17,19,24,.6);
-      border: 1px solid var(--border); border-radius: 16px;
-      margin-bottom: 24px; position: relative;
-      backdrop-filter: blur(8px);
+    /* Script cards with color stripe */
+    .script-stripe-card {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden; display: flex;
+      transition: border-color .2s; margin-bottom: 10px;
+    }
+    .script-stripe-card:hover { border-color: rgba(255,255,255,.12); }
+    .script-stripe { width: 4px; flex-shrink: 0; }
+    .script-stripe-body { padding: 14px 18px; flex: 1; min-width: 0; }
+    .script-stripe-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 6px;
+    }
+    .script-stripe-title {
+      font-family: var(--font-display); font-size: .92rem; font-weight: 400;
+    }
+    .script-stripe-preview {
+      font-size: .82rem; color: var(--text2); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .script-stripe-footer {
+      display: flex; gap: 8px; margin-top: 10px; align-items: center;
+    }
+    .script-stripe-badge {
+      font-size: .65rem; text-transform: uppercase; letter-spacing: .05em;
+      padding: 2px 8px; border-radius: 4px; font-weight: 600;
+    }
+
+    /* Project cards grid */
+    .proj-cards-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .proj-card-v2 {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden; cursor: pointer;
+      transition: all .2s; position: relative;
+    }
+    .proj-card-v2:hover { border-color: rgba(255,255,255,.12); transform: translateY(-2px); }
+    .proj-card-v2-header {
+      height: 72px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 18px; gap: 12px;
+    }
+    .proj-card-v2-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display); font-size: 1.2rem;
+    }
+    .proj-card-v2-body { padding: 14px 18px; }
+    .proj-card-v2-meta {
+      font-size: .72rem; color: var(--text3); display: flex;
+      align-items: center; gap: 6px; margin-bottom: 8px;
+    }
+    .proj-card-v2-style {
+      font-size: .78rem; color: var(--text3); font-style: italic;
+      line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .proj-card-v2-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 12px;
+    }
+
+    /* New project card */
+    .proj-card-new {
+      border: 1px dashed var(--border); border-radius: 16px;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; min-height: 160px;
+      cursor: pointer; color: var(--text3); transition: all .18s;
+      background: transparent;
+    }
+    .proj-card-new:hover { border-color: var(--purple); color: var(--text2); }
+
+    /* Assistant cards in profile */
+    .asst-cards-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .asst-card-v2 {
+      background: var(--surf); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px; position: relative;
+      transition: all .18s;
+    }
+    .asst-card-v2:hover { border-color: rgba(255,255,255,.12); }
+    .asst-card-v2.is-default {
+      border-color: var(--purple);
+      box-shadow: 0 0 20px rgba(249,115,22,.1);
+    }
+    .asst-card-v2-default-badge {
+      position: absolute; top: -9px; left: 16px;
+      background: var(--purple); color: #fff; font-size: .6rem;
+      font-weight: 700; padding: 2px 10px; border-radius: 20px;
+      letter-spacing: .05em;
+    }
+    .asst-card-v2-head {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+    }
+    .asst-card-v2-head img {
+      width: 38px; height: 38px; border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .asst-card-v2-name { font-family: var(--font-display); font-size: .92rem; }
+    .asst-card-v2-sub { font-size: .68rem; color: var(--text3); }
+    .asst-card-v2-preview {
+      font-size: .78rem; color: var(--text2); font-style: italic;
+      line-height: 1.5; margin-bottom: 14px;
+      display: -webkit-box; -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .asst-card-v2-acts {
+      display: flex; gap: 6px;
+    }
+
+    /* Section headers in main content */
+    .prof-section-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px;
+    }
+    .prof-section-title {
+      font-family: var(--font-display); font-size: 1.3rem; font-weight: 400;
+    }
+    .prof-section-sub {
+      font-size: .82rem; color: var(--text3); margin-top: 2px;
     }
 
     /* DiceBear avatar in profile */
@@ -1462,53 +1641,17 @@
     .plan-badge.agency   { background: rgba(167,139,250,.15); color: #a78bfa; border: 1px solid rgba(167,139,250,.3); }
 
     /* Usage bar */
-    .usage-bar-wrap {
-      margin-top: 10px;
-    }
+    .usage-bar-wrap { margin-top: 10px; }
     .usage-bar-label {
       font-size: .75rem; color: var(--text3); margin-bottom: 5px;
       display: flex; justify-content: space-between;
     }
-    .usage-bar-track {
-      height: 4px; background: rgba(255,255,255,.06); border-radius: 3px; overflow: hidden;
-    }
+    .usage-bar-track { height: 4px; background: rgba(255,255,255,.06); border-radius: 3px; overflow: hidden; }
     .usage-bar-fill {
       height: 100%; border-radius: 3px;
       background: linear-gradient(90deg, var(--purple), var(--pink));
       transition: width .4s ease;
     }
-
-    .prof-info { flex: 1; min-width: 0; }
-    .prof-email { font-family: var(--font-display); font-size: .95rem; font-weight: 400; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .prof-meta { font-size: .78rem; color: var(--text3); margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-
-    .prof-stats {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 12px; margin-bottom: 28px;
-    }
-    .prof-stat {
-      padding: 18px; background: rgba(17,19,24,.5);
-      border: 1px solid var(--border); border-radius: 14px;
-      text-align: center; backdrop-filter: blur(8px);
-      transition: border-color .2s;
-    }
-    .prof-stat:hover { border-color: rgba(255,255,255,.12); }
-    .prof-stat-num { font-family: var(--font-display); font-size: 1.5rem; font-weight: 400; color: var(--text); }
-    .prof-stat-lbl { font-family: var(--font-body); font-size: .68rem; color: var(--text3); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; font-weight: 500; }
-
-    .prof-tabs {
-      display: flex; gap: 4px; margin-bottom: 20px;
-      background: rgba(17,19,24,.5); border: 1px solid var(--border);
-      border-radius: 12px; padding: 4px;
-      backdrop-filter: blur(8px);
-    }
-    .prof-tab {
-      flex: 1; padding: 10px 16px; border: none; background: none;
-      border-radius: 9px; font-size: .8rem; font-weight: 500;
-      color: var(--text3); cursor: pointer; transition: all .2s;
-      font-family: var(--font-body);
-    }
-    .prof-tab.on { background: var(--grad); color: #fff; font-weight: 600; }
 
     .prof-list { display: flex; flex-direction: column; gap: 8px; }
     .prof-card {
@@ -1517,10 +1660,7 @@
       transition: border-color .2s;
     }
     .prof-card:hover { border-color: var(--purple); }
-    .prof-card-top {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 8px;
-    }
+    .prof-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .prof-card-badge {
       font-size: .68rem; font-weight: 800; text-transform: uppercase;
       letter-spacing: .4px; padding: 3px 8px;
@@ -1533,46 +1673,17 @@
       overflow: hidden; cursor: pointer;
     }
     .prof-card-text:hover { color: var(--text); }
-    .prof-card-acts {
-      display: flex; gap: 6px; margin-top: 10px;
-    }
+    .prof-card-acts { display: flex; gap: 6px; margin-top: 10px; }
     .prof-card-acts button {
       padding: 5px 12px; border: 1px solid var(--border); background: none;
       border-radius: 7px; font-size: .72rem; font-weight: 600;
       color: var(--text3); cursor: pointer; transition: all .2s;
+      font-family: var(--font-body);
     }
     .prof-card-acts button:hover { border-color: var(--text2); color: var(--text2); }
     .prof-card-acts button.del:hover { border-color: #f87171; color: #f87171; }
-    .prof-card-acts button {
-      font-family: var(--font-body);
-    }
-    .prof-empty {
-      text-align: center; padding: 40px 20px;
-      color: var(--text3); font-size: .9rem;
-    }
+    .prof-empty { text-align: center; padding: 40px 20px; color: var(--text3); font-size: .9rem; }
     .prof-empty-icon { font-size: 2rem; margin-bottom: 8px; }
-
-    /* Project cards grid */
-    .proj-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
-      margin-top: 12px;
-    }
-    .proj-card {
-      padding: 18px; background: rgba(17,19,24,.5);
-      border: 1px solid var(--border); border-radius: 14px;
-      cursor: pointer; transition: all .2s; backdrop-filter: blur(8px);
-    }
-    .proj-card:hover { border-color: rgba(249,115,22,.25); transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,.2); }
-    .proj-card-name {
-      font-family: var(--font-display); font-size: .95rem; font-weight: 400; color: var(--text); margin-bottom: 6px;
-      display: flex; align-items: center; gap: 7px;
-    }
-    .proj-card-meta { font-size: .72rem; color: var(--text3); display: flex; gap: 12px; margin-bottom: 8px; font-weight: 300; }
-    .proj-card-style {
-      font-size: .78rem; color: var(--text2); line-height: 1.4;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .proj-card-acts { display: flex; gap: 6px; margin-top: 10px; }
 
     /* ── Project detail view ───────────────────────────── */
     .proj-detail-overlay {
@@ -1707,21 +1818,28 @@
     .rsi-link  { font-size: .75rem; color: var(--purple); font-weight: 600; flex-shrink: 0; text-decoration: none; }
     .rsi-link:hover { text-decoration: underline; }
 
-    /* Upgrade banner in profile */
-    .prof-upgrade-banner {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 14px 18px; background: linear-gradient(135deg, rgba(249,115,22,.12), rgba(251,191,36,.08));
-      border: 1px solid rgba(249,115,22,.25); border-radius: var(--r);
-      margin-bottom: 20px;
-    }
-    .prof-upgrade-banner p { font-size: .85rem; color: var(--text2); }
-    .prof-upgrade-banner strong { color: #fed7aa; }
-
-    @media (max-width: 600px) {
-      .prof-stats { grid-template-columns: 1fr 1fr; }
-      .prof-header { flex-direction: column; text-align: center; }
-      .prof-meta { justify-content: center; }
-      .proj-grid { grid-template-columns: 1fr; }
+    /* Mobile responsive — Profile Hub */
+    @media (max-width: 768px) {
+      .prof-layout { grid-template-columns: 1fr; height: auto; }
+      .prof-sidebar {
+        height: auto; border-right: none; border-bottom: 1px solid var(--border);
+        overflow: visible;
+      }
+      .prof-sidebar-identity { padding: 16px; display: flex; align-items: center; gap: 14px; text-align: left; }
+      .prof-sidebar-identity .prof-av { width: 48px; height: 48px; margin: 0; }
+      .prof-sidebar-nav {
+        flex-direction: row; overflow-x: auto; padding: 8px 12px;
+        gap: 4px; -webkit-overflow-scrolling: touch;
+      }
+      .prof-nav-item { flex: 0 0 auto; white-space: nowrap; padding: 8px 12px; font-size: .78rem; }
+      .prof-sidebar-footer { flex-direction: row; padding: 8px 12px; }
+      .prof-sidebar-footer button { flex: 1; }
+      .prof-main { padding: 20px 16px 60px; overflow-y: visible; }
+      .prof-stats-row { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .prof-stat-card { padding: 14px 12px; flex-direction: column; gap: 8px; }
+      .prof-stat-val { font-size: 1.3rem; }
+      .proj-cards-grid { grid-template-columns: 1fr; }
+      .asst-cards-grid { grid-template-columns: 1fr; }
     }
 
     /* ── Toast ────────────────────────────────────────────────── */
@@ -1788,18 +1906,6 @@
 
       /* Pricing */
       .section, .section-sm { padding: 64px 16px; }
-
-      /* Profile */
-      .prof-inner { padding: 20px 16px 60px; }
-      .prof-header { flex-direction: column; text-align: center; gap: 14px; }
-      .prof-meta { justify-content: center; }
-      .prof-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-      .prof-stat { padding: 12px 8px; }
-      .prof-stat-num { font-size: 1.2rem; }
-      .prof-stat-lbl { font-size: .62rem; }
-      .prof-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; gap: 2px; }
-      .prof-tab { flex: 0 0 auto; white-space: nowrap; padding: 9px 14px; font-size: .76rem; }
-      .proj-grid { grid-template-columns: 1fr; }
 
       /* Project detail */
       .proj-detail-inner { padding: 16px 16px 60px; }
@@ -2434,122 +2540,127 @@
 
 <!-- ── PROFILE PAGE ──────────────────────────────────────────────────── -->
 <div class="profile-overlay" id="profilePage">
-  <div class="prof-inner">
-    <div class="prof-top">
-      <button class="prof-back" onclick="closeProfile()">←</button>
-      <div class="prof-title">Profile Hub</div>
-    </div>
+  <div class="prof-layout">
 
-    <!-- Header: avatar + info + usage -->
-    <div class="prof-header" id="profHeader">
-      <!-- Avatar (clickable → picker) -->
-      <div class="prof-av" id="profAv" onclick="toggleAvatarPicker(event)" title="Change avatar">
-        <div class="prof-av-edit">Edit</div>
-      </div>
-      <!-- Avatar picker grid -->
-      <div class="avatar-picker" id="avatarPicker">
-        <div class="avatar-picker-title">Choose your avatar</div>
-        <div class="avatar-picker-grid" id="avatarPickerGrid"></div>
-      </div>
-
-      <div class="prof-info">
-        <div class="prof-email" id="profEmail">—</div>
-        <div class="prof-meta">
-          <span class="plan-badge free" id="profPlanBadge">Free</span>
-          <span id="profFree" style="display:none"></span>
+    <!-- Sidebar -->
+    <div class="prof-sidebar">
+      <div class="prof-sidebar-identity" style="position:relative">
+        <div class="prof-av" id="profAv" onclick="toggleAvatarPicker(event)" title="Change avatar" style="width:64px;height:64px;border-radius:14px;margin:0 auto 12px;display:block">
+          <div class="prof-av-edit">Edit</div>
         </div>
-        <!-- Usage bar -->
-        <div class="usage-bar-wrap" id="profUsageWrap" style="display:none">
-          <div class="usage-bar-label">
-            <span id="profUsageLabel">0 / 0 used this month</span>
-          </div>
-          <div class="usage-bar-track">
-            <div class="usage-bar-fill" id="profUsageFill" style="width:0%"></div>
+        <!-- Avatar picker grid -->
+        <div class="avatar-picker" id="avatarPicker">
+          <div class="avatar-picker-title">Choose your avatar</div>
+          <div class="avatar-picker-grid" id="avatarPickerGrid"></div>
+        </div>
+        <div>
+          <div class="prof-email" id="profEmail" style="font-family:var(--font-display);font-size:.9rem">—</div>
+          <div style="margin-top:6px"><span class="plan-badge free" id="profPlanBadge">Free</span></div>
+          <!-- Usage bar -->
+          <div id="profUsageWrap" style="display:none;margin-top:10px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:.68rem;color:var(--text3)">Monthly usage</span>
+              <span style="font-size:.68rem;color:var(--text2)" id="profUsageLabel">0/0</span>
+            </div>
+            <div style="height:3px;background:var(--surf2);border-radius:2px;overflow:hidden">
+              <div id="profUsageFill" style="height:100%;border-radius:2px;background:linear-gradient(90deg,var(--purple),#fb923c);width:0%;transition:width .4s"></div>
+            </div>
           </div>
         </div>
-        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn-topup-sm" id="profUpgradeBtn"
-            onclick="closeProfile();document.getElementById('pricingSection').scrollIntoView({behavior:'smooth'})">
-            Upgrade plan
-          </button>
-          <button class="btn-topup-sm" id="profManageSub" style="display:none;background:var(--surf2);border:1px solid var(--border);color:var(--text2)"
-            onclick="manageSub()">Manage subscription</button>
-          <button class="btn-topup-sm" style="background:var(--surf2);border:1px solid var(--border);color:var(--text2)"
-            onclick="closeProfile();openTopup()">+ Top up</button>
+      </div>
+
+      <div class="prof-sidebar-nav" id="profSidebarNav">
+        <button class="prof-nav-item on" onclick="profTab('overview')">📊 Overview</button>
+        <button class="prof-nav-item" onclick="profTab('scripts')">✨ Saved scripts</button>
+        <button class="prof-nav-item" onclick="profTab('transc')">🎙 Transcriptions</button>
+        <button class="prof-nav-item" id="profNavProjects" style="display:none" onclick="profTab('projects')">📁 Projects</button>
+        <button class="prof-nav-item" id="profNavAssistants" style="display:none" onclick="profTab('assistants')">🤖 Assistants</button>
+        <button class="prof-nav-item" id="profNavTeam" style="display:none" onclick="profTab('team')">👥 Team</button>
+      </div>
+
+      <div class="prof-sidebar-footer">
+        <button style="padding:9px;border-radius:8px;background:var(--purple);color:#fff;font-size:.8rem;font-weight:600;border:none;cursor:pointer" onclick="closeProfile();openTopup()">+ Top up</button>
+        <button id="profManageSubSidebar" style="display:none;padding:8px;border-radius:8px;background:transparent;color:var(--text3);font-size:.75rem;border:1px solid var(--border);cursor:pointer" onclick="manageSub()">Manage subscription</button>
+        <button style="padding:8px;border-radius:8px;background:transparent;color:var(--text3);font-size:.75rem;border:1px solid var(--border);cursor:pointer" onclick="closeProfile()">← Back to app</button>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="prof-main" id="profMain">
+
+      <!-- Overview panel (default) -->
+      <div id="profPanelOverview">
+        <div class="prof-stats-row">
+          <div class="prof-stat-card">
+            <div class="prof-stat-icon orange">🎙</div>
+            <div><div class="prof-stat-val" id="profStatTransc">0</div><div class="prof-stat-label">Transcriptions</div></div>
+          </div>
+          <div class="prof-stat-card">
+            <div class="prof-stat-icon purple">✨</div>
+            <div><div class="prof-stat-val" id="profStatScripts">0</div><div class="prof-stat-label">Saved scripts</div></div>
+          </div>
+          <div class="prof-stat-card">
+            <div class="prof-stat-icon green">⚡</div>
+            <div><div class="prof-stat-val" id="profStatUsos">0</div><div class="prof-stat-label">Uses left</div></div>
+          </div>
         </div>
+        <div id="profRecentScripts"></div>
       </div>
-    </div>
 
-    <!-- Stats row -->
-    <div class="prof-stats">
-      <div class="prof-stat">
-        <div class="prof-stat-num" id="profStatTransc">0</div>
-        <div class="prof-stat-lbl">Transcriptions</div>
-      </div>
-      <div class="prof-stat">
-        <div class="prof-stat-num" id="profStatScripts">0</div>
-        <div class="prof-stat-lbl">Saved scripts</div>
-      </div>
-      <div class="prof-stat">
-        <div class="prof-stat-num" id="profStatUsos">0</div>
-        <div class="prof-stat-lbl">Uses left</div>
-      </div>
-    </div>
-
-    <!-- Tabs: Overview | Projects | Team -->
-    <div class="prof-tabs" id="profTabsRow">
-      <button class="prof-tab on" id="profTabOverview"  onclick="profTab('overview')">Overview</button>
-      <button class="prof-tab"    id="profTabScripts"   onclick="profTab('scripts')">Saved scripts</button>
-      <button class="prof-tab"    id="profTabTransc"    onclick="profTab('transc')">Transcriptions</button>
-      <button class="prof-tab"    id="profTabProjects"   onclick="profTab('projects')"   style="display:none">Projects</button>
-      <button class="prof-tab"    id="profTabTeam"       onclick="profTab('team')"       style="display:none">Team</button>
-      <button class="prof-tab"    id="profTabAssistants" onclick="profTab('assistants')" style="display:none">🤖 Assistants</button>
-    </div>
-
-    <!-- Overview tab -->
-    <div id="profPanelOverview">
-      <div style="font-size:.82rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Recent scripts</div>
-      <div class="recent-scripts-list" id="profRecentScripts"></div>
-    </div>
-
-    <!-- Saved scripts tab -->
-    <div id="profPanelScripts" style="display:none">
-      <div class="prof-list" id="profListScripts"></div>
-    </div>
-
-    <!-- Transcriptions tab -->
-    <div id="profPanelTransc" style="display:none">
-      <div class="prof-list" id="profListTransc"></div>
-    </div>
-
-    <!-- Projects tab (pro/agency) -->
-    <div id="profPanelProjects" style="display:none">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-        <button class="btn-topup-sm" onclick="openNewProjectModal()">+ New Project</button>
-      </div>
-      <div class="proj-grid" id="profProjGrid"></div>
-      <div class="prof-empty" id="profProjEmpty" style="display:none">
-        <div class="prof-empty-icon">📁</div>No projects yet. Create your first one.
-      </div>
-    </div>
-
-    <!-- Team tab (agency) -->
-    <div id="profPanelTeam" style="display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <span style="font-size:.82rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Team members</span>
-        <div style="display:flex;gap:8px">
-          <button class="btn-topup-sm" onclick="openInviteModal()">+ Invite member</button>
-          <button class="btn-sm" onclick="copyInviteLink()">Copy invite link</button>
+      <!-- Scripts panel -->
+      <div id="profPanelScripts" style="display:none">
+        <div class="prof-section-head">
+          <div><div class="prof-section-title">Saved scripts</div></div>
         </div>
+        <div id="profListScripts"></div>
       </div>
-      <div class="team-list" id="profTeamList"></div>
-    </div>
 
-    <!-- Assistants tab (basic/pro/agency) -->
-    <div id="profPanelAssistants" style="display:none">
-      <div class="prof-list" id="profListAssistants"></div>
-    </div>
-  </div>
+      <!-- Transcriptions panel -->
+      <div id="profPanelTransc" style="display:none">
+        <div class="prof-section-head">
+          <div><div class="prof-section-title">Transcriptions</div></div>
+        </div>
+        <div id="profListTransc"></div>
+      </div>
+
+      <!-- Projects panel -->
+      <div id="profPanelProjects" style="display:none">
+        <div class="prof-section-head">
+          <div>
+            <div class="prof-section-title">Projects</div>
+            <div class="prof-section-sub" id="profProjCount"></div>
+          </div>
+          <button style="background:var(--purple);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer" onclick="openNewProjectModal()">+ New project</button>
+        </div>
+        <div class="proj-cards-grid" id="profProjGrid"></div>
+        <div class="prof-empty" id="profProjEmpty" style="display:none"><div class="prof-empty-icon">📁</div>No projects yet.</div>
+      </div>
+
+      <!-- Assistants panel -->
+      <div id="profPanelAssistants" style="display:none">
+        <div class="prof-section-head">
+          <div>
+            <div class="prof-section-title">Your assistants</div>
+            <div class="prof-section-sub" id="profAsstCount"></div>
+          </div>
+          <button id="profNewAsstBtn" style="background:var(--purple);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer" onclick="openAssistantModal()">+ New assistant</button>
+        </div>
+        <div class="asst-cards-grid" id="profListAssistants"></div>
+      </div>
+
+      <!-- Team panel -->
+      <div id="profPanelTeam" style="display:none">
+        <div class="prof-section-head">
+          <div><div class="prof-section-title">Team members</div></div>
+          <div style="display:flex;gap:8px">
+            <button style="background:var(--purple);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer" onclick="openInviteModal()">Invite member</button>
+          </div>
+        </div>
+        <div id="profTeamList"></div>
+      </div>
+
+    </div><!-- /.prof-main -->
+  </div><!-- /.prof-layout -->
 </div>
 
 <!-- New Project modal -->
@@ -3060,35 +3171,37 @@ function renderProfAssistants() {
   const limits = { free: 0, basic: 1, pro: 5, agency: 999 };
   const limit = limits[plan] || 0;
 
+  const countEl = document.getElementById("profAsstCount");
+  if (countEl) countEl.textContent = `${userAssistants.length} / ${plan === "agency" ? "∞" : limit} assistants`;
+
   if (plan === "free") {
     el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">🤖</div>Upgrade to Basic to create your first assistant.</div>';
     return;
   }
 
-  let html = `<div style="font-size:.78rem;color:var(--text3);margin-bottom:12px">${userAssistants.length} / ${plan === "agency" ? "∞" : limit} assistants</div>`;
-
   if (!userAssistants.length) {
-    html += '<div class="prof-empty"><div class="prof-empty-icon">🤖</div>No assistants yet. Create your first one in the style grid.</div>';
-  } else {
-    const seed = st.user?.avatar_seed || "default";
-    html += userAssistants.map(a => `
-      <div class="prof-card">
-        <div class="prof-card-top">
-          <span class="prof-card-badge" style="background:rgba(20,184,166,.15);color:#14b8a6">
-            <img src="https://api.dicebear.com/7.x/pixel-art/svg?seed=${seed}&backgroundColor=b6e3f4" style="width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:4px" />${esc(a.name)}
-          </span>
-          <span class="prof-card-date">${fmtDate(a.created_at)}</span>
-        </div>
-        <div class="prof-card-text" style="font-style:italic">${esc((a.instructions || "").slice(0, 120))}${(a.instructions || "").length > 120 ? "..." : ""}</div>
-        <div class="prof-card-acts">
-          <button onclick="editAssistant('${a.id}')">Edit</button>
-          <button class="del" onclick="deleteAssistant('${a.id}')">Delete</button>
-        </div>
-      </div>
-    `).join("");
+    el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">🤖</div>No assistants yet. Create your first one.</div>';
+    return;
   }
 
-  el.innerHTML = html;
+  const seed = st.user?.avatar_seed || "default";
+  el.innerHTML = userAssistants.map(a => `
+    <div class="asst-card-v2${a.is_default ? ' is-default' : ''}">
+      ${a.is_default ? '<div class="asst-card-v2-default-badge">DEFAULT</div>' : ''}
+      <div class="asst-card-v2-head">
+        <img src="${dicebearUrl(seed)}" />
+        <div>
+          <div class="asst-card-v2-name">${esc(a.name)}</div>
+          <div class="asst-card-v2-sub">Custom assistant</div>
+        </div>
+      </div>
+      <div class="asst-card-v2-preview">"${esc((a.instructions || '').slice(0, 120))}"</div>
+      <div class="asst-card-v2-acts">
+        <button class="btn-sm" onclick="editAssistant('${a.id}')">Edit</button>
+        <button class="btn-sm del" onclick="deleteAssistant('${a.id}')">Delete</button>
+      </div>
+    </div>
+  `).join("");
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────
@@ -3306,8 +3419,8 @@ function renderProfileHub() {
   const profAv = document.getElementById("profAv");
   profAv.innerHTML = '<div class="prof-av-edit">Edit</div>';
   if (seed) {
-    const img = avatarImgEl(seed, 72);
-    img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;inset:0";
+    const img = avatarImgEl(seed, 64);
+    img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:14px;position:absolute;inset:0";
     profAv.prepend(img);
   }
 
@@ -3328,12 +3441,6 @@ function renderProfileHub() {
   badge.textContent = planLabels[plan] || plan;
   badge.className = `plan-badge ${plan}`;
 
-  // Hide upgrade btn if already on top plan
-  document.getElementById("profUpgradeBtn").style.display = plan === "agency" ? "none" : "";
-
-  // Show manage subscription if on a paid plan
-  document.getElementById("profManageSub").style.display = ["basic","pro","agency"].includes(plan) ? "" : "none";
-
   // Usage bar
   const usageWrap = document.getElementById("profUsageWrap");
   const usageFill = document.getElementById("profUsageFill");
@@ -3342,35 +3449,39 @@ function renderProfileHub() {
     usageWrap.style.display = "";
     const pct = Math.min(100, Math.round(st.monthlyUsage / st.monthlyLimit * 100));
     usageFill.style.width = pct + "%";
-    usageLabel.textContent = `${st.monthlyUsage} / ${st.monthlyLimit} used this month`;
+    usageLabel.textContent = `${st.monthlyUsage}/${st.monthlyLimit}`;
   } else if (plan === "free") {
     usageWrap.style.display = "";
     usageFill.style.width = "0%";
-    usageLabel.textContent = "Unlimited (credit-based)";
+    usageLabel.textContent = "Credit-based";
   } else {
     usageWrap.style.display = "none";
   }
 
   // Stats
   document.getElementById("profStatTransc").textContent = histCache.length;
+  document.getElementById("profStatScripts").textContent = scriptsCache.length;
   document.getElementById("profStatUsos").textContent = Math.floor(st.credits / 18);
 
-  // Tabs visibility
+  // Show nav items based on plan
+  const hasPaidPlan = ["basic","pro","agency"].includes(plan);
   const isPro = plan === "pro" || plan === "agency";
   const isAgency = plan === "agency";
-  const hasPaidPlan = ["basic", "pro", "agency"].includes(plan);
-  document.getElementById("profTabProjects").style.display = isPro ? "" : "none";
-  document.getElementById("profTabTeam").style.display = isAgency ? "" : "none";
-  document.getElementById("profTabAssistants").style.display = hasPaidPlan ? "" : "none";
+  document.getElementById("profNavProjects").style.display = hasPaidPlan ? "" : "none";
+  document.getElementById("profNavAssistants").style.display = hasPaidPlan ? "" : "none";
+  document.getElementById("profNavTeam").style.display = isAgency ? "" : "none";
+
+  // Manage sub button in sidebar
+  document.getElementById("profManageSubSidebar").style.display = hasPaidPlan ? "" : "none";
 
   // Load data
   loadSavedScripts();
-  if (isPro) loadProjects();
+  if (hasPaidPlan) { loadProjects(); loadAssistants(); }
   if (isAgency) loadTeamMembers();
   renderProfTransc();
   renderProfOverview();
 
-  // Default tab
+  // Default to overview
   profTab("overview");
 }
 
@@ -3436,25 +3547,42 @@ function updateAllAvatars(seed) {
     profAv.innerHTML = `<div class="prof-av-edit">Edit</div>`;
     const img = document.createElement("img");
     img.src = url;
-    img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;inset:0";
+    img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:14px;position:absolute;inset:0";
     profAv.prepend(img);
   }
 }
 
 function profTab(tab) {
-  // Map tab name → panel id
-  const panels = { overview: "profPanelOverview", scripts: "profPanelScripts", transc: "profPanelTransc", projects: "profPanelProjects", team: "profPanelTeam", assistants: "profPanelAssistants" };
-  Object.entries(panels).forEach(([k, pid]) => {
-    const panel = document.getElementById(pid);
-    if (panel) panel.style.display = k === tab ? "" : "none";
+  const panels = {
+    overview: "profPanelOverview",
+    scripts: "profPanelScripts",
+    transc: "profPanelTransc",
+    projects: "profPanelProjects",
+    assistants: "profPanelAssistants",
+    team: "profPanelTeam",
+  };
+  // Hide all panels
+  Object.values(panels).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
   });
-  // Highlight correct tab button
-  const tabIds = { overview: "profTabOverview", scripts: "profTabScripts", transc: "profTabTransc", projects: "profTabProjects", team: "profTabTeam", assistants: "profTabAssistants" };
-  Object.entries(tabIds).forEach(([k, bid]) => {
-    const btn = document.getElementById(bid);
-    if (btn) btn.classList.toggle("on", k === tab);
-  });
+  // Show selected
+  const target = document.getElementById(panels[tab]);
+  if (target) target.style.display = "";
+
+  // Update nav active state
+  document.querySelectorAll(".prof-nav-item").forEach(btn => btn.classList.remove("on"));
+  const tabOrder = ["overview","scripts","transc","projects","assistants","team"];
+  const navItems = document.querySelectorAll(".prof-nav-item");
+  const idx = tabOrder.indexOf(tab);
+  if (navItems[idx]) navItems[idx].classList.add("on");
+
+  // Load data for specific tabs
+  if (tab === "scripts") renderProfScripts();
+  if (tab === "transc") renderProfTransc();
+  if (tab === "projects") renderProfProjects();
   if (tab === "assistants") renderProfAssistants();
+  if (tab === "team") loadTeamMembers();
 }
 
 function renderProfOverview() {
@@ -3594,29 +3722,51 @@ async function loadProjects() {
   } catch {}
 }
 
+const PROJECT_COLORS = ['#f97316','#a78bfa','#22c55e','#3b82f6','#ec4899','#14b8a6','#f59e0b'];
+function getProjectColor(name) { return PROJECT_COLORS[(name || '').charCodeAt(0) % PROJECT_COLORS.length]; }
+
 function renderProfProjects() {
   const grid = document.getElementById("profProjGrid");
   const empty = document.getElementById("profProjEmpty");
+  const countEl = document.getElementById("profProjCount");
+  if (countEl) countEl.textContent = `${projectsCache.length} project${projectsCache.length !== 1 ? 's' : ''}`;
+
   if (!projectsCache.length) {
-    grid.innerHTML = "";
+    grid.innerHTML = '';
     empty.style.display = "";
     return;
   }
   empty.style.display = "none";
-  grid.innerHTML = projectsCache.map(p => `
-    <div class="proj-card" onclick="openProjDetail('${p.id}')">
-      <div class="proj-card-name">📁 ${esc(p.name)}</div>
-      <div class="proj-card-meta">
-        <span>${fmtDate(p.created_at)}</span>
-        ${p.script_count != null ? `<span>${p.script_count} scripts</span>` : ""}
+
+  grid.innerHTML = projectsCache.map(p => {
+    const color = getProjectColor(p.name);
+    const initial = (p.name || '?')[0].toUpperCase();
+    return `
+    <div class="proj-card-v2" onclick="openProjDetail('${p.id}')">
+      <div class="proj-card-v2-header" style="background:linear-gradient(135deg,${color}15,${color}05)">
+        <div class="proj-card-v2-icon" style="background:${color}20;border:1px solid ${color}35;color:${color}">${initial}</div>
+        <div>
+          <div style="font-family:var(--font-display);font-size:.95rem">${esc(p.name)}</div>
+          <div style="font-size:.72rem;color:var(--text3)">${p.script_count || 0} scripts</div>
+        </div>
       </div>
-      ${p.style_prompt ? `<div class="proj-card-style">${esc(p.style_prompt.slice(0, 80))}</div>` : ""}
-      <div class="proj-card-acts" onclick="event.stopPropagation()">
-        <button class="btn-sm" onclick="openProjDetail('${p.id}')">Open</button>
-        <button class="btn-sm del" onclick="delProject('${p.id}')">Delete</button>
+      <div class="proj-card-v2-body">
+        ${p.style_prompt ? `<div class="proj-card-v2-style">"${esc(p.style_prompt.slice(0, 80))}"</div>` : ''}
+        <div class="proj-card-v2-footer">
+          <span style="font-size:.72rem;color:var(--text3)">${fmtDate(p.created_at)}</span>
+          <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
+            <button class="btn-sm" onclick="openProjDetail('${p.id}')">Open</button>
+            <button class="btn-sm del" onclick="delProject('${p.id}')">Delete</button>
+          </div>
+        </div>
       </div>
-    </div>
-  `).join("");
+    </div>`;
+  }).join("") + `
+    <button class="proj-card-new" onclick="openNewProjectModal()">
+      <span style="font-size:1.2rem">+</span>
+      <span style="font-size:.78rem">New project</span>
+    </button>
+  `;
 }
 
 function openNewProjectModal() {

@@ -1046,6 +1046,16 @@ def delete_project(project_id):
     return jsonify({"ok": True})
 
 
+@app.route("/projects/<project_id>/assistant", methods=["PUT"])
+@require_auth
+def assign_assistant_to_project(project_id):
+    user = current_user()
+    body = request.get_json()
+    assistant_id = body.get("assistant_id") or None
+    db.table("projects").update({"assistant_id": assistant_id}).eq("id", project_id).eq("user_id", user["id"]).execute()
+    return jsonify({"ok": True})
+
+
 # ── Avatar ────────────────────────────────────────────────────────────────────
 
 @app.route("/profile/avatar", methods=["POST"])
