@@ -510,11 +510,11 @@
       pointer-events: none;
     }
     .style-pill .sp-emoji {
-      width: 40px; height: 40px; border-radius: 10px;
-      background: rgba(var(--scr), .12);
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(var(--scr), .1);
       display: flex; align-items: center; justify-content: center;
-      font-size: 1.2rem; line-height: 1;
     }
+    .style-pill .sp-emoji svg { flex-shrink: 0; }
     .style-pill .sp-name  { font-family: var(--font-display); font-size: .82rem; font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: var(--text); transition: color .2s; }
     .style-pill .sp-hint  { font-size: .72rem; font-weight: 300; color: var(--text3); line-height: 1.4; transition: color .2s; }
     [data-theme="light"] .style-pill .sp-hint { color: #555; }
@@ -2110,37 +2110,37 @@
       <div class="style-grid">
         <button class="style-pill" data-s="viral"
           onclick="selectStyle(this)" onmouseenter="previewStyle('viral')">
-          <span class="sp-emoji">🔥</span>
+          <span class="sp-emoji"><svg width="28" height="34" viewBox="0 0 72 88" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><rect x="24" y="4" width="24" height="4" fill="#1a1a2e"/><rect x="20" y="8" width="32" height="4" fill="#1a1a2e"/><rect x="16" y="12" width="40" height="28" fill="#fcd9a0"/><rect x="16" y="12" width="40" height="8" fill="#1a1a2e"/><rect x="16" y="20" width="12" height="6" fill="#1a1a2e"/><rect x="44" y="20" width="12" height="6" fill="#1a1a2e"/><rect x="17" y="21" width="10" height="4" fill="#60a5fa"/><rect x="45" y="21" width="10" height="4" fill="#60a5fa"/><rect x="28" y="34" width="16" height="4" fill="#f97316"/><rect x="10" y="40" width="8" height="20" fill="#f97316"/><rect x="54" y="40" width="8" height="20" fill="#f97316"/><rect x="18" y="40" width="36" height="4" fill="#f97316"/><rect x="14" y="44" width="44" height="16" fill="#f97316"/><rect x="18" y="60" width="14" height="20" fill="#f97316"/><rect x="40" y="60" width="14" height="20" fill="#f97316"/><rect x="14" y="76" width="18" height="4" fill="#1a1a2e"/><rect x="40" y="76" width="18" height="4" fill="#1a1a2e"/></svg></span>
           <span class="sp-name">Viral</span>
           <span class="sp-hint" data-i18n="sh.viral">Hook + tensión + CTA brutal</span>
         </button>
         <button class="style-pill" data-s="divertido"
           onclick="selectStyle(this)" onmouseenter="previewStyle('divertido')">
-          <span class="sp-emoji">😂</span>
+          <span class="sp-emoji"><svg width="28" height="34" viewBox="0 0 72 88" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><rect x="24" y="4" width="24" height="4" fill="#f4a400"/><rect x="20" y="8" width="32" height="4" fill="#f4a400"/><rect x="16" y="12" width="40" height="28" fill="#fcd9a0"/><rect x="16" y="12" width="40" height="8" fill="#92400e"/><rect x="26" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="42" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="22" y="28" width="4" height="4" fill="#fcd9a0"/><rect x="46" y="28" width="4" height="4" fill="#fcd9a0"/><rect x="24" y="32" width="24" height="6" fill="#f97316"/><rect x="26" y="36" width="20" height="2" fill="#fff"/><rect x="10" y="40" width="6" height="4" fill="#fcd9a0"/><rect x="56" y="40" width="6" height="4" fill="#fcd9a0"/><rect x="6" y="44" width="6" height="4" fill="#fcd9a0"/><rect x="60" y="44" width="6" height="4" fill="#fcd9a0"/><rect x="18" y="40" width="36" height="4" fill="#f4a400"/><rect x="14" y="44" width="44" height="16" fill="#f4a400"/><rect x="18" y="60" width="14" height="20" fill="#f4a400"/><rect x="40" y="60" width="14" height="20" fill="#f4a400"/><rect x="14" y="76" width="18" height="4" fill="#1a1a2e"/><rect x="40" y="76" width="18" height="4" fill="#1a1a2e"/></svg></span>
           <span class="sp-name" data-i18n="sn.divertido">Divertido</span>
           <span class="sp-hint" data-i18n="sh.divertido">Tono relajado, humor ligero</span>
         </button>
         <button class="style-pill" data-s="linkedin"
           onclick="selectStyle(this)" onmouseenter="previewStyle('linkedin')">
-          <span class="sp-emoji">💼</span>
+          <span class="sp-emoji"><svg width="28" height="34" viewBox="0 0 72 88" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><rect x="24" y="4" width="24" height="4" fill="#1a1a2e"/><rect x="20" y="8" width="32" height="4" fill="#1a1a2e"/><rect x="16" y="12" width="40" height="28" fill="#fcd9a0"/><rect x="16" y="12" width="40" height="8" fill="#1a1a2e"/><rect x="26" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="42" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="28" y="34" width="16" height="4" fill="#f97316"/><rect x="16" y="40" width="40" height="4" fill="#1e3a5f"/><rect x="10" y="40" width="8" height="24" fill="#fcd9a0"/><rect x="54" y="40" width="8" height="24" fill="#fcd9a0"/><rect x="18" y="44" width="36" height="16" fill="#1e3a5f"/><rect x="30" y="38" width="12" height="6" fill="#fff"/><rect x="32" y="36" width="8" height="2" fill="#e2e8f0"/><rect x="18" y="60" width="14" height="20" fill="#334155"/><rect x="40" y="60" width="14" height="20" fill="#334155"/><rect x="14" y="76" width="18" height="4" fill="#1a1a2e"/><rect x="40" y="76" width="18" height="4" fill="#1a1a2e"/></svg></span>
           <span class="sp-name">LinkedIn</span>
           <span class="sp-hint" data-i18n="sh.linkedin">Profesional, reflexivo, red</span>
         </button>
         <button class="style-pill" data-s="storytelling"
           onclick="selectStyle(this)" onmouseenter="previewStyle('storytelling')">
-          <span class="sp-emoji">📖</span>
+          <span class="sp-emoji"><svg width="28" height="34" viewBox="0 0 72 88" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><rect x="24" y="4" width="24" height="4" fill="#7c3aed"/><rect x="20" y="8" width="32" height="4" fill="#7c3aed"/><rect x="16" y="12" width="40" height="28" fill="#fcd9a0"/><rect x="16" y="12" width="40" height="8" fill="#4c1d95"/><rect x="26" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="42" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="28" y="34" width="16" height="4" fill="#f97316"/><rect x="10" y="40" width="8" height="20" fill="#7c3aed"/><rect x="54" y="40" width="8" height="20" fill="#7c3aed"/><rect x="18" y="40" width="36" height="4" fill="#7c3aed"/><rect x="14" y="44" width="44" height="16" fill="#7c3aed"/><rect x="54" y="32" width="14" height="18" fill="#fef3c7"/><rect x="54" y="32" width="2" height="18" fill="#d97706"/><rect x="54" y="32" width="14" height="2" fill="#d97706"/><rect x="66" y="32" width="2" height="18" fill="#d97706"/><rect x="54" y="48" width="14" height="2" fill="#d97706"/><rect x="58" y="36" width="8" height="2" fill="#94a3b8"/><rect x="58" y="40" width="10" height="2" fill="#94a3b8"/><rect x="58" y="44" width="6" height="2" fill="#94a3b8"/><rect x="18" y="60" width="14" height="20" fill="#7c3aed"/><rect x="40" y="60" width="14" height="20" fill="#7c3aed"/><rect x="14" y="76" width="18" height="4" fill="#1a1a2e"/><rect x="40" y="76" width="18" height="4" fill="#1a1a2e"/></svg></span>
           <span class="sp-name" data-i18n="sn.storytelling">Historia</span>
           <span class="sp-hint" data-i18n="sh.storytelling">Narrativa emocional, escenas</span>
         </button>
         <button class="style-pill" data-s="hooks"
           onclick="selectStyle(this)" onmouseenter="previewStyle('hooks')">
-          <span class="sp-emoji">🪝</span>
+          <span class="sp-emoji"><svg width="28" height="34" viewBox="0 0 72 88" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><rect x="24" y="4" width="24" height="4" fill="#0369a1"/><rect x="20" y="8" width="32" height="4" fill="#0369a1"/><rect x="16" y="12" width="40" height="28" fill="#fcd9a0"/><rect x="16" y="12" width="40" height="8" fill="#0c4a6e"/><rect x="26" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="42" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="28" y="34" width="16" height="4" fill="#f97316"/><rect x="10" y="40" width="8" height="20" fill="#0369a1"/><rect x="54" y="40" width="8" height="20" fill="#0369a1"/><rect x="18" y="40" width="36" height="4" fill="#0369a1"/><rect x="14" y="44" width="44" height="16" fill="#0369a1"/><rect x="56" y="20" width="2" height="44" fill="#92400e"/><rect x="58" y="18" width="12" height="2" fill="#92400e"/><rect x="68" y="18" width="2" height="14" fill="#64748b"/><rect x="64" y="30" width="6" height="2" fill="#64748b"/><rect x="66" y="32" width="2" height="4" fill="#22c55e"/><rect x="56" y="60" width="12" height="8" fill="#60a5fa"/><rect x="54" y="62" width="16" height="4" fill="#60a5fa"/><rect x="18" y="60" width="14" height="20" fill="#0369a1"/><rect x="40" y="60" width="14" height="20" fill="#0369a1"/><rect x="14" y="76" width="18" height="4" fill="#1a1a2e"/><rect x="40" y="76" width="18" height="4" fill="#1a1a2e"/></svg></span>
           <span class="sp-name">5 Hooks</span>
           <span class="sp-hint" data-i18n="sh.hooks">5 aperturas que atrapan</span>
         </button>
         <button class="style-pill" data-s="custom"
           onclick="selectStyle(this)" onmouseenter="previewStyle('custom')">
-          <span class="sp-emoji">✍️</span>
+          <span class="sp-emoji"><svg width="28" height="34" viewBox="0 0 72 88" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><rect x="24" y="4" width="24" height="4" fill="#0d9488"/><rect x="20" y="8" width="32" height="4" fill="#0d9488"/><rect x="16" y="12" width="40" height="28" fill="#fcd9a0"/><rect x="16" y="12" width="40" height="8" fill="#134e4a"/><rect x="26" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="42" y="24" width="4" height="4" fill="#1a1a2e"/><rect x="32" y="20" width="4" height="4" fill="#f97316"/><rect x="28" y="34" width="16" height="4" fill="#f97316"/><rect x="10" y="40" width="8" height="20" fill="#0d9488"/><rect x="54" y="40" width="8" height="20" fill="#0d9488"/><rect x="18" y="40" width="36" height="4" fill="#0d9488"/><rect x="14" y="44" width="44" height="16" fill="#0d9488"/><rect x="4" y="34" width="12" height="6" fill="#94a3b8"/><rect x="2" y="36" width="4" height="4" fill="#94a3b8"/><rect x="6" y="30" width="8" height="6" fill="#cbd5e1"/><rect x="8" y="28" width="4" height="2" fill="#f97316"/><rect x="18" y="60" width="14" height="20" fill="#0d9488"/><rect x="40" y="60" width="14" height="20" fill="#0d9488"/><rect x="14" y="76" width="18" height="4" fill="#1a1a2e"/><rect x="40" y="76" width="18" height="4" fill="#1a1a2e"/></svg></span>
           <span class="sp-name">Custom</span>
           <span class="sp-hint" data-i18n="sh.custom">Tú decides las instrucciones</span>
         </button>
