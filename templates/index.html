@@ -1739,17 +1739,101 @@
     .fade-in { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
     .fade-in.in { opacity: 1; transform: translateY(0); }
 
-    /* ── Responsive ───────────────────────────────────────────── */
-    @media (max-width: 768px) {
-      nav { padding: 0 16px; }
-      .demo-grid   { grid-template-columns: 1fr; }
+    /* ── Responsive — Mobile first ────────────────────────────── */
+
+    /* iOS zoom prevention */
+    @media (max-width: 640px) {
+      input, select, textarea { font-size: 16px !important; }
+    }
+
+    /* Safe area */
+    @supports (padding-bottom: env(safe-area-inset-bottom)) {
+      .tour-tooltip, .modal, .drawer { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+    }
+
+    /* Tablet + mobile */
+    @media (max-width: 1024px) {
       .pricing-cards { grid-template-columns: repeat(2,1fr) !important; }
-      .testi-grid  { grid-template-columns: 1fr; }
-      .steps       { grid-template-columns: 1fr; gap: 32px; }
-      .steps::before { display: none; }
-      .section, .section-sm { padding: 64px 16px; }
+    }
+
+    /* Tablet + mobile */
+    @media (max-width: 768px) {
+      /* Nav */
+      nav { padding: 0 12px; height: 52px; }
+      .lang-switch { display: none; }
+      .user-pill span { display: none; }
+      .badge-bal { padding: 4px 10px; font-size: .72rem; }
+
+      /* Hero */
+      .hero { padding: 60px 16px 40px; min-height: auto; }
+      .hero-h1 { font-size: clamp(2rem, 9vw, 4.8rem); }
+      .hero-input-wrap { max-width: 100%; }
+      .hero-input-wrap.has-result { flex-direction: column; }
+      .hero-input-wrap.has-result .hero-input-left { flex: none; width: 100%; }
+      .btn-queue-add { width: 44px; }
+
+      /* Adapt */
       .adapt-section { padding: 60px 16px; }
-      .hist-inner  { padding: 20px 16px; }
+      .adapt-inner { grid-template-columns: 1fr; gap: 36px; }
+      .adapt-right { position: relative; top: 0; }
+      .preview-card { min-height: 260px; }
+      .style-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .style-pill { padding: 14px 12px; min-height: 90px; }
+      .style-pill .sp-emoji { width: 34px; height: 34px; font-size: 1rem; }
+
+      /* Flow */
+      .flow-nodes { flex-direction: column; gap: 16px; }
+      .flow-node { max-width: 100%; }
+      .flow-arrow { display: none; }
+
+      /* Pricing */
+      .section, .section-sm { padding: 64px 16px; }
+
+      /* Profile */
+      .prof-inner { padding: 20px 16px 60px; }
+      .prof-header { flex-direction: column; text-align: center; gap: 14px; }
+      .prof-meta { justify-content: center; }
+      .prof-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .prof-stat { padding: 12px 8px; }
+      .prof-stat-num { font-size: 1.2rem; }
+      .prof-stat-lbl { font-size: .62rem; }
+      .prof-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; gap: 2px; }
+      .prof-tab { flex: 0 0 auto; white-space: nowrap; padding: 9px 14px; font-size: .76rem; }
+      .proj-grid { grid-template-columns: 1fr; }
+
+      /* Project detail */
+      .proj-detail-inner { padding: 16px 16px 60px; }
+      .proj-detail-name { font-size: 1.1rem; }
+      .script-card-perf { flex-direction: column; }
+      .script-card-perf .perf-field input { width: 100%; }
+      .script-card-perf .perf-field textarea { width: 100%; }
+
+      /* Modals → bottom sheet */
+      .overlay { align-items: flex-end; padding: 0; }
+      .modal {
+        border-radius: 20px 20px 0 0; max-width: 100%;
+        padding: 28px 20px 40px;
+        animation: sheet-up .25s ease;
+      }
+      @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+      /* Drawer */
+      .drawer { width: 100%; }
+
+      /* Misc */
+      .demo-grid { grid-template-columns: 1fr; }
+      .testi-grid { grid-template-columns: 1fr; }
+      .hist-inner { padding: 20px 16px; }
+      .btn-shimmer { min-height: 48px; font-size: .9rem; }
+      .btn-plan { min-height: 44px; }
+      .toast { font-size: .78rem; bottom: 20px; }
+    }
+
+    /* Small mobile */
+    @media (max-width: 480px) {
+      .pricing-cards { grid-template-columns: 1fr !important; }
+      .hero-badge { font-size: .68rem; }
+      .hero-sub { font-size: .9rem; }
     }
 
     /* ── Onboarding Tour ─────────────────────────────────────── */
@@ -4277,13 +4361,16 @@ function showToast(msg) {
   resize();
   window.addEventListener("resize", resize);
 
-  const waves = [
+  const isMobile = window.innerWidth < 640;
+  const allWaves = [
     { yRatio: 0.20, color: "rgba(249,115,22,0.10)", amp: 40, freq: 0.016, speed: 0.0005 },
     { yRatio: 0.40, color: "rgba(139,92,246,0.06)", amp: 30, freq: 0.020, speed: 0.0007 },
     { yRatio: 0.60, color: "rgba(249,115,22,0.07)", amp: 50, freq: 0.013, speed: 0.0004 },
     { yRatio: 0.78, color: "rgba(180,60,0,0.05)",   amp: 25, freq: 0.018, speed: 0.0006 },
     { yRatio: 0.92, color: "rgba(139,92,246,0.04)", amp: 35, freq: 0.015, speed: 0.0005 },
   ];
+  const waves = isMobile ? allWaves.slice(0, 3) : allWaves;
+  const step = isMobile ? 12 : 6;
 
   function draw() {
     const w = canvas.width, h = canvas.height;
@@ -4306,7 +4393,7 @@ function showToast(msg) {
 
       ctx.beginPath();
       ctx.moveTo(0, h);
-      for (let x = 0; x <= w; x += 6) {
+      for (let x = 0; x <= w; x += step) {
         const y = baseY
           + Math.sin(x * wave.freq + t * wave.speed * 60 + i * 1.2) * wave.amp
           + Math.sin(x * wave.freq * 0.5 + t * wave.speed * 35 + i) * (wave.amp * 0.35);

@@ -180,8 +180,17 @@
     }
 
     @media (max-width: 640px) {
-      .steps { grid-template-columns: 1fr; }
-      .comm-table { font-size: .82rem; }
+      input, select { font-size: 16px !important; }
+      .hero { padding: 60px 16px 50px; }
+      .hero h1 { font-size: clamp(1.8rem, 8vw, 3.8rem); }
+      .hero p { font-size: .92rem; }
+      .section { padding: 60px 16px; }
+      .steps { grid-template-columns: 1fr; gap: 12px; }
+      .comm-table { font-size: .82rem; display: block; overflow-x: auto; }
+      .form-section { padding: 60px 16px; }
+      .form-section h2 { font-size: 1.6rem; }
+      .btn-cta, .btn-submit { min-height: 48px; }
+      .section-title { font-size: clamp(1.3rem, 5vw, 2.2rem); }
     }
   </style>
 </head>
