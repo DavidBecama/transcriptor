@@ -1939,6 +1939,54 @@
       font-size: .85rem; font-weight: 700; cursor: pointer; text-decoration: underline;
     }
     .tut-modal-footer button:hover { opacity: .8; }
+
+    /* Assistant cards in style grid */
+    .style-pill.assistant-card .sp-emoji img {
+      width: 28px; height: 28px; border-radius: 6px; object-fit: cover;
+    }
+    .style-pill .sp-badge {
+      position: absolute; top: 6px; right: 6px;
+      font-size: .55rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .5px; padding: 2px 6px; border-radius: 4px;
+      background: rgba(20,184,166,.15); color: #14b8a6;
+    }
+    .style-pill .sp-actions {
+      position: absolute; top: 6px; right: 6px;
+      display: none; gap: 4px;
+    }
+    .style-pill.assistant-card:hover .sp-actions { display: flex; }
+    .style-pill.assistant-card:hover .sp-badge { display: none; }
+    .sp-act-btn {
+      background: var(--surf2); border: 1px solid var(--border);
+      color: var(--text3); width: 24px; height: 24px; border-radius: 4px;
+      cursor: pointer; font-size: .65rem; display: flex; align-items: center;
+      justify-content: center; transition: all .15s;
+    }
+    .sp-act-btn:hover { color: var(--text); border-color: var(--text3); }
+    .sp-act-btn.del:hover { color: #f87171; border-color: #f87171; }
+
+    /* New assistant button (+ card) */
+    .style-pill-add {
+      border: 1px dashed var(--border);
+      border-radius: var(--r); min-height: 110px;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; cursor: pointer;
+      color: var(--text3); transition: all .18s;
+      background: transparent; padding: 0;
+    }
+    .style-pill-add:hover { border-color: var(--purple); color: var(--text2); }
+    .style-pill-add.disabled { opacity: .4; cursor: not-allowed; }
+    .style-pill-add .add-icon { font-size: 1.2rem; }
+    .style-pill-add .add-label { font-size: .72rem; }
+
+    /* Search bar above grid */
+    .style-search {
+      width: 100%; padding: 10px 14px; margin-bottom: 12px;
+      background: var(--surf2); border: 1px solid var(--border);
+      border-radius: var(--rsm); color: var(--text); font-size: .85rem;
+      font-family: var(--font-body); outline: none; transition: border-color .2s;
+    }
+    .style-search:focus { border-color: var(--purple); }
   </style>
 </head>
 <body>
@@ -2107,6 +2155,7 @@
       <textarea id="adaptInput" class="script-ta"
         placeholder="Pega aquí el guión o la transcripción que quieres transformar…"></textarea>
 
+      <input type="text" class="style-search" id="styleSearch" placeholder="Search styles..." style="display:none" oninput="renderStyleGrid()" />
       <div class="style-grid">
         <button class="style-pill" data-s="viral"
           onclick="selectStyle(this)" onmouseenter="previewStyle('viral')">
@@ -2452,8 +2501,9 @@
       <button class="prof-tab on" id="profTabOverview"  onclick="profTab('overview')">Overview</button>
       <button class="prof-tab"    id="profTabScripts"   onclick="profTab('scripts')">Saved scripts</button>
       <button class="prof-tab"    id="profTabTransc"    onclick="profTab('transc')">Transcriptions</button>
-      <button class="prof-tab"    id="profTabProjects"  onclick="profTab('projects')" style="display:none">Projects</button>
-      <button class="prof-tab"    id="profTabTeam"      onclick="profTab('team')"     style="display:none">Team</button>
+      <button class="prof-tab"    id="profTabProjects"   onclick="profTab('projects')"   style="display:none">Projects</button>
+      <button class="prof-tab"    id="profTabTeam"       onclick="profTab('team')"       style="display:none">Team</button>
+      <button class="prof-tab"    id="profTabAssistants" onclick="profTab('assistants')" style="display:none">🤖 Assistants</button>
     </div>
 
     <!-- Overview tab -->
@@ -2493,6 +2543,11 @@
         </div>
       </div>
       <div class="team-list" id="profTeamList"></div>
+    </div>
+
+    <!-- Assistants tab (basic/pro/agency) -->
+    <div id="profPanelAssistants" style="display:none">
+      <div class="prof-list" id="profListAssistants"></div>
     </div>
   </div>
 </div>
@@ -2570,6 +2625,27 @@
       <span class="count" id="projScriptCount">0 scripts</span>
     </div>
     <div class="script-grid" id="projScriptGrid"></div>
+  </div>
+</div>
+
+<!-- ASSISTANT MODAL -->
+<div class="overlay" id="assistantOverlay" onclick="backdropClose(event,'assistantOverlay')">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('assistantOverlay')">✕</button>
+    <h2 id="asstModalTitle">New assistant</h2>
+    <div class="field">
+      <label>Assistant name</label>
+      <input type="text" id="asstName" placeholder="e.g. My viral style" />
+    </div>
+    <div class="field">
+      <label>Your instructions</label>
+      <textarea id="asstInstructions" rows="5" style="width:100%;padding:11px 14px;background:var(--surf2);border:1.5px solid var(--border);border-radius:var(--rsm);font-size:.88rem;color:var(--text);outline:none;resize:vertical;font-family:var(--font-body);line-height:1.6" placeholder="Describe how you want your scripts..."></textarea>
+    </div>
+    <div style="background:var(--surf2);border:1px solid var(--border);border-radius:var(--rsm);padding:12px 14px;font-size:.75rem;color:var(--text3);margin-bottom:16px;line-height:1.5">
+      Base structure rules are always applied automatically. Your instructions are added on top to define your personal style.
+    </div>
+    <button class="btn-full" id="asstSaveBtn" onclick="saveAssistant()">Create assistant</button>
+    <div class="form-err" id="asstErr"></div>
   </div>
 </div>
 
@@ -2764,6 +2840,256 @@ let st = { user: null, credits: 0, freeUsed: 0, freeLimit: 5, freeDailyAnon: 3 }
 let topupAmt = "129";
 let authMode = "login";
 let activeStyle = null;
+let selectedAssistantId = null;
+let userAssistants = [];
+let editingAssistantId = null;
+
+// ── Assistants ────────────────────────────────────────────────────────────
+
+async function loadAssistants() {
+  if (!st.user) return;
+  try {
+    const r = await fetch("/assistants");
+    if (r.ok) userAssistants = await r.json();
+  } catch {}
+  renderStyleGrid();
+}
+
+function renderStyleGrid() {
+  const grid = document.querySelector(".adapt-left .style-grid");
+  if (!grid) return;
+
+  // Get search value if search exists
+  const searchEl = document.getElementById("styleSearch");
+  const search = searchEl ? searchEl.value.toLowerCase() : "";
+
+  // Show/hide search bar based on total count
+  const total = 6 + userAssistants.length;
+  if (searchEl) searchEl.style.display = total > 6 ? "" : "none";
+
+  // Remove old assistant cards and add button
+  grid.querySelectorAll(".assistant-card, .style-pill-add").forEach(el => el.remove());
+
+  // Filter predefined pills by search
+  if (search) {
+    grid.querySelectorAll(".style-pill:not(.assistant-card)").forEach(pill => {
+      const name = pill.querySelector(".sp-name")?.textContent?.toLowerCase() || "";
+      pill.style.display = name.includes(search) ? "" : "none";
+    });
+  } else {
+    grid.querySelectorAll(".style-pill:not(.assistant-card)").forEach(pill => {
+      pill.style.display = "";
+    });
+  }
+
+  // Filter assistants by search
+  const filtered = search
+    ? userAssistants.filter(a => a.name.toLowerCase().includes(search))
+    : userAssistants;
+
+  // Add assistant cards
+  const seed = st.user?.avatar_seed || "default";
+  filtered.forEach(a => {
+    const btn = document.createElement("button");
+    btn.className = "style-pill assistant-card";
+    btn.dataset.s = "custom";
+    btn.dataset.assistantId = a.id;
+    btn.onclick = () => selectAssistant(a.id, btn);
+    const preview = (a.instructions || "").slice(0, 60);
+    btn.innerHTML = `
+      <span class="sp-badge">CUSTOM</span>
+      <span class="sp-actions">
+        <button class="sp-act-btn" onclick="event.stopPropagation();editAssistant('${a.id}')" title="Edit">&#9998;</button>
+        <button class="sp-act-btn del" onclick="event.stopPropagation();deleteAssistant('${a.id}')" title="Delete">&#10005;</button>
+      </span>
+      <span class="sp-emoji"><img src="https://api.dicebear.com/7.x/pixel-art/svg?seed=${seed}&backgroundColor=b6e3f4" /></span>
+      <span class="sp-name">${esc(a.name)}</span>
+      <span class="sp-hint" style="font-style:italic">${esc(preview)}${preview.length >= 60 ? "..." : ""}</span>
+    `;
+    grid.appendChild(btn);
+  });
+
+  // Add "+" button
+  const plan = st.plan || "free";
+  const limits = { free: 0, basic: 1, pro: 5, agency: 999 };
+  const limit = limits[plan] || 0;
+  const atLimit = userAssistants.length >= limit;
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "style-pill-add" + (atLimit && plan !== "agency" ? " disabled" : "");
+  addBtn.onclick = () => {
+    if (atLimit && plan !== "agency") { showToast("Upgrade your plan to create more assistants"); return; }
+    openAssistantModal();
+  };
+  addBtn.innerHTML = `<span class="add-icon">+</span><span class="add-label">New assistant</span>`;
+  grid.appendChild(addBtn);
+}
+
+function selectAssistant(id, btn) {
+  document.querySelectorAll(".style-pill").forEach(b => b.classList.remove("act"));
+  btn.classList.add("act");
+  activeStyle = null;
+  selectedAssistantId = id;
+  // Hide custom prompt row
+  document.getElementById("customRow").classList.remove("on");
+  // Trigger adapt
+  runAdaptWithAssistant(id);
+}
+
+async function runAdaptWithAssistant(id) {
+  const text = document.getElementById("adaptInput").value.trim();
+  if (!text) { showToast("Escribe o pega un guión primero"); return; }
+
+  const previewSpinner  = document.getElementById("previewSpinner");
+  const previewContent  = document.getElementById("previewContent");
+  const previewResult   = document.getElementById("previewResultText");
+  const previewLabel    = document.getElementById("previewCardLabel");
+  const pfCopyBtn       = document.getElementById("pfCopyBtn");
+  const previewFooterTxt= document.getElementById("previewFooterTxt");
+
+  previewContent.style.visibility = "hidden";
+  previewSpinner.classList.add("on");
+  previewResult.classList.remove("on");
+  pfCopyBtn.style.display = "none";
+  document.getElementById("pfSaveBtn").style.display = "none";
+  previewLabel.textContent = "Generando…";
+
+  try {
+    const r = await fetch("/adapt", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, style: "custom", assistant_id: id }),
+    });
+    const d = await r.json();
+    previewSpinner.classList.remove("on");
+    previewContent.style.visibility = "visible";
+    if (!r.ok) {
+      showToast(d.error || "Error al transformar");
+      previewLabel.textContent = "Ejemplo";
+    } else {
+      document.querySelectorAll(".preview-slide").forEach(s => s.classList.remove("on"));
+      previewResult.textContent = d.result;
+      previewResult.classList.add("on");
+      previewLabel.textContent = "Tu resultado";
+      pfCopyBtn.style.display = "block";
+      if (st.user) document.getElementById("pfSaveBtn").style.display = "block";
+      previewFooterTxt.textContent = d.cost_cents > 0
+        ? `−${eur(d.cost_cents)} de saldo`
+        : "Generado con IA · gratis";
+      if (d.credits_cents !== undefined) {
+        st.credits = d.credits_cents; st.freeUsed = d.free_used_today;
+        document.getElementById("balDisp").textContent = usos(d.credits_cents);
+        renderFreeBar();
+      }
+    }
+  } catch {
+    previewSpinner.classList.remove("on");
+    previewContent.style.visibility = "visible";
+    previewLabel.textContent = "Ejemplo";
+    showToast("Error de conexión.");
+  }
+}
+
+function openAssistantModal(id) {
+  editingAssistantId = id || null;
+  document.getElementById("asstName").value = "";
+  document.getElementById("asstInstructions").value = "";
+  document.getElementById("asstErr").classList.remove("on");
+
+  if (id) {
+    const a = userAssistants.find(a => a.id === id);
+    if (a) {
+      document.getElementById("asstName").value = a.name;
+      document.getElementById("asstInstructions").value = a.instructions;
+    }
+    document.getElementById("asstModalTitle").textContent = "Edit assistant";
+    document.getElementById("asstSaveBtn").textContent = "Save changes";
+  } else {
+    document.getElementById("asstModalTitle").textContent = "New assistant";
+    document.getElementById("asstSaveBtn").textContent = "Create assistant";
+  }
+
+  openModal("assistantOverlay");
+}
+
+function editAssistant(id) { openAssistantModal(id); }
+
+async function saveAssistant() {
+  const name = document.getElementById("asstName").value.trim();
+  const instructions = document.getElementById("asstInstructions").value.trim();
+  const err = document.getElementById("asstErr");
+  err.classList.remove("on");
+
+  if (!name || !instructions) {
+    err.textContent = "Name and instructions required";
+    err.classList.add("on");
+    return;
+  }
+
+  const url = editingAssistantId ? `/assistants/${editingAssistantId}` : "/assistants";
+  const method = editingAssistantId ? "PUT" : "POST";
+
+  const res = await fetch(url, {
+    method, headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, instructions }),
+  });
+  const d = await res.json();
+
+  if (!res.ok) {
+    err.textContent = d.error || "Error";
+    err.classList.add("on");
+    return;
+  }
+
+  closeModal("assistantOverlay");
+  showToast(editingAssistantId ? "Assistant updated" : "Assistant created");
+  await loadAssistants();
+}
+
+async function deleteAssistant(id) {
+  if (!confirm("Delete this assistant?")) return;
+  await fetch(`/assistants/${id}`, { method: "DELETE" });
+  showToast("Assistant deleted");
+  if (selectedAssistantId === id) selectedAssistantId = null;
+  await loadAssistants();
+}
+
+function renderProfAssistants() {
+  const el = document.getElementById("profListAssistants");
+  if (!el) return;
+  const plan = st.plan || "free";
+  const limits = { free: 0, basic: 1, pro: 5, agency: 999 };
+  const limit = limits[plan] || 0;
+
+  if (plan === "free") {
+    el.innerHTML = '<div class="prof-empty"><div class="prof-empty-icon">🤖</div>Upgrade to Basic to create your first assistant.</div>';
+    return;
+  }
+
+  let html = `<div style="font-size:.78rem;color:var(--text3);margin-bottom:12px">${userAssistants.length} / ${plan === "agency" ? "∞" : limit} assistants</div>`;
+
+  if (!userAssistants.length) {
+    html += '<div class="prof-empty"><div class="prof-empty-icon">🤖</div>No assistants yet. Create your first one in the style grid.</div>';
+  } else {
+    const seed = st.user?.avatar_seed || "default";
+    html += userAssistants.map(a => `
+      <div class="prof-card">
+        <div class="prof-card-top">
+          <span class="prof-card-badge" style="background:rgba(20,184,166,.15);color:#14b8a6">
+            <img src="https://api.dicebear.com/7.x/pixel-art/svg?seed=${seed}&backgroundColor=b6e3f4" style="width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:4px" />${esc(a.name)}
+          </span>
+          <span class="prof-card-date">${fmtDate(a.created_at)}</span>
+        </div>
+        <div class="prof-card-text" style="font-style:italic">${esc((a.instructions || "").slice(0, 120))}${(a.instructions || "").length > 120 ? "..." : ""}</div>
+        <div class="prof-card-acts">
+          <button onclick="editAssistant('${a.id}')">Edit</button>
+          <button class="del" onclick="deleteAssistant('${a.id}')">Delete</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  el.innerHTML = html;
+}
 
 // ── Init ─────────────────────────────────────────────────────────────────
 function initPrices() {
@@ -2797,6 +3123,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   initPrices();
   await refreshMe();
   if (st.user) loadHistory();
+  if (st.user) loadAssistants();
   animateCounter();
   initDemo();
   initScrollReveal();
@@ -3031,8 +3358,10 @@ function renderProfileHub() {
   // Tabs visibility
   const isPro = plan === "pro" || plan === "agency";
   const isAgency = plan === "agency";
+  const hasPaidPlan = ["basic", "pro", "agency"].includes(plan);
   document.getElementById("profTabProjects").style.display = isPro ? "" : "none";
   document.getElementById("profTabTeam").style.display = isAgency ? "" : "none";
+  document.getElementById("profTabAssistants").style.display = hasPaidPlan ? "" : "none";
 
   // Load data
   loadSavedScripts();
@@ -3114,17 +3443,18 @@ function updateAllAvatars(seed) {
 
 function profTab(tab) {
   // Map tab name → panel id
-  const panels = { overview: "profPanelOverview", scripts: "profPanelScripts", transc: "profPanelTransc", projects: "profPanelProjects", team: "profPanelTeam" };
+  const panels = { overview: "profPanelOverview", scripts: "profPanelScripts", transc: "profPanelTransc", projects: "profPanelProjects", team: "profPanelTeam", assistants: "profPanelAssistants" };
   Object.entries(panels).forEach(([k, pid]) => {
     const panel = document.getElementById(pid);
     if (panel) panel.style.display = k === tab ? "" : "none";
   });
   // Highlight correct tab button
-  const tabIds = { overview: "profTabOverview", scripts: "profTabScripts", transc: "profTabTransc", projects: "profTabProjects", team: "profTabTeam" };
+  const tabIds = { overview: "profTabOverview", scripts: "profTabScripts", transc: "profTabTransc", projects: "profTabProjects", team: "profTabTeam", assistants: "profTabAssistants" };
   Object.entries(tabIds).forEach(([k, bid]) => {
     const btn = document.getElementById(bid);
     if (btn) btn.classList.toggle("on", k === tab);
   });
+  if (tab === "assistants") renderProfAssistants();
 }
 
 function renderProfOverview() {
@@ -3955,7 +4285,7 @@ async function runInlineAdapt() {
   try {
     const r = await fetch("/adapt", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, style: activeChip, custom_prompt: custom }),
+      body: JSON.stringify({ text, style: activeChip, custom_prompt: custom, assistant_id: selectedAssistantId }),
     });
     const d = await r.json();
     if (!r.ok) { showToast(d.error || "Error al transformar"); }
@@ -4010,6 +4340,7 @@ function previewStyle(s) {
 }
 
 function selectStyle(btn) {
+  selectedAssistantId = null;
   const s = btn.dataset.s;
   document.querySelectorAll(".style-pill").forEach(b => b.classList.remove("act"));
   btn.classList.add("act");
@@ -4045,7 +4376,7 @@ async function runAdapt() {
   try {
     const r = await fetch("/adapt", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, style: activeStyle, custom_prompt: custom }),
+      body: JSON.stringify({ text, style: activeStyle, custom_prompt: custom, assistant_id: selectedAssistantId }),
     });
     const d = await r.json();
     previewSpinner.classList.remove("on");

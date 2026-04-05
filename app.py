@@ -830,13 +830,23 @@ def adapt():
     text          = (body.get("text") or "").strip()
     style         = (body.get("style") or "").strip()
     custom_prompt = (body.get("custom_prompt") or "").strip()
+    assistant_id  = (body.get("assistant_id") or "").strip()
 
     if not text:
         return jsonify({"error": "Debes proporcionar un guión"}), 400
     if not GROQ_API_KEY:
         return jsonify({"error": "GROQ_API_KEY no configurada"}), 500
-    if not style and not custom_prompt:
+    if not style and not custom_prompt and not assistant_id:
         return jsonify({"error": "Selecciona un estilo"}), 400
+
+    # If assistant_id, override style to use assistant's instructions
+    if assistant_id:
+        ast_result = db.table("assistants").select("instructions").eq("id", assistant_id).execute()
+        if ast_result.data:
+            style = "custom"
+            custom_prompt = ast_result.data[0]["instructions"]
+        else:
+            return jsonify({"error": "Assistant not found"}), 404
 
     user = current_user()
     cost_cents = 0
@@ -895,6 +905,75 @@ def adapt():
         payload["credits_cents"]   = updated["credits_cents"]
         payload["free_used_today"] = updated["free_used_today"]
     return jsonify(payload)
+
+
+# ── Assistants ────────────────────────────────────────────────────────────────
+
+ASSISTANT_LIMITS = {"free": 0, "basic": 1, "pro": 5, "agency": None}
+
+
+@app.route("/assistants", methods=["GET"])
+@require_auth
+def list_assistants():
+    user = current_user()
+    rows = db.table("assistants").select("*").eq("user_id", user["id"]).order("created_at").execute()
+    return jsonify(rows.data)
+
+
+@app.route("/assistants", methods=["POST"])
+@require_auth
+def create_assistant():
+    user = current_user()
+    body = request.get_json()
+    name = (body.get("name") or "").strip()
+    instructions = (body.get("instructions") or "").strip()
+
+    if not name or not instructions:
+        return jsonify({"error": "Name and instructions required"}), 400
+
+    profile = get_profile(user["id"])
+    plan = profile.get("plan", "free")
+    limit = ASSISTANT_LIMITS.get(plan)
+
+    if plan == "free":
+        return jsonify({"error": "Upgrade your plan to create assistants"}), 403
+
+    if limit is not None:
+        count = db.table("assistants").select("id", count="exact").eq("user_id", user["id"]).execute()
+        current = count.count if hasattr(count, "count") else len(count.data)
+        if current >= limit:
+            return jsonify({"error": f"Your plan allows up to {limit} assistant(s)"}), 403
+
+    row = db.table("assistants").insert({
+        "user_id": user["id"],
+        "name": name,
+        "instructions": instructions,
+    }).execute()
+    return jsonify(row.data[0] if row.data else {"ok": True})
+
+
+@app.route("/assistants/<assistant_id>", methods=["PUT"])
+@require_auth
+def update_assistant(assistant_id):
+    user = current_user()
+    body = request.get_json()
+    updates = {}
+    if "name" in body:
+        updates["name"] = body["name"]
+    if "instructions" in body:
+        updates["instructions"] = body["instructions"]
+    if not updates:
+        return jsonify({"error": "Nothing to update"}), 400
+    db.table("assistants").update(updates).eq("id", assistant_id).eq("user_id", user["id"]).execute()
+    return jsonify({"ok": True})
+
+
+@app.route("/assistants/<assistant_id>", methods=["DELETE"])
+@require_auth
+def delete_assistant(assistant_id):
+    user = current_user()
+    db.table("assistants").delete().eq("id", assistant_id).eq("user_id", user["id"]).execute()
+    return jsonify({"ok": True})
 
 
 # ── Scripts & Projects (pro/agency) ──────────────────────────────────────────
