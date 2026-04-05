@@ -100,7 +100,7 @@ def set_security_headers(response):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    response.headers.pop("Server", None)
+    response.headers["Server"] = "ReelScript"
     return response
 
 
