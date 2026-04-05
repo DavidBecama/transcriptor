@@ -1,6 +1,9 @@
 """Transcriptor — Flask app con Supabase, créditos y Apify."""
 
+import logging
 import os
+import re
+import sys
 import tempfile
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -13,10 +16,30 @@ from flask import Flask, Response, jsonify, render_template, request, session
 
 load_dotenv()
 
+# ── Validate required env vars ───────────────────────────────────────────────
+
+REQUIRED_ENV_VARS = [
+    "GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
+    "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "FLASK_SECRET_KEY",
+]
+missing = [v for v in REQUIRED_ENV_VARS if not os.environ.get(v)]
+if missing:
+    print(f"[FATAL] Missing required environment variables: {', '.join(missing)}", file=sys.stderr)
+    sys.exit(1)
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger(__name__)
+
 from supabase import create_client, Client  # noqa: E402 (after dotenv)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", uuid.uuid4().hex)
+app.secret_key = os.environ["FLASK_SECRET_KEY"]
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
@@ -54,6 +77,64 @@ try:
     STRIPE_OK = bool(STRIPE_SECRET_KEY)
 except ImportError:
     STRIPE_OK = False
+
+# ── Rate limiting ────────────────────────────────────────────────────────────
+
+from flask_limiter import Limiter  # noqa: E402
+from flask_limiter.util import get_remote_address  # noqa: E402
+
+limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["200 per hour"], storage_uri="memory://")
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({"error": "Too many requests. Please slow down.", "retry_after": str(e.description)}), 429
+
+
+# ── Security headers ────────────────────────────────────────────────────────
+
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers.pop("Server", None)
+    return response
+
+
+# ── Input validators ────────────────────────────────────────────────────────
+
+def validate_url(url):
+    if not url:
+        return "URL is required"
+    if len(url) > 500:
+        return "URL too long"
+    if not url.startswith(("https://www.instagram.com/", "https://instagram.com/",
+                           "https://www.tiktok.com/", "https://vm.tiktok.com/",
+                           "https://vt.tiktok.com/")):
+        return "Only Instagram and TikTok URLs are supported"
+    return None
+
+
+def validate_adapt(data):
+    text = (data.get("text") or "").strip()
+    if not text:
+        return "Text is required"
+    if len(text) > 10000:
+        return "Text too long (max 10,000 characters)"
+    style = (data.get("style") or "").strip()
+    valid = {"viral", "divertido", "linkedin", "storytelling", "hooks", "custom"}
+    if style and style not in valid and not data.get("assistant_id"):
+        return f"Invalid style"
+    if len(data.get("custom_prompt") or "") > 2000:
+        return "Custom prompt too long (max 2,000 characters)"
+    return None
+
+
+def validate_email(email):
+    return bool(re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email))
 
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -235,6 +316,7 @@ def transcribe_with_groq(audio_path: str, language: str | None = None) -> str:
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("5 per minute;20 per hour")
 def auth_register():
     body = request.get_json()
     email    = (body.get("email") or "").strip().lower()
@@ -268,6 +350,7 @@ def auth_register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("10 per minute;30 per hour")
 def auth_login():
     body = request.get_json()
     email    = (body.get("email") or "").strip().lower()
@@ -321,15 +404,17 @@ def auth_me():
 from tasks import transcribe_task  # noqa: E402
 
 @app.route("/transcribe", methods=["POST"])
+@limiter.limit("10 per minute;50 per hour;200 per day")
 def transcribe():
-    body = request.get_json()
+    body = request.get_json() or {}
     url = (body.get("url") or "").strip()
     language = (body.get("language") or "").strip() or None
 
-    if not url:
-        return jsonify({"error": "Debes proporcionar una URL"}), 400
+    err = validate_url(url)
+    if err:
+        return jsonify({"error": err}), 400
     if not GROQ_API_KEY:
-        return jsonify({"error": "GROQ_API_KEY no configurada en el servidor"}), 500
+        return jsonify({"error": "Service unavailable"}), 500
 
     platform = detect_platform(url)
     if platform == "youtube":
@@ -480,6 +565,7 @@ def download_transcription(tid: int):
 # ── Stripe / payments ─────────────────────────────────────────────────────────
 
 @app.route("/checkout", methods=["POST"])
+@limiter.limit("5 per minute;20 per hour")
 @require_auth
 def create_checkout():
     if not STRIPE_OK:
@@ -515,10 +601,12 @@ def create_checkout():
         }).execute()
         return jsonify({"url": checkout_session.url})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error. Please try again."}), 500
 
 
 @app.route("/stripe-webhook", methods=["POST"])
+@limiter.exempt
 def stripe_webhook():
     if not STRIPE_OK or not STRIPE_WEBHOOK_SECRET:
         return "", 200
@@ -526,9 +614,15 @@ def stripe_webhook():
     payload    = request.get_data()
     sig_header = request.headers.get("Stripe-Signature", "")
 
+    if not sig_header:
+        return jsonify({"error": "Missing signature"}), 400
+
     try:
         event = stripe_lib.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except ValueError:
+        return jsonify({"error": "Invalid payload"}), 400
     except Exception:
+        logger.warning(f"Invalid Stripe signature from IP: {get_client_ip()}")
         return "", 400
 
     if event["type"] == "checkout.session.completed":
@@ -595,6 +689,7 @@ PRICE_TO_PLAN = {
 
 
 @app.route("/create-subscription-checkout", methods=["POST"])
+@limiter.limit("5 per minute;20 per hour")
 @require_auth
 def create_subscription_checkout():
     if not STRIPE_OK:
@@ -622,7 +717,8 @@ def create_subscription_checkout():
         )
         return jsonify({"url": checkout_session.url})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error. Please try again."}), 500
 
 
 @app.route("/manage-subscription", methods=["POST"])
@@ -646,7 +742,8 @@ def manage_subscription():
         )
         return jsonify({"url": portal.url})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error. Please try again."}), 500
 
 
 @app.route("/cancel-subscription", methods=["POST"])
@@ -665,7 +762,8 @@ def cancel_subscription():
         stripe_lib.Subscription.modify(sub_id, cancel_at_period_end=True)
         return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error. Please try again."}), 500
 
 
 # ── Adapt route ───────────────────────────────────────────────────────────────
@@ -825,19 +923,21 @@ def save_script():
 
 
 @app.route("/adapt", methods=["POST"])
+@limiter.limit("20 per minute;100 per hour")
 def adapt():
-    body          = request.get_json()
+    body          = request.get_json() or {}
     text          = (body.get("text") or "").strip()
     style         = (body.get("style") or "").strip()
     custom_prompt = (body.get("custom_prompt") or "").strip()
     assistant_id  = (body.get("assistant_id") or "").strip()
 
-    if not text:
-        return jsonify({"error": "Debes proporcionar un guión"}), 400
+    err = validate_adapt(body)
+    if err:
+        return jsonify({"error": err}), 400
     if not GROQ_API_KEY:
-        return jsonify({"error": "GROQ_API_KEY no configurada"}), 500
+        return jsonify({"error": "Service unavailable"}), 500
     if not style and not custom_prompt and not assistant_id:
-        return jsonify({"error": "Selecciona un estilo"}), 400
+        return jsonify({"error": "Select a style"}), 400
 
     # If assistant_id, override style to use assistant's instructions
     if assistant_id:
@@ -881,7 +981,8 @@ def adapt():
     except requests.HTTPError as e:
         return jsonify({"error": f"Error de la API: {e}"}), 502
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error. Please try again."}), 500
 
     # Actualizar contadores
     is_unlimited = user and user.get("email", "").lower() in UNLIMITED_EMAILS
@@ -1218,9 +1319,9 @@ def profile_data():
 # ── Affiliate program ────────────────────────────────────────────────────────
 
 @app.route("/affiliate/apply", methods=["POST"])
+@limiter.limit("3 per hour")
 def affiliate_apply():
-    import re
-    body = request.get_json()
+    body = request.get_json() or {}
     name = (body.get("name") or "").strip()
     email = (body.get("email") or "").strip().lower()
     handle = (body.get("handle") or "").strip()
@@ -1228,6 +1329,10 @@ def affiliate_apply():
 
     if not name or not email:
         return jsonify({"error": "Name and email required"}), 400
+    if len(name) > 100:
+        return jsonify({"error": "Name too long"}), 400
+    if not validate_email(email):
+        return jsonify({"error": "Invalid email address"}), 400
 
     # Check if already an affiliate
     existing = db.table("affiliates").select("code, status").eq("email", email).execute()
@@ -1264,6 +1369,7 @@ def affiliate_apply():
 
 
 @app.route("/affiliate/click", methods=["POST"])
+@limiter.limit("30 per minute")
 def affiliate_click():
     body = request.get_json()
     code = (body.get("code") or "").strip()

@@ -2721,6 +2721,9 @@
     <div class="proj-detail-top">
       <button class="proj-detail-back" onclick="closeProjDetail()">← Back</button>
       <input class="proj-detail-name" id="projDetailName" onblur="saveProjName()" />
+      <select id="projDetailAssistant" onchange="saveProjAssistant()" style="padding:6px 12px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--rsm);color:var(--text2);font-size:.8rem;outline:none">
+        <option value="">No assistant</option>
+      </select>
       <button class="proj-detail-del" onclick="delProjFromDetail()">Delete project</button>
     </div>
     <div class="proj-detail-style">
@@ -3840,6 +3843,11 @@ async function openProjDetail(projectId) {
   document.getElementById("projDetailOverlay").classList.add("on");
   document.body.style.overflow = "hidden";
 
+  // Populate assistant selector
+  const sel = document.getElementById("projDetailAssistant");
+  sel.innerHTML = '<option value="">No assistant</option>' +
+    userAssistants.map(a => `<option value="${a.id}" ${a.id === proj.assistant_id ? "selected" : ""}>${esc(a.name)}</option>`).join("");
+
   // Load scripts for this project
   try {
     const r = await fetch(`/scripts?project_id=${projectId}`);
@@ -3879,6 +3887,18 @@ async function saveProjStyle() {
   });
   const p = projectsCache.find(p => p.id === currentProjId);
   if (p) p.style_prompt = style;
+}
+
+async function saveProjAssistant() {
+  if (!currentProjId) return;
+  const assistantId = document.getElementById("projDetailAssistant").value || null;
+  await fetch(`/projects/${currentProjId}/assistant`, {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ assistant_id: assistantId }),
+  });
+  const p = projectsCache.find(p => p.id === currentProjId);
+  if (p) p.assistant_id = assistantId;
+  showToast(assistantId ? "Assistant assigned" : "Assistant removed");
 }
 
 async function delProjFromDetail() {
