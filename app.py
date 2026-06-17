@@ -6530,6 +6530,22 @@ def legal_notice_page():
     return render_template("legal.html")
 
 
+@app.route("/refund")
+def refund_page():
+    return render_template("refund.html")
+
+
+# Versiones en catalán (CA) — solo privacy y refund (idioma oficial de Andorra).
+@app.route("/ca/privacy")
+def privacy_page_ca():
+    return render_template("privacy_ca.html")
+
+
+@app.route("/ca/refund")
+def refund_page_ca():
+    return render_template("refund_ca.html")
+
+
 # v0.14.12 — i18n strings for forgot/reset password (server-side render)
 FORGOT_RESET_STRINGS = {
     "es": {
