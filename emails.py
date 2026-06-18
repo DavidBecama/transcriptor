@@ -118,8 +118,19 @@ def _btn(href, label):
     )
 
 
+# Eslogan UNIFICADO (Fathom 18/06): el mismo de la landing («Roba lo que funciona»),
+# como firma de marca en todos los emails. ES/EN. Centraliza para no divergir.
+SLOGAN_ES = "Roba lo que funciona."
+SLOGAN_EN = "Steal what works."
+
+
+def slogan(lang="es"):
+    return SLOGAN_EN if lang == "en" else SLOGAN_ES
+
+
 def _wrap_html(body_html, unsubscribe_url, lang="es"):
     foot_unsub = "darse de baja" if lang == "es" else "unsubscribe"
+    slog = slogan(lang)
     return (
         '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" '
         '"http://www.w3.org/TR/html4/loose.dtd">\n'
@@ -132,7 +143,10 @@ def _wrap_html(body_html, unsubscribe_url, lang="es"):
         'alt="Reelscript" width="48" height="48" '
         'style="display:block;margin-bottom:24px;border:0">'
         f'{body_html}'
-        '<p style="margin-top:36px;font-size:11px;color:#888;line-height:1.6">'
+        '<p style="margin-top:36px;font-size:12px;color:#aaa;line-height:1.4;'
+        'font-weight:600;letter-spacing:.01em">'
+        f'{slog}</p>'
+        '<p style="margin-top:6px;font-size:11px;color:#888;line-height:1.6">'
         f'<a href="{APP_URL}" style="color:#888;text-decoration:none">reelscript.net</a> · '
         f'<a href="{unsubscribe_url}" style="color:#888;text-decoration:underline">{foot_unsub}</a>'
         '</p></div></body></html>'
@@ -144,7 +158,7 @@ def _wrap_text(body_text, unsubscribe_url, lang="es"):
         "reelscript.net · darse de baja: " if lang == "es"
         else "reelscript.net · unsubscribe: "
     )
-    return f"{body_text}\n\n{foot}{unsubscribe_url}"
+    return f"{body_text}\n\n{slogan(lang)}\n{foot}{unsubscribe_url}"
 
 
 # template_key → (lang → {subject, body_html_inner, body_text_inner, cta_href})
@@ -1116,6 +1130,105 @@ def send_trial_expired(user_id):
          + _btn(cta, "go back to Pro →")),
         ("hey creator.\n\nyour Pro trial ended. you're now on Free (3 analyses and 2 scripts "
          "a month, 1 competitor). your voice and data are intact.\n\ngo back to Pro: " + cta),
+    )
+
+
+# ── CRECIMIENTO (Fathom 18/06) · 3 emails con métricas REALES del ranking ───
+# Se apoyan en las views que ya scrapeamos (ig_videos del user + creator_reels_
+# global de sus competidores). El worker (tasks.send_growth_nudges) calcula la
+# métrica y elige UN email por semana; aquí solo se renderiza+envía. Idempotentes
+# por (user, semana) → el period_key lleva la semana ISO. Marketing → respeta
+# opt-out/rate-limit vía _trial_email.
+
+def _fmt_views_email(n):
+    n = int(n or 0)
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}".rstrip("0").rstrip(".") + "M"
+    if n >= 1_000:
+        return f"{n/1_000:.1f}".rstrip("0").rstrip(".") + "K"
+    return str(n)
+
+
+def send_growth_climb(user_id, period_key, growth_pct):
+    """#1 «Has subido X%» — tus reels recientes rinden más que los anteriores.
+    Refuerzo positivo del progreso REAL (media reciente vs previa de ig_videos)."""
+    cta = f"{APP_URL}/profile/radar"
+    g = int(round(growth_pct))
+    return _trial_email(
+        user_id, f"growth_climb_{period_key}",
+        f"vas subiendo: +{g}% en tus últimos reels 📈",
+        f"you're climbing: +{g}% on your latest reels 📈",
+        (f"<p>hola creador.</p>"
+         f"<p>tus últimos reels rinden <b>+{g}%</b> de views respecto a los de antes. "
+         f"eso es señal de que tu contenido está afinando — sigue robando lo que petó en tu nicho y mantén la racha.</p>"
+         f"<p>entra y mira tu posición en el ranking.</p>"
+         + _btn(cta, "ver mi ranking →")),
+        (f"hola creador.\n\ntus últimos reels rinden +{g}% de views respecto a los de antes. "
+         f"sigue la racha: {cta}"),
+        (f"<p>hey creator.</p>"
+         f"<p>your latest reels are pulling <b>+{g}%</b> more views than your earlier ones. "
+         f"your content is dialing in — keep stealing what blew up in your niche and keep the streak.</p>"
+         f"<p>jump in and check your ranking.</p>"
+         + _btn(cta, "see my ranking →")),
+        (f"hey creator.\n\nyour latest reels are pulling +{g}% more views than your earlier ones. "
+         f"keep the streak: {cta}"),
+    )
+
+
+def send_growth_almost_beat(user_id, period_key, rival_handle, rival_avg, your_best):
+    """#2 «Estás a un vídeo de superar a @Y» — tu mejor reel casi alcanza la media
+    de un competidor. Engancha con el Versus «Supéralo» (mismo dato: views)."""
+    cta = f"{APP_URL}/profile/radar"
+    rh = (rival_handle or "tu rival").lstrip("@")
+    gap = max(0, int(rival_avg) - int(your_best))
+    return _trial_email(
+        user_id, f"growth_almost_{period_key}",
+        f"estás a un vídeo de superar a @{rh} 🎯",
+        f"you're one video away from beating @{rh} 🎯",
+        (f"<p>hola creador.</p>"
+         f"<p>tu mejor reel va por <b>{_fmt_views_email(your_best)}</b> views. la media de @{rh} es "
+         f"<b>{_fmt_views_email(rival_avg)}</b> — te faltan solo <b>{_fmt_views_email(gap)}</b> para superarle.</p>"
+         f"<p>un buen reel más y le pasas. roba un ángulo que petó en tu nicho y publícalo.</p>"
+         + _btn(cta, "ir a por el reto →")),
+        (f"hola creador.\n\ntu mejor reel: {_fmt_views_email(your_best)} views. media de @{rh}: "
+         f"{_fmt_views_email(rival_avg)}. te faltan {_fmt_views_email(gap)} para superarle.\n\nva: {cta}"),
+        (f"<p>hey creator.</p>"
+         f"<p>your best reel sits at <b>{_fmt_views_email(your_best)}</b> views. @{rh}'s average is "
+         f"<b>{_fmt_views_email(rival_avg)}</b> — just <b>{_fmt_views_email(gap)}</b> to overtake them.</p>"
+         f"<p>one more strong reel and you pass them. steal an angle that blew up in your niche and post it.</p>"
+         + _btn(cta, "go for the goal →")),
+        (f"hey creator.\n\nyour best reel: {_fmt_views_email(your_best)} views. @{rh}'s average: "
+         f"{_fmt_views_email(rival_avg)}. just {_fmt_views_email(gap)} to overtake.\n\ngo: {cta}"),
+    )
+
+
+def send_growth_niche_explosion(user_id, period_key, rival_handle, views, mult):
+    """#3 «Un creador de tu nicho se pegó un reel de 200k» — un competidor que
+    sigues acaba de petar muy por encima de su media. Gancho FOMO + «tú también»."""
+    cta = f"{APP_URL}/profile/radar"
+    rh = (rival_handle or "alguien de tu nicho").lstrip("@")
+    vtxt = _fmt_views_email(views)
+    mtxt = f"×{mult:.1f}".rstrip("0").rstrip(".") if mult else ""
+    return _trial_email(
+        user_id, f"growth_explosion_{period_key}",
+        f"@{rh} se pegó un reel de {vtxt} views 🚀",
+        f"@{rh} just hit a {vtxt}-view reel 🚀",
+        (f"<p>hola creador.</p>"
+         f"<p>@{rh}, de tu nicho, acaba de petar con un reel de <b>{vtxt}</b> views"
+         + (f" ({mtxt} su media)" if mtxt else "") + ". "
+         f"el ángulo funciona AHORA — y tú lo tienes en tu radar.</p>"
+         f"<p>róbalo, pásalo a tu voz y publícalo antes de que se enfríe.</p>"
+         + _btn(cta, "robar la idea →")),
+        (f"hola creador.\n\n@{rh}, de tu nicho, petó con un reel de {vtxt} views"
+         + (f" ({mtxt} su media)" if mtxt else "") + ".\n\nróbalo a tu voz: " + cta),
+        (f"<p>hey creator.</p>"
+         f"<p>@{rh}, from your niche, just blew up with a <b>{vtxt}</b>-view reel"
+         + (f" ({mtxt} their average)" if mtxt else "") + ". "
+         f"the angle is working RIGHT NOW — and it's already on your radar.</p>"
+         f"<p>steal it, make it yours and post it before it cools off.</p>"
+         + _btn(cta, "steal the idea →")),
+        (f"hey creator.\n\n@{rh}, from your niche, blew up with a {vtxt}-view reel"
+         + (f" ({mtxt} their average)" if mtxt else "") + ".\n\nmake it yours: " + cta),
     )
 
 

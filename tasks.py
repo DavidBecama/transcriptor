@@ -116,6 +116,13 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.send_train_hooks_nudges",
         "schedule": crontab(hour=9, minute=0),
     },
+    # Fathom 18/06: 3 EMAILS DE CRECIMIENTO con métricas reales (subiste X% / a un
+    # vídeo de superar a @Y / un creador de tu nicho petó). Semanal, miércoles 10:00
+    # UTC (día distinto a los digests). 1 email por user/semana, prioridad interna.
+    "send-growth-nudges": {
+        "task": "tasks.send_growth_nudges",
+        "schedule": crontab(day_of_week=3, hour=10, minute=0),
+    },
 }
 celery_app.conf.timezone = "UTC"
 
@@ -897,6 +904,9 @@ def refresh_metrics_bulk(self, user_id, tid_list):
 # guard "stale" = si last_scraped_at < now() - 10min con status='scraping',
 # considerar abandonado y permitir re-encolar.
 SCRAPE_TIMEOUT_SEC = 240
+# SPEC-fase-accion-radar #4 (Fathom 18/06): pre-transcripción top-N al primer scrape.
+# N=3 confirmado por David (presupuesto conservador). Ajustable por env.
+_PRETRANSCRIBE_TOP_N = int(os.environ.get("PRETRANSCRIBE_TOP_N", "3"))
 
 
 @celery_app.task(name="tasks.scrape_creator")
@@ -930,6 +940,9 @@ def scrape_creator_task(creator_id: str) -> dict:
 
     ig_username = creator["ig_username"]
     logger.info("scrape_creator started for %s (creator_id=%s)", ig_username, creator_id)
+    # SPEC #4: ¿es el PRIMER scrape de este creador? (pre-transcribimos top-N solo
+    # entonces, no en refrescos — acota el coste Groq). Estado previo al lock.
+    was_first_scrape = (creator.get("scrape_status") in (None, "", "pending"))
 
     # 2. Anti-race: UPDATE scrape_status='scraping' WHERE != 'scraping'.
     lock = (db.table("creators_global")
@@ -1055,6 +1068,30 @@ def scrape_creator_task(creator_id: str) -> dict:
         db.table("creators_global").update(update_payload).eq("id", creator_id).execute()
     except Exception as e:
         logger.exception("scrape_creator final update failed for %s: %s", ig_username, e)
+
+    # SPEC #4 — PRE-TRANSCRIPCIÓN top-N (Fathom 18/06, N=3): al primer scrape, encola
+    # la transcripción de los 3 reels con más views → el primer «Roba la idea» es
+    # cache-hit (instantáneo). Solo primer scrape (acota coste). transcribe_reel_task
+    # ya es idempotente (salta si ya hay transcript). Best-effort, nunca rompe el scrape.
+    if final_status == "ok" and reels_count > 0 and was_first_scrape:
+        try:
+            top = (db.table("creator_reels_global")
+                     .select("id, transcript")
+                     .eq("creator_id", creator_id).eq("is_archived", False)
+                     .order("views", desc=True).limit(_PRETRANSCRIBE_TOP_N).execute()).data or []
+            enq = 0
+            for r in top:
+                if (r.get("transcript") or "").strip():
+                    continue   # ya transcrito → no re-encolar
+                try:
+                    transcribe_reel_task.delay(r["id"])
+                    enq += 1
+                except Exception as e:
+                    logger.warning("scrape_creator: pre-transcribe enqueue failed reel=%s err=%s", r.get("id"), e)
+            if enq:
+                logger.info("scrape_creator: pre-transcribe queued=%d (first scrape) for %s", enq, ig_username)
+        except Exception as e:
+            logger.warning("scrape_creator: pre-transcribe step failed for %s: %s", ig_username, e)
 
     # Log final con detalle según status.
     if final_status == "ok":
@@ -1211,6 +1248,149 @@ def send_train_hooks_nudges():
             skipped += 1
     logger.info("send_train_hooks_nudges (daily brain exercise): sent=%d skipped=%d", sent, skipped)
     return {"users": len(profs), "sent": sent, "skipped": skipped}
+
+
+def _user_view_stats(db, uid):
+    """Views de los reels propios del user (ig_videos) → (best, growth%). growth =
+    media de los 3 más nuevos vs los 3 siguientes. Sin perfil/datos → (0, 0)."""
+    try:
+        prof = db.table("ig_profiles").select("id").eq("user_id", uid).limit(1).execute()
+        if not prof.data:
+            return 0, 0
+        mv = (db.table("ig_videos").select("views, published_at")
+                .eq("user_id", uid).order("published_at", desc=True).limit(12).execute()).data or []
+    except Exception:
+        return 0, 0
+    vs = [int(v.get("views") or 0) for v in mv]
+    if not vs:
+        return 0, 0
+    best = max(vs)
+    growth = 0
+    if len(vs) >= 4:
+        n = min(3, len(vs) // 2)
+        recent = sum(vs[:n]) / n
+        prev = sum(vs[n:2 * n]) / n
+        if prev > 0:
+            growth = max(-95, min(300, round((recent - prev) / prev * 100)))
+    return best, growth
+
+
+@celery_app.task(name="tasks.send_growth_nudges")
+def send_growth_nudges():
+    """Beat SEMANAL (Fathom 18/06): 3 emails de crecimiento con métricas REALES.
+    Por user con competidores + perfil propio, elige UN email (prioridad):
+      1) climb        — tus reels recientes rinden +X% (X>=15).
+      2) almost_beat  — tu mejor reel está cerca (>=60%, <100%) de la media de un rival.
+      3) explosion    — un competidor petó un reel reciente (×>=3 su media, >=50k views).
+    Idempotente por semana ISO (key en email_log). Solo planes con radar."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        return {"error": "supabase_not_configured"}
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        from emails import (send_growth_climb, send_growth_almost_beat,
+                            send_growth_niche_explosion)
+    except Exception as e:
+        logger.error("send_growth_nudges: import emails failed: %s", e)
+        return {"error": "import_emails"}
+
+    now = datetime.now(timezone.utc)
+    iso = now.isocalendar()
+    week_key = f"{iso[0]}-W{iso[1]:02d}"
+    recent_since = (now - timedelta(days=7)).isoformat()
+
+    # 1. Competidores activos por user.
+    try:
+        tracked = (db.table("user_tracked_creators").select("user_id, creator_id")
+                     .is_("archived_at", "null").execute()).data or []
+    except Exception as e:
+        logger.error("send_growth_nudges: tracked query failed: %s", e)
+        return {"error": "tracked_query"}
+    by_user = {}
+    for t in tracked:
+        by_user.setdefault(t["user_id"], set()).add(t["creator_id"])
+    if not by_user:
+        return {"users": 0, "sent": 0}
+
+    uids = list(by_user.keys())
+    plan_by_uid = {}
+    for i in range(0, len(uids), 300):
+        try:
+            profs = (db.table("profiles").select("id, plan")
+                       .in_("id", uids[i:i + 300]).execute()).data or []
+            for p in profs:
+                plan_by_uid[p["id"]] = p.get("plan") or "free"
+        except Exception:
+            pass
+
+    sent = skipped = 0
+    for uid, cid_set in by_user.items():
+        if plan_by_uid.get(uid, "free") not in RADAR_ENABLED_PLANS:
+            skipped += 1
+            continue
+        cids = list(cid_set)
+        baselines = _radar_baselines(db, cids)
+        # Métricas de competidores: media de views por creador + mejor explosión reciente.
+        avg_by_creator = {}
+        for cid, med in baselines.items():
+            avg_by_creator[cid] = med  # mediana de views ~ "media" del rival (real)
+        handle_by_creator = {}
+        try:
+            cg = (db.table("creators_global").select("id, ig_username")
+                    .in_("id", cids).execute()).data or []
+            handle_by_creator = {c["id"]: c.get("ig_username") or "" for c in cg}
+        except Exception:
+            pass
+
+        best, growth = _user_view_stats(db, uid)
+        res = None
+
+        # PRIORIDAD 1 — climb.
+        if growth >= 15:
+            res = send_growth_climb(uid, week_key, growth)
+
+        # PRIORIDAD 2 — almost_beat (requiere tener datos propios).
+        if (res is None or not res.get("sent")) and best > 0 and avg_by_creator:
+            cand = None
+            for cid, avg in avg_by_creator.items():
+                if avg and best < avg and best >= 0.6 * avg:
+                    if cand is None or avg < cand[1]:
+                        cand = (cid, avg)  # el rival más cercano por encima
+            if cand:
+                res = send_growth_almost_beat(uid, week_key,
+                                              handle_by_creator.get(cand[0], ""),
+                                              int(cand[1]), int(best))
+
+        # PRIORIDAD 3 — explosion (reel reciente de un competidor muy por encima de su media).
+        if res is None or not res.get("sent"):
+            try:
+                rows = (db.table("creator_reels_global")
+                          .select("creator_id, views, posted_at")
+                          .in_("creator_id", cids).eq("is_archived", False)
+                          .gte("posted_at", recent_since)
+                          .order("views", desc=True).limit(60).execute()).data or []
+            except Exception:
+                rows = []
+            top = None
+            for r in rows:
+                v = int(r.get("views") or 0)
+                mult = _radar_explosion(v, baselines.get(r.get("creator_id")))
+                if mult is not None and mult >= 3.0 and v >= 50000:
+                    if top is None or v > top[1]:
+                        top = (r.get("creator_id"), v, mult)
+            if top:
+                res = send_growth_niche_explosion(uid, week_key,
+                                                  handle_by_creator.get(top[0], ""),
+                                                  top[1], top[2])
+
+        if res and res.get("sent"):
+            sent += 1
+        else:
+            skipped += 1
+
+    logger.info("send_growth_nudges done users=%d sent=%d skipped=%d", len(by_user), sent, skipped)
+    return {"users": len(by_user), "sent": sent, "skipped": skipped}
 
 
 # ── v0.15.5: generar guion desde reel de competidor (async) ──────────────────

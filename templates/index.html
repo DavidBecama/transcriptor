@@ -3279,6 +3279,8 @@
     .modal.upgrade-modal { max-width: 900px; width: 96vw; max-height: calc(100vh - 40px); overflow-y: auto; }
     .upgrade-modal h2 { text-align: center; }
     .upgrade-modal > p { text-align: center; color: var(--text2); }
+    /* Eslogan de marca unificado (Fathom 18/06) — mismo de la landing. */
+    .upgrade-modal .upgrade-slogan { text-align: center; font-weight: 700; letter-spacing: .01em; color: var(--brand-500); margin: 2px 0 -2px; font-size: .92rem; }
     .upgrade-modal .billing-toggle { display: flex; justify-content: center; margin: 8px auto 18px; width: max-content; }
     .upgrade-cards-grid {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px;
@@ -10267,6 +10269,17 @@
     .rs .bt-yes { background:linear-gradient(90deg, var(--brand-500), #6f93ff); color:#fff; border-color:transparent; }
     .rs .bt-yes:hover { filter:brightness(1.06); }
     .rs .bt-prog { font-family:var(--font-mono); font-size:11px; color:var(--text-tertiary); margin-top:12px; }
+    /* Tinder de guiones (Fathom 18/06): reusa .bt-card; intro + 2ª línea del guion. */
+    .rs .gt-intro { border:1px dashed color-mix(in srgb, var(--brand-500) 32%, transparent); border-radius:16px; padding:16px 18px; background:color-mix(in srgb, var(--brand-500) 5%, var(--surface-raised)); }
+    .rs .gt-intro-t { font-size:14px; line-height:1.45; color:var(--text-secondary); margin:0 0 12px; }
+    .rs .gt-intro-t b { color:var(--text-primary); }
+    .rs .gt-beat { font-size:13.5px; line-height:1.4; color:var(--text-secondary); margin:-6px 0 16px; padding-left:10px; border-left:2px solid var(--border-strong); }
+    /* Seed del radar (SPEC #3): aviso «esto petó en tu nicho» mientras no hay competidores. */
+    .rs .seed-banner { display:flex; align-items:center; gap:12px; margin:0 0 14px; padding:12px 16px; border-radius:14px; border:1px dashed color-mix(in srgb, var(--brand-500) 34%, transparent); background:color-mix(in srgb, var(--brand-500) 6%, var(--surface-raised)); font-size:13.5px; line-height:1.4; color:var(--text-secondary); }
+    .rs .seed-banner > svg { flex-shrink:0; color:var(--brand-500); }
+    .rs .seed-banner b { color:var(--text-primary); }
+    .rs .seed-banner > span { flex:1; }
+    .rs .seed-banner .btn { flex-shrink:0; }
     .rs .brain-hero-body { flex:1; min-width:0; }
     .rs .brain-lvl { font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; color:var(--brand-400); margin-bottom:4px; }
     .rs .brain-voiceline { font-family:var(--font-display); font-size:30px; line-height:1; }
@@ -13760,6 +13773,7 @@
 <div class="overlay" id="upgradeOverlay" onclick="backdropClose(event,'upgradeOverlay')">
   <div class="modal upgrade-modal">
     <button class="modal-x" onclick="closeModal('upgradeOverlay')">✕</button>
+    <p class="upgrade-slogan" data-i18n-es="Roba lo que funciona." data-i18n-en="Steal what works.">Roba lo que funciona.</p>
     <h2 data-i18n-es="Mejorar plan" data-i18n-en="Upgrade plan">Mejorar plan</h2>
     <p data-i18n-es="Elige el plan que mejor se adapte. Cancela cuando quieras." data-i18n-en="Pick the plan that fits. Cancel anytime.">Elige el plan que mejor se adapte. Cancela cuando quieras.</p>
     <div class="billing-toggle" data-host="upgradeOverlay" style="margin:8px auto 18px">
