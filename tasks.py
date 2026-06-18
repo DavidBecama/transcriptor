@@ -110,10 +110,11 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.scrape_user_profiles",
         "schedule": crontab(day_of_week="1,4", hour=7, minute=0),
     },
-    # Fathom 18/06: nudge "entrena tus hooks" — semanal (miércoles 09:00 UTC).
+    # Fathom 18/06: alerta DIARIA "tu ejercicio del Cerebro está listo" (09:00 UTC).
+    # Solo a onboarded que no lo hayan hecho hoy. Cadencia ajustable si satura.
     "send-train-hooks-nudges": {
         "task": "tasks.send_train_hooks_nudges",
-        "schedule": crontab(day_of_week=3, hour=9, minute=0),
+        "schedule": crontab(hour=9, minute=0),
     },
 }
 celery_app.conf.timezone = "UTC"
@@ -1174,8 +1175,9 @@ def scrape_user_profiles():
 
 @celery_app.task(name="tasks.send_train_hooks_nudges")
 def send_train_hooks_nudges():
-    """Beat SEMANAL (Fathom 18/06): nudge "hoy toca entrenar tus hooks" a usuarios de
-    pago con competidores. Idempotente por semana ISO (dentro de send_train_hooks_nudge)."""
+    """Beat DIARIO (Fathom 18/06): alerta "tu ejercicio del Cerebro está listo" a usuarios
+    ONBOARDED que NO han hecho el ejercicio de hoy. Idempotente por día (dentro de
+    send_train_hooks_nudge) + filtro brain_exercise_date != hoy para no avisar al que ya lo hizo."""
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
@@ -1186,38 +1188,29 @@ def send_train_hooks_nudges():
     except Exception as e:
         logger.error("send_train_hooks_nudges: import emails failed: %s", e)
         return {"error": "import_emails"}
+    today = datetime.now(timezone.utc).date().isoformat()
+    # Onboarded = tienen % de Cerebro sembrado. No avisar si ya hicieron el de hoy.
     try:
-        tracked = (db.table("user_tracked_creators").select("user_id")
-                     .is_("archived_at", "null").limit(20000).execute()).data or []
-        uids = sorted({t["user_id"] for t in tracked if t.get("user_id")})
+        profs = (db.table("profiles").select("id, brain_progress, brain_exercise_date")
+                   .not_.is_("brain_progress", "null").limit(20000).execute()).data or []
     except Exception as e:
-        logger.error("send_train_hooks_nudges: tracked query failed: %s", e)
-        return {"error": "tracked_query"}
-    if not uids:
-        return {"users": 0, "sent": 0}
-    plan_by_uid = {}
-    for i in range(0, len(uids), 200):
-        try:
-            profs = db.table("profiles").select("id, plan").in_("id", uids[i:i + 200]).execute().data or []
-            for p in profs:
-                plan_by_uid[p["id"]] = p.get("plan") or "free"
-        except Exception:
-            pass
-    week_key = datetime.now(timezone.utc).strftime("%G-W%V")
+        logger.error("send_train_hooks_nudges: profiles query failed: %s", e)
+        return {"error": "profiles_query"}
     sent = skipped = 0
-    for uid in uids:
-        if plan_by_uid.get(uid, "free") not in RADAR_ENABLED_PLANS:
+    for p in profs:
+        uid = p.get("id")
+        if not uid or str(p.get("brain_exercise_date") or "") == today:
             skipped += 1
             continue
         try:
-            r = send_train_hooks_nudge(uid, week_key)
+            r = send_train_hooks_nudge(uid, today)
             sent += 1 if r.get("sent") else 0
             skipped += 0 if r.get("sent") else 1
         except Exception:
             logger.exception("send_train_hooks_nudges: send failed user=%s", uid)
             skipped += 1
-    logger.info("send_train_hooks_nudges: sent=%d skipped=%d", sent, skipped)
-    return {"users": len(uids), "sent": sent, "skipped": skipped}
+    logger.info("send_train_hooks_nudges (daily brain exercise): sent=%d skipped=%d", sent, skipped)
+    return {"users": len(profs), "sent": sent, "skipped": skipped}
 
 
 # ── v0.15.5: generar guion desde reel de competidor (async) ──────────────────

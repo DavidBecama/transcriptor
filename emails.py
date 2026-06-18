@@ -761,11 +761,11 @@ def send_radar_digest(user_id, reels, day_key, next_suggestion=None):
     return {"sent": True}
 
 
-def send_train_hooks_nudge(user_id, week_key):
-    """Nudge "hoy toca entrenar tus hooks" (Fathom 18/06): empuja a votar hooks en el
-    Cerebro para afinar la voz (ahora alimenta el prompt de verdad). Idempotente por
-    (user_id, semana ISO). Devuelve dict {sent|skipped|error}."""
-    key = f"train_hooks_{week_key}"
+def send_train_hooks_nudge(user_id, day_key):
+    """Alerta DIARIA "tu ejercicio del Cerebro está listo" (Fathom 18/06): empuja a hacer
+    el ejercicio del día (votar hooks/guiones) → sube el % del Cerebro +3-6%. Idempotente
+    por (user_id, día). Devuelve dict {sent|skipped|error}."""
+    key = f"brain_exercise_{day_key}"
     db = _db()
     now = datetime.now(timezone.utc).isoformat()
     try:
@@ -801,29 +801,29 @@ def send_train_hooks_nudge(user_id, week_key):
     brain_url = f"{APP_URL}/profile/radar"
 
     if lang == "es":
-        subject = "🧠 Hoy toca entrenar tus hooks"
+        subject = "🧠 Listo tu ejercicio para entrenar el Cerebro"
         inner_html = (
-            "<h1 style=\"margin:0 0 12px;font-size:22px;color:#111\">Afina tu voz en 2 minutos</h1>"
+            "<h1 style=\"margin:0 0 12px;font-size:22px;color:#111\">Tu ejercicio de hoy está listo</h1>"
             "<p style=\"margin:0 0 18px;font-size:15px;line-height:1.6;color:#333\">"
-            "Tu Cerebro aprende lo que suena a ti. Vota unos hooks (👍 / 👎) y dime "
-            "<b>cómo los dirías tú</b> — los próximos guiones saldrán más tuyos y con menos retoques.</p>"
-            + _btn(brain_url, "Entrenar mis hooks")
+            "1 minuto: vota el set de hoy (👍 / 👎) y dime <b>cómo lo dirías tú</b>. "
+            "Tu Cerebro <b>sube +3-6%</b> y los próximos guiones salen más tuyos. Solo <b>1 al día</b>.</p>"
+            + _btn(brain_url, "Hacer mi ejercicio")
         )
-        inner_text = ("Hoy toca entrenar tus hooks.\n\n"
-                      "Vota unos hooks en tu Cerebro (me gusta / no es mío) y di cómo los "
-                      f"dirías tú: los próximos guiones sonarán más a ti.\n\n{brain_url}")
+        inner_text = ("Tu ejercicio del Cerebro de hoy está listo.\n\n"
+                      "1 minuto: vota el set de hoy (me gusta / no es mío) y di cómo lo dirías tú. "
+                      f"Tu Cerebro sube +3-6%. Solo 1 al día.\n\n{brain_url}")
     else:
-        subject = "🧠 Time to train your hooks"
+        subject = "🧠 Your Brain exercise is ready"
         inner_html = (
-            "<h1 style=\"margin:0 0 12px;font-size:22px;color:#111\">Sharpen your voice in 2 minutes</h1>"
+            "<h1 style=\"margin:0 0 12px;font-size:22px;color:#111\">Today's exercise is ready</h1>"
             "<p style=\"margin:0 0 18px;font-size:15px;line-height:1.6;color:#333\">"
-            "Your Brain learns what sounds like you. Rate a few hooks (👍 / 👎) and tell me "
-            "<b>how you'd say them</b> — your next scripts come out more yours, with fewer tweaks.</p>"
-            + _btn(brain_url, "Train my hooks")
+            "1 minute: rate today's set (👍 / 👎) and tell me <b>how you'd say it</b>. "
+            "Your Brain <b>climbs +3-6%</b> and your next scripts come out more yours. Just <b>1 a day</b>.</p>"
+            + _btn(brain_url, "Do my exercise")
         )
-        inner_text = ("Time to train your hooks.\n\n"
-                      "Rate a few hooks in your Brain (like / not me) and tell me how you'd "
-                      f"say them: your next scripts will sound more like you.\n\n{brain_url}")
+        inner_text = ("Your Brain exercise for today is ready.\n\n"
+                      "1 minute: rate today's set (like / not me) and tell me how you'd say it. "
+                      f"Your Brain climbs +3-6%. Just 1 a day.\n\n{brain_url}")
 
     html = _wrap_html(inner_html, unsub_url, lang)
     text = _wrap_text(inner_text, unsub_url, lang)
