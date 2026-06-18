@@ -2263,37 +2263,57 @@ def paddle_webhook():
 # WHOP — checkout por link (con metadata user_id) + webhook. Activo si
 # PAYMENT_PROVIDER=whop. Mismo modelo de planes/créditos que Paddle/Stripe.
 # ══════════════════════════════════════════════════════════════════════════════
+def _whop_secret_keys():
+    """Derivaciones candidatas de la clave HMAC desde WHOP_WEBHOOK_SECRET ('ws_<…>').
+    No conocemos su codificación exacta → probamos base64, hex y cruda."""
+    import base64
+    part = WHOP_WEBHOOK_SECRET.split("_", 1)[1] if "_" in WHOP_WEBHOOK_SECRET else WHOP_WEBHOOK_SECRET
+    keys = []
+    for fn in (lambda s: base64.b64decode(s + "=" * (-len(s) % 4)),
+               lambda s: bytes.fromhex(s),
+               lambda s: s.encode("utf-8"),
+               lambda s: WHOP_WEBHOOK_SECRET.encode("utf-8")):
+        try:
+            k = fn(part)
+            if k and k not in keys:
+                keys.append(k)
+        except Exception:
+            pass
+    return keys
+
+
 def _whop_verify_signature(raw: bytes, headers) -> bool:
-    """Verifica la firma del webhook de Whop (HMAC-SHA256 con WHOP_WEBHOOK_SECRET).
-    Whop varía el formato según versión; aceptamos los habituales:
-      - hex crudo (con/sin prefijo 'sha256=') sobre el body
-      - estilo 't=<ts>,v1=<hex>' (HMAC sobre '<ts>.<body>')
-    El esquema exacto se confirma con el primer evento real (David crea el webhook)."""
+    """Verifica la firma del webhook de Whop. Whop usa **Svix**: cabecera
+    'Webhook-Signature' = 'v1,<base64> [v1,<base64>…]', y se firma
+    '<webhook-id>.<webhook-timestamp>.<body>' con HMAC-SHA256 (resultado en base64).
+    Probamos las derivaciones de clave de _whop_secret_keys(). Fallback: hex sobre
+    el body con X-Whop-Signature (para self-tests)."""
     import hmac
     import hashlib
+    import base64
     if not WHOP_WEBHOOK_SECRET:
         return False
-    sig = (headers.get("X-Whop-Signature") or headers.get("Whop-Signature")
-           or headers.get("X-Whop-Webhook-Signature") or "")
-    if not sig:
-        return False
-    sec = WHOP_WEBHOOK_SECRET.encode()
-    body_hex = hmac.new(sec, raw, hashlib.sha256).hexdigest()
-    cand = sig.strip()
-    # formato simple: posible prefijo 'sha256='
-    simple = cand.split("=", 1)[1].strip() if cand.startswith("sha256=") else cand
-    if hmac.compare_digest(simple, body_hex):
-        return True
-    # formato 't=..,v1=..' (HMAC sobre ts.body)
-    try:
-        parts = dict(p.split("=", 1) for p in cand.replace(" ", "").split(",") if "=" in p)
-        ts, v1 = parts.get("t"), parts.get("v1")
-        if ts and v1:
-            tb = hmac.new(sec, ts.encode() + b"." + raw, hashlib.sha256).hexdigest()
-            if hmac.compare_digest(v1, tb):
+    keys = _whop_secret_keys()
+    # ── Svix ──
+    sig_hdr = (headers.get("Webhook-Signature") or headers.get("Whop-Signature")
+               or headers.get("X-Whop-Signature") or "")
+    given = [p.split(",", 1)[1] for p in sig_hdr.split() if p.startswith("v1,")]
+    msg_id = headers.get("Webhook-Id") or headers.get("Whop-Webhook-Id") or ""
+    ts = headers.get("Webhook-Timestamp") or headers.get("Whop-Webhook-Timestamp") or ""
+    if given and msg_id and ts:
+        signed = (msg_id + "." + ts + ".").encode("utf-8") + raw
+        for k in keys:
+            exp = base64.b64encode(hmac.new(k, signed, hashlib.sha256).digest()).decode()
+            for g in given:
+                if hmac.compare_digest(g, exp):
+                    return True
+    # ── Fallback: hex crudo sobre el body (self-tests) ──
+    legacy = headers.get("X-Whop-Signature") or ""
+    if legacy and not legacy.startswith("v1,"):
+        simple = legacy.split("=", 1)[1].strip() if legacy.startswith("sha256=") else legacy.strip()
+        for k in keys:
+            if hmac.compare_digest(simple, hmac.new(k, raw, hashlib.sha256).hexdigest()):
                 return True
-    except Exception:
-        pass
     return False
 
 
@@ -2322,8 +2342,8 @@ def whop_webhook():
     if not _whop_verify_signature(raw, request.headers):
         # Diagnóstico QA: nombres+valores de cabeceras de firma (el HMAC NO es secreto)
         # para confirmar el esquema real de Whop en la primera entrega real.
-        _sh = {k: v for k, v in request.headers.items() if ("whop" in k.lower() or "sign" in k.lower())}
-        logger.warning("[whop] firma inválida desde %s · hdrs=%s", get_client_ip(), _sh)
+        _sh = {k: v for k, v in request.headers.items() if ("whop" in k.lower() or "sign" in k.lower() or "webhook" in k.lower())}
+        logger.warning("[whop] firma inválida desde %s · hdrs=%s · body[:140]=%s", get_client_ip(), _sh, raw[:140])
         return jsonify({"error": "invalid signature"}), 400
     try:
         event = json.loads(raw.decode("utf-8"))
