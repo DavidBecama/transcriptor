@@ -2311,15 +2311,19 @@ def _whop_event_seen(key: str) -> bool:
 @limiter.exempt
 def whop_webhook():
     """Webhook de Whop. Verifica firma, deduplica, y mapea a profiles.plan/créditos.
-      membership.went_valid → plan + créditos · went_invalid/canceled → free
-      payment.succeeded → topup suma créditos / renovación resetea pool."""
+      membership_activated → plan + créditos · membership_deactivated → free
+      cancel_at_period_end_changed → solo registra (acceso sigue hasta fin de periodo)
+      payment_succeeded/invoice_paid → topup suma créditos / renovación resetea pool
+      payment_failed/invoice_past_due → dunning · refund_created → registra (MVP)."""
     if not WHOP_WEBHOOK_SECRET:
         logger.info("[whop] webhook recibido pero WHOP_WEBHOOK_SECRET no está configurado")
         return "", 200
     raw = request.get_data()
     if not _whop_verify_signature(raw, request.headers):
-        logger.warning("[whop] firma inválida desde %s (sig hdr=%s)", get_client_ip(),
-                       bool(request.headers.get("X-Whop-Signature") or request.headers.get("Whop-Signature")))
+        # Diagnóstico QA: nombres+valores de cabeceras de firma (el HMAC NO es secreto)
+        # para confirmar el esquema real de Whop en la primera entrega real.
+        _sh = {k: v for k, v in request.headers.items() if ("whop" in k.lower() or "sign" in k.lower())}
+        logger.warning("[whop] firma inválida desde %s · hdrs=%s", get_client_ip(), _sh)
         return jsonify({"error": "invalid signature"}), 400
     try:
         event = json.loads(raw.decode("utf-8"))
@@ -2328,8 +2332,12 @@ def whop_webhook():
 
     action = event.get("action") or event.get("event") or event.get("type") or ""
     data = event.get("data") or {}
-    plan_id = data.get("plan") or data.get("plan_id")
-    md = data.get("metadata") or {}
+    # plan_id y user_id robustos (Whop anida distinto según el evento).
+    _memb = data.get("membership") if isinstance(data.get("membership"), dict) else {}
+    plan_id = data.get("plan") or data.get("plan_id") or _memb.get("plan") or _memb.get("plan_id")
+    md = data.get("metadata")
+    if not (isinstance(md, dict) and md.get("user_id")):
+        md = _memb.get("metadata") if isinstance(_memb.get("metadata"), dict) else (md if isinstance(md, dict) else {})
     uid = md.get("user_id") if isinstance(md, dict) else None
     # id de idempotencia: cabecera de entrega si la hay, si no action+id(+status)
     deliv = request.headers.get("X-Whop-Webhook-Id") or request.headers.get("Whop-Webhook-Id")
@@ -2340,9 +2348,9 @@ def whop_webhook():
 
     mapped = WHOP_PLAN_TO_PLAN.get(plan_id or "")
     try:
-        if action in ("membership.went_valid", "membership_went_valid", "membership.created"):
+        if action == "membership_activated":   # alta / acceso concedido
             if not uid:
-                logger.warning("[whop] %s sin metadata.user_id (plan=%s)", action, plan_id)
+                logger.warning("[whop] membership_activated sin metadata.user_id (plan=%s)", plan_id)
                 return "", 200
             if mapped and mapped["plan"] == "brand_addon":
                 prof = db.table("profiles").select("extra_brand_slots").eq("id", uid).single().execute()
@@ -2355,7 +2363,7 @@ def whop_webhook():
                 grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
                 track_event("subscription_upgraded", uid, {"plan": plan, "plan_id": plan_id, "provider": "whop"})
 
-        elif action in ("membership.went_invalid", "membership_went_invalid", "membership.canceled", "membership.cancelled", "membership.deleted"):
+        elif action == "membership_deactivated":   # baja / fin de acceso → free
             if mapped and mapped["plan"] == "brand_addon":
                 if uid:
                     prof = db.table("profiles").select("extra_brand_slots").eq("id", uid).single().execute()
@@ -2365,12 +2373,19 @@ def whop_webhook():
                 db.table("profiles").update({"plan": "free"}).eq("id", uid).execute()
                 track_event("subscription_cancelled", uid, {"provider": "whop"})
 
-        elif action in ("payment.succeeded", "payment_succeeded", "payment.created"):
+        elif action == "membership_cancel_at_period_end_changed":
+            # El acceso SIGUE hasta fin de periodo (la baja real llega vía
+            # membership_deactivated) → no se cambia el plan, solo se registra.
+            if uid:
+                track_event("subscription_cancel_scheduled", uid,
+                            {"provider": "whop", "cancel_at_period_end": data.get("cancel_at_period_end")})
+
+        elif action in ("payment_succeeded", "invoice_paid"):
             if not uid:
-                logger.warning("[whop] payment sin metadata.user_id (id=%s)", data.get("id"))
+                logger.warning("[whop] %s sin metadata.user_id (id=%s)", action, data.get("id"))
                 return "", 200
             credits = WHOP_TOPUP_PLANS.get(plan_id or "")
-            if credits:
+            if credits:   # topup → suma créditos
                 amount_cents = credits * get_cost_cents()
                 profile = get_profile(uid)
                 db.table("profiles").update({
@@ -2378,7 +2393,23 @@ def whop_webhook():
                 }).eq("id", uid).execute()
                 track_event("topup_purchased", uid, {"credits": credits, "provider": "whop"})
             elif mapped and mapped["plan"] in ("creator", "estudio", "agency"):
-                grant_monthly_allowance(uid, mapped["plan"])  # renovación → resetea pool
+                grant_monthly_allowance(uid, mapped["plan"])   # alta/renovación → resetea pool
+
+        elif action in ("payment_failed", "invoice_past_due"):   # dunning
+            if uid:
+                track_event("payment_failed", uid, {"provider": "whop", "id": data.get("id")})
+                try:
+                    from tasks import send_payment_failed_email
+                    send_payment_failed_email.delay(uid, data.get("id"), 1)
+                except Exception:
+                    logger.warning("[whop] dunning email dispatch failed uid=%s", uid, exc_info=True)
+
+        elif action == "refund_created":
+            # MVP: se registra; el reverso de créditos/plan no se automatiza aún.
+            if uid:
+                track_event("refund_created", uid, {"provider": "whop", "id": data.get("id"), "plan_id": plan_id})
+
+        # payment_pending → sin acción (informativo)
     except Exception:
         logger.exception("[whop] error procesando %s (%s)", action, ev_key)
         return "", 200
