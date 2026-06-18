@@ -1178,6 +1178,10 @@ def auth_me():
         # Fathom 18/06: tope diario del trial (3 guiones/día). El front lo muestra "N hoy".
         "trial_daily_cap": TRIAL_DAILY_SCRIPTS,
         "trial_daily_left": trial_daily_left(profile),
+        # Fathom 18/06: % del Cerebro gamificado (35% + ejercicio diario +3-6%).
+        "brain_progress": profile.get("brain_progress") if profile.get("brain_progress") is not None else 35,
+        "brain_exercise_date": (str(profile.get("brain_exercise_date")) if profile.get("brain_exercise_date") else None),
+        "brain_last_gain": profile.get("brain_last_gain") or 4,
         "effective_plan": effective_plan(profile),
         # watermark en exports: solo free post-trial (ni pago ni trial).
         "watermark": not paid_features_active(profile, user),
@@ -6583,22 +6587,6 @@ def legal_notice_page():
     return render_template("legal.html")
 
 
-@app.route("/refund")
-def refund_page():
-    return render_template("refund.html")
-
-
-# Versiones en catalán (CA) — solo privacy y refund (idioma oficial de Andorra).
-@app.route("/ca/privacy")
-def privacy_page_ca():
-    return render_template("privacy_ca.html")
-
-
-@app.route("/ca/refund")
-def refund_page_ca():
-    return render_template("refund_ca.html")
-
-
 # v0.14.12 — i18n strings for forgot/reset password (server-side render)
 FORGOT_RESET_STRINGS = {
     "es": {
@@ -7239,6 +7227,36 @@ def brain_rate():
     return jsonify({"ok": True}), 200
 
 
+@app.route("/api/brain/exercise-done", methods=["POST"])
+@require_auth
+@limiter.limit("30 per hour")
+def brain_exercise_done():
+    """Ejercicio diario del Cerebro completado (Fathom 18/06) → +3-6% al %, 1 vez/día.
+    Idempotente por día: si ya lo hizo hoy, no vuelve a sumar. El % arranca en 35
+    (lo siembra onboarding_complete)."""
+    user = current_user()
+    uid = user["id"]
+    profile = get_profile(uid)
+    today = datetime.now(timezone.utc).date().isoformat()
+    if str(profile.get("brain_exercise_date") or "") == today:
+        return jsonify({"ok": True, "already": True,
+                        "brain_progress": profile.get("brain_progress") or 35,
+                        "brain_last_gain": profile.get("brain_last_gain") or 0}), 200
+    cur = profile.get("brain_progress")
+    cur = 35 if cur is None else cur
+    gain = 3 + (abs(hash(uid + today)) % 4)   # 3-6, se computa una vez y se persiste
+    newp = min(95, cur + gain)
+    try:
+        db.table("profiles").update({
+            "brain_progress": newp, "brain_exercise_date": today, "brain_last_gain": gain,
+        }).eq("id", uid).execute()
+    except Exception:
+        logger.exception("brain_exercise_done: update failed uid=%s", uid)
+        return jsonify({"error": "internal"}), 500
+    track_event("brain_exercise_done", uid, {"gain": gain, "progress": newp})
+    return jsonify({"ok": True, "brain_progress": newp, "brain_last_gain": gain}), 200
+
+
 @app.route("/api/brain/rescrape", methods=["POST"])
 @require_auth
 @limiter.limit("10 per hour")
@@ -7449,10 +7467,12 @@ def onboarding_complete():
         "competitors": len(comps), "skipped": skipped})
 
     # 1) persistir nicho/subnichos/objetivo (degradado si faltan columnas)
+    #    + seed del % del Cerebro a 35 (Fathom 18/06: sube +3-6%/día con el ejercicio).
     try:
         db.table("profiles").update({
             "niche": niche or None, "subniches": subs,
-            "goal": goal or None, "onboarding_v2_done": True}).eq("id", uid).execute()
+            "goal": goal or None, "onboarding_v2_done": True,
+            "brain_progress": 35}).eq("id", uid).execute()
     except Exception:
         logger.warning("[onb2] profiles update failed (¿migración?)", exc_info=True)
         try:

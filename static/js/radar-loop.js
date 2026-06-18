@@ -586,10 +586,10 @@
   }
   // Paso 7 — CIERRE: Cerebro 50% + primer guión + camino a 100%.
   function onbCloseHTML(){
-    var pct=50;
+    var pct=35;
     return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Listo","Ready")+'</div>',
-      L("Listo. Te conozco al 50%.","Done. I know you at 50%."),
-      L("Ya leí tu cuenta y a tus 2 competidores. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía) — y con eso ya escribo a tu medida.","I've read your account and your 2 competitors. Your Brain is a <b>context profile</b> (not a full clone of your voice yet) — and with that I already write to your measure."),
+      L("Listo. Te conozco al 35%.","Done. I know you at 35%."),
+      L("Ya leí tu cuenta y a tus 2 competidores. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía). Cada día, con <b>un ejercicio de 1 minuto</b>, subo un poco más — hasta sonar clavado a ti.","I've read your account and your 2 competitors. Your Brain is a <b>context profile</b> (not a full clone of your voice yet). Each day, with a <b>1-minute exercise</b>, it climbs a bit more — until it sounds just like you."),
       '<div class="onb-brain"><div class="onb-brain-bar"><div class="onb-brain-fill" style="width:'+pct+'%"></div></div>'+
         '<div class="onb-brain-row"><span class="onb-brain-k">'+IC.brain+' '+L("Cerebro","Brain")+'</span><span class="onb-brain-v">'+pct+'%</span></div></div>'+
       '<ul class="onb-checklist">'+
@@ -1803,25 +1803,29 @@
      En prod: tabla `challenges` + comparar las vistas reales de la semana. */
   function versusHintHTML(){
     if(S.versus) return '';
-    return '<div class="versus-hint">⚔️ '+L("Rétate con tu nicho","Challenge your niche")+' — '+
-      L("7 días, el que más vistas haga <b>gana créditos</b>. Pulsa <b>Retar</b> en cualquiera 👇","7 days, whoever gets more views <b>wins credits</b>. Hit <b>Challenge</b> on anyone 👇")+'</div>';
+    return '<div class="versus-hint">🎯 '+L("Ponte un objetivo","Set a goal")+' — '+
+      L("supera la <b>media de views</b> de un rival con tus reels. Pulsa <b>Supéralo</b> en cualquiera 👇","beat a rival's <b>average views</b> with your reels. Hit <b>Beat it</b> on anyone 👇")+'</div>';
   }
+  /* "Supéralo" (no reto mutuo): los competidores son cuentas de Instagram que NO usan
+     la app, así que no se les puede retar. Es un OBJETIVO personal — superar su media
+     de views con tus reels. Una cara, con datos que ya tienes. */
   function versusCardHTML(){
     if(!S.versus) return '';
-    var v=S.versus, lead=v.meViews>=v.themViews, total=(v.meViews+v.themViews)||1, mePct=Math.round(v.meViews/total*100);
-    var daysLeft=Math.max(0,7-v.day);
+    var v=S.versus, beat=v.mine>=v.oppAvg, pct=Math.min(100,Math.round(v.mine/(v.oppAvg||1)*100)), gap=Math.max(0,v.oppAvg-v.mine);
     return '<div class="versus-card">'+
-      '<div class="versus-head"><span class="versus-ico">⚔️</span><b>'+L("Reto activo","Active challenge")+'</b>'+
-        '<span class="versus-day">'+L("Día","Day")+' '+v.day+'/7 · '+(daysLeft>0?L(daysLeft+" día"+(daysLeft===1?"":"s")+" para el final",daysLeft+" day"+(daysLeft===1?"":"s")+" left"):L("último día","last day"))+'</span>'+
-        '<button class="versus-quit" data-act="versus-quit" aria-label="Abandonar reto">'+IC.x+'</button></div>'+
+      '<div class="versus-head"><span class="versus-ico">🎯</span><b>'+L("Tu objetivo","Your goal")+'</b>'+
+        '<span class="versus-day">'+L("supera a","beat")+' @'+ESC(v.opp)+'</span>'+
+        '<button class="versus-quit" data-act="versus-quit" aria-label="'+L("Quitar objetivo","Remove goal")+'">'+IC.x+'</button></div>'+
       '<div class="versus-vs">'+
-        '<div class="versus-side"><span class="ava bava">'+ESC(initialsOf(v.youHandle))+'</span><span class="vs-h">'+L("Tú","You")+'</span><span class="vs-n">'+_fmtK(v.meViews)+'</span></div>'+
-        '<span class="versus-mid '+(lead?'win':'lose')+'">'+(lead?'▲ '+L("vas ganando","winning"):'▼ '+L("vas perdiendo","behind"))+'</span>'+
-        '<div class="versus-side them"><span class="ava bava">'+ESC(initialsOf(v.opp))+'</span><span class="vs-h">@'+ESC(v.opp)+'</span><span class="vs-n">'+_fmtK(v.themViews)+'</span></div>'+
+        '<div class="versus-side"><span class="ava bava">'+ESC(initialsOf(v.youHandle))+'</span><span class="vs-h">'+L("Tu mejor reel","Your best reel")+'</span><span class="vs-n">'+_fmtK(v.mine)+'</span></div>'+
+        '<span class="versus-mid '+(beat?'win':'lose')+'">'+(beat?'✓ '+L("lo superas","you beat it"):L("a "+_fmtK(gap)+" de superarlo","− "+_fmtK(gap)+" to go"))+'</span>'+
+        '<div class="versus-side them"><span class="ava bava">'+ESC(initialsOf(v.opp))+'</span><span class="vs-h">'+L("media de","avg of")+' @'+ESC(v.opp)+'</span><span class="vs-n">'+_fmtK(v.oppAvg)+'</span></div>'+
       '</div>'+
-      '<div class="versus-bar"><i style="width:'+mePct+'%"></i></div>'+
-      '<div class="versus-foot"><span class="versus-metric">'+L("Vistas esta semana","Views this week")+'</span>'+
-        '<span class="versus-prize">🏆 '+L("Premio: <b>+10 créditos</b>","Prize: <b>+10 credits</b>")+'</span></div>'+
+      '<div class="versus-bar"><i style="width:'+pct+'%"></i></div>'+
+      '<div class="versus-foot"><span class="versus-metric">'+L("Views medias por reel","Avg views per reel")+'</span>'+
+        (beat
+          ? '<span class="versus-prize">🏆 '+L("¡Lo superas! Mantén el ritmo","You beat it! Keep it up")+'</span>'
+          : '<button class="btn btn-sm btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Roba y publica más","Steal & publish more")+'</button>')+'</div>'+
     '</div>';
   }
   // PÁGINA COMPLETA del leaderboard (tab "leaderboard"). Tu posición vs competidores.
@@ -1857,7 +1861,7 @@
         '<span class="lb-h">@'+ESC(r.handle)+(r.you?' <b>('+L("tú","you")+')</b>':'')+'</span>'+
         '<span class="lb-f">'+_fmtK(r.followers)+'</span>'+
         '<span class="lb-g '+(g>=0?'up':'down')+'">'+gtxt+'</span>'+
-        ((!r.you && !S.versus)?'<button class="lb-challenge" data-act="versus-start" data-id="'+ESC(r.handle)+'">⚔️ '+L("Retar","Challenge")+'</button>':'<span class="lb-challenge-sp"></span>')+
+        ((!r.you && !S.versus)?'<button class="lb-challenge" data-act="versus-start" data-id="'+ESC(r.handle)+'">🎯 '+L("Supéralo","Beat it")+'</button>':'<span class="lb-challenge-sp"></span>')+
       '</div>';
     }).join("");
     return '<div class="scroll"><div class="canvas">'+
@@ -1980,9 +1984,33 @@
     if(!bt.cards.length && !bt.loading) brainTrainLoad();
   }
   // Fathom 17/06: modo del día — un día se entrenan HOOKS, otro GUIONES. Override manual.
+  /* % del Cerebro = progreso gamificado (Fathom 18/06): el tutorial deja 35% y cada
+     día subes +3-6% completando EL ejercicio del día (1 al día, alterna hooks/guiones,
+     no puedes hacer más). Demo: localStorage. Real: S.user.brainProgress del backend
+     (+ POST /api/brain/exercise-done) — pendiente de migración. */
+  function _todayStr(){ return new Date().toISOString().slice(0,10); }
+  function brainProgress(){
+    if(isDemo()){ try{ var v=localStorage.getItem("rs_brain_progress"); return v!=null?parseInt(v,10):35; }catch(e){ return 35; } }
+    return (S.user.brainProgress!=null) ? S.user.brainProgress : (hasRealVoice()?Math.max(35,Math.min(100,S.voice.confidence||0)):35);
+  }
+  function brainExDoneToday(){
+    if(isDemo()){ try{ return localStorage.getItem("rs_brain_ex_date")===_todayStr(); }catch(e){ return false; } }
+    return S.user.brainExDate===_todayStr();
+  }
+  function brainLastGain(){
+    if(isDemo()){ try{ return parseInt(localStorage.getItem("rs_brain_ex_gain")||"4",10); }catch(e){ return 4; } }
+    return S.user.brainLastGain||4;
+  }
+  function _brainCompleteExercise(){
+    if(brainExDoneToday()) return;
+    var day=_todayStr(), gain=3+_lbHash(day+"g",0,4), np=Math.min(95, brainProgress()+gain);  // +3..6 determinista
+    if(isDemo()){ try{ localStorage.setItem("rs_brain_progress",String(np)); localStorage.setItem("rs_brain_ex_date",day); localStorage.setItem("rs_brain_ex_gain",String(gain)); }catch(e){} }
+    else { S.user.brainProgress=np; S.user.brainExDate=day; S.user.brainLastGain=gain; try{ apiPost('/api/brain/exercise-done',{}); }catch(e){} }
+    try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
+    showToast(L("🧠 +"+gain+"% · Cerebro entrenado hoy. Vuelve mañana para subir más.","🧠 +"+gain+"% · Brain trained today. Come back tomorrow for more."));
+  }
   function brainTrainMode(){
-    var bt=S.brainTrain||{};
-    if(bt.mode==='hooks'||bt.mode==='guiones') return bt.mode;
+    // El DÍA decide (alterna hooks/guiones); el usuario no elige (1 ejercicio/día).
     return (new Date().getDate()%2===0)?'hooks':'guiones';
   }
   function setBrainTrainMode(m){
@@ -2015,6 +2043,7 @@
     // voto = SOLO VISUAL para el cerebro 3D (no infla el % real); feed silencioso.
     try{ if(window.RSBrain) window.RSBrain.feed(rating?'guio':'comp', true); }catch(e){}
     if(!isDemo()){ var niche=(S.onb&&S.onb.niche)||""; try{ apiPost('/api/brain/rate',{text:c.text, kind:c.kind||brainTrainMode(), type:brainTrainMode(), rating:rating, suggestion:suggestion||"", niche:niche}); }catch(e){} }
+    if(bt.i>=bt.cards.length){ _brainCompleteExercise(); }   // completó el ejercicio del día → +3-6%
     render();
   }
   function brainImprove(send){
@@ -2046,19 +2075,21 @@
     ];
   }
   function brainTrainHTML(){
-    var bt=S.brainTrain, inner;
     var mode=brainTrainMode();
     var modeLbl=mode==='hooks'?L("hooks","hooks"):L("guiones","scripts");
-    var toggle='<div class="bt-modes">'+
-      '<button class="bt-mode'+(mode==='hooks'?' on':'')+'" data-act="brain-train-mode" data-k="hooks">'+IC.hook+' Hooks</button>'+
-      '<button class="bt-mode'+(mode==='guiones'?' on':'')+'" data-act="brain-train-mode" data-k="guiones">'+IC.doc+' '+L("Guiones","Scripts")+'</button>'+
-    '</div>';
+    var head='<div class="brain-section-t">'+L("Tu ejercicio de hoy: entrena tus "+modeLbl,"Today's exercise: train your "+modeLbl)+
+      ' <span class="brain-tag">'+L("+3-6% al Cerebro · 1 al día","+3-6% to your Brain · 1 a day")+'</span></div>';
+    // Ejercicio diario YA hecho → bloqueado hasta mañana (no se puede hacer más).
+    if(brainExDoneToday()){
+      return head+'<div class="bt-wrap"><div class="bt-done bt-locked">'+IC.check+' '+
+        L("Ejercicio completado · <b>+"+brainLastGain()+"%</b> al Cerebro. Vuelve mañana para el siguiente.",
+          "Done · <b>+"+brainLastGain()+"%</b> to your Brain. Come back tomorrow for the next one.")+'</div></div>';
+    }
+    var bt=S.brainTrain, inner;
     if(!bt || (bt.loading && !bt.cards.length)){
-      inner='<div class="bt-load"><span class="mini-spin"></span> '+L("Preparando "+modeLbl+" para entrenarte…","Preparing "+modeLbl+" to train you…")+'</div>';
+      inner='<div class="bt-load"><span class="mini-spin"></span> '+L("Preparando tu ejercicio…","Preparing your exercise…")+'</div>';
     } else if(!bt.cards.length){
-      inner='<div class="bt-load">'+L("No pude traer "+modeLbl+" ahora.","Couldn't fetch "+modeLbl+" now.")+' <button class="btn btn-sm btn-ghost" data-act="brain-train-more">'+L("Reintentar","Retry")+'</button></div>';
-    } else if(bt.i>=bt.cards.length){
-      inner='<div class="bt-done">'+IC.check+' '+L("Has entrenado <b>"+(bt.rated||0)+"</b> hoy. Cada voto afina tu Cerebro.","You've trained <b>"+(bt.rated||0)+"</b> today. Every vote sharpens your Brain.")+' <button class="btn btn-sm btn-secondary" data-act="brain-train-more">'+IC.spark+' '+L("Traer más","More")+'</button></div>';
+      inner='<div class="bt-load">'+L("No pude traer tu ejercicio ahora.","Couldn't load your exercise now.")+' <button class="btn btn-sm btn-ghost" data-act="brain-train-more">'+L("Reintentar","Retry")+'</button></div>';
     } else {
       var c=bt.cards[bt.i];
       var actions = bt.improving
@@ -2071,10 +2102,10 @@
         '<div class="bt-kind">'+ESC(c.kind||mode)+'</div>'+
         '<p class="bt-text">'+ESC(c.text)+'</p>'+
         actions+
-        '<div class="bt-prog">'+(bt.i+1)+' / '+bt.cards.length+' · <b>'+(bt.rated||0)+'</b> '+L("entrenados","trained")+'</div>'+
+        '<div class="bt-prog">'+(bt.i+1)+' / '+bt.cards.length+'</div>'+
       '</div>';
     }
-    return '<div class="brain-section-t">'+L("Hoy toca entrenar tus "+modeLbl,"Today: train your "+modeLbl)+' <span class="brain-tag">'+L("cada voto te afina","every vote sharpens you")+'</span></div>'+toggle+'<div class="bt-wrap">'+inner+'</div>';
+    return head+'<div class="bt-wrap">'+inner+'</div>';
   }
   function brainHTML(){
     var b=brand();
@@ -2131,8 +2162,8 @@
         '<div id="rsBrainStage" class="brain3d-stage"><div class="brain-orb brain3d-fallback">'+IC.brain+'</div></div>'+
         '<div class="brain-hero-body">'+
           '<div class="brain-lvl">Nivel '+lv.level+' · '+ESC(ecoLevelName(lv.level))+(lv.level>=4?' <span class="brain-pro" title="Eres Pro Reelscript — acceso a grupos solo-pros">🏅 Pro</span>':'')+'</div>'+
-          '<div class="brain-voiceline">Te conozco al <b>'+voicePct+'%</b></div>'+
-          '<div class="eco-bar" style="margin:10px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,lv.pct)+'%"></div></div>'+
+          '<div class="brain-voiceline">Te conozco al <b>'+brainProgress()+'%</b></div>'+
+          '<div class="eco-bar" style="margin:10px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,brainProgress())+'%"></div></div>'+
           // B2: umbrales VISIBLES del siguiente nivel (checklist ✓/○) + UNA acción primaria
           // (la primera carencia). B4: el beneficio es real — voz y ganadores entran en el prompt.
           (lv.next
@@ -3771,12 +3802,14 @@
     if(act==="sugg-dismiss"){ S._suggDismissed=true; S._suggReal=null; showToast(L("Vale, te sugeriré otro.","Okay, I'll suggest another.")); return render(); }
     if(act==="versus-start"){
       var opp=btn.getAttribute("data-id")||"rival";
+      // oppAvg = media de views del competidor (en real, de sus reels scrapeados);
+      // mine = tu mejor reel. Demo: deterministas, como el resto del leaderboard.
       S.versus={ opp:opp, youHandle:(brand().handle||S.user.handle||"tu_cuenta"),
-        meViews:_lbHash((S.user.handle||"me")+"vw",60000,180000), themViews:_lbHash(opp+"vw",60000,180000), day:3 };
-      showToast(L("⚔️ Reto enviado a @"+opp+" — 7 días, que gane el mejor.","⚔️ Challenge sent to @"+opp+" — 7 days, may the best win."));
+        oppAvg:_lbHash(opp+"avg",40000,160000), mine:_lbHash((S.user.handle||"me")+"best",50000,190000) };
+      showToast(L("🎯 Objetivo fijado: supera la media de @"+opp+".","🎯 Goal set: beat @"+opp+"'s average."));
       return render();
     }
-    if(act==="versus-quit"){ S.versus=null; showToast(L("Reto abandonado.","Challenge abandoned.")); return render(); }
+    if(act==="versus-quit"){ S.versus=null; showToast(L("Objetivo quitado.","Goal removed.")); return render(); }
     if(act==="expand-feed"){ S.feedExpanded=true; return render(); }
     if(act==="add-reel") return addReelManual();
     // growth-2: onboarding de activación
@@ -4073,6 +4106,10 @@
       S.user.trialCreditsLeft=(me.trial_credits_left!=null)?me.trial_credits_left:0;
       // Fathom 18/06: tope diario del trial (3 guiones/día) → la pill muestra "N hoy".
       if(me.trial_daily_left!=null) S.user.dayLeft=me.trial_daily_left;
+      // Fathom 18/06: % del Cerebro gamificado + candado del ejercicio diario.
+      if(me.brain_progress!=null) S.user.brainProgress=me.brain_progress;
+      S.user.brainExDate=me.brain_exercise_date||null;
+      if(me.brain_last_gain!=null) S.user.brainLastGain=me.brain_last_gain;
       S.user.watermark=!!me.watermark;
       // Plan: en demo arranca en Agencia para ver el portfolio (toggle lo cambia);
       // en prod sale de /auth/me (profiles.plan).
