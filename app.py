@@ -1182,6 +1182,8 @@ def auth_me():
         "brain_progress": profile.get("brain_progress") if profile.get("brain_progress") is not None else 35,
         "brain_exercise_date": (str(profile.get("brain_exercise_date")) if profile.get("brain_exercise_date") else None),
         "brain_last_gain": profile.get("brain_last_gain") or 4,
+        # Lista de espera de la Comunidad (teaser "Avísame").
+        "community_waitlist": bool(profile.get("community_waitlist_at")),
         "effective_plan": effective_plan(profile),
         # watermark en exports: solo free post-trial (ni pago ni trial).
         "watermark": not paid_features_active(profile, user),
@@ -7225,6 +7227,27 @@ def brain_rate():
     except Exception:
         pass
     return jsonify({"ok": True}), 200
+
+
+@app.route("/api/community/interest", methods=["POST"])
+@require_auth
+@limiter.limit("20 per hour")
+def community_interest():
+    """Lista de espera de la Comunidad (Pushear reels→regalo + Grupos, Fathom 18/06):
+    marca el interés del usuario para avisarle cuando lance. Idempotente."""
+    user = current_user()
+    uid = user["id"]
+    profile = get_profile(uid)
+    if not profile.get("community_waitlist_at"):
+        try:
+            db.table("profiles").update({
+                "community_waitlist_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", uid).execute()
+        except Exception:
+            logger.exception("community_interest: update failed uid=%s", uid)
+            return jsonify({"error": "internal"}), 500
+    track_event("community_interest", uid, {"feature": "community"})
+    return jsonify({"ok": True, "waitlisted": True}), 200
 
 
 @app.route("/api/brain/exercise-done", methods=["POST"])

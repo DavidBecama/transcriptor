@@ -1877,7 +1877,28 @@
         '<button class="btn btn-md btn-secondary" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add a competitor")+'</button>'+
       '</div>'+
       '<p class="lb-note">'+L("Las cifras de competidores son estimaciones del nicho; tus métricas reales salen al conectar Instagram.","Competitor figures are niche estimates; your real metrics appear once you connect Instagram.")+'</p>'+
+      communitySoonHTML()+
     '</div></div>';
+  }
+  /* Teaser "Próximamente" de las features de comunidad (entre USUARIOS de la app):
+     genera expectativa + "Avísame" capta interés (PostHog) para medir demanda. */
+  function communitySoonHTML(){
+    var interested=!!S.user.communityWaitlist; if(!interested){ try{ interested=localStorage.getItem("rs_community_interest")==="1"; }catch(e){} }
+    var card=function(ico,title,desc){
+      return '<div class="soon-card"><div class="soon-ico">'+ico+'</div>'+
+        '<div class="soon-body"><div class="soon-h">'+title+' <span class="soon-pill">'+L("Próximamente","Soon")+'</span></div>'+
+        '<div class="soon-desc">'+desc+'</div></div></div>';
+    };
+    var cta=interested
+      ? '<div class="soon-cta done">'+IC.check+' '+L("Te avisaremos en cuanto llegue ✨","We'll let you know when it lands ✨")+'</div>'
+      : '<div class="soon-cta"><button class="btn btn-sm btn-secondary" data-act="community-interest">'+IC.spark+' '+L("Avísame cuando llegue","Notify me when it's live")+'</button></div>';
+    return '<div class="sec-soon-t">'+L("Comunidad de creadores","Creator community")+' <span class="brain-tag">'+L("en camino","on the way")+'</span></div>'+
+      '<div class="soon-grid">'+
+        card('🎁', L("Pushea tus reels a tu nicho","Push your reels to your niche"),
+             L("Comparte tu mejor reel con creadores de tu nicho — y recibe los suyos como <b>regalo</b>, ya analizados para que los robes.","Share your best reel with creators in your niche — and get theirs as a <b>gift</b>, already analyzed to steal."))+
+        card('👥', L("Grupos de creadores","Creator groups"),
+             L("Únete a un grupo de tu nicho: <b>comparte métricas</b> y mira en directo qué le está funcionando a los demás.","Join a niche group: <b>share metrics</b> and see live what's working for everyone else."))+
+      '</div>'+cta;
   }
   // T3: lista REAL de competidores seguidos (con id de tracking → permite dejar de
   // seguir). Se carga aparte del feed; al resolver, repinta las vistas que la
@@ -3810,6 +3831,14 @@
       return render();
     }
     if(act==="versus-quit"){ S.versus=null; showToast(L("Objetivo quitado.","Goal removed.")); return render(); }
+    if(act==="community-interest"){
+      try{ localStorage.setItem("rs_community_interest","1"); }catch(e){}
+      try{ if(window.posthog&&window.posthog.capture) window.posthog.capture("community_interest",{from:"ranking"}); }catch(e){}
+      S.user.communityWaitlist=true;
+      if(!isDemo()){ try{ apiPost('/api/community/interest',{}); }catch(e){} }   // persiste en backend
+      showToast(L("¡Hecho! Te avisaremos en cuanto la comunidad esté lista.","Done! We'll let you know when the community is ready."));
+      return render();
+    }
     if(act==="expand-feed"){ S.feedExpanded=true; return render(); }
     if(act==="add-reel") return addReelManual();
     // growth-2: onboarding de activación
@@ -4110,6 +4139,7 @@
       if(me.brain_progress!=null) S.user.brainProgress=me.brain_progress;
       S.user.brainExDate=me.brain_exercise_date||null;
       if(me.brain_last_gain!=null) S.user.brainLastGain=me.brain_last_gain;
+      S.user.communityWaitlist=!!me.community_waitlist;   // lista de espera Comunidad
       S.user.watermark=!!me.watermark;
       // Plan: en demo arranca en Agencia para ver el portfolio (toggle lo cambia);
       // en prod sale de /auth/me (profiles.plan).
