@@ -7212,18 +7212,20 @@ def brain_rate():
     text = (body.get("text") or "").strip()[:1000]
     suggestion = (body.get("suggestion") or "").strip()[:1000]
     brand_id = (body.get("brand_id") or "").strip()[:64]
+    # origen del voto: "nicho" (brain-train) o "tinder_guiones" (Tinder de tus guiones).
+    source = (body.get("source") or "nicho").strip().lower()[:32] or "nicho"
     if not text:
         return jsonify({"error": "missing_text"}), 400
     try:
         db.table("brain_ratings").insert({
             "user_id": uid, "brand_id": brand_id, "kind": kind,
             "content": text, "rating": rating,
-            "suggestion": suggestion or None, "source": "nicho",
+            "suggestion": suggestion or None, "source": source,
         }).execute()
     except Exception:
         logger.exception("brain_rate insert failed uid=%s", uid)
     try:
-        track_event("brain_rating", uid, {"rating": rating, "kind": kind, "text": text[:120]})
+        track_event("brain_rating", uid, {"rating": rating, "kind": kind, "source": source, "text": text[:120]})
     except Exception:
         pass
     return jsonify({"ok": True}), 200
@@ -7801,6 +7803,104 @@ def delete_tracked_creator(tracking_id: str):
     return "", 204
 
 
+def _views_stats(views_newest_first):
+    """De una lista de views (reels ordenados del MÁS reciente al más antiguo)
+    devuelve {avg, best, reels, growth}. growth% = media de los 3 reels más
+    nuevos vs los 3 siguientes (momentum real, no seguidores). Sin suficientes
+    reels → growth=0. avg/best son enteros de views."""
+    vs = [int(v or 0) for v in (views_newest_first or [])]
+    if not vs:
+        return {"avg": 0, "best": 0, "reels": 0, "growth": 0}
+    avg = sum(vs) // len(vs)
+    best = max(vs)
+    growth = 0
+    if len(vs) >= 4:
+        n = min(3, len(vs) // 2)
+        recent = sum(vs[:n]) / n
+        prev = sum(vs[n:2 * n]) / n
+        if prev > 0:
+            growth = max(-95, min(300, round((recent - prev) / prev * 100)))
+    return {"avg": avg, "best": best, "reels": len(vs), "growth": growth}
+
+
+@app.route("/api/leaderboard", methods=["GET"])
+@require_auth
+def leaderboard():
+    """Ranking REAL del nicho (Fathom 18/06) — tú vs tus competidores por VIEWS
+    MEDIAS por reel. Nota: el scraper de reels NO trae nº de seguidores, así que
+    la métrica honesta y comparable en ambos lados son las views (que ya
+    scrapeamos): competidores ← creator_reels_global, tú ← ig_videos. Es además
+    la misma base que el Versus «Supéralo». followers se incluye solo si está
+    cacheado (hoy NULL); el front no lo muestra si falta."""
+    user = current_user()
+    uid = user["id"]
+
+    # 1. Mis competidores trackeados.
+    try:
+        tc = (db.table("user_tracked_creators")
+                .select("creator:creators_global(id, ig_username, followers_count_cached)")
+                .eq("user_id", uid).is_("archived_at", "null").limit(60).execute())
+    except Exception:
+        logger.exception("leaderboard: tracked read failed uid=%s", uid)
+        tc = type("X", (), {"data": []})()
+    comps = {}
+    for t in (tc.data or []):
+        c = t.get("creator") or {}
+        cid = c.get("id")
+        if cid and cid not in comps:
+            comps[cid] = {"handle": c.get("ig_username") or "", "followers": c.get("followers_count_cached")}
+    cids = list(comps.keys())
+
+    # 2. Reels de TODOS los competidores en una query (.in_), agrupo en Python.
+    by_creator = {cid: [] for cid in cids}
+    if cids:
+        try:
+            rr = (db.table("creator_reels_global")
+                    .select("creator_id, views, posted_at")
+                    .in_("creator_id", cids).eq("is_archived", False)
+                    .order("posted_at", desc=True).limit(900).execute())
+            for r in (rr.data or []):
+                cid = r.get("creator_id")
+                if cid in by_creator:
+                    by_creator[cid].append(int(r.get("views") or 0))
+        except Exception:
+            logger.exception("leaderboard: reels read failed uid=%s", uid)
+
+    rows = []
+    for cid, info in comps.items():
+        st = _views_stats(by_creator.get(cid))
+        if st["reels"] == 0:
+            continue  # sin reels scrapeados aún → fuera del ranking (no inventamos)
+        rows.append({
+            "handle": info["handle"], "you": False,
+            "followers": info["followers"],
+            "avg_views": st["avg"], "best_views": st["best"],
+            "reels": st["reels"], "growth": st["growth"],
+        })
+
+    # 3. MIS métricas (ig_videos), mismo cálculo de views.
+    me = {"handle": "", "you": True, "followers": None,
+          "avg_views": 0, "best_views": 0, "reels": 0, "growth": 0, "has_data": False}
+    try:
+        prof_r = db.table("ig_profiles").select("ig_username").eq("user_id", uid).limit(1).execute()
+        if prof_r.data:
+            me["handle"] = (prof_r.data[0].get("ig_username") or "").lstrip("@")
+            mv = (db.table("ig_videos")
+                    .select("views, published_at")
+                    .eq("user_id", uid).order("published_at", desc=True)
+                    .limit(30).execute())
+            myviews = [int(v.get("views") or 0) for v in (mv.data or [])]
+            st = _views_stats(myviews)
+            me.update({"avg_views": st["avg"], "best_views": st["best"],
+                       "reels": st["reels"], "growth": st["growth"],
+                       "has_data": st["reels"] > 0})
+    except Exception:
+        logger.warning("leaderboard: own metrics failed uid=%s", uid)
+
+    rows.sort(key=lambda r: -r["avg_views"])
+    return jsonify({"metric": "avg_views", "you": me, "rows": rows}), 200
+
+
 
 @app.route("/api/competitors/reels/<reel_id>/generate-script", methods=["POST"])
 @require_auth
@@ -7922,7 +8022,13 @@ def generate_script_from_competitor_reel(reel_id: str):
                .limit(1)
                .execute())
     if not own_r.data:
-        return jsonify({"error": "reel_not_found"}), 404
+        # SEED (SPEC #3, Fathom 18/06): el user puede robar un reel del SEED de su
+        # nicho aunque aún no siga al creador. Si el reel es seed-válido (creador
+        # tageado con su subnicho) y le quedan huecos de competidor, lo AUTO-SEGUIMOS
+        # y continuamos — convierte el seed en una relación real (activación). Si no
+        # encaja o no hay hueco → 404 (igual que antes).
+        if not _autotrack_seed_creator(uid, profile, creator_id):
+            return jsonify({"error": "reel_not_found"}), 404
 
     # 4. Resolver asistente (body > profile.default).
     body = request.get_json(silent=True) or {}
@@ -8839,6 +8945,92 @@ def _build_brand_report(user_id, project_id):
     return {"reels": reels, "scripts": scripts, "competitors": len(cids)}
 
 
+def _recycled_reels(subniches, niche=None, limit=20, exclude_creator_ids=None):
+    """SEED ALGORÍTMICO del Radar (SPEC-fase-accion-radar #3, Fathom 18/06):
+    reels que YA petaron de creadores tageados con el subnicho del user — SIN
+    scrape (cero coste/latencia). Reusa creators_global + creator_reels_global,
+    mismo shape que el feed real + marca source='seed' para que el front etiquete
+    «del nicho» (no «de tu competidor»). Si el user no tiene subniches, cae a las
+    sugerencias del nicho. Devuelve [] si no hay nada (cold-start total)."""
+    subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:8]
+    if not subs and niche:
+        subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(niche)) if t][:8]
+    if not subs:
+        return []
+    exclude = set(exclude_creator_ids or [])
+    try:
+        cg = (db.table("creators_global").select("id, ig_username")
+                .overlaps("subniches", subs).limit(60).execute()).data or []
+    except Exception:
+        logger.warning("[seed] creators_global overlaps failed (¿migración subniches?)")
+        return []
+    uname = {c["id"]: c["ig_username"] for c in cg}
+    cids = [c for c in uname if c not in exclude]
+    if not cids:
+        return []
+    try:
+        rr = (db.table("creator_reels_global")
+                .select("id, ig_reel_id, creator_id, caption, views, likes, comments, "
+                        "posted_at, thumb_url, thumb_b64, video_duration_sec")
+                .in_("creator_id", cids).eq("is_archived", False)
+                .order("views", desc=True).limit(max(limit * 2, 30)).execute()).data or []
+    except Exception:
+        logger.warning("[seed] creator_reels_global read failed")
+        return []
+    baselines = _creator_view_baselines(cids)
+    out = []
+    for r in rr[:limit]:
+        r["creator"] = {"ig_username": uname.get(r.get("creator_id"), "")}
+        r["is_favorite"] = False
+        r["explosion_score"] = _explosion_score(r.get("views"), baselines.get(r.get("creator_id")))
+        r["source"] = "seed"   # el front muestra microcopy honesto «mientras llenas tu radar»
+        out.append(r)
+    return out
+
+
+def _autotrack_seed_creator(uid, profile, creator_id) -> bool:
+    """SEED (SPEC #3): cuando el user roba un reel del seed de su nicho sin seguir
+    aún al creador, lo auto-seguimos SI (a) el creador está tageado con su subnicho
+    (es seed-válido, no un creador random) y (b) le quedan huecos de competidor en
+    su plan. Inserta el tracking (marca «default», sin project) → el ownership pasa.
+    Devuelve True si quedó seguido (o ya lo seguía), False si no procede."""
+    try:
+        # Subniches del user (o sugerencias del nicho si no tiene) y del creador.
+        subs = [t for t in (_norm_tag(s) for s in (profile.get("subniches") or [])) if t]
+        if not subs and profile.get("niche"):
+            subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(profile["niche"])) if t]
+        if not subs:
+            return False
+        cg = (db.table("creators_global").select("subniches")
+                .eq("id", creator_id).single().execute()).data or {}
+        c_subs = set(_norm_tag(s) for s in (cg.get("subniches") or []))
+        if not c_subs or c_subs.isdisjoint(set(subs)):
+            return False  # no es seed-válido para este user
+        # Hueco de competidor en el plan (reverse-trial: plan efectivo).
+        plan = effective_plan(profile)
+        limits = get_tracked_creators_limit(plan)
+        if not limits.get("enabled"):
+            return False
+        cap = limits["base_slots_global"] + get_user_extra_slots(uid)
+        if count_active_tracked(uid, scope="global") >= cap:
+            return False  # sin hueco → que vea el muro de plan por la vía normal
+        # Reactivar una fila archivada si existe (evita chocar con UNIQUE user+creator).
+        existing = (db.table("user_tracked_creators").select("id, archived_at")
+                      .eq("user_id", uid).eq("creator_id", creator_id).limit(1).execute()).data or []
+        if existing:
+            db.table("user_tracked_creators").update({"archived_at": None}) \
+              .eq("id", existing[0]["id"]).execute()
+        else:
+            db.table("user_tracked_creators").insert({
+                "user_id": uid, "creator_id": creator_id, "project_id": None,
+            }).execute()
+        track_event("seed_autotrack", uid, {"creator_id": creator_id})
+        return True
+    except Exception:
+        logger.warning("seed autotrack failed uid=%s creator=%s", uid, creator_id, exc_info=True)
+        return False
+
+
 @app.route("/api/tracked-creators/reels", methods=["GET"])
 @require_auth
 def get_tracked_creators_reels():
@@ -8884,7 +9076,16 @@ def get_tracked_creators_reels():
     tracked = tq.execute()
     creator_ids = list({t["creator_id"] for t in (tracked.data or [])})
     if not creator_ids and not favorites_only:
-        return jsonify({"reels": [], "total": 0, "has_more": False})
+        # SEED (SPEC #3): user sin competidores → no devolvemos vacío (acantilado de
+        # activación). Reciclamos reels que petaron en su subnicho, marca source='seed'.
+        try:
+            prof = get_profile(uid)
+            seed = _recycled_reels(prof.get("subniches"), prof.get("niche"), limit=20)
+        except Exception:
+            logger.warning("[seed] feed fallback failed uid=%s", uid)
+            seed = []
+        return jsonify({"reels": seed, "total": len(seed),
+                        "has_more": False, "seed": True})
 
     # 3. Validar creator_id si pasa.
     filter_creator_id = request.args.get("creator_id")
@@ -10047,6 +10248,96 @@ def script_hooks_generate_batch(script_id):
         logger.error("script_hooks_batch: alt_hooks persist failed user=%s err=%s", uid, e, exc_info=True)
 
     return jsonify({"hooks": new_hooks, "alt_hooks": merged,
+                    "cost_cents": get_cost_cents(), **_credits_display(uid)})
+
+
+@app.route("/api/hooks/from-source", methods=["POST"])
+@require_auth
+@limiter.limit("10 per minute;40 per hour")
+def hooks_from_source():
+    """5 HOOKS DESDE 3 FUENTES (Fathom 18/06, David — «el gancho es el 80/20»):
+      (a) source="competitor" → un reel de la competencia (reel_id o texto/caption),
+      (b) source="idea"       → una idea tuya en texto libre,
+      (c) source="script"     → un guión que ya tienes (script_id).
+    Reusa el mismo regenerador de hooks (_HOOK_REGEN_PROMPT) y cobra 1 crédito
+    (COST.hooks5=1) antes del LLM, refunda si ninguno sale. NO persiste (no hay
+    script destino salvo en (c), que ya tiene su propio botón); devuelve los hooks.
+    Response: {hooks:[str], source, cost_cents, credits_cents, credits}."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    source = (body.get("source") or "idea").strip().lower()
+    count = max(1, min(int(body.get("count") or 5), 5))
+
+    context = ""
+    original_text = ""
+    label = ""
+    if source == "script":
+        sid = (body.get("script_id") or "").strip()
+        row = db.table("scripts").select("script, hook").eq("id", sid).eq("user_id", uid).execute()
+        if not row.data:
+            return jsonify({"error": "not_found"}), 404
+        s = row.data[0]
+        full = (s.get("script") or "").strip()
+        lines = [l.strip() for l in full.split("\n") if l.strip()]
+        context = "\n".join(lines[1:] if len(lines) > 1 else lines)
+        original_text = s.get("hook") or (lines[0] if lines else "") or full
+        label = "guión"
+    elif source == "competitor":
+        rid = (body.get("reel_id") or "").strip()
+        cap = (body.get("text") or "").strip()
+        if rid:
+            try:
+                rr = (db.table("creator_reels_global")
+                        .select("caption, transcript")
+                        .eq("id", rid).eq("is_archived", False).single().execute())
+                if rr.data:
+                    cap = (rr.data.get("transcript") or rr.data.get("caption") or cap).strip()
+            except Exception:
+                logger.warning("hooks_from_source: reel lookup failed uid=%s reel=%s", uid, rid)
+        if not cap:
+            return jsonify({"error": "missing_source",
+                            "message": "No hay contenido del reel para sacar hooks."}), 400
+        context = cap[:2000]
+        original_text = cap[:300]
+        label = "vídeo de competencia"
+    else:  # idea (texto libre)
+        txt = (body.get("text") or "").strip()
+        if len(txt) < 4:
+            return jsonify({"error": "missing_source",
+                            "message": "Escribe tu idea para sacar los hooks."}), 400
+        context = txt[:2000]
+        original_text = txt[:300]
+        label = "idea"
+
+    user_msg = (f"Material fuente ({label}):\n{context}\n\n"
+                f"Texto base del que parte el hook:\n{original_text}")
+
+    err, refund, _ = _charge_units_locked(uid, 1, user)
+    if err:
+        return err
+
+    new_hooks = []
+    for _ in range(count):
+        try:
+            raw = _call_llm(_HOOK_REGEN_PROMPT, user_msg, temperature=0.9)
+            h = _extract_hook(raw)
+            if h and h not in new_hooks:
+                new_hooks.append(h)
+        except Exception as e:
+            logger.warning("hooks_from_source: regen failed user=%s src=%s err=%s", uid, source, e)
+            continue
+
+    if not new_hooks:
+        refund()
+        return jsonify({"error": "llm_error",
+                        "message": "No se pudieron generar hooks. Inténtalo de nuevo."}), 502
+
+    try:
+        track_event("hooks_from_source", uid, {"source": source, "n": len(new_hooks)})
+    except Exception:
+        pass
+    return jsonify({"hooks": new_hooks, "source": source,
                     "cost_cents": get_cost_cents(), **_credits_display(uid)})
 
 

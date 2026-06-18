@@ -178,6 +178,7 @@
       likes: typeof r.likes==="string"?r.likes:fmtNum(r.likes),
       dur:r.dur||durFmt(r.video_duration_sec), cap:r.cap||r.caption||"", sum:r.sum||"",
       thumb:r.thumb_b64||r.thumb_url||r.thumb||null, fav:!!(r.is_favorite||r.fav),
+      seed:(r.source==="seed"),   // SPEC #3: reel del nicho mientras llenas tu radar
       script:r.script||null, hooks:r.hooks||null };
   }
 
@@ -829,6 +830,17 @@
       if(r && r.ok && r.d && r.d.suggestion){ S._suggReal=r.d.suggestion; if(S.tab==="dashboard") render(); }
     });
   }
+  // Real: ranking del nicho por VIEWS medias/reel (no seguidores — el scrape no los
+  // trae). Lo carga 1 vez al entrar en el tab. S.lb = {you, rows[], metric}.
+  function loadLeaderboard(force){
+    if(isDemo()) return;
+    if(!force && (S._lbReal || S._lbLoading)) return;
+    S._lbLoading=true;
+    apiGet('/api/leaderboard').then(function(r){
+      S._lbLoading=false;
+      if(r && r.ok && r.d){ S._lbReal=r.d; if(S.tab==="leaderboard") render(); }
+    });
+  }
   function suggestedCompHTML(){
     var c=suggestedComp(); if(!c) return '';
     var why=c.why || L(c.why_es, c.why_en);   // real → string; demo → bilingüe
@@ -878,6 +890,15 @@
     '</div>';
   }
 
+  // SPEC #3: cuando el radar se llena con el SEED del nicho (user sin competidores
+  // aún), microcopy honesto + CTA a seguir competidores para tener señales propias.
+  function seedBannerHTML(){
+    if(!S.radarSeed || isDemo()) return '';
+    return '<div class="seed-banner">'+IC.spark+
+      '<span>'+L("Mientras llenas tu radar, esto está <b>petando en tu nicho</b>. Sigue a tus competidores para que el radar se llene con lo TUYO.","While you fill your radar, this is <b>blowing up in your niche</b>. Follow your competitors so the radar fills with YOUR signals.")+'</span>'+
+      '<button class="btn btn-sm btn-secondary" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+    '</div>';
+  }
   function feedReels(){
     var a=S.reels.slice();
     if(S.filter==="fav") a=a.filter(function(r){return S.favs[r.id];});
@@ -1151,6 +1172,7 @@
       statbarHTML()+
       trackedManageHTML()+
       activationProgressHTML()+   // endowed progress: «1/4 · Roba tu primera idea»
+      seedBannerHTML()+           // SPEC #3: aviso «esto petó en tu nicho» con seed
       opportunityCarouselHTML(heroN)+
       suggestedCompHTML()+      // sugerir competidores proactivamente (Fathom 18/06)
       voiceOnboardCardHTML()+   // B6+T1: banner de voz BAJO la oportunidad — no empuja el hero bajo el fold
@@ -1270,10 +1292,22 @@
       : '<button class="btn btn-sm btn-secondary" data-act="gen5scripts" data-id="'+idea.id+'">+ 5 guiones más</button>';
     var count=n?'<span class="idea-count">'+n+' guion'+(n===1?"":"es")+'</span>':'';
     var caret=n?'<button class="idea-caret'+(open?" open":"")+'" data-act="idea-toggle" data-id="'+idea.id+'" title="'+(open?"Plegar":"Desplegar")+'">'+IC.chev+'</button>':'';
+    // 5 hooks DESDE LA IDEA (fuente «idea» del trío de fuentes, Fathom 18/06).
+    var hooksBtn=idea.hooks?'':'<button class="btn btn-sm btn-ghost" data-act="idea5hooks" data-id="'+idea.id+'" title="Saca 5 hooks de esta idea ('+COST.hooks5+' créd.)">'+IC.hook+' 5 hooks</button>';
+    var hooksList=idea.hooks?hooksResultHTML(idea.hooks):'';
     return '<div class="idea-block">'+
-      '<div class="idea-block-head"><div class="idea-ic">'+IC.bulb+'</div><div class="idea-text">'+ESC(idea.text)+'</div>'+count+genBtn+caret+'</div>'+
+      '<div class="idea-block-head"><div class="idea-ic">'+IC.bulb+'</div><div class="idea-text">'+ESC(idea.text)+'</div>'+count+hooksBtn+genBtn+caret+'</div>'+
+      hooksList+
       ((n&&open)?'<div class="idea-scripts">'+scripts+'</div>':'')+
     '</div>';
+  }
+  // Lista de hooks generados (idea/competencia) con botón Copiar — reusa data-act="copy".
+  function hooksResultHTML(hooks){
+    if(!hooks||!hooks.length) return '';
+    return '<div class="sc-hooks hooks-result">'+hooks.map(function(h,i){
+      return '<div class="sc-hook"><span class="hn">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(h)+'</span>'+
+        '<span class="copy sc-hook-save" data-act="copy" data-txt="'+ESC(h)+'">Copiar</span></div>';
+    }).join("")+'</div>';
   }
   function scriptBlockHTML(sc){
     var open=!!sc.expanded;
@@ -1789,7 +1823,24 @@
      seguidores se siembran deterministas por handle; en prod saldrían de métricas. */
   function _lbHash(s,min,max){ var h=2166136261; for(var i=0;i<s.length;i++){ h=((h^s.charCodeAt(i))>>>0)*16777619>>>0; } return min+(h%(max-min)); }
   function _fmtK(n){ n=Math.round(n); return n>=1000000?((n/1000000).toFixed(1).replace(/\.0$/,'')+'M'):n>=1000?((n/1000).toFixed(1).replace(/\.0$/,'')+'K'):String(n); }
+  // Real (no demo): {you, rows[], metric:"avg_views"} cargado por loadLeaderboard().
+  function lbReal(){ return (!isDemo() && S._lbReal && Array.isArray(S._lbReal.rows)) ? S._lbReal : null; }
+  function lbIsViews(){ return !!lbReal(); }            // métrica = views/reel (no seguidores)
+  function lbUnit(){ return lbIsViews()? L("views/reel","views/reel") : L("seguidores","followers"); }
   function leaderboardRows(){
+    var lr=lbReal();
+    if(lr){
+      // PROD: el número del ranking son las views MEDIAS por reel (lo que scrapeamos).
+      // Lo guardo en `.followers` para reusar todo el render; el label sale de lbUnit().
+      var mr=lr.you||{};
+      var me={handle:(mr.handle||brand().handle||S.user.handle||"tu_cuenta"), followers:(mr.avg_views||0),
+              best:(mr.best_views||0), growth:(mr.growth||0), reels:(mr.reels||0), hasData:!!mr.has_data, you:true};
+      var comps=(lr.rows||[]).map(function(c){
+        return {handle:c.handle, followers:(c.avg_views||0), best:(c.best_views||0),
+                growth:(c.growth||0), reels:(c.reels||0), you:false};
+      });
+      return comps.concat([me]).sort(function(a,b){ return b.followers-a.followers; });
+    }
     var b=brand();
     var me={handle:(b.handle||S.user.handle||"tu_cuenta"), followers:42000, growth:8, you:true};
     var comps=brainCompetitors().slice(0,12).map(function(c){
@@ -1836,6 +1887,7 @@
     var me=rows[myIdx]||{followers:0,growth:0};
     var above=myIdx>0?rows[myIdx-1]:null;
     var gap=above?(above.followers-me.followers):0;
+    var unit=lbUnit(), realV=lbIsViews();
     // #1 proyección: a TU ritmo, cuándo superas al de arriba → meta cercana y tangible.
     var proj='';
     if(above && me.growth>0){
@@ -1843,14 +1895,26 @@
       var weeks=Math.max(1,Math.round((gap/Math.max(1,perMonth))*4.345));
       proj=' · '+L("a tu ritmo lo superas en ~<b>"+weeks+" semana"+(weeks===1?"":"s")+"</b>","at your pace you pass them in ~<b>"+weeks+" week"+(weeks===1?"":"s")+"</b>");
     }
-    var goal=above
-      ? '<div class="lb-goal">🎯 '+L("Te faltan <b>"+_fmtK(gap)+"</b> seguidores para superar a <b>@"+ESC(above.handle)+"</b>","<b>"+_fmtK(gap)+"</b> followers to overtake <b>@"+ESC(above.handle)+"</b>")+proj+'</div>'
-      : '<div class="lb-goal">🏆 '+L("Lideras tu nicho — sigue así","You lead your niche — keep it up")+'</div>';
-    // #3 momentum: racha de crecimiento (refuerzo positivo). Demo: semanas deterministas.
+    var goal;
+    if(realV && !me.hasData){
+      goal='<div class="lb-goal">🔗 '+L("Conecta tu Instagram para ver tu posición y tu objetivo.","Connect your Instagram to see your rank and goal.")+'</div>';
+    } else if(realV && !above && rows.length<=1){
+      goal='<div class="lb-goal">🎯 '+L("Sigue a competidores y deja que scrapeemos sus reels para ver tu ranking.","Follow competitors and let us scrape their reels to see your ranking.")+'</div>';
+    } else {
+      goal=above
+        ? '<div class="lb-goal">🎯 '+L("Te faltan <b>"+_fmtK(gap)+"</b> "+unit+" para superar a <b>@"+ESC(above.handle)+"</b>","<b>"+_fmtK(gap)+"</b> "+unit+" to overtake <b>@"+ESC(above.handle)+"</b>")+proj+'</div>'
+        : '<div class="lb-goal">🏆 '+L("Lideras tu nicho — sigue así","You lead your niche — keep it up")+'</div>';
+    }
+    // #3 momentum: racha de crecimiento (refuerzo positivo). Real: % de tus reels
+    // recientes (sin semanas inventadas). Demo: semanas deterministas.
     var momentum='';
     if(me.growth>0){
-      var streakW=2+_lbHash((b.handle||"x")+"s",0,4);
-      momentum='<div class="lb-momentum">📈 '+L("Subiendo · <b>+"+me.growth+"%</b> este mes · llevas <b>"+streakW+" semanas</b> creciendo","Rising · <b>+"+me.growth+"%</b> this month · <b>"+streakW+" weeks</b> growing")+'</div>';
+      if(realV){
+        momentum='<div class="lb-momentum">📈 '+L("Subiendo · <b>+"+me.growth+"%</b> en tus reels recientes","Rising · <b>+"+me.growth+"%</b> on your recent reels")+'</div>';
+      } else {
+        var streakW=2+_lbHash((b.handle||"x")+"s",0,4);
+        momentum='<div class="lb-momentum">📈 '+L("Subiendo · <b>+"+me.growth+"%</b> este mes · llevas <b>"+streakW+" semanas</b> creciendo","Rising · <b>+"+me.growth+"%</b> this month · <b>"+streakW+" weeks</b> growing")+'</div>';
+      }
     }
     var items=rows.map(function(r,i){
       var g=r.growth, gtxt=(g>=0?'↑':'↓')+Math.abs(g)+'%';
@@ -1876,7 +1940,9 @@
         '<button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Roba y publica más para subir","Steal & publish more to climb")+'</button>'+
         '<button class="btn btn-md btn-secondary" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add a competitor")+'</button>'+
       '</div>'+
-      '<p class="lb-note">'+L("Las cifras de competidores son estimaciones del nicho; tus métricas reales salen al conectar Instagram.","Competitor figures are niche estimates; your real metrics appear once you connect Instagram.")+'</p>'+
+      '<p class="lb-note">'+(lbIsViews()
+        ? L("El ranking va por <b>views medias por reel</b> (lo que de verdad scrapeamos). Conecta tu Instagram para ver tu posición.","Ranking is by <b>average views per reel</b> (what we actually scrape). Connect your Instagram to see your spot.")
+        : L("Las cifras de competidores son estimaciones del nicho; tus métricas reales salen al conectar Instagram.","Competitor figures are niche estimates; your real metrics appear once you connect Instagram."))+'</p>'+
       communitySoonHTML()+
     '</div></div>';
   }
@@ -2128,6 +2194,66 @@
     }
     return head+'<div class="bt-wrap">'+inner+'</div>';
   }
+  /* TINDER DE GUIONES (Fathom 18/06, lo pidió David): una baraja con TUS guiones
+     ya generados. Deslizas «esto soy yo» / «no es mío» → refina tu voz (mismo
+     /api/brain/rate) Y entrena el Cerebro. Completar la baraja cuenta como el
+     ejercicio del día (sube el % 1×/día, respetando el tope). Distinto del
+     brain-train (que valora hooks del nicho); este va sobre lo que TÚ creaste. */
+  function guionTinderPool(){
+    return (S.guiones||[]).filter(function(g){ return g && g.status!=="discarded" && (g.hook||(g.beats&&g.beats.length)); });
+  }
+  function guionTinderEligible(){ return guionTinderPool().length>=3; }
+  function ensureGuionTinder(){ if(!S.guionTinder) S.guionTinder={cards:[], i:0, started:false}; }
+  function startGuionTinder(){
+    var pool=guionTinderPool().slice(0,8).map(function(g){
+      return {id:g.id, title:g.title||"", hook:(g.hook||((g.beats&&g.beats[0])||"")), beat:((g.beats&&g.beats[0])||"")};
+    });
+    S.guionTinder={cards:pool, i:0, started:true};
+    render();
+  }
+  function guionTinderVote(rating){
+    ensureGuionTinder();
+    var gt=S.guionTinder; if(!gt.started||gt.i>=gt.cards.length) return;
+    var c=gt.cards[gt.i]; gt.i++;
+    try{ if(window.RSBrain) window.RSBrain.feed(rating?'guio':'comp', true); }catch(e){}   // feed visual al cerebro 3D
+    if(!isDemo()){ try{ apiPost('/api/brain/rate',{text:(c.hook||c.title), kind:'guion', type:'guiones', rating:rating, suggestion:'', source:'tinder_guiones', niche:(S.onb&&S.onb.niche)||''}); }catch(e){} }
+    if(gt.i>=gt.cards.length){
+      // Completó la baraja → cuenta como el ejercicio del día (sube el Cerebro, 1/día).
+      if(!brainExDoneToday()) _brainCompleteExercise();
+      else showToast(L("🃏 Baraja completada. El Cerebro ya subió hoy — vuelve mañana.","🃏 Deck done. Your Brain already leveled today — come back tomorrow."));
+    }
+    render();
+  }
+  function guionTinderReset(){ S.guionTinder={cards:[], i:0, started:false}; render(); }
+  function guionTinderHTML(){
+    if(!guionTinderEligible()) return '';   // necesita >=3 guiones tuyos para que tenga sentido
+    ensureGuionTinder();
+    var gt=S.guionTinder;
+    var head='<div class="brain-section-t">'+L("Tinder de tus guiones","Tinder of your scripts")+
+      ' <span class="brain-tag">'+L("entrena el Cerebro con lo que ya creaste","train your Brain with what you made")+'</span></div>';
+    if(!gt.started){
+      return head+'<div class="bt-wrap"><div class="gt-intro">'+
+        '<p class="gt-intro-t">'+L("Desliza tus guiones: <b>esto soy yo</b> o <b>no es mío</b>. Cada deslizamiento afina tu voz y alimenta el Cerebro.","Swipe your scripts: <b>this is me</b> or <b>not me</b>. Each swipe sharpens your voice and feeds your Brain.")+'</p>'+
+        '<button class="btn btn-md btn-primary" data-act="gt-start">'+IC.spark+' '+L("Empezar la baraja","Start the deck")+'</button>'+
+      '</div></div>';
+    }
+    if(gt.i>=gt.cards.length){
+      return head+'<div class="bt-wrap"><div class="bt-done">'+IC.check+' '+
+        L("Baraja completada. Tu Cerebro tiene más de TU voz.","Deck done. Your Brain has more of YOUR voice.")+
+        ' <button class="btn btn-sm btn-ghost" data-act="gt-reset">'+L("Otra vez","Again")+'</button></div></div>';
+    }
+    var c=gt.cards[gt.i];
+    var sub=(c.beat && c.beat!==c.hook) ? '<p class="gt-beat">'+ESC(c.beat)+'</p>' : '';
+    return head+'<div class="bt-wrap"><div class="bt-card gt-card">'+
+      (c.title?'<div class="bt-kind">'+ESC(c.title)+'</div>':'')+
+      '<p class="bt-text">'+ESC(c.hook)+'</p>'+ sub +
+      '<div class="bt-row">'+
+        '<button class="bt-btn bt-no" data-act="gt-vote" data-k="0">'+IC.x+' '+L("No es mío","Not me")+'</button>'+
+        '<button class="bt-btn bt-yes" data-act="gt-vote" data-k="1">'+IC.check+' '+L("Esto soy yo","This is me")+'</button>'+
+      '</div>'+
+      '<div class="bt-prog">'+(gt.i+1)+' / '+gt.cards.length+'</div>'+
+    '</div></div>';
+  }
   function brainHTML(){
     var b=brand();
     var v=brainVoice(b);
@@ -2204,6 +2330,9 @@
       '</div>'+
       // Entrenar (inversión): valora hooks → afina tu gusto + alimenta el cerebro 3D.
       brainTrainHTML()+
+      // Tinder de TUS guiones (Fathom 18/06, David): swipe sobre lo que ya creaste →
+      // refina la voz y entrena el Cerebro. Solo aparece con >=3 guiones propios.
+      guionTinderHTML()+
       // Forzar re-scrape del propio perfil (Fathom 18/06): adelanta el análisis auto
       // 2×/sem a cambio de créditos. Siempre disponible (publicaste → sube ya de nivel).
       '<div class="brain-section-t">'+L("Sube de nivel ya","Level up now")+'</div>'+
@@ -2527,6 +2656,7 @@
     if(S.tab==="brain"){ ensureBrain3D(); ensureBrainTrain(); } else pauseBrain3D();
     ensureFlashCountdown();   // tic-tac del reloj de la oferta flash si está visible
     if(S.tab==="dashboard") loadSuggestion();   // sugerir competidores (real): carga 1 vez
+    if(S.tab==="leaderboard") loadLeaderboard(); // ranking real por views: carga 1 vez
     // Sección legacy pendiente de la URL (/profile/transcriptions|settings): se abre
     // una vez que #rsLegacy ya existe (primer render). openLegacy consume el flag.
     if(S._pendingLegacy && document.getElementById("rsLegacy")){ var _pl=S._pendingLegacy; S._pendingLegacy=null; openLegacy(_pl); }
@@ -2799,9 +2929,12 @@
       '</div>'+
       '<div class="reel-d-acts">'+
         '<button class="btn btn-md btn-primary" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' Roba la idea</button>'+
+        // 5 hooks DESDE EL VÍDEO DE COMPETENCIA (fuente «competidor» del trío, Fathom 18/06).
+        (r.hooks?'':'<button class="btn btn-md btn-ghost" data-act="reel5hooks" data-id="'+ESC(r.id)+'" title="Saca 5 hooks de este reel ('+COST.hooks5+' créd.)">'+IC.hook+' 5 hooks</button>')+
         '<button class="iconbtn'+(isFav?" on":"")+'" data-act="fav" data-id="'+ESC(r.id)+'" title="Guardar" aria-label="'+(isFav?"Quitar de favoritos":"Guardar en favoritos")+'">'+(isFav?IC.star:IC.starO)+'</button>'+
         '<button class="btn btn-md btn-ghost" data-act="reel-follow" data-handle="'+ESC(r.creator.handle)+'">'+IC.plus+' Seguir a @'+ESC(r.creator.handle)+'</button>'+
       '</div>'+
+      (r.hooks?'<div class="brain-section-t" style="margin-top:14px">'+L("5 hooks de este reel","5 hooks from this reel")+'</div>'+hooksResultHTML(r.hooks):'')+
       '<div class="brain-section-t" style="margin-top:18px">Transcripción <span class="brain-tag">lo que dice el creador</span></div>'+
       txBody+
     '</div>';
@@ -3279,6 +3412,32 @@
       applyCredits(r.d, COST.hooks5); render(); showToast("5 hooks nuevos para tu guion.");
     });
   }
+  /* 5 HOOKS DESDE 3 FUENTES (Fathom 18/06, David): además del guión (gen5hooks),
+     desde una IDEA y desde un VÍDEO DE COMPETENCIA. Mismo coste (COST.hooks5) y
+     endpoint unificado /api/hooks/from-source. assign(hooks) pega el resultado. */
+  function _genHooks(payload, assign, btn){
+    if(isDemo()){
+      spend(COST.hooks5);
+      var seed=((payload.text||payload.reel_id||"")+"" ).length + Object.keys(S.ideas).length;
+      assign(pick(BANK_HOOKS,5,seed)); render(); flashSpark(-COST.hooks5); return;
+    }
+    var restore=_btnLoading(btn);
+    showToast(L("Generando 5 hooks…","Generating 5 hooks…"));
+    apiPost('/api/hooks/from-source', payload).then(function(r){
+      if(!r.ok || !r.d || !Array.isArray(r.d.hooks) || !r.d.hooks.length){ restore(); return showPaywallOrError(r); }
+      assign(r.d.hooks.slice()); applyCredits(r.d, COST.hooks5); render();
+      showToast(L("5 hooks listos.","5 hooks ready."));
+    });
+  }
+  function genHooksFromIdea(ideaId, btn){
+    var idea=findIdea(ideaId); if(!idea) return;
+    _genHooks({source:"idea", text:idea.text, count:5}, function(hooks){ idea.hooks=hooks; }, btn);
+  }
+  function genHooksFromReel(reelId, btn){
+    var r=reelById(reelId); if(!r) return;
+    // En real mandamos el reel_id (el backend saca transcript/caption); en demo da igual.
+    _genHooks({source:"competitor", reel_id:r.id, text:(r.cap||r.sum||""), count:5}, function(hooks){ r.hooks=hooks; }, btn);
+  }
   function explosion(btn){
     if(isDemo()){
       spend(COST.explosion); var seed=Date.now()%89;
@@ -3414,7 +3573,7 @@
     ]).then(function(res){
       var st=res[0], fd=res[1];
       if(st&&st.ok&&st.d){ S.stats={ competitors:st.d.competitors||0, reels_week:st.d.reels_week||0, exploded_week:st.d.exploded_week||0, stolen_today:st.d.stolen_today!=null?st.d.stolen_today:(st.d.stolen_total||0) }; }
-      if(fd&&fd.ok&&fd.d&&Array.isArray(fd.d.reels)){ S.reels=fd.d.reels.map(normReel); S.favs={}; S.reels.forEach(function(r){ if(r.fav) S.favs[r.id]=true; }); }
+      if(fd&&fd.ok&&fd.d&&Array.isArray(fd.d.reels)){ S.reels=fd.d.reels.map(normReel); S.radarSeed=!!fd.d.seed; S.favs={}; S.reels.forEach(function(r){ if(r.fav) S.favs[r.id]=true; }); }
       loadTracked();
       render();
       if(cb) cb();
@@ -3764,6 +3923,9 @@
     if(act==="brain-train-mode") return setBrainTrainMode(k);
     if(act==="brain-improve") return brainImprove(k==="send");
     if(act==="brain-train-more") return brainTrainMore();
+    if(act==="gt-start") return startGuionTinder();
+    if(act==="gt-vote") return guionTinderVote(parseInt(btn.getAttribute("data-k"),10)||0);
+    if(act==="gt-reset") return guionTinderReset();
     if(act==="team-invite") return teamInvite();
     if(act==="team-edit") return showToast("Gestión de roles y marcas por miembro: próximamente.");
     if(act==="brand-add") return brandCreate();
@@ -3823,10 +3985,17 @@
     if(act==="sugg-dismiss"){ S._suggDismissed=true; S._suggReal=null; showToast(L("Vale, te sugeriré otro.","Okay, I'll suggest another.")); return render(); }
     if(act==="versus-start"){
       var opp=btn.getAttribute("data-id")||"rival";
-      // oppAvg = media de views del competidor (en real, de sus reels scrapeados);
-      // mine = tu mejor reel. Demo: deterministas, como el resto del leaderboard.
-      S.versus={ opp:opp, youHandle:(brand().handle||S.user.handle||"tu_cuenta"),
-        oppAvg:_lbHash(opp+"avg",40000,160000), mine:_lbHash((S.user.handle||"me")+"best",50000,190000) };
+      // oppAvg = media de views del competidor; mine = tu mejor reel.
+      var oppAvg, mine, lr=lbReal();
+      if(lr){
+        // PROD: de las views reales ya cargadas (creator_reels_global / ig_videos).
+        var row=(lr.rows||[]).filter(function(r){ return r.handle===opp; })[0];
+        oppAvg=row?(row.avg_views||0):0;
+        mine=(lr.you&&lr.you.best_views)||0;
+      } else {
+        oppAvg=_lbHash(opp+"avg",40000,160000); mine=_lbHash((S.user.handle||"me")+"best",50000,190000);
+      }
+      S.versus={ opp:opp, youHandle:(brand().handle||S.user.handle||"tu_cuenta"), oppAvg:oppAvg, mine:mine };
       showToast(L("🎯 Objetivo fijado: supera la media de @"+opp+".","🎯 Goal set: beat @"+opp+"'s average."));
       return render();
     }
@@ -3904,6 +4073,8 @@
     if(act==="gen5ideas") return gen5ideas(btn);
     if(act==="gen5scripts") return gen5scripts(id, btn);
     if(act==="gen5hooks") return gen5hooks(id, btn);
+    if(act==="idea5hooks") return genHooksFromIdea(id, btn);
+    if(act==="reel5hooks") return genHooksFromReel(id, btn);
     if(act==="explosion") return explosion(btn);
     if(act==="save-script") return saveScript(id);
     if(act==="save-hook") return saveHook(id, parseInt(btn.getAttribute("data-i"),10));
@@ -4053,6 +4224,7 @@
       if(res[3]) S.voice=res[3];   // perfil de voz real (moat) — null en demo dummy
       S.stats={ competitors:stats.competitors||0, reels_week:stats.reels_week||0, exploded_week:stats.exploded_week||0, stolen_today:stats.stolen_today!=null?stats.stolen_today:(stats.stolen_total||0) };
       S.reels=(feed.reels||[]).map(normReel);
+      S.radarSeed=!!feed.seed;   // SPEC #3: el radar viene del seed del nicho (sin competidores)
       loadTracked();   // T3: lista de competidores seguidos (manejable en Cerebro)
       S.favs={}; S.reels.forEach(function(r){ if(r.fav) S.favs[r.id]=true; });
       S._reelPool=S.reels.slice();   // pool base para variar feed por-marca en demo
