@@ -2317,6 +2317,14 @@ def _whop_verify_signature(raw: bytes, headers) -> bool:
     return False
 
 
+def _whop_str_id(val):
+    """Whop anida el plan/membership a veces como objeto {id:...} y a veces como
+    string suelto. Devuelve siempre el string id (o None) para usar como clave."""
+    if isinstance(val, dict):
+        return val.get("id") or val.get("plan_id") or val.get("plan")
+    return val if isinstance(val, str) else None
+
+
 def _whop_event_seen(key: str) -> bool:
     """Idempotencia por id de evento/entrega (Redis, TTL 7d). True = ya visto."""
     if not key or rds is None:
@@ -2352,9 +2360,14 @@ def whop_webhook():
 
     action = event.get("action") or event.get("event") or event.get("type") or ""
     data = event.get("data") or {}
-    # plan_id y user_id robustos (Whop anida distinto según el evento).
+    # plan_id y user_id robustos (Whop anida distinto según el evento; el plan
+    # puede venir como objeto {id:...} o como string suelto → _whop_str_id).
     _memb = data.get("membership") if isinstance(data.get("membership"), dict) else {}
-    plan_id = data.get("plan") or data.get("plan_id") or _memb.get("plan") or _memb.get("plan_id")
+    plan_id = (_whop_str_id(data.get("plan")) or _whop_str_id(data.get("plan_id"))
+               or _whop_str_id(_memb.get("plan")) or _whop_str_id(_memb.get("plan_id")))
+    # QA temporal: shape real del payload para confirmar mapeo (quitar antes de prod).
+    logger.info("[whop] %s · plan_id=%r · data.keys=%s · plan.type=%s",
+                action, plan_id, sorted(data.keys()), type(data.get("plan")).__name__)
     md = data.get("metadata")
     if not (isinstance(md, dict) and md.get("user_id")):
         md = _memb.get("metadata") if isinstance(_memb.get("metadata"), dict) else (md if isinstance(md, dict) else {})
