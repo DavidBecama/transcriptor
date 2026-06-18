@@ -99,6 +99,22 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.send_weekly_digests",
         "schedule": crontab(day_of_week=1, hour=9, minute=0),
     },
+    # Fathom 18/06: NOVEDAD DIARIA — re-scrape diario de competidores seguidos a las
+    # 06:00 UTC (antes del digest de las 08:00, para que el correo lleve lo fresco).
+    "refresh-radar-daily": {
+        "task": "tasks.refresh_radar_daily",
+        "schedule": crontab(hour=6, minute=0),
+    },
+    # Fathom 18/06: AUTO-SCRAPE del perfil propio 2×/semana (lunes y jueves 07:00 UTC).
+    "scrape-user-profiles": {
+        "task": "tasks.scrape_user_profiles",
+        "schedule": crontab(day_of_week="1,4", hour=7, minute=0),
+    },
+    # Fathom 18/06: nudge "entrena tus hooks" — semanal (miércoles 09:00 UTC).
+    "send-train-hooks-nudges": {
+        "task": "tasks.send_train_hooks_nudges",
+        "schedule": crontab(day_of_week=3, hour=9, minute=0),
+    },
 }
 celery_app.conf.timezone = "UTC"
 
@@ -1055,6 +1071,153 @@ def scrape_creator_task(creator_id: str) -> dict:
     return out
 
 
+# ── Fathom 18/06: NOVEDAD DIARIA + AUTO-SCRAPE del perfil propio ─────────────
+# Beat re-scrapea a diario los competidores SEGUIDOS (radar con reels nuevos cada
+# día = hábito) y 2×/semana el perfil PROPIO de cada usuario (detecta lo publicado
+# → sube nivel del Cerebro sin que el usuario haga nada). Ambas RESPETAN staleness
+# y CAPAN el nº de scrapes por corrida para no disparar el coste de Apify.
+_RADAR_DAILY_CAP = int(os.environ.get("RADAR_DAILY_SCRAPE_CAP", "400"))
+_USER_SCRAPE_CAP = int(os.environ.get("USER_PROFILE_SCRAPE_CAP", "400"))
+
+
+def _enqueue_if_stale(db, creator_ids, stale_hours, cap):
+    """Encola scrape_creator_task para los creadores stale (>stale_hours) y no
+    privados/inexistentes. Una sola lectura a creators_global (.in_) + filtro en
+    memoria. Devuelve (queued, candidates)."""
+    creator_ids = [c for c in dict.fromkeys(creator_ids) if c]  # únicos, orden estable
+    if not creator_ids:
+        return 0, 0
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=stale_hours)).isoformat()
+    queued = 0
+    # Supabase limita el tamaño de .in_(); troceamos de 100 en 100.
+    rows = []
+    for i in range(0, len(creator_ids), 100):
+        chunk = creator_ids[i:i + 100]
+        try:
+            r = (db.table("creators_global")
+                   .select("id, scrape_status, last_scraped_at")
+                   .in_("id", chunk).execute())
+            rows.extend(r.data or [])
+        except Exception:
+            logger.exception("refresh: creators_global read failed (chunk)")
+    for cr in rows:
+        if queued >= cap:
+            break
+        if cr.get("scrape_status") in ("private", "not_found", "scraping"):
+            continue
+        last = cr.get("last_scraped_at")
+        if last and str(last) > cutoff:   # fresco → skip (ISO comparable lexicográficamente)
+            continue
+        try:
+            scrape_creator_task.delay(cr["id"])
+            queued += 1
+        except Exception:
+            logger.exception("refresh: enqueue failed for %s", cr.get("id"))
+    return queued, len(creator_ids)
+
+
+@celery_app.task(name="tasks.refresh_radar_daily")
+def refresh_radar_daily():
+    """NOVEDAD DIARIA (Fathom 18/06): re-scrapea a diario los competidores que alguien
+    sigue (stale >20h) → cada día hay reels nuevos en el radar. Capado a _RADAR_DAILY_CAP."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        tr = (db.table("user_tracked_creators").select("creator_id")
+                .is_("archived_at", "null").limit(5000).execute())
+        creator_ids = [r["creator_id"] for r in (tr.data or []) if r.get("creator_id")]
+    except Exception:
+        logger.exception("refresh_radar_daily: tracked read failed")
+        return {"status": "error"}
+    queued, cand = _enqueue_if_stale(db, creator_ids, stale_hours=20, cap=_RADAR_DAILY_CAP)
+    logger.info("refresh_radar_daily: queued=%d candidates=%d", queued, cand)
+    return {"queued": queued, "candidates": cand}
+
+
+@celery_app.task(name="tasks.scrape_user_profiles")
+def scrape_user_profiles():
+    """AUTO-SCRAPE 2×/semana (Fathom 18/06): scrapea el perfil PROPIO de cada usuario
+    (de ig_profiles) → detecta reels recién publicados → sube nivel del Cerebro solo.
+    Asegura que el handle esté en creators_global. Capado a _USER_SCRAPE_CAP."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        pr = db.table("ig_profiles").select("ig_username").limit(5000).execute()
+        usernames = sorted({(p.get("ig_username") or "").strip().lstrip("@").lower()
+                            for p in (pr.data or []) if p.get("ig_username")})
+    except Exception:
+        logger.exception("scrape_user_profiles: ig_profiles read failed")
+        return {"status": "error"}
+    if not usernames:
+        return {"queued": 0, "candidates": 0}
+    # Asegura/recoge los creator_id de esos handles (upsert idempotente).
+    creator_ids = []
+    for uname in usernames:
+        try:
+            ins = (db.table("creators_global")
+                     .upsert({"ig_username": uname}, on_conflict="ig_username").execute())
+            row = (ins.data or [None])[0]
+            if not row:
+                sel = db.table("creators_global").select("id").eq("ig_username", uname).single().execute()
+                row = sel.data
+            if row and row.get("id"):
+                creator_ids.append(row["id"])
+        except Exception:
+            logger.exception("scrape_user_profiles: upsert failed for %s", uname)
+    # Stale 60h: el perfil propio se refresca como mucho ~cada 2,5 días (2×/sem).
+    queued, cand = _enqueue_if_stale(db, creator_ids, stale_hours=60, cap=_USER_SCRAPE_CAP)
+    logger.info("scrape_user_profiles: queued=%d candidates=%d", queued, cand)
+    return {"queued": queued, "candidates": cand}
+
+
+@celery_app.task(name="tasks.send_train_hooks_nudges")
+def send_train_hooks_nudges():
+    """Beat SEMANAL (Fathom 18/06): nudge "hoy toca entrenar tus hooks" a usuarios de
+    pago con competidores. Idempotente por semana ISO (dentro de send_train_hooks_nudge)."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        return {"error": "supabase_not_configured"}
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        from emails import send_train_hooks_nudge
+    except Exception as e:
+        logger.error("send_train_hooks_nudges: import emails failed: %s", e)
+        return {"error": "import_emails"}
+    try:
+        tracked = (db.table("user_tracked_creators").select("user_id")
+                     .is_("archived_at", "null").limit(20000).execute()).data or []
+        uids = sorted({t["user_id"] for t in tracked if t.get("user_id")})
+    except Exception as e:
+        logger.error("send_train_hooks_nudges: tracked query failed: %s", e)
+        return {"error": "tracked_query"}
+    if not uids:
+        return {"users": 0, "sent": 0}
+    plan_by_uid = {}
+    for i in range(0, len(uids), 200):
+        try:
+            profs = db.table("profiles").select("id, plan").in_("id", uids[i:i + 200]).execute().data or []
+            for p in profs:
+                plan_by_uid[p["id"]] = p.get("plan") or "free"
+        except Exception:
+            pass
+    week_key = datetime.now(timezone.utc).strftime("%G-W%V")
+    sent = skipped = 0
+    for uid in uids:
+        if plan_by_uid.get(uid, "free") not in RADAR_ENABLED_PLANS:
+            skipped += 1
+            continue
+        try:
+            r = send_train_hooks_nudge(uid, week_key)
+            sent += 1 if r.get("sent") else 0
+            skipped += 0 if r.get("sent") else 1
+        except Exception:
+            logger.exception("send_train_hooks_nudges: send failed user=%s", uid)
+            skipped += 1
+    logger.info("send_train_hooks_nudges: sent=%d skipped=%d", sent, skipped)
+    return {"users": len(uids), "sent": sent, "skipped": skipped}
 
 
 # ── v0.15.5: generar guion desde reel de competidor (async) ──────────────────

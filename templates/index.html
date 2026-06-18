@@ -3231,6 +3231,8 @@
       font-family: var(--font-body); font-size: .65rem; font-weight: 600;
       padding: 4px 14px; border-radius: 20px; letter-spacing: .05em; white-space: nowrap;
     }
+    /* En el modal de upgrade ya hay un badge i18n (.price-badge "Más elegido") → evita el doble. */
+    .upgrade-modal .price-card.featured::before { display: none; }
     /* Billing toggle */
     .billing-toggle {
       display: inline-flex; align-items: center; gap: 4px;
@@ -3571,6 +3573,13 @@
     .topup-amt { font-size: 1.4rem; font-weight: 900; }
     .topup-cred { font-size: .7rem; color: var(--text3); margin-top: 3px; }
     .topup-note { font-size: .77rem; color: var(--text3); text-align: center; margin-bottom: 14px; }
+    /* #5 empuje a suscripción dentro del modal de packs */
+    .topup-sub-nudge { display:flex; flex-direction:column; gap:9px; align-items:flex-start; margin:14px 0 4px; padding:12px 14px; border-radius:12px;
+      border:1px solid rgba(79,124,255,.3); background:rgba(79,124,255,.08); font-size:.82rem; line-height:1.45; color:var(--text2); }
+    .topup-sub-nudge b { color:var(--text); font-weight:700; }
+    .topup-sub-nudge button { align-self:stretch; padding:9px 14px; border-radius:10px; border:none; cursor:pointer; font-weight:700; font-size:.82rem;
+      background:var(--brand-cta); color:#fff; box-shadow:0 3px 0 #22357c; transition:transform .12s; }
+    .topup-sub-nudge button:active { transform:translateY(2px); box-shadow:0 1px 0 #22357c; }
 
     /* ── Button active/inactive state ────────────────────────── */
     .btn-shimmer.inactive {
@@ -8873,13 +8882,24 @@
 
     /* ── Onboarding Tour ─────────────────────────────────────── */
     .tour-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.55);
+      position: fixed; inset: 0; background: transparent;
       z-index: 10000; transition: opacity .25s;
     }
-    .tour-highlight {
-      position: relative; z-index: 10001;
-      box-shadow: 0 0 0 3px rgba(79,124,255,.45), 0 0 20px rgba(79,124,255,.2);
-      border-radius: var(--rsm); transition: box-shadow .3s;
+    .tour-highlight { position: relative; z-index: 10001; border-radius: var(--rsm); }
+    /* Spotlight: oscurece TODO menos el hueco del elemento (box-shadow gigante).
+       Vive a nivel de body → inmune al stacking context del island, así lo de
+       dentro queda a brillo real, no atenuado por la capa del tour. */
+    .tour-spotlight {
+      position: fixed; z-index: 10001; pointer-events: none;
+      border-radius: var(--rsm); display: none;
+      animation: tourPulse 1.7s ease-in-out infinite;
+    }
+    @keyframes tourPulse {
+      0%,100% { box-shadow: 0 0 0 3px rgba(79,124,255,.85), 0 0 26px 3px rgba(79,124,255,.5), 0 0 0 9999px rgba(0,0,0,.62); }
+      50%     { box-shadow: 0 0 0 5px rgba(79,124,255,1),   0 0 40px 6px rgba(79,124,255,.7), 0 0 0 9999px rgba(0,0,0,.62); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .tour-spotlight { animation: none; box-shadow: 0 0 0 4px rgba(79,124,255,.9), 0 0 30px 4px rgba(79,124,255,.55), 0 0 0 9999px rgba(0,0,0,.62); }
     }
     /* Mobile-first: fixed bottom sheet */
     .tour-tooltip {
@@ -8901,7 +8921,7 @@
     .tour-text { margin-bottom: 18px; font-weight: 300; }
     .tour-btns { display: flex; align-items: center; gap: 8px; }
     .tour-btn {
-      padding: 10px 20px; border-radius: var(--rsm); font-size: .85rem;
+      padding: 10px 16px; border-radius: var(--rsm); font-size: .85rem;
       font-weight: 600; cursor: pointer; border: none; transition: all .2s;
       -webkit-tap-highlight-color: transparent;
     }
@@ -8926,7 +8946,7 @@
     @media (min-width: 768px) {
       .tour-tooltip {
         position: absolute; bottom: auto; left: auto; right: auto;
-        max-width: 360px; width: max-content;
+        max-width: 420px; width: max-content;
         border-radius: var(--r); border: 1px solid rgba(79,124,255,.15);
         padding: 20px 22px 16px;
         box-shadow: 0 12px 40px rgba(0,0,0,.35);
@@ -9564,6 +9584,9 @@
     .rs .thumb .dur { position:absolute; right:6px; bottom:6px; font-family:var(--font-mono); font-size:10px; color:#fff; background:rgba(0,0,0,.55); padding:2px 5px; border-radius:5px; z-index:1; }
     /* avatar */
     .rs .ava { width:30px; height:30px; border-radius:99px; flex-shrink:0; background:linear-gradient(135deg,var(--brand-400),var(--brand-700)); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:12px; }
+    /* Avatar con foto real (unavatar): la img cubre las iniciales; si falla (onerror) se elimina y quedan las iniciales. */
+    .rs .ava--photo { position:relative; overflow:hidden; }
+    .rs .ava--photo .ava-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:inherit; }
     /* app shell (isla) */
     .rs.app { display:flex; flex-direction:column; position:relative; overflow:hidden; background:var(--surface-base); border-radius:18px; border:1px solid var(--border-subtle); min-height:560px; }
     .rs .topbar { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border-subtle); background:var(--surface-base); position:relative; z-index:6; }
@@ -9669,8 +9692,8 @@
     .rs .chain:hover { border-color:var(--border-strong); transform:translateY(-1px); }
     .rs .chain:active { transform:scale(.99); }
     .rs .chain .cic { width:40px; height:40px; border-radius:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:19px; background:var(--surface-overlay); }
-    .rs .chain.feature { background:linear-gradient(120deg, rgba(79,124,255,.12), transparent); border-color:rgba(79,124,255,.35); }
-    .rs .chain.feature .cic { background:var(--brand-600); color:#fff; }
+    .rs .chain.chain-feature { background:linear-gradient(120deg, rgba(79,124,255,.12), transparent); border-color:rgba(79,124,255,.35); }
+    .rs .chain.chain-feature .cic { background:var(--brand-600); color:#fff; }
     .rs .chain .ctext { flex:1; min-width:0; }
     .rs .chain .ctext .ct { font-size:14.5px; font-weight:600; margin-bottom:1px; }
     .rs .chain .ctext .cd { font-size:12px; color:var(--text-tertiary); line-height:1.35; }
@@ -9812,9 +9835,9 @@
       padding:32px 30px; box-shadow:var(--shadow-lg); }
     .rs .onb-box--wide { max-width:560px; }
     .rs .onb-screen-inner:has(.onb-box--wide) { max-width:720px; }
-    .rs .onb-box .btn-primary, .rs .onb-cta { width:100%; justify-content:center; }
-    .rs .onb-row { display:flex; gap:10px; align-items:center; margin-top:6px; }
-    .rs .onb-row .onb-cta { flex:1; }
+    .rs .onb-box .btn-primary, .rs .onb-cta { width:100%; justify-content:center; margin-top:16px; }
+    .rs .onb-row { display:flex; gap:10px; align-items:center; margin-top:18px; }
+    .rs .onb-row .onb-cta { flex:1; margin-top:0; }
     .rs .onb-back-btn { flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; min-height:48px; padding:0 16px; border-radius:12px; border:1px solid var(--border-default); background:transparent; color:var(--text-secondary); font:inherit; font-family:var(--font-body); font-weight:600; font-size:14px; cursor:pointer; }
     .rs .onb-back-btn:hover { border-color:var(--border-strong); color:var(--text-primary); }
     /* nicho: chips + texto libre */
@@ -9895,6 +9918,10 @@
     .rs .rs-lock-h { font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--text-primary); margin-bottom:6px; }
     .rs .rs-lock-sub { font-size:13.5px; line-height:1.5; color:var(--text-secondary); margin-bottom:16px; }
     .rs .rs-lock-card .btn { width:100%; justify-content:center; }
+    /* Variante compacta del muro (datos del competidor en el detalle de reel). */
+    .rs .rs-lock--sm .rs-lock-inner { filter:blur(6px); }
+    .rs .rs-lock--sm .rs-lock-over { padding:6px; }
+    .rs .rs-lock--sm .rs-lock-over .btn { width:auto; }
     .rs .rs-skel { background:var(--surface-raised); border:1px solid var(--border-default); border-radius:18px; height:160px; animation: rsPulse 1.3s ease-in-out infinite; }
     @keyframes rsPulse { 0%,100%{opacity:.5;} 50%{opacity:.8;} }
 
@@ -10184,6 +10211,60 @@
     .rs--mobile .brain-hero { flex-direction:column; align-items:flex-start; }
     .rs .brain-orb { width:64px; height:64px; flex-shrink:0; border-radius:18px; display:flex; align-items:center; justify-content:center; color:#fff; background:linear-gradient(135deg, var(--brand-500), #6f93ff); box-shadow:0 8px 26px rgba(79,124,255,.32); }
     .rs .brain-orb svg { width:32px; height:32px; }
+    /* Cerebro 3D (WebGL): panel oscuro; el canvas (lazy) lo cubre. Si no carga, queda el orb. */
+    .rs .brain3d-stage { position:relative; flex:0 0 300px; height:210px; border-radius:18px; overflow:hidden; background:radial-gradient(120% 120% at 30% 25%, #1a2150 0%, #0e1230 48%, #080a1c 100%); box-shadow:0 14px 40px -20px rgba(20,28,80,.6); }
+    .rs--mobile .brain3d-stage { flex:1 1 auto; width:100%; height:200px; }
+    .rs .brain3d-stage canvas { display:block; position:absolute; inset:0; width:100%!important; height:100%!important; }
+    .rs .brain3d-fallback { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
+    .rs .brain3d-stage:has(canvas) .brain3d-fallback { display:none; }   /* 3D montado → fuera el orb */
+    /* Capa "alimentar al cerebro": toast flotante "+1 [tipo]" cuando una señal real aterriza */
+    .rs .brain-feed-pop { position:absolute; left:50%; bottom:16px; transform:translateX(-50%); z-index:3; pointer-events:none;
+      font-family:var(--font-mono); font-size:12px; font-weight:700; letter-spacing:.02em; color:#fff; white-space:nowrap;
+      padding:5px 11px; border-radius:99px; background:rgba(79,124,255,.92); box-shadow:0 6px 18px -6px rgba(79,124,255,.7);
+      animation:rsFeedPop 1.4s var(--ease-out) forwards; }
+    .rs .brain-feed-pop.bf-comp { background:rgba(166,140,250,.92); box-shadow:0 6px 18px -6px rgba(166,140,250,.7); }
+    .rs .brain-feed-pop.bf-guio { background:rgba(245,168,61,.95); box-shadow:0 6px 18px -6px rgba(245,168,61,.7); }
+    .rs .brain-feed-pop.bf-metr { background:rgba(51,212,153,.95); box-shadow:0 6px 18px -6px rgba(51,212,153,.7); }
+    @keyframes rsFeedPop {
+      0% { opacity:0; transform:translateX(-50%) translateY(10px) scale(.85); }
+      18% { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
+      70% { opacity:1; transform:translateX(-50%) translateY(-6px) scale(1); }
+      100% { opacity:0; transform:translateX(-50%) translateY(-26px) scale(.96); }
+    }
+    /* bump del contador de la fuente al recibir su señal */
+    .rs .brain-src-n.bump { animation:rsCountBump .6s var(--ease-out); }
+    @keyframes rsCountBump {
+      0% { transform:scale(1); }
+      40% { transform:scale(1.28); color:var(--brand-500); }
+      100% { transform:scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce){
+      .rs .brain-feed-pop { animation:none; opacity:1; }
+      .rs .brain-src-n.bump { animation:none; }
+    }
+    /* Brain «Entrenar» (inversión): valora hooks 👍/👎. */
+    .rs .bt-wrap { margin:4px 0 20px; }
+    /* Fathom 17/06: toggle hooks/guiones + flujo "¿cómo lo dirías?" */
+    .rs .bt-modes { display:inline-flex; gap:4px; padding:3px; border-radius:10px; background:var(--surface-raised); border:1px solid var(--border-default); margin:2px 0 10px; }
+    .rs .bt-mode { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; border-radius:7px; border:none; background:transparent; color:var(--text-tertiary); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; transition:background .15s, color .15s; }
+    .rs .bt-mode svg { width:14px; height:14px; }
+    .rs .bt-mode.on { background:var(--brand-500); color:#fff; }
+    .rs .bt-improve { display:flex; flex-direction:column; gap:9px; }
+    .rs .bt-suggest { width:100%; resize:vertical; min-height:46px; padding:10px 12px; border-radius:11px; border:1px solid var(--border-strong); background:var(--surface-base); color:var(--text-primary); font:inherit; font-size:14px; }
+    .rs .bt-suggest:focus { outline:none; border-color:var(--brand-500); }
+    .rs .bt-skip { flex:0 0 auto; min-width:90px; }
+    .rs .bt-skip:hover { border-color:var(--border-strong); color:var(--text-secondary); }
+    .rs .bt-load, .rs .bt-done { font-size:13.5px; color:var(--text-secondary); padding:14px 16px; border:1px solid var(--border-default); border-radius:14px; background:var(--surface-raised); display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+    .rs .bt-card { border:1px solid color-mix(in srgb, var(--brand-500) 24%, transparent); border-radius:16px; padding:18px; background:linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 8%, var(--surface-raised)), var(--surface-raised)); }
+    .rs .bt-kind { font-family:var(--font-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--brand-400); font-weight:600; }
+    .rs .bt-text { font-size:18px; font-weight:600; line-height:1.35; margin:8px 0 16px; color:var(--text-primary); }
+    .rs .bt-row { display:flex; gap:10px; }
+    .rs .bt-btn { flex:1; display:flex; align-items:center; justify-content:center; gap:7px; padding:12px; border-radius:12px; font-weight:600; font-size:14px; cursor:pointer; border:1px solid var(--border-strong); background:var(--surface-base); color:var(--text-primary); transition:transform .12s, border-color .15s, color .15s; }
+    .rs .bt-btn:active { transform:scale(.97); }
+    .rs .bt-no:hover { border-color:#ef4444; color:#ef4444; }
+    .rs .bt-yes { background:linear-gradient(90deg, var(--brand-500), #6f93ff); color:#fff; border-color:transparent; }
+    .rs .bt-yes:hover { filter:brightness(1.06); }
+    .rs .bt-prog { font-family:var(--font-mono); font-size:11px; color:var(--text-tertiary); margin-top:12px; }
     .rs .brain-hero-body { flex:1; min-width:0; }
     .rs .brain-lvl { font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; color:var(--brand-400); margin-bottom:4px; }
     .rs .brain-voiceline { font-family:var(--font-display); font-size:30px; line-height:1; }
@@ -10197,6 +10278,13 @@
     .rs .brain-req.ok { border-color:color-mix(in srgb, var(--success-fg) 38%, transparent); color:var(--success-fg); background:color-mix(in srgb, var(--success-fg) 9%, transparent); }
     .rs .brain-req-o { font-size:11px; opacity:.7; }
     .rs .brain-why { font-size:12px; color:var(--text-tertiary); margin-top:10px; }
+    /* Fathom 18/06: insignia Pro (nivel 4+) + nota de auto-análisis 2×/semana */
+    .rs .brain-pro { display:inline-flex; align-items:center; gap:3px; margin-left:6px; padding:2px 9px; border-radius:99px; font-size:11px; font-weight:800; letter-spacing:.02em;
+      color:#7a5b00; background:linear-gradient(120deg,#ffd75e,#f2a900); border:1px solid #e0980a; box-shadow:0 1px 6px rgba(240,169,0,.35); }
+    .rs .brain-autonote { display:flex; align-items:flex-start; gap:7px; margin-top:11px; font-size:12.5px; line-height:1.5; color:var(--text-secondary);
+      border:1px solid color-mix(in srgb, var(--brand-500) 26%, transparent); background:color-mix(in srgb, var(--brand-500) 8%, transparent); border-radius:10px; padding:9px 12px; }
+    .rs .brain-autonote svg { width:15px; height:15px; flex-shrink:0; margin-top:1px; color:var(--brand-500); }
+    .rs .brain-autonote b { color:var(--text-primary); }
     /* B3: pulso del orbe al subir de nivel (recompensa que SE SIENTE) */
     .rs .brain-orb.lvlup { animation:rsLvlUp 1.4s var(--ease-out); }
     @keyframes rsLvlUp {
@@ -10241,9 +10329,15 @@
     .rs--mobile .voice-banner .btn { width:100%; }
     .rs .brain-comps { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .rs--mobile .brain-comps { grid-template-columns:1fr; }
-    .rs .brain-comp { display:flex; align-items:center; gap:11px; padding:12px 14px; border:1px solid var(--border-default); border-radius:12px; background:var(--surface-raised); }
+    .rs .brain-comp { display:flex; align-items:center; flex-wrap:wrap; gap:11px; padding:12px 14px; border:1px solid var(--border-default); border-radius:12px; background:var(--surface-raised); }
     .rs .brain-comp-h { font-size:13.5px; font-weight:600; }
     .rs .brain-comp-n { margin-left:auto; font-size:12px; color:var(--text-tertiary); }
+    /* Fathom 17/06: miniaturas de vídeos del competidor (segunda línea) */
+    .rs .comp-thumbs { display:flex; gap:7px; width:100%; margin-top:2px; }
+    .rs .comp-thumb { position:relative; flex:1 1 0; max-width:84px; aspect-ratio:9/14; border-radius:8px; overflow:hidden; background:var(--surface-overlay); border:1px solid var(--border-subtle); }
+    .rs .comp-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .comp-thumb .ct-dur { position:absolute; bottom:3px; right:3px; font-family:var(--font-mono); font-size:9px; font-weight:600; color:#fff; background:rgba(0,0,0,.6); padding:1px 4px; border-radius:4px; }
+    .rs .comp-thumb .ct-ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:16px; color:rgba(255,255,255,.85); }
     /* T3: dejar de seguir competidor. */
     .rs .brain-comp-x { flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:8px; border:1px solid transparent; background:transparent; color:var(--text-tertiary); cursor:pointer; transition:color .15s, border-color .15s, background .15s; }
     .rs .brain-comp-x:hover { color:#e0556b; border-color:color-mix(in srgb, #e0556b 45%, transparent); background:color-mix(in srgb, #e0556b 8%, transparent); }
@@ -10306,6 +10400,10 @@
     .rs .rs-legacy-bar { position:sticky; top:0; z-index:2; padding:12px 16px; background:color-mix(in srgb, var(--surface-base) 92%, transparent); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border-bottom:1px solid var(--border-subtle); }
     /* ── COMMAND BAR ── */
     .rs .cmd { position:sticky; top:0; z-index:7; display:flex; align-items:center; gap:14px; height:58px; padding:0 26px; background:color-mix(in srgb, var(--surface-base) 84%, transparent); backdrop-filter:saturate(1.3) blur(14px); -webkit-backdrop-filter:saturate(1.3) blur(14px); border-bottom:1px solid var(--border-subtle); }
+    /* Overlay de nivel del Cerebro: centrado en la barra (no a un lado) */
+    .rs .cmd-brain-center { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:1; pointer-events:none; }
+    .rs .cmd-brain-center .brain-badge { pointer-events:auto; }
+    .rs--mobile .cmd-brain-center { position:static; transform:none; }
     .rs .cmd .brand-switch { display:inline-flex; align-items:center; gap:10px; height:36px; padding:0 12px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:8px; color:var(--text-primary); font:inherit; font-family:var(--font-body); font-weight:600; font-size:14px; cursor:pointer; transition:border-color .14s var(--ease); }
     .rs .cmd .brand-switch:hover { border-color:var(--border-strong); }
     .rs .cmd .brand-static { display:inline-flex; align-items:center; gap:10px; height:36px; padding:0 12px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:8px; color:var(--text-primary); font-family:var(--font-body); font-weight:600; font-size:14px; }
@@ -10356,7 +10454,139 @@
     .rs .stat-link:focus-visible { box-shadow:inset 0 0 0 2px var(--brand-500); }
     .rs .stat-link .stat-v { font-size:24px; color:var(--brand-400); }
     /* ── FEATURE (señal destacada) ── */
+    /* Endowed progress (#2): barra de activación «X/4» en el Radar */
+    .rs .act-prog { border:1px solid color-mix(in srgb, var(--brand-500) 22%, var(--border-default)); border-radius:14px; padding:13px 16px; margin-bottom:14px; background:linear-gradient(120deg, color-mix(in srgb, var(--brand-500) 8%, var(--surface-raised)), var(--surface-raised)); }
+    .rs .act-prog-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
+    .rs .act-prog-t { font-size:13.5px; font-weight:600; color:var(--text-primary); }
+    .rs .act-prog-n { font-family:var(--font-mono); font-size:12.5px; font-weight:700; color:var(--brand-500); flex-shrink:0; }
+    .rs .act-prog-bar { height:5px; border-radius:99px; background:var(--surface-overlay); overflow:hidden; margin-bottom:11px; }
+    .rs .act-prog-fill { height:100%; border-radius:99px; background:linear-gradient(90deg, var(--brand-500), #6f93ff); transition:width .5s var(--ease-out); }
+    .rs .act-prog-steps { display:flex; flex-wrap:wrap; gap:7px; }
+    .rs .ap-chip { display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:4px 9px; border-radius:99px; border:1px solid var(--border-default); color:var(--text-secondary); background:var(--surface-raised); }
+    .rs .ap-chip svg { width:12px; height:12px; }
+    .rs .ap-chip.ok { border-color:color-mix(in srgb, var(--success-fg) 35%, transparent); color:var(--success-fg); background:color-mix(in srgb, var(--success-fg) 9%, transparent); }
+    .rs .ap-o { font-size:10px; opacity:.6; }
+    /* #2 escasez al robar (decisión interesante / empuje suave al muro) */
+    .rs .feat-scarce { display:flex; align-items:center; gap:6px; margin-top:10px; font-size:12.5px; font-weight:600; color:var(--brand-500); }
+    .rs .feat-scarce svg { width:13px; height:13px; }
+    .rs .feat-scarce b { color:var(--brand-500); }
+    .rs .feat-scarce.out { color:var(--warn-fg, #d4a017); }
+    .rs .feat-scarce.out b { color:var(--warn-fg, #d4a017); }
+    .rs .feat-scarce-btn { border:none; background:none; font:inherit; padding:0; cursor:pointer; }
+    .rs .feat-scarce-btn:hover { text-decoration:underline; }
+    /* #6 badge de nivel del Cerebro = estatus visible (vanidad + no perder progreso) */
+    .rs .brain-badge { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; cursor:pointer;
+      padding:6px 12px; border-radius:99px; color:var(--brand-500); white-space:nowrap;
+      border:1px solid color-mix(in srgb, var(--brand-500) 32%, transparent);
+      background:linear-gradient(120deg, color-mix(in srgb, var(--brand-500) 12%, transparent), transparent);
+      transition:transform .12s, border-color .15s; }
+    .rs .brain-badge svg { width:14px; height:14px; }
+    .rs .brain-badge b { color:var(--brand-600); font-weight:800; }
+    .rs .brain-badge:hover { transform:translateY(-1px); border-color:var(--brand-500); }
+    .rs .brain-badge:active { transform:translateY(0); }
+    .rs--mobile .brain-badge { font-size:11.5px; padding:5px 10px; }
+    /* #1 core-loop: badge de bombazo (recompensa variable — solo cuando es excepcional) */
+    .rs .opp-mega { display:inline-flex; align-items:center; gap:6px; margin:6px 0 2px; font-size:12px; font-weight:800; letter-spacing:.02em;
+      color:#d4530f; padding:4px 11px; border-radius:99px; width:max-content;
+      background:linear-gradient(120deg, rgba(255,122,0,.16), rgba(255,45,85,.10)); border:1px solid rgba(255,122,0,.35);
+      animation:oppMegaPulse 2s ease-in-out infinite; }
+    @keyframes oppMegaPulse { 0%,100%{ box-shadow:0 0 0 0 rgba(255,122,0,.35);} 60%{ box-shadow:0 0 0 6px rgba(255,122,0,0);} }
+    @media (prefers-reduced-motion: reduce){ .rs .opp-mega { animation:none; } }
+    [data-theme="dark"] .rs .opp-mega { color:#ffb079; }
+    /* Leaderboard (Fathom 17/06) — tú vs competidores */
+    .rs .leaderboard { border:1px solid var(--border-default); border-radius:14px; overflow:hidden; margin-bottom:18px; background:var(--surface-raised); }
+    .rs .lb-row { display:grid; grid-template-columns:26px 30px 1fr auto auto auto; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid var(--border-subtle); font-size:13.5px; }
+    .rs .lb-challenge { font-size:11.5px; font-weight:700; padding:5px 10px; border-radius:99px; cursor:pointer; white-space:nowrap;
+      border:1px solid color-mix(in srgb, var(--brand-500) 40%, transparent); background:transparent; color:var(--brand-500); transition:background .14s, transform .1s; }
+    .rs .lb-challenge:hover { background:color-mix(in srgb, var(--brand-500) 12%, transparent); transform:translateY(-1px); }
+    .rs .lb-challenge-sp { width:1px; }
+    /* Versus / retos */
+    .rs .versus-hint { font-size:12.5px; color:var(--text-secondary); padding:9px 13px; margin-bottom:14px; border-radius:11px; line-height:1.45;
+      border:1px dashed color-mix(in srgb, var(--brand-500) 35%, transparent); background:color-mix(in srgb, var(--brand-500) 5%, transparent); }
+    .rs .versus-hint b { color:var(--text-primary); }
+    .rs .versus-card { margin-bottom:16px; padding:16px 18px; border-radius:16px; color:#fff; position:relative; overflow:hidden;
+      background:linear-gradient(135deg, #2a1d3a, #3b2350 55%, #1d1822); border:1px solid #5b3f7a; box-shadow:0 6px 24px rgba(91,63,122,.35); }
+    .rs .versus-head { display:flex; align-items:center; gap:9px; font-size:13px; margin-bottom:14px; }
+    .rs .versus-ico { font-size:17px; }
+    .rs .versus-day { margin-left:4px; font-size:11.5px; opacity:.8; font-family:var(--font-mono); }
+    .rs .versus-quit { margin-left:auto; background:rgba(255,255,255,.12); border:none; color:#fff; width:26px; height:26px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .rs .versus-quit svg { width:13px; height:13px; }
+    .rs .versus-vs { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; margin-bottom:12px; }
+    .rs .versus-side { display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .rs .versus-side .ava { width:42px; height:42px; font-size:14px; }
+    .rs .versus-side .vs-h { font-size:12px; opacity:.85; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rs .versus-side .vs-n { font-family:var(--font-mono); font-size:22px; font-weight:800; letter-spacing:-.02em; }
+    .rs .versus-mid { font-size:12.5px; font-weight:800; text-align:center; padding:5px 10px; border-radius:99px; background:rgba(255,255,255,.12); white-space:nowrap; }
+    .rs .versus-mid.win { color:#7CFFB2; } .rs .versus-mid.lose { color:#ff9bb0; }
+    .rs .versus-bar { height:8px; border-radius:6px; overflow:hidden; background:rgba(255,255,255,.16); margin-bottom:11px; }
+    .rs .versus-bar i { display:block; height:100%; background:linear-gradient(90deg,#8b5cf6,#c4a0ff); transition:width .4s; }
+    .rs .versus-foot { display:flex; justify-content:space-between; align-items:center; font-size:12px; opacity:.95; }
+    .rs .versus-prize b { color:#ffd75e; }
+    .rs--mobile .lb-row { gap:7px; padding:9px 11px; } .rs--mobile .lb-challenge { padding:4px 8px; font-size:11px; }
+    .rs .lb-row:first-child { border-top:none; }
+    .rs .lb-row.me { background:linear-gradient(90deg, color-mix(in srgb, var(--brand-500) 12%, transparent), transparent); }
+    .rs .lb-pos { font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--text-tertiary); text-align:center; }
+    .rs .lb-row.me .lb-pos { color:var(--brand-500); }
+    .rs .lb-row .ava { width:30px; height:30px; font-size:11px; }
+    .rs .lb-h { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+    .rs .lb-h b { color:var(--brand-500); font-weight:700; }
+    .rs .lb-f { font-family:var(--font-mono); font-weight:700; font-size:13px; }
+    .rs .lb-g { font-family:var(--font-mono); font-size:11.5px; font-weight:700; min-width:42px; text-align:right; }
+    .rs .lb-g.up { color:var(--success-fg, #22c55e); }
+    .rs .lb-g.down { color:var(--text-tertiary); }
+    .rs .lb-goal { display:flex; align-items:center; gap:8px; padding:13px 16px; margin-bottom:14px; border-radius:14px; font-size:14px; font-weight:600; color:var(--text-primary);
+      border:1px solid color-mix(in srgb, var(--brand-500) 28%, transparent); background:linear-gradient(120deg, color-mix(in srgb, var(--brand-500) 12%, var(--surface-raised)), var(--surface-raised)); }
+    .rs .lb-goal b { color:var(--brand-500); font-weight:800; }
+    .rs .lb-momentum { display:flex; align-items:center; gap:8px; padding:10px 14px; margin-bottom:10px; border-radius:12px; font-size:13px; font-weight:600;
+      color:var(--success-fg, #22c55e); border:1px solid color-mix(in srgb, var(--success-fg, #22c55e) 30%, transparent); background:color-mix(in srgb, var(--success-fg, #22c55e) 9%, transparent); }
+    .rs .lb-momentum b { color:var(--success-fg, #22c55e); font-weight:800; }
+    .rs .lb-note { font-size:12px; color:var(--text-tertiary); margin:0 2px 18px; }
     .rs .feature { display:grid; grid-template-columns:184px 1fr 132px; border:1px solid var(--border-strong); border-radius:16px; background:var(--surface-raised); box-shadow:var(--shadow-lg); overflow:hidden; margin-bottom:14px; }
+    /* Carrusel de 2-3 oportunidades (Fathom 18/06) */
+    .rs .opp-carousel { position:relative; margin-bottom:14px; }
+    .rs .opp-track { display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth; -ms-overflow-style:none; scrollbar-width:none; }
+    .rs .opp-track::-webkit-scrollbar { display:none; }
+    .rs .opp-slide { flex:0 0 100%; scroll-snap-align:start; min-width:0; }
+    .rs .opp-slide .feature { margin-bottom:0; height:100%; }
+    .rs .opp-arrow { position:absolute; top:50%; transform:translateY(-50%); z-index:3; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;
+      background:var(--surface-raised); border:1px solid var(--border-strong); box-shadow:var(--shadow-lg); color:var(--text-strong); transition:transform .12s, border-color .15s; }
+    .rs .opp-arrow:hover { border-color:var(--brand-500); transform:translateY(-50%) scale(1.06); }
+    .rs .opp-arrow.prev { left:-6px; } .rs .opp-arrow.next { right:-6px; }
+    .rs .opp-nav-bar { display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:12px; }
+    .rs .opp-dots { display:flex; justify-content:center; gap:8px; }
+    .rs .opp-dot { width:9px; height:9px; border-radius:50%; padding:0; cursor:pointer; background:transparent; border:1.5px solid color-mix(in srgb, var(--brand-500) 55%, transparent); transition:background .15s, width .15s, border-color .15s; }
+    .rs .opp-dot:hover { border-color:var(--brand-500); }
+    .rs .opp-dot.on { width:22px; border-radius:99px; background:var(--brand-500); border-color:var(--brand-500); }
+    .rs .opp-count { font-family:var(--font-mono,ui-monospace,monospace); font-size:11px; letter-spacing:.04em; color:var(--text-tertiary); text-transform:uppercase; }
+    .rs--mobile .opp-arrow { display:none; }
+    /* Flash de 1ª compra (Fathom 18/06) */
+    .rs .flash-offer { display:flex; align-items:center; gap:16px; margin-bottom:14px; padding:14px 18px; border-radius:14px; cursor:pointer;
+      color:#fff; background:linear-gradient(120deg, #C4501A, #e0762f 55%, #8b2f0c); border:1px solid #e0884a;
+      box-shadow:0 6px 22px rgba(196,80,26,.32); position:relative; overflow:hidden; transition:transform .12s, box-shadow .15s; }
+    .rs .flash-offer:hover { transform:translateY(-1px); box-shadow:0 10px 28px rgba(196,80,26,.42); }
+    .rs .flash-offer::after { content:""; position:absolute; inset:0; background:linear-gradient(100deg, transparent 30%, rgba(255,255,255,.18) 50%, transparent 70%); transform:translateX(-120%); animation:flashShine 3.2s ease-in-out infinite; }
+    @keyframes flashShine { 0%,60%{ transform:translateX(-120%); } 100%{ transform:translateX(120%); } }
+    .rs .flash-badge { flex-shrink:0; font-family:var(--font-mono,ui-monospace,monospace); font-weight:800; font-size:20px; letter-spacing:-.02em; padding:8px 12px; border-radius:10px; background:rgba(0,0,0,.22); }
+    .rs .flash-txt { display:flex; flex-direction:column; gap:2px; min-width:0; line-height:1.3; }
+    .rs .flash-txt b { font-size:15px; } .rs .flash-txt span { font-size:12.5px; opacity:.92; } .rs .flash-txt s { opacity:.7; }
+    .rs .flash-cd-wrap { margin-left:auto; flex-shrink:0; text-align:center; }
+    .rs .flash-cd-k { display:block; font-size:9.5px; text-transform:uppercase; letter-spacing:.1em; opacity:.85; }
+    .rs .flash-cd { font-family:var(--font-mono,ui-monospace,monospace); font-weight:700; font-size:18px; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
+    .rs .flash-cta { flex-shrink:0; display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:13px; padding:9px 14px; border-radius:99px; background:#fff; color:#9a3a10; white-space:nowrap; }
+    .rs .flash-cta svg { width:15px; height:15px; }
+    .rs--mobile .flash-offer { flex-wrap:wrap; gap:10px; } .rs--mobile .flash-cd-wrap { margin-left:0; }
+    /* Sugerir competidores (Fathom 18/06) */
+    .rs .sugg-comp { display:flex; align-items:center; gap:14px; margin-bottom:14px; padding:13px 16px; border-radius:14px;
+      border:1px solid color-mix(in srgb, var(--brand-500) 30%, var(--border-default)); background:color-mix(in srgb, var(--brand-500) 6%, var(--surface-raised)); }
+    .rs .sugg-comp .ava { width:46px; height:46px; flex-shrink:0; font-size:15px; }
+    .rs .sugg-body { min-width:0; flex:1; }
+    .rs .sugg-tag { display:flex; align-items:center; gap:5px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; font-weight:700; color:var(--brand-500); margin-bottom:3px; }
+    .rs .sugg-tag svg { width:13px; height:13px; }
+    .rs .sugg-h { font-family:var(--font-display); font-size:17px; font-weight:600; display:flex; align-items:center; gap:9px; }
+    .rs .sugg-x { font-family:var(--font-mono,ui-monospace,monospace); font-size:12px; font-weight:700; color:var(--brand-600); background:color-mix(in srgb, var(--brand-500) 14%, transparent); padding:2px 8px; border-radius:99px; }
+    .rs .sugg-why { font-size:13px; color:var(--text-secondary); margin-top:3px; line-height:1.4; }
+    .rs .sugg-actions { display:flex; gap:8px; flex-shrink:0; }
+    .rs--mobile .sugg-comp { flex-wrap:wrap; } .rs--mobile .sugg-actions { width:100%; }
     .rs .feature-thumb { position:relative; } .rs .feature-thumb .thumb { width:100%; height:100%; min-height:230px; border:none; border-radius:0; border-right:1px solid var(--border-default); }
     .rs .feature-main { padding:24px 26px; min-width:0; display:flex; flex-direction:column; }
     .rs .feature-eyebrow { font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--brand-500); margin-bottom:13px; display:flex; align-items:center; gap:9px; }
@@ -11677,7 +11907,7 @@
   <section class="rsl-hero">
     <div class="rsl-wrap">
       <span class="rsl-hero-badge" data-i18n-html-en="<i class=&quot;rsl-pulse&quot; aria-hidden=&quot;true&quot;></i>The creator&#39;s operating system"><i class="rsl-pulse" aria-hidden="true"></i>El sistema operativo del creador</span>
-      <h1 id="rslHeroH1" data-i18n-html-en="Copy what <em>already works.</em>">Copia lo que <em>ya funciona.</em></h1>
+      <h1 id="rslHeroH1" data-i18n-html-en="Steal what <em>works.</em>">Roba lo que <em>funciona.</em></h1>
       <p class="rsl-hero-sub" data-i18n-html-en="While you're not looking, reels are exploding in your niche. Reelscript detects them, tells you <strong>which one deserves your next script</strong> and rewrites it <strong>in your voice</strong> — you don't copy the reel, you copy the play. What takes you <strong>2–3 hours</strong> today is one click here.">Mientras no miras, en tu nicho hay reels explotando. Reelscript los detecta, te dice <strong>cuál merece tu próximo guion</strong> y lo reescribe <strong>en tu voz</strong> — no copias el reel, copias la jugada. Lo que hoy te lleva <strong>2–3 horas</strong>, aquí es un clic.</p>
       <div class="rsl-hero-ctas">
         <button type="button" class="rsl-btn rsl-btn-primary" onclick="openAuth('register','landing_hero')" data-i18n-en="Steal your first script free">Roba tu primer guion gratis</button>
@@ -11920,8 +12150,7 @@
           <button type="button" class="rsl-btn rsl-btn-ghost" onclick="openAuth('register','landing_plan_free')" data-i18n-en="Start 3-day Pro trial">Empezar 3 días de Pro</button>
           <p class="rsl-risk">&nbsp;</p>
         </div>
-        <div class="rsl-plan rsl-hot rsl-rise">
-          <span class="rsl-pop" data-i18n-en="The one publishers pick">El de los que publican</span>
+        <div class="rsl-plan rsl-rise">
           <h3>Creator</h3>
           <p class="rsl-for" data-i18n-en="For the creator who publishes weekly and wants to sound like themselves.">Para el creador que publica cada semana y quiere sonar a él.</p>
           <p class="rsl-price" data-m="€29" data-y="€23"><span class="rsl-amt">€29</span><small data-i18n-en="/mo">/mes</small></p>
@@ -11934,10 +12163,11 @@
             <li data-i18n-en="Creative explosion (5 hooks × 5 angles × 5 ideas), series and formats">Explosión creativa (5 hooks × 5 ángulos × 5 ideas), series y formatos</li>
             <li data-i18n-en="Unlimited scripts and history">Guiones e historial ilimitados</li>
           </ul>
-          <button type="button" class="rsl-btn rsl-btn-primary" onclick="openAuth('register','landing_plan_creator')" data-i18n-en="Start with Creator">Empezar con Creator</button>
+          <button type="button" class="rsl-btn rsl-btn-ghost" onclick="openAuth('register','landing_plan_creator')" data-i18n-en="Start with Creator">Empezar con Creator</button>
           <p class="rsl-risk" data-i18n-en="Cancel in 2 clicks · your Brain stays saved">Cancela en 2 clics · tu Cerebro se queda guardado</p>
         </div>
-        <div class="rsl-plan rsl-rise">
+        <div class="rsl-plan rsl-hot rsl-rise">
+          <span class="rsl-pop" data-i18n-en="Most popular">El más elegido</span>
           <h3>Estudio</h3>
           <p class="rsl-for" data-i18n-en="For the creator who already bills and runs a few brands.">Para el creador que ya factura y lleva varias marcas.</p>
           <p class="rsl-price" data-m="€59" data-y="€47"><span class="rsl-amt">€59</span><small data-i18n-en="/mo">/mes</small></p>
@@ -11949,7 +12179,7 @@
             <li data-i18n-en="Everything in Creator + priority">Todo lo de Creator + prioridad</li>
             <li data-i18n-en="The bridge between solo and agency">El puente entre creador y agencia</li>
           </ul>
-          <button type="button" class="rsl-btn rsl-btn-ghost" onclick="openAuth('register','landing_plan_estudio')" data-i18n-en="Start with Studio">Empezar con Estudio</button>
+          <button type="button" class="rsl-btn rsl-btn-primary" onclick="openAuth('register','landing_plan_estudio')" data-i18n-en="Start with Studio">Empezar con Estudio</button>
           <p class="rsl-risk" data-i18n-en="Cancel in 2 clicks · your Brain stays saved">Cancela en 2 clics · tu Cerebro se queda guardado</p>
         </div>
         <div class="rsl-plan rsl-rise">
@@ -13548,6 +13778,11 @@
     <button class="modal-x" onclick="closeModal('topupOverlay')">✕</button>
     <h2 data-i18n="topup.title">Top up balance</h2>
     <p id="topupSubtitle"></p>
+    <!-- #5 conversión: empuje a suscripción (mejor €/crédito + sin límites) sobre el pack suelto. -->
+    <div class="topup-sub-nudge">
+      <span data-i18n-html-en="💡 With <b>Creator (€29/mo)</b> you get 200 credits and <b>unlimited</b> scripts — better value than buying one-offs.">💡 Con <b>Creador (29€/mes)</b> tienes 200 créditos y guiones <b>sin límite</b> — sale más a cuenta que comprar sueltos.</span>
+      <button type="button" onclick="closeModal('topupOverlay'); if(typeof openUpgradeModal==='function') openUpgradeModal('topup_nudge');" data-i18n-en="See plans">Ver planes</button>
+    </div>
     <!-- Packs dinámicos (GET /api/topups). Si falla o no hay packs configurados,
          se rellena con el pack legacy (1 opción · 7 usos). -->
     <div class="topup-grid" id="topupGrid" style="grid-template-columns:1fr">
@@ -13763,7 +13998,7 @@ const LANGS = {
     "comp.add_modal_sub": "Sigue a un creador para ver sus reels más recientes.",
     "comp.add_modal_btn": "Añadir",
     // v0.15.5: motor guion-desde-reel-competidor.
-    "comp.gen_script": "✨ Hazlo mío",
+    "comp.gen_script": "✨ Roba la idea",
     "comp.gen_script_loading": "Generando…",
     "comp.gen_script_analyzing": "Analizando reel… ~1 min",
     "comp.gen_script_done": "✓ Guion creado",
@@ -14265,7 +14500,7 @@ const LANGS = {
     "comp.add_modal_sub": "Follow a creator to see their recent reels.",
     "comp.add_modal_btn": "Add",
     // v0.15.5: script-from-competitor engine.
-    "comp.gen_script": "✨ Make it mine",
+    "comp.gen_script": "✨ Steal the idea",
     "comp.gen_script_loading": "Generating…",
     "comp.gen_script_analyzing": "Analyzing reel… ~1 min",
     "comp.gen_script_done": "✓ Script created",
@@ -23376,7 +23611,6 @@ const PLAN_META = {
     features: { es: ["200 créditos/mes","1 marca","Cerebro: aprende tu voz","Ideas, hooks y formatos","Métricas de Instagram","Teleprompter + grabación","Soporte por email"],
                 en: ["200 credits/mo","1 brand","Brain: learns your voice","Ideas, hooks & formats","Instagram metrics","Teleprompter + recording","Email support"] },
     stripeKeys: { month: "", year: "" },
-    featured: true,
   },
   estudio: {
     icon: "🎬", label: "Estudio",
@@ -23386,6 +23620,7 @@ const PLAN_META = {
                 en: ["400 credits/mo (double)","3 brands, each with its own brain","Everything in Creator + priority","The bridge between solo and agency"] },
     // FLAG: David crea los price IDs de Estudio en Stripe (STRIPE_PRICE_ESTUDIO_*).
     stripeKeys: { month: "", year: "" },
+    featured: true,
   },
   agency: {
     icon: "🏢", label: "Agencia",
@@ -23400,12 +23635,36 @@ const PLAN_META = {
 const PLAN_RANK = { free: 0, pro: 1, creator: 2, estudio: 3, agency: 4 };
 
 function openUpgradeModal(source) {
-  if (!st.user) { openAuth("register"); return; }
-  if (st.plan === "agency") {
+  // En demo (sin login) NO redirigimos a registro: mostramos los planes igual — los
+  // precios son client-side (PLAN_META), así que el muro sí lleva a la suscripción.
+  if (!st.user && !window.__DEMO__) { openAuth("register"); return; }
+  // En demo SIEMPRE mostramos los planes (st.plan puede venir como "agency" del estado
+  // de la demo, lo que bloquearía el modal); fuera de demo respetamos el tope real.
+  if (!window.__DEMO__ && st.plan === "agency") {
     showToast(currentLang === "es" ? "Ya tienes el plan más alto." : "You're already on the top plan.");
     return;
   }
   renderUpgradeCards();
+  // #1 conversión: copy PAS cuando el muro viene de agotar robos (problema → agita →
+  // resuelve), no un "Mejorar plan" frío. En otros orígenes, copy neutro.
+  try {
+    var um = document.querySelector(".upgrade-modal");
+    if (um) {
+      var uh = um.querySelector("h2"), up = um.querySelector("p");
+      var fromLimit = /free_limit|hazlo_mio|steal|guion|script/i.test(source || "");
+      if (uh && up) {
+        if (fromLimit) {
+          uh.textContent = currentLang === "es" ? "Tu radar tiene ideas que petan, listas para robar" : "Your radar has ideas blowing up, ready to steal";
+          up.textContent = currentLang === "es"
+            ? "Cada día que no publicas, tu competidor sí — y el algoritmo se lo premia. Desbloquea robos en tu voz, sin límite."
+            : "Every day you don't post, your competitor does — and the algorithm rewards them. Unlock steals in your voice, no limits.";
+        } else {
+          uh.textContent = currentLang === "es" ? "Mejorar plan" : "Upgrade plan";
+          up.textContent = currentLang === "es" ? "Elige el plan que mejor se adapte. Cancela cuando quieras." : "Pick the plan that fits. Cancel anytime.";
+        }
+      }
+    }
+  } catch (e) {}
   openModal("upgradeOverlay");
   try { window.track && window.track.upgradeModalOpened && window.track.upgradeModalOpened({ source: source || "unknown", plan: st.plan }); } catch(e){}
 }
@@ -23413,12 +23672,16 @@ function openUpgradeModal(source) {
 function renderUpgradeCards() {
   const grid = document.getElementById("upgradeCardsGrid");
   if (!grid) return;
-  const plan = st.plan || "free";
+  // En demo partimos de "free" para mostrar TODOS los planes (el estado demo puede
+  // traer st.plan="agency", que dejaría el modal vacío).
+  const plan = window.__DEMO__ ? "free" : (st.plan || "free");
   const cyc = billingCycle;
   const lang = currentLang;
 
-  // Show only plans strictly above the user's current tier
-  const plans = ["creator","estudio","agency"].filter(p => PLAN_RANK[p] > PLAN_RANK[plan]);
+  // Show only plans strictly above the user's current tier.
+  // #5 conversión: ANCLAJE — el más caro primero. Tras ver Agencia (129€), Creador
+  // (29€ · "Más elegido") aterriza como una ganga. Orden caro→barato.
+  const plans = ["agency","estudio","creator"].filter(p => PLAN_RANK[p] > PLAN_RANK[plan]);
 
   grid.innerHTML = plans.map(p => {
     const m = PLAN_META[p];
@@ -23794,22 +24057,62 @@ function stopLoadingRotator(handle) {
 // feature card, botón "Hazlo mío"). showTourStep hace skip si el target falta,
 // así que si una vista no monta alguno (p.ej. agencia en portfolio) se autocura.
 const _TOUR_EN = (document.documentElement.lang || "es").toLowerCase().indexOf("en") === 0;
+// Tour INTERACTIVO: en el paso de crear guión el usuario pulsa de verdad y se le
+// genera; luego le mostramos la cinta de funciones del reveal y le guiamos a cerrar,
+// de modo que al llegar a Guiones YA tiene su primer guión (endowed progress real).
+//   hold: true       → paso sin botón «Siguiente»; avanza cuando el usuario actúa.
+//   awaitEl: 'sel'   → avanza cuando ESE elemento aparece (p.ej. el guión generado).
+//   awaitGone: 'sel' → avanza cuando ESE elemento desaparece (p.ej. al cerrar el reveal).
 const TOUR_STEPS = _TOUR_EN ? [
-  { target: '.rail',                text: "This is your radar. Here you spy on your competitors: every day we bring you the reels exploding in your niche, sorted by what deserves your next script." },
-  { target: '.feature',             text: "Today's opportunity. The most explosive reel in your niche, with the why behind why it worked. You don't start from scratch: you start from what's already landing." },
-  { target: '[data-act="steal"]',   text: "Hit «Make it mine» and we rewrite it in your voice, not your competitor's. From spying to a script ready to record in one click." },
-  { target: '.searchbox',           text: "And the loop closes: every script you publish sharpens your voice. The more you create, the more the next one sounds like you. That's the moat." },
+  { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "Your Radar. Every day I bring you the reels exploding in your niche, sorted by what deserves your next script." },
+  { tab: 'dashboard', target: '.feature',                    text: "Today's opportunity: the most explosive reel in your niche, with the why behind why it worked. You don't start from scratch." },
+  { tab: 'dashboard', target: '[data-act="steal"]',          text: "Try it 👇 Hit «Steal the idea» and I'll turn it into your first script — in your voice, ready to record.", hold: true, awaitEl: '.script-hook' },
+  {                   target: '.belt',                       text: "Done! From here you multiply your script: record it, steal the next signal… and it's already saved for you automatically." },
+  {                   target: '[data-act="close-feed"]',     text: "Close it whenever you like 👆 — your script is already waiting for you in Scripts.", hold: true, awaitGone: '.script-hook' },
+  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "And here it is — your first script, saved. Everything you steal lives here, ready to record and reuse." },
+  { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Your Brain: it learns your voice. The more you create, the more the next one sounds like you. That's the moat." },
+  { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Metrics: see what's working on your account and double down. This is where the loop closes." },
 ] : [
-  { target: '.rail',                text: "Este es tu radar. Aquí espías a tus competidores: cada día te traemos los reels que están explotando en tu nicho, ordenados por lo que merece tu próximo guion." },
-  { target: '.feature',             text: "Tu oportunidad de hoy. El reel más explosivo de tu nicho, con el porqué de por qué funcionó. No empiezas de cero: empiezas de lo que ya está pegando." },
-  { target: '[data-act="steal"]',   text: "Pulsa «Hazlo mío» y lo reescribimos con tu voz, no con la del competidor. De espiar a guión listo para grabar en un clic." },
-  { target: '.searchbox',           text: "Y el loop se cierra: cada guión que publicas afina tu voz. Cuanto más creas, más tuyo sale lo siguiente. Ese es el moat." },
+  { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "Tu Radar. Cada día te traigo los reels que están explotando en tu nicho, ordenados por lo que merece tu próximo guion." },
+  { tab: 'dashboard', target: '.feature',                    text: "Tu oportunidad de hoy: el reel más explosivo de tu nicho, con el porqué de por qué funcionó. No empiezas de cero." },
+  { tab: 'dashboard', target: '[data-act="steal"]',          text: "Pruébalo 👇 Pulsa «Roba la idea» y te lo convierto en tu primer guión — en tu voz, listo para grabar.", hold: true, awaitEl: '.script-hook' },
+  {                   target: '.belt',                       text: "¡Hecho! Desde aquí multiplicas tu guión: grábalo, roba la siguiente señal… y ya se ha guardado solo, automáticamente." },
+  {                   target: '[data-act="close-feed"]',     text: "Ciérralo cuando quieras 👆 — tu guión ya te espera en Guiones.", hold: true, awaitGone: '.script-hook' },
+  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Y aquí está: tu primer guión, ya guardado. Todo lo que robas vive aquí, listo para grabar y reutilizar." },
+  { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Tu Cerebro: aprende tu voz. Cuanto más creas, más tuyo suena lo siguiente. Ese es el moat." },
+  { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Métricas: mira qué funciona en tu cuenta y dóblalo. Aquí se cierra el círculo." },
 ];
 
 let tourStep = 0;
 let tourActive = false;
 let tourOverlay = null;
 let tourTooltip = null;
+let tourSpotlight = null;
+let tourTrackRaf = 0;
+let tourHoldTimer = 0;   // poll de los pasos interactivos (hold)
+let tourHoldFocusHidden = false;   // true en cuanto el usuario pulsa el target de un paso hold
+
+function clearHoldWatch() { if (tourHoldTimer) { clearInterval(tourHoldTimer); tourHoldTimer = 0; } }
+// Pasos interactivos: en vez de «Siguiente», esperamos a que el usuario actúe.
+//  awaitEl   → avanza cuando aparece el selector (se creó el guión).
+//  awaitGone → avanza cuando desaparece (cerró el reveal).
+// Mientras la acción está en curso (el target original ya no está, p.ej. durante la
+// generación), ocultamos el foco para no estorbar la animación.
+function startHoldWatch(step) {
+  clearHoldWatch();
+  tourHoldTimer = setInterval(function () {
+    if (!tourActive) { clearHoldWatch(); return; }
+    if (step.awaitEl) {
+      if (document.querySelector(step.awaitEl)) { clearHoldWatch(); nextTourStep(); return; }
+      if (step.target && !document.querySelector(step.target)) {
+        if (tourSpotlight) tourSpotlight.style.display = "none";
+        if (tourTooltip) { tourTooltip.classList.remove("on"); tourTooltip.style.display = "none"; }
+      }
+    } else if (step.awaitGone) {
+      if (!document.querySelector(step.awaitGone)) { clearHoldWatch(); nextTourStep(); return; }
+    }
+  }, 250);
+}
 
 function startTour() {
   tourStep = 0;
@@ -23828,10 +24131,30 @@ function startTour() {
     tourTooltip.className = "tour-tooltip";
     document.body.appendChild(tourTooltip);
   }
+  if (!tourSpotlight) {
+    tourSpotlight = document.createElement("div");
+    tourSpotlight.className = "tour-spotlight";
+    document.body.appendChild(tourSpotlight);
+  }
   showTourStep();
 }
 
 function showTourStep() {
+  // Oculta el resalte anterior YA (sin lag): nada de recuadro fantasma en la vista nueva.
+  if (tourSpotlight) tourSpotlight.style.display = "none";
+  if (tourTrackRaf) { cancelAnimationFrame(tourTrackRaf); tourTrackRaf = 0; }
+  clearHoldWatch();
+  document.querySelectorAll(".tour-highlight").forEach(e => e.classList.remove("tour-highlight"));
+  const step = TOUR_STEPS[tourStep];
+  // House tour: si el paso vive en otra sección, navega allí (click en la pestaña
+  // del rail). El render del island es síncrono → con un rAF basta para resaltar.
+  if (step.tab) {
+    const railBtn = document.querySelector('[data-act="tab"][data-k="' + step.tab + '"]');
+    if (railBtn && !railBtn.classList.contains("on")) { railBtn.click(); requestAnimationFrame(renderTourStep); return; }
+  }
+  renderTourStep();
+}
+function renderTourStep() {
   const step = TOUR_STEPS[tourStep];
   const el = document.querySelector(step.target);
 
@@ -23840,8 +24163,9 @@ function showTourStep() {
 
   if (!el) { nextTourStep(); return; }
 
-  // Scroll into view & highlight
-  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Scroll INSTANTÁNEO (no smooth) → el rect es final ya, el spotlight cae en su
+  // sitio sin lag ni recuadro arrastrado.
+  el.scrollIntoView({ behavior: "auto", block: "center" });
   el.classList.add("tour-highlight");
 
   // Dots
@@ -23849,11 +24173,16 @@ function showTourStep() {
     `<div class="tour-dot ${i === tourStep ? "active" : ""}"></div>`
   ).join("");
 
+  // Pasos interactivos (hold): dejamos pasar los clics a la app (el usuario pulsa el
+  // botón real) y NO hay «Siguiente» — el tour avanza solo cuando actúa (startHoldWatch).
+  // En los demás, el overlay vuelve a capturar clics (clic fuera = saltar).
+  if (tourOverlay) tourOverlay.style.pointerEvents = step.hold ? "none" : "";
+
   // Buttons
   const skipBtn = `<button class="tour-btn tour-btn-skip" onclick="skipTour()">${_TOUR_EN ? "Skip" : "Saltar"}</button>`;
   const prevBtn = tourStep > 0 ? `<button class="tour-btn tour-btn-prev" onclick="prevTourStep()">${_TOUR_EN ? "Back" : "Atrás"}</button>` : "";
   const nextLabel = tourStep === TOUR_STEPS.length - 1 ? (_TOUR_EN ? "Done" : "Listo") : (_TOUR_EN ? "Next" : "Siguiente");
-  const nextBtn = `<button class="tour-btn tour-btn-next" onclick="nextTourStep()">${nextLabel}</button>`;
+  const nextBtn = step.hold ? "" : `<button class="tour-btn tour-btn-next" onclick="nextTourStep()">${nextLabel}</button>`;
 
   tourTooltip.innerHTML = `
     <div class="tour-handle"></div>
@@ -23866,11 +24195,46 @@ function showTourStep() {
   `;
   tourTooltip.style.display = "block";
 
-  // Animate in on mobile
-  requestAnimationFrame(() => {
+  // Arranca la espera de acción para los pasos interactivos. Además, en cuanto el
+  // usuario PULSA el target (crear / cerrar), ocultamos el foco AL INSTANTE — sin
+  // esperar al poll ni al tracking — para que no quede el recuadro flotando.
+  tourHoldFocusHidden = false;
+  if (step.hold) {
+    startHoldWatch(step);
+    if (el) el.addEventListener("click", function () {
+      tourHoldFocusHidden = true;
+      if (tourTrackRaf) { cancelAnimationFrame(tourTrackRaf); tourTrackRaf = 0; }
+      if (tourSpotlight) tourSpotlight.style.display = "none";
+      // display:none (no solo quitar .on): en escritorio .on no controla la visibilidad.
+      if (tourTooltip) { tourTooltip.classList.remove("on"); tourTooltip.style.display = "none"; }
+    }, { once: true });
+  }
+
+  // DOBLE rAF + tracking: tras 2 frames (scroll/layout asentados) el spotlight se
+  // pinta YA en su sitio y luego SIGUE al elemento frame a frame ~1s. Si el layout
+  // se mueve (avatares/thumbs async), el recuadro va PEGADO (sin transición = sin
+  // deslizar): nunca se ve "ponerse mal y moverse".
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (tourHoldFocusHidden) return;   // ya actuó: no muestres el foco
     tourTooltip.classList.add("on");
-    positionTooltip(el);
-  });
+    var t0 = performance.now();
+    (function track() {
+      if (!tourActive || tourHoldFocusHidden) { tourTrackRaf = 0; return; }   // acabó o ya actuó → no repintes el oscurecido
+      positionSpotlight(el); positionTooltip(el);
+      if (performance.now() - t0 < 1000) tourTrackRaf = requestAnimationFrame(track);
+      else tourTrackRaf = 0;
+    })();
+  }));
+}
+function positionSpotlight(el) {
+  if (!tourSpotlight) return;
+  const r = el.getBoundingClientRect();
+  const pad = 6;
+  tourSpotlight.style.top = (r.top - pad) + "px";
+  tourSpotlight.style.left = (r.left - pad) + "px";
+  tourSpotlight.style.width = (r.width + pad * 2) + "px";
+  tourSpotlight.style.height = (r.height + pad * 2) + "px";
+  tourSpotlight.style.display = "block";
 }
 
 function positionTooltip(el) {
@@ -23904,7 +24268,11 @@ function positionTooltip(el) {
 }
 
 function nextTourStep() {
-  if (tourStep >= TOUR_STEPS.length - 1) { endTour(); return; }
+  if (tourStep >= TOUR_STEPS.length - 1) {
+    // Activación (Fathom 18/06): completó el tutorial → 1er paso del funnel a "1er robo".
+    try { window.posthog && window.posthog.capture("tutorial_completed", { steps: TOUR_STEPS.length }); } catch (e) {}
+    endTour(); return;
+  }
   tourStep++;
   showTourStep();
 }
@@ -23916,14 +24284,18 @@ function prevTourStep() {
 }
 
 function skipTour() {
+  try { window.posthog && window.posthog.capture("tutorial_skipped", { at_step: tourStep + 1 }); } catch (e) {}
   endTour();
 }
 
 function endTour() {
   tourActive = false;
+  clearHoldWatch();
+  if (tourTrackRaf) { cancelAnimationFrame(tourTrackRaf); tourTrackRaf = 0; }   // mata el tracking → no deja el oscurecido pegado
   document.querySelectorAll(".tour-highlight").forEach(e => e.classList.remove("tour-highlight"));
-  if (tourOverlay) tourOverlay.style.display = "none";
+  if (tourOverlay) { tourOverlay.style.pointerEvents = ""; tourOverlay.style.display = "none"; }
   if (tourTooltip) { tourTooltip.classList.remove("on"); tourTooltip.style.display = "none"; }
+  if (tourSpotlight) tourSpotlight.style.display = "none";
   localStorage.setItem("onboarding_completed", "true");
 }
 
@@ -23933,8 +24305,11 @@ function endTour() {
 // [data-act="steal"], .searchbox). Si algún target no existe en esa vista, showTourStep
 // hace skip automático (if(!el) nextTourStep()), así que el arranque es robusto.
 window.addEventListener("DOMContentLoaded", () => {
-  if (document.body.classList.contains("workspace") && !localStorage.getItem("onboarding_completed")) {
-    setTimeout(startTour, 1500);
+  if (document.body.classList.contains("workspace") && !localStorage.getItem("onboarding_completed")
+      && !/headless/i.test(navigator.userAgent)) {   // headless (harness) → no auto-tour, no interfiere
+    // No arrancar si el onboarding v2 está en pantalla: el island lo dispara al
+    // terminar (onbStartTour). Reevaluamos a los 1500ms, ya montado el island.
+    setTimeout(() => { if (!document.querySelector(".onb-screen")) startTour(); }, 1500);
   }
 });
 
@@ -24222,7 +24597,7 @@ function renderCompetitorFeed(reels) {
           <span class="comp-reel-meta-date">${esc(dateTxt)}</span>
         </div>
         <div class="comp-reel-genscript-split">
-          <button type="button" class="comp-reel-genscript-btn" onclick="generateScriptFromReel('${rid}')" data-i18n="comp.gen_script">✨ Hazlo mío</button>
+          <button type="button" class="comp-reel-genscript-btn" onclick="generateScriptFromReel('${rid}')" data-i18n="comp.gen_script">✨ Roba la idea</button>
           <button type="button" class="comp-reel-genscript-caret" onclick="openAsstPicker('${rid}')" aria-label="${esc(PICK_LBL)}" title="${esc(PICK_LBL)}">▾</button>
           <select class="comp-reel-asst-picker" id="reel-asst-${rid}" tabindex="-1" aria-hidden="true" onchange="_onReelAsstPick('${rid}', this)">
             ${asstOptionsHTML}

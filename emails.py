@@ -761,6 +761,88 @@ def send_radar_digest(user_id, reels, day_key, next_suggestion=None):
     return {"sent": True}
 
 
+def send_train_hooks_nudge(user_id, week_key):
+    """Nudge "hoy toca entrenar tus hooks" (Fathom 18/06): empuja a votar hooks en el
+    Cerebro para afinar la voz (ahora alimenta el prompt de verdad). Idempotente por
+    (user_id, semana ISO). Devuelve dict {sent|skipped|error}."""
+    key = f"train_hooks_{week_key}"
+    db = _db()
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        db.table("email_log").insert({
+            "user_id": user_id, "template_key": key,
+            "status": "queued", "scheduled_for": now,
+        }).execute()
+    except Exception:
+        return {"skipped": "already_week"}
+
+    def _skip(reason):
+        db.table("email_log").update({
+            "status": "skipped", "error": reason, "sent_at": now
+        }).eq("user_id", user_id).eq("template_key", key).execute()
+        return {"skipped": reason}
+
+    profile = _profile(user_id)
+    email, confirmed_at = _user_email(user_id)
+    if not email:
+        return _skip("no_email")
+    if not confirmed_at:
+        return _skip("email_not_confirmed")
+    if not profile.get("email_marketing", True):
+        return _skip("marketing_opted_out")
+    if _rate_limited(user_id):
+        return _skip("rate_limited")
+
+    lang = profile.get("lang") or "es"
+    if lang not in ("es", "en"):
+        lang = "es"
+    token = profile.get("unsubscribe_token") or ""
+    unsub_url = f"{APP_URL}/unsubscribe?token={token}"
+    brain_url = f"{APP_URL}/profile/radar"
+
+    if lang == "es":
+        subject = "🧠 Hoy toca entrenar tus hooks"
+        inner_html = (
+            "<h1 style=\"margin:0 0 12px;font-size:22px;color:#111\">Afina tu voz en 2 minutos</h1>"
+            "<p style=\"margin:0 0 18px;font-size:15px;line-height:1.6;color:#333\">"
+            "Tu Cerebro aprende lo que suena a ti. Vota unos hooks (👍 / 👎) y dime "
+            "<b>cómo los dirías tú</b> — los próximos guiones saldrán más tuyos y con menos retoques.</p>"
+            + _btn(brain_url, "Entrenar mis hooks")
+        )
+        inner_text = ("Hoy toca entrenar tus hooks.\n\n"
+                      "Vota unos hooks en tu Cerebro (me gusta / no es mío) y di cómo los "
+                      f"dirías tú: los próximos guiones sonarán más a ti.\n\n{brain_url}")
+    else:
+        subject = "🧠 Time to train your hooks"
+        inner_html = (
+            "<h1 style=\"margin:0 0 12px;font-size:22px;color:#111\">Sharpen your voice in 2 minutes</h1>"
+            "<p style=\"margin:0 0 18px;font-size:15px;line-height:1.6;color:#333\">"
+            "Your Brain learns what sounds like you. Rate a few hooks (👍 / 👎) and tell me "
+            "<b>how you'd say them</b> — your next scripts come out more yours, with fewer tweaks.</p>"
+            + _btn(brain_url, "Train my hooks")
+        )
+        inner_text = ("Time to train your hooks.\n\n"
+                      "Rate a few hooks in your Brain (like / not me) and tell me how you'd "
+                      f"say them: your next scripts will sound more like you.\n\n{brain_url}")
+
+    html = _wrap_html(inner_html, unsub_url, lang)
+    text = _wrap_text(inner_text, unsub_url, lang)
+    resend_id, err = _send_via_resend(email, subject, html, text)
+    now2 = datetime.now(timezone.utc).isoformat()
+    if err:
+        db.table("email_log").update({
+            "status": "failed", "error": err, "sent_at": now2
+        }).eq("user_id", user_id).eq("template_key", key).execute()
+        track("email_failed", user_id, {"template_key": "train_hooks", "error": err})
+        return {"error": err}
+    db.table("email_log").update({
+        "status": "sent", "sent_at": now2, "resend_id": resend_id
+    }).eq("user_id", user_id).eq("template_key", key).execute()
+    track("email_sent", user_id, {"template_key": "train_hooks", "resend_id": resend_id})
+    logger.info("train_hooks nudge sent user=%s", user_id)
+    return {"sent": True}
+
+
 # ── Ola Agencia B5 · aviso mensual del informe white-label ──────────────────
 
 def send_brand_report_ready(owner_id, brand_name, project_id, n_reels, n_scripts, month_label):

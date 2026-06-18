@@ -177,7 +177,7 @@ async function main() {
     });
     return { n: prim.length, labels: prim.map(function(b){return b.textContent.trim();}) };
   })()`);
-  check("único .btn-primary sobre el fold = «Hazlo mío»", t1.n === 1 && /Hazlo mío/.test(t1.labels?.[0] || ""), JSON.stringify(t1));
+  check("único .btn-primary sobre el fold = «Roba la idea»", t1.n === 1 && /Roba la idea/.test(t1.labels?.[0] || ""), JSON.stringify(t1));
 
   /* ═══ T3: bombilla → modal → Enter «Guardar idea» (gratis) → en Guiones › Sin desarrollar ═══ */
   console.log("\n■ T3 · teclado");

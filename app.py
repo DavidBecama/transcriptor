@@ -244,15 +244,17 @@ TOPUPS = {
 PLAN_LIMITS = {p: v["monthly_uses"] or None for p, v in PLANS.items()}
 
 # ── Reverse-trial ────────────────────────────────────────────────────────────
-# Al registrarse: 3 días de Pro CAPADO sin tarjeta (trial_ends_at). Features de
-# pago desbloqueadas pero con TOPE de TRIAL_CREDIT_CAP créditos. El trial deja de
-# ser usable cuando se agota el tope O pasan los 3 días → cae a FREE mensual
-# ligero (3 análisis + 2 guiones + 1 competidor, resetea cada mes) + watermark.
-# El contador del tope = monthly_usage (lo que ya incrementan transcribe/genscript
-# durante el trial; 1 unidad = 1 crédito). NO toca los planes de pago.
-TRIAL_DAYS = 3
-TRIAL_CREDIT_CAP = 10        # tope de créditos (= acciones de pago) durante el trial
+# Al registrarse: 5 días de Pro CAPADO sin tarjeta (trial_ends_at). Features de
+# pago desbloqueadas pero con TOPE DIARIO de TRIAL_DAILY_SCRIPTS guiones/día (Fathom
+# 18/06: David quiere 5 días · 3 guiones/día para crear hábito sin quemarlo el día 1).
+# El trial deja de ser usable cuando pasan los 5 días → cae a FREE mensual ligero.
+# Tope diario = nº de scripts creados hoy (trial_scripts_today). TRIAL_CREDIT_CAP queda
+# como backstop total del trial (= 5×3). NO toca los planes de pago.
+TRIAL_DAYS = 5
+TRIAL_DAILY_SCRIPTS = 3      # tope de guiones/día durante el trial (reset diario, UTC)
+TRIAL_CREDIT_CAP = 15        # backstop total del trial (= TRIAL_DAYS × TRIAL_DAILY_SCRIPTS)
 TRIAL_PLAN = "creator"       # tier cuyos límites/feature-set ve el trial (Pro completo)
+RESCRAPE_COST_CREDITS = 10   # coste de forzar el re-scrape del propio perfil (Fathom 18/06)
 
 
 def _parse_ts(ts):
@@ -296,6 +298,26 @@ def trial_days_left(profile: dict) -> int:
     if secs <= 0:
         return 0
     return int(secs // 86400) + (1 if secs % 86400 else 0)
+
+
+def trial_scripts_today(user_id) -> int:
+    """Guiones creados HOY (UTC) por el usuario — base del tope diario del trial.
+    Sin tabla nueva: se cuenta de `scripts` por fecha (Fathom 18/06)."""
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        r = (db.table("scripts").select("id", count="exact")
+               .eq("user_id", user_id)
+               .gte("created_at", start.isoformat()).execute())
+        return r.count or 0
+    except Exception:
+        return 0
+
+
+def trial_daily_left(profile: dict) -> int:
+    """Guiones que le quedan HOY en el trial (None-equivalente: 0 si no está en trial)."""
+    if not in_trial(profile):
+        return 0
+    return max(0, TRIAL_DAILY_SCRIPTS - trial_scripts_today(profile.get("id")))
 
 
 def effective_plan(profile: dict) -> str:
@@ -1153,6 +1175,9 @@ def auth_me():
         "trial_days_left": trial_days_left(profile),
         "trial_credit_cap": TRIAL_CREDIT_CAP,
         "trial_credits_left": trial_credits_left(profile) if in_trial(profile) else 0,
+        # Fathom 18/06: tope diario del trial (3 guiones/día). El front lo muestra "N hoy".
+        "trial_daily_cap": TRIAL_DAILY_SCRIPTS,
+        "trial_daily_left": trial_daily_left(profile),
         "effective_plan": effective_plan(profile),
         # watermark en exports: solo free post-trial (ni pago ni trial).
         "watermark": not paid_features_active(profile, user),
@@ -2535,6 +2560,33 @@ def voice_prompt_block(vp) -> str:
     return "\n".join(parts)
 
 
+def brain_voice_block(user_id, brand_id=None) -> str:
+    """Señal del Brain «Entrenar» (Fathom 18/06): hooks que el creador marcó 👍/👎 y
+    sus sugerencias ('cómo lo diría él'). Pesa el gusto REAL por encima de lo genérico.
+    Tolera que la tabla brain_ratings no exista todavía (devuelve '')."""
+    if not user_id:
+        return ""
+    try:
+        q = (db.table("brain_ratings")
+               .select("content,rating,suggestion")
+               .eq("user_id", user_id))
+        if brand_id is not None:
+            q = q.eq("brand_id", brand_id or "")
+        rows = (q.order("created_at", desc=True).limit(40).execute().data) or []
+    except Exception:
+        return ""
+    liked    = [r["content"] for r in rows if (r.get("rating") or 0) > 0 and r.get("content")][:6]
+    disliked = [r["content"] for r in rows if (r.get("rating") or 0) < 0 and r.get("content")][:4]
+    sugg     = [r["suggestion"] for r in rows if r.get("suggestion")][:4]
+    if not (liked or disliked or sugg):
+        return ""
+    parts = ["\n\n=== GUSTO DEL CREADOR (Brain «Entrenar» — pesa más que lo genérico) ==="]
+    if liked:    parts.append("Hooks que le GUSTAN (imita su tono y estructura): " + " · ".join(liked))
+    if disliked: parts.append("Hooks que RECHAZÓ (no van con él, evítalos): " + " · ".join(disliked))
+    if sugg:     parts.append("Cómo lo diría ÉL (aplica estas correcciones suyas): " + " · ".join(sugg))
+    return "\n".join(parts)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  LOOP DE MEDICIÓN (C) — el lock-in: reel publicado → guión que lo originó →
 #  ¿superó tu media? → realimenta el VoiceProfile (B). El modelo de voz mejora
@@ -2806,6 +2858,7 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
         neg = underperformers_signal(user_id)                 # evita lo que te hunde
         if neg:
             ctx += "\n\nEVITA (no te ha funcionado): " + neg
+        ctx += brain_voice_block(user_id)                     # gusto del Brain «Entrenar» (👍/👎 + sugerencias)
     if ctx:
         system = (system + ctx +
                   "\n\nIMPORTANTE: lo anterior es CONTEXTO de estilo. Responde SOLO con el "
@@ -7053,6 +7106,323 @@ def niche_trending_reels():
                     "subniche_suggestions": _subniche_suggestions(niche)}), 200
 
 
+@app.route("/api/onboarding/aha-script", methods=["POST"])
+@require_auth
+@limiter.limit("12 per hour;40 per day")
+def onboarding_aha_script():
+    """Onboarding aha (Fathom): genera el PRIMER guion del usuario a partir de un
+    reel del seed/reciclaje de su subnicho, en su voz. GRATIS y sin requerir que
+    el creador esté tracked (el reel viene de la librería de reciclaje, no de un
+    competidor seguido). Es un teaser de activación: NO cobra créditos ni persiste
+    el guion. Reusa adapt_with_ai (mismo generador que «Hazlo mío»)."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    caption = (body.get("caption") or "").strip()[:600]
+    handle = (body.get("handle") or "").strip().lstrip("@")[:40]
+    niche = (body.get("niche") or "").strip()[:80]
+    subs = body.get("subniches") or []
+    if isinstance(subs, list):
+        subs = ", ".join(s.strip()[:40] for s in (str(x) for x in subs[:5]) if s.strip())
+    else:
+        subs = str(subs)[:120]
+    out_lang = (body.get("language") or "es").lower()[:2]
+    if not caption:
+        return jsonify({"error": "missing_caption"}), 400
+
+    niche_ctx = niche + ((" · " + subs) if subs else "")
+    user_content = (
+        f"Un reel está EXPLOTANDO ahora mismo en el nicho «{niche_ctx or 'creadores'}»"
+        + (f" (de @{handle})" if handle else "") + ".\n"
+        f'Idea/caption del reel: "{caption}"\n\n'
+        "Reescríbelo como el PRIMER guion de un creador de ese nicho: mismo ángulo "
+        "ganador, pero en su voz, listo para grabar. Responde en "
+        + ("español." if out_lang == "es" else "inglés.")
+    )
+    try:
+        result = adapt_with_ai(user_content, "viral",
+                               voice=get_voice_profile(uid), user_id=uid)
+    except Exception:
+        logger.exception("aha_script failed user=%s", uid)
+        # El front cae a su respaldo plantillado: nunca rompemos el aha.
+        return jsonify({"error": "generation_failed"}), 200
+
+    script = {
+        "hook": (result.get("hook") or "").strip(),
+        "beats": [str(b) for b in (result.get("body") or []) if str(b).strip()],
+        "close": (result.get("closing") or "").strip(),
+    }
+    try:
+        track_event("onboarding_aha_generated", uid, {"niche": niche})
+    except Exception:
+        pass
+    return jsonify({"script": script}), 200
+
+
+@app.route("/api/brain/training-cards", methods=["GET"])
+@require_auth
+@limiter.limit("20 per hour")
+def brain_training_cards():
+    """Brain «Entrenar» (lever de INVERSIÓN, Fathom): genera hooks variados del nicho
+    del usuario para que los valore (👍/👎). Cada voto refina su gusto. GRATIS."""
+    user = current_user()
+    uid = user["id"]
+    profile = get_profile(uid)
+    niche = (request.args.get("niche") or profile.get("niche") or "").strip()[:80]
+    lang = (request.args.get("language") or profile.get("lang") or "es").lower()[:2]
+    system = (
+        "Eres guionista de reels. Generas HOOKS (1-2 líneas que paran el scroll) para "
+        "que un creador los valore (me gusta / no me gusta) y aprendamos su gusto. "
+        "Devuelves SOLO JSON válido, sin markdown."
+    )
+    user_content = (
+        f"Nicho del creador: {niche or 'creadores de contenido'}.\n"
+        "Genera 6 hooks variados, cada uno con un ángulo distinto (polémico, curiosidad, "
+        "error común, resultado, promesa, contraintuitivo), en "
+        + ("español" if lang == "es" else "inglés") + ".\n"
+        'Forma EXACTA: {"cards":[{"kind":"ángulo en 1 palabra","text":"el hook"}]}'
+    )
+    cards = []
+    try:
+        raw = _call_llm(system, user_content, temperature=0.9, max_tokens=900)
+        t = (raw or "").strip()
+        if t.startswith("```"):
+            t = re.sub(r"^```(?:json)?\s*", "", t); t = re.sub(r"\s*```$", "", t)
+        try:
+            data = json.loads(t)
+        except json.JSONDecodeError:
+            m = re.search(r"\{[\s\S]*\}", t); data = json.loads(m.group()) if m else {}
+        for c in (data.get("cards") or [])[:8]:
+            if not isinstance(c, dict):
+                continue
+            tx = (c.get("text") or "").strip()
+            if tx:
+                cards.append({"kind": (c.get("kind") or "hook").strip()[:24], "text": tx[:240]})
+    except Exception:
+        logger.exception("brain_training_cards failed uid=%s", uid)
+        cards = []
+    return jsonify({"cards": cards}), 200
+
+
+@app.route("/api/brain/rate", methods=["POST"])
+@require_auth
+@limiter.limit("180 per hour")
+def brain_rate():
+    """Guarda el voto del Brain «Entrenar» en la tabla brain_ratings (afina la voz)
+    + evento PostHog. Los 👍 y las sugerencias ('¿cómo lo dirías tú?') se realimentan
+    en el prompt de generación (ver brain_voice_block)."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    like = body.get("rating") in (1, "1", True, "true")
+    rating = 1 if like else -1
+    # `type` = modo del día (hooks/guiones); `kind` del front es el ángulo de la tarjeta.
+    mode = (body.get("type") or body.get("kind") or "hook").strip().lower()
+    kind = "guion" if mode.startswith("gui") else "hook"
+    text = (body.get("text") or "").strip()[:1000]
+    suggestion = (body.get("suggestion") or "").strip()[:1000]
+    brand_id = (body.get("brand_id") or "").strip()[:64]
+    if not text:
+        return jsonify({"error": "missing_text"}), 400
+    try:
+        db.table("brain_ratings").insert({
+            "user_id": uid, "brand_id": brand_id, "kind": kind,
+            "content": text, "rating": rating,
+            "suggestion": suggestion or None, "source": "nicho",
+        }).execute()
+    except Exception:
+        logger.exception("brain_rate insert failed uid=%s", uid)
+    try:
+        track_event("brain_rating", uid, {"rating": rating, "kind": kind, "text": text[:120]})
+    except Exception:
+        pass
+    return jsonify({"ok": True}), 200
+
+
+@app.route("/api/brain/rescrape", methods=["POST"])
+@require_auth
+@limiter.limit("10 per hour")
+def brain_rescrape():
+    """Fuerza un re-scrape del PERFIL del usuario (adelanta el análisis automático
+    2×/sem) para detectar reels recién publicados → sube el nivel del Cerebro.
+    Cuesta créditos (Fathom 18/06: 'si quieres más scrapeos, gasta crédito').
+    Reusa scrape_creator_task; cobra del mismo pool que la pill (mensual + topups)."""
+    user = current_user()
+    uid = user["id"]
+    profile = get_profile(uid)
+    n = RESCRAPE_COST_CREDITS
+
+    # Handle propio del usuario (ig_profiles). Sin él no hay nada que scrapear.
+    try:
+        ig_r = db.table("ig_profiles").select("ig_username").eq("user_id", uid).limit(1).execute()
+        ig_username = ((ig_r.data or [{}])[0].get("ig_username") or "").strip().lstrip("@")
+    except Exception:
+        ig_username = ""
+    if not ig_username:
+        return jsonify({"error": "no_handle",
+                        "message": "Conecta tu Instagram primero para analizar tu perfil."}), 400
+
+    # Cobro: del mismo pool que credits_available (mensual del plan + topups). 402 si no llega.
+    plan = profile.get("plan", "free")
+    limit = PLAN_LIMITS.get(plan)
+    # "unlimited" SOLO para planes de pago sin tope (no para free-en-trial, cuyo limit
+    # también es None → si no, el free se saltaría el cobro).
+    unlimited = paid_features_active(profile, user) and limit is None and plan != "free"
+    if not unlimited:
+        monthly_rem = max(0, limit - (profile.get("monthly_usage", 0) or 0)) if limit else 0
+        topup_credits = (profile.get("credits_cents", 0) or 0) // COST_CENTS
+        if monthly_rem + topup_credits < n:
+            track_event("paywall_shown", uid, {"wall": "rescrape_no_credits"})
+            return jsonify({"error": "no_credits",
+                            "message": f"Necesitas {n} créditos para forzar el análisis de tu perfil."}), 402
+
+    # Resuelve/crea el creador global del propio usuario.
+    try:
+        ins = (db.table("creators_global")
+                 .upsert({"ig_username": ig_username}, on_conflict="ig_username").execute())
+        creator_row = (ins.data or [None])[0]
+        if not creator_row:
+            creator_row = (db.table("creators_global").select("id")
+                             .eq("ig_username", ig_username).single().execute()).data
+        creator_id = creator_row["id"]
+    except Exception:
+        logger.exception("brain_rescrape: upsert creators_global failed uid=%s", uid)
+        return jsonify({"error": "internal"}), 500
+
+    # Cobra (primero mensual, luego topups) — mismo orden que credits_available.
+    if not unlimited:
+        from_monthly = min(n, monthly_rem)
+        from_topup = n - from_monthly
+        updates = {}
+        if from_monthly:
+            updates["monthly_usage"] = (profile.get("monthly_usage", 0) or 0) + from_monthly
+        if from_topup:
+            updates["credits_cents"] = (profile.get("credits_cents", 0) or 0) - from_topup * COST_CENTS
+        try:
+            if updates:
+                db.table("profiles").update(updates).eq("id", uid).execute()
+        except Exception:
+            logger.exception("brain_rescrape: charge failed uid=%s", uid)
+            return jsonify({"error": "internal"}), 500
+
+    # Encola el scrape del perfil propio. Si falla, refund.
+    try:
+        from tasks import scrape_creator_task  # noqa: E402
+        scrape_creator_task.delay(creator_id)
+    except Exception:
+        logger.exception("brain_rescrape: enqueue failed uid=%s", uid)
+        if not unlimited:
+            try:
+                fresh = get_profile(uid)
+                refund = {}
+                if from_monthly:
+                    refund["monthly_usage"] = max(0, (fresh.get("monthly_usage", 0) or 0) - from_monthly)
+                if from_topup:
+                    refund["credits_cents"] = (fresh.get("credits_cents", 0) or 0) + from_topup * COST_CENTS
+                if refund:
+                    db.table("profiles").update(refund).eq("id", uid).execute()
+            except Exception:
+                logger.exception("brain_rescrape: refund failed uid=%s", uid)
+        return jsonify({"error": "enqueue_failed",
+                        "message": "No pude encolar el análisis. Inténtalo en un momento."}), 503
+
+    track_event("brain_rescrape", uid, {"handle": ig_username, "cost_credits": (0 if unlimited else n)})
+    fresh = get_profile(uid)
+    return jsonify({"ok": True, "credits": credits_available(fresh),
+                    "message": "Análisis de tu perfil encolado — tu nivel sube en cuanto termine."}), 200
+
+
+@app.route("/api/suggested-competitor", methods=["GET"])
+@require_auth
+@limiter.limit("60 per hour")
+def suggested_competitor():
+    """Sugerir competidores (Fathom 18/06): un creador del nicho que el usuario NO sigue
+    aún y está en alza. Heurística por CO-OCURRENCIA (quien sigue a tus competidores
+    también sigue a estos) → niche-relevante sin tag explícito. Acompaña el mejor
+    candidato de un reel reciente que petó. La UI ya existe (suggestedComp)."""
+    user = current_user()
+    uid = user["id"]
+    # 1. Mis competidores.
+    try:
+        mine_r = (db.table("user_tracked_creators").select("creator_id")
+                    .eq("user_id", uid).is_("archived_at", "null").execute())
+        mine = {r["creator_id"] for r in (mine_r.data or []) if r.get("creator_id")}
+    except Exception:
+        mine = set()
+    if not mine:
+        return jsonify({"suggestion": None}), 200
+    # 2. Peers que siguen a alguno de mis competidores.
+    peer_ids = set()
+    mine_list = list(mine)
+    for i in range(0, len(mine_list), 100):
+        try:
+            pr = (db.table("user_tracked_creators").select("user_id")
+                    .in_("creator_id", mine_list[i:i + 100]).is_("archived_at", "null")
+                    .neq("user_id", uid).limit(3000).execute())
+            peer_ids.update(r["user_id"] for r in (pr.data or []) if r.get("user_id"))
+        except Exception:
+            pass
+    # 3. Creadores que esos peers siguen y yo NO → co-ocurrencia.
+    counts = {}
+    peer_list = list(peer_ids)
+    for i in range(0, len(peer_list), 100):
+        try:
+            cr = (db.table("user_tracked_creators").select("creator_id")
+                    .in_("user_id", peer_list[i:i + 100]).is_("archived_at", "null")
+                    .limit(5000).execute())
+            for r in (cr.data or []):
+                cid = r.get("creator_id")
+                if cid and cid not in mine:
+                    counts[cid] = counts.get(cid, 0) + 1
+        except Exception:
+            pass
+    if not counts:
+        return jsonify({"suggestion": None}), 200
+    ranked = sorted(counts.items(), key=lambda kv: -kv[1])[:8]
+    cand_ids = [c for c, _ in ranked]
+    # 4. Mejor reel reciente (explosión) de los candidatos.
+    baselines = _creator_view_baselines(cand_ids)
+    try:
+        reels = (db.table("creator_reels_global")
+                   .select("creator_id, views, posted_at")
+                   .in_("creator_id", cand_ids).eq("is_archived", False)
+                   .order("posted_at", desc=True).limit(240).execute()).data or []
+    except Exception:
+        reels = []
+    best = {}
+    for r in reels:
+        cid = r.get("creator_id"); v = int(r.get("views") or 0)
+        exp = _explosion_score(v, baselines.get(cid))
+        score = exp if exp is not None else 0
+        if cid and (cid not in best or score > best[cid]["score"]):
+            best[cid] = {"views": v, "exp": exp, "score": score}
+    chosen = None
+    for cid, cooc in ranked:
+        info = best.get(cid)
+        if info and info["views"] > 0:
+            chosen = (cid, cooc, info); break
+    if not chosen:
+        cid, cooc = ranked[0]; chosen = (cid, cooc, best.get(cid) or {})
+    cid, cooc, info = chosen
+    try:
+        cg = db.table("creators_global").select("ig_username").eq("id", cid).single().execute()
+        handle = ((cg.data or {}).get("ig_username") or "").lstrip("@")
+    except Exception:
+        handle = ""
+    if not handle:
+        return jsonify({"suggestion": None}), 200
+    exp = info.get("exp"); views = info.get("views") or 0
+    if exp and exp >= 2:
+        why = f"se pegó un reel de {_fmt_views(views)} (×{exp:g} su media)"; xtag = f"×{exp:g}"
+    elif views:
+        why = f"tiene un reel reciente de {_fmt_views(views)}"; xtag = _fmt_views(views)
+    else:
+        why = "está creciendo en tu nicho"; xtag = "en alza"
+    return jsonify({"suggestion": {
+        "handle": handle, "why": why, "x": xtag, "tag": "Lo siguen en tu nicho",
+    }}), 200
+
+
 @app.route("/api/onboarding/complete", methods=["POST"])
 @require_auth
 @limiter.limit("10 per hour;30 per day")
@@ -7440,6 +7810,15 @@ def generate_script_from_competitor_reel(reel_id: str):
         logger.warning("generate_script: dup check failed user=%s reel=%s err=%s",
                        uid, reel_id, e)
 
+    # Trial (Fathom 18/06): 5 días de Pro pero TOPE DIARIO de 3 guiones. Muro suave
+    # "vuelve mañana" — empuja al hábito y, al 4º, a desbloquear. Antes de la cuota.
+    if in_trial(profile) and trial_scripts_today(uid) >= TRIAL_DAILY_SCRIPTS:
+        track_event("paywall_shown", uid, {"wall": "trial_daily", "plan": plan})
+        return jsonify({
+            "error": "trial_daily_limit",
+            "message": f"Has hecho tus {TRIAL_DAILY_SCRIPTS} guiones de hoy. Vuelve mañana — o desbloquea sin límite."
+        }), 402
+
     # 1-2. Quién puede generar y cómo se paga este guion (sin cobrar todavía).
     #   paid  → cuenta contra su asignación mensual (monthly_usage).
     #   free  → 2 guiones/mes (reverse-trial) → luego topups (credits_cents) → muro.
@@ -7481,6 +7860,16 @@ def generate_script_from_competitor_reel(reel_id: str):
     creator = reel["creator"]
     creator_id = creator["id"]
     ig_username = creator.get("ig_username") or ""
+
+    # Activación (Fathom 18/06): funnel tutorial → 1er robo. Marca cada robo y, si es
+    # el PRIMERO del usuario, el evento "activated" (la métrica norte de la activación).
+    try:
+        _n = (db.table("scripts").select("id", count="exact").eq("user_id", uid).execute()).count or 0
+        track_event("reel_steal", uid, {"reel_id": reel_id, "nth": _n + 1})
+        if _n == 0:
+            track_event("activated", uid, {"first_steal_reel": reel_id, "creator": ig_username})
+    except Exception:
+        pass
 
     own_r = (db.table("user_tracked_creators")
                .select("id")
