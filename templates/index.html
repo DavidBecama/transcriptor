@@ -23185,6 +23185,18 @@ function paddlePrice(cfg, plan, cycle, cur) {
   try { return cfg.paddle.prices[plan][cycle === "year" ? "YEAR" : "MONTH"][(cur || "eur").toUpperCase()]; }
   catch (e) { return ""; }
 }
+// Whop: checkout por link con el user_id en metadata (→ webhook membership.metadata).
+function whopPlanId(cfg, plan, cycle, cur) {
+  try { return cfg.whop.plans[plan][cycle === "year" ? "YEAR" : "MONTH"][(cur || "eur").toUpperCase()]; }
+  catch (e) { return ""; }
+}
+function whopCheckout(planId) {
+  if (!planId) { showToast(currentLang === "es" ? "Plan no configurado" : "Plan not configured"); return; }
+  const cfg = _billingCfg || {};
+  const base = (cfg.whop && cfg.whop.checkout_base) || "https://whop.com/checkout";
+  const uid = (st.user && st.user.id) || "";
+  window.location.href = base + "/" + planId + "?metadata[user_id]=" + encodeURIComponent(uid);
+}
 
 async function submitTopup() {
   const btn = document.getElementById("btnTopupOk");
@@ -23196,6 +23208,12 @@ async function submitTopup() {
     if (!topupKey) { err.textContent = currentLang === "es" ? "Elige un pack de créditos." : "Pick a credit pack."; err.classList.add("on"); return; }
     const pid = (((cfg.paddle.prices.topup || {})[topupKey]) || {})[(CUR || "eur").toUpperCase()];
     return paddleCheckoutOpen(pid);
+  }
+  if (cfg.provider === "whop") {
+    btn.disabled = false; btn.textContent = t("topup.go");
+    if (!topupKey) { err.textContent = currentLang === "es" ? "Elige un pack de créditos." : "Pick a credit pack."; err.classList.add("on"); return; }
+    const pid = (((cfg.whop.plans.topup || {})[topupKey]) || {})[(CUR || "eur").toUpperCase()];
+    return whopCheckout(pid);
   }
   // ── Stripe (dormido salvo provider==='stripe') ──
   // Si hay un pack elegido manda {topup_key}; el server resuelve precio/créditos
@@ -23229,6 +23247,10 @@ async function subscribePlanFromCard(planKey) {
   if (cfg.provider === "paddle") {
     // Paddle: checkout client-side con el priceId resuelto por plan/ciclo/moneda.
     return paddleCheckoutOpen(paddlePrice(cfg, planKey, billingCycle, CUR));
+  }
+  if (cfg.provider === "whop") {
+    // Whop: redirige al checkout link del plan con user_id en metadata.
+    return whopCheckout(whopPlanId(cfg, planKey, billingCycle, CUR));
   }
   // ── Stripe (dormido): el cliente manda {plan, cycle} y el server resuelve el
   // price IID desde env (STRIPE_PRICE_*). ──

@@ -348,8 +348,10 @@ PADDLE_API_BASE = "https://sandbox-api.paddle.com" if "sand" in PADDLE_ENV else 
 
 
 def payment_provider() -> str:
-    """Proveedor de pago activo: 'paddle' o 'stripe' (default)."""
-    return "paddle" if PAYMENT_PROVIDER == "paddle" else "stripe"
+    """Proveedor de pago activo: 'paddle' | 'whop' | 'stripe' (default)."""
+    if PAYMENT_PROVIDER in ("paddle", "whop"):
+        return PAYMENT_PROVIDER
+    return "stripe"
 
 
 # Suscripción: PADDLE_PRICE_<PLAN>_<CICLO>_<MONEDA>. Una price por (plan,ciclo,moneda)
@@ -391,6 +393,43 @@ for _plan, _cycles in PADDLE_PRICES.items():
 for _cur, _pid in PADDLE_PRICE_ADDON_BRAND.items():
     if _pid:
         PADDLE_PRICE_TO_PLAN[_pid] = {"plan": "brand_addon", "interval": "month"}
+
+# ── Whop (v0.23) — tercera pasarela detrás del flag (stripe|paddle|whop) ───────
+# Mismo modelo de planes/créditos que Paddle/Stripe; solo cambia la fuente del
+# evento. Catálogo creado en la cuenta aprobada; los plan IDs se leen por la API
+# (no se hardcodean) y viven en .env como WHOP_PLAN_*/WHOP_TOPUP_*.
+WHOP_API_KEY = os.environ.get("WHOP_API_KEY", "")
+WHOP_WEBHOOK_SECRET = os.environ.get("WHOP_WEBHOOK_SECRET", "")  # se rellena al crear el webhook
+WHOP_API_BASE = "https://api.whop.com"
+WHOP_CHECKOUT_BASE = "https://whop.com/checkout"  # checkout link por plan_id
+
+WHOP_PLANS = {
+    plan: {
+        cycle: {cur: _pp(f"WHOP_PLAN_{plan.upper()}_{cycle.upper()}_{cur}") for cur in ("EUR", "USD")}
+        for cycle in ("MONTH", "YEAR")
+    }
+    for plan in ("creator", "estudio", "agency")
+}
+WHOP_PLAN_ADDON_BRAND = {
+    "EUR": _pp("WHOP_PLAN_ADDON_BRAND_EUR"),
+    "USD": _pp("WHOP_PLAN_ADDON_BRAND_USD"),
+}
+WHOP_TOPUP_PLANS = {}      # plan_id → créditos
+for _n, _cr in (("100", 100), ("300", 300), ("1000", 1000)):
+    for _cur in ("EUR", "USD"):
+        _pid = _pp(f"WHOP_TOPUP_{_n}_{_cur}")
+        if _pid:
+            WHOP_TOPUP_PLANS[_pid] = _cr
+# plan_id → (plan, intervalo) para el webhook.
+WHOP_PLAN_TO_PLAN = {}
+for _plan, _cycles in WHOP_PLANS.items():
+    for _cycle, _curs in _cycles.items():
+        for _cur, _pid in _curs.items():
+            if _pid:
+                WHOP_PLAN_TO_PLAN[_pid] = {"plan": _plan, "interval": _cycle.lower()}
+for _cur, _pid in WHOP_PLAN_ADDON_BRAND.items():
+    if _pid:
+        WHOP_PLAN_TO_PLAN[_pid] = {"plan": "brand_addon", "interval": "month"}
 
 db: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -2088,6 +2127,23 @@ def billing_config():
                 },
             },
         }
+    elif prov == "whop":
+        # Whop: checkout por plan_id (link https://whop.com/checkout/<plan_id>).
+        # Los plan IDs son públicos; el front construye el link con metadata user_id.
+        out["whop"] = {
+            "checkout_base": WHOP_CHECKOUT_BASE,
+            "plans": {
+                "creator": WHOP_PLANS["creator"],
+                "estudio": WHOP_PLANS["estudio"],
+                "agency": WHOP_PLANS["agency"],
+                "addon_brand": WHOP_PLAN_ADDON_BRAND,
+                "topup": {
+                    "100": {"EUR": _pp("WHOP_TOPUP_100_EUR"), "USD": _pp("WHOP_TOPUP_100_USD")},
+                    "300": {"EUR": _pp("WHOP_TOPUP_300_EUR"), "USD": _pp("WHOP_TOPUP_300_USD")},
+                    "1000": {"EUR": _pp("WHOP_TOPUP_1000_EUR"), "USD": _pp("WHOP_TOPUP_1000_USD")},
+                },
+            },
+        }
     return jsonify(out)
 
 
@@ -2198,6 +2254,133 @@ def paddle_webhook():
     except Exception:
         logger.exception("[paddle] error procesando %s (%s)", etype, event_id)
         # 200: el evento ya quedó marcado como visto; reprocesar no lo arreglaría.
+        return "", 200
+
+    return "", 200
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WHOP — checkout por link (con metadata user_id) + webhook. Activo si
+# PAYMENT_PROVIDER=whop. Mismo modelo de planes/créditos que Paddle/Stripe.
+# ══════════════════════════════════════════════════════════════════════════════
+def _whop_verify_signature(raw: bytes, headers) -> bool:
+    """Verifica la firma del webhook de Whop (HMAC-SHA256 con WHOP_WEBHOOK_SECRET).
+    Whop varía el formato según versión; aceptamos los habituales:
+      - hex crudo (con/sin prefijo 'sha256=') sobre el body
+      - estilo 't=<ts>,v1=<hex>' (HMAC sobre '<ts>.<body>')
+    El esquema exacto se confirma con el primer evento real (David crea el webhook)."""
+    import hmac
+    import hashlib
+    if not WHOP_WEBHOOK_SECRET:
+        return False
+    sig = (headers.get("X-Whop-Signature") or headers.get("Whop-Signature")
+           or headers.get("X-Whop-Webhook-Signature") or "")
+    if not sig:
+        return False
+    sec = WHOP_WEBHOOK_SECRET.encode()
+    body_hex = hmac.new(sec, raw, hashlib.sha256).hexdigest()
+    cand = sig.strip()
+    # formato simple: posible prefijo 'sha256='
+    simple = cand.split("=", 1)[1].strip() if cand.startswith("sha256=") else cand
+    if hmac.compare_digest(simple, body_hex):
+        return True
+    # formato 't=..,v1=..' (HMAC sobre ts.body)
+    try:
+        parts = dict(p.split("=", 1) for p in cand.replace(" ", "").split(",") if "=" in p)
+        ts, v1 = parts.get("t"), parts.get("v1")
+        if ts and v1:
+            tb = hmac.new(sec, ts.encode() + b"." + raw, hashlib.sha256).hexdigest()
+            if hmac.compare_digest(v1, tb):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _whop_event_seen(key: str) -> bool:
+    """Idempotencia por id de evento/entrega (Redis, TTL 7d). True = ya visto."""
+    if not key or rds is None:
+        return False
+    try:
+        return not bool(rds.set("whop:evt:" + key, "1", nx=True, ex=604800))
+    except Exception:
+        return False
+
+
+@app.route("/webhooks/whop", methods=["POST"])
+@limiter.exempt
+def whop_webhook():
+    """Webhook de Whop. Verifica firma, deduplica, y mapea a profiles.plan/créditos.
+      membership.went_valid → plan + créditos · went_invalid/canceled → free
+      payment.succeeded → topup suma créditos / renovación resetea pool."""
+    if not WHOP_WEBHOOK_SECRET:
+        logger.info("[whop] webhook recibido pero WHOP_WEBHOOK_SECRET no está configurado")
+        return "", 200
+    raw = request.get_data()
+    if not _whop_verify_signature(raw, request.headers):
+        logger.warning("[whop] firma inválida desde %s (sig hdr=%s)", get_client_ip(),
+                       bool(request.headers.get("X-Whop-Signature") or request.headers.get("Whop-Signature")))
+        return jsonify({"error": "invalid signature"}), 400
+    try:
+        event = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return jsonify({"error": "invalid payload"}), 400
+
+    action = event.get("action") or event.get("event") or event.get("type") or ""
+    data = event.get("data") or {}
+    plan_id = data.get("plan") or data.get("plan_id")
+    md = data.get("metadata") or {}
+    uid = md.get("user_id") if isinstance(md, dict) else None
+    # id de idempotencia: cabecera de entrega si la hay, si no action+id(+status)
+    deliv = request.headers.get("X-Whop-Webhook-Id") or request.headers.get("Whop-Webhook-Id")
+    ev_key = deliv or f"{action}:{data.get('id')}:{data.get('status','')}"
+    if _whop_event_seen(ev_key):
+        logger.info("[whop] evento %s ya procesado → skip", ev_key)
+        return "", 200
+
+    mapped = WHOP_PLAN_TO_PLAN.get(plan_id or "")
+    try:
+        if action in ("membership.went_valid", "membership_went_valid", "membership.created"):
+            if not uid:
+                logger.warning("[whop] %s sin metadata.user_id (plan=%s)", action, plan_id)
+                return "", 200
+            if mapped and mapped["plan"] == "brand_addon":
+                prof = db.table("profiles").select("extra_brand_slots").eq("id", uid).single().execute()
+                cur = int((prof.data or {}).get("extra_brand_slots") or 0)
+                db.table("profiles").update({"extra_brand_slots": cur + 1}).eq("id", uid).execute()
+                track_event("brand_addon_purchased", uid, {"slots": cur + 1, "provider": "whop"})
+            elif mapped:
+                plan = mapped["plan"]
+                db.table("profiles").update({"plan": plan}).eq("id", uid).execute()
+                grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
+                track_event("subscription_upgraded", uid, {"plan": plan, "plan_id": plan_id, "provider": "whop"})
+
+        elif action in ("membership.went_invalid", "membership_went_invalid", "membership.canceled", "membership.cancelled", "membership.deleted"):
+            if mapped and mapped["plan"] == "brand_addon":
+                if uid:
+                    prof = db.table("profiles").select("extra_brand_slots").eq("id", uid).single().execute()
+                    cur = int((prof.data or {}).get("extra_brand_slots") or 0)
+                    db.table("profiles").update({"extra_brand_slots": max(0, cur - 1)}).eq("id", uid).execute()
+            elif uid:
+                db.table("profiles").update({"plan": "free"}).eq("id", uid).execute()
+                track_event("subscription_cancelled", uid, {"provider": "whop"})
+
+        elif action in ("payment.succeeded", "payment_succeeded", "payment.created"):
+            if not uid:
+                logger.warning("[whop] payment sin metadata.user_id (id=%s)", data.get("id"))
+                return "", 200
+            credits = WHOP_TOPUP_PLANS.get(plan_id or "")
+            if credits:
+                amount_cents = credits * get_cost_cents()
+                profile = get_profile(uid)
+                db.table("profiles").update({
+                    "credits_cents": (profile.get("credits_cents") or 0) + amount_cents
+                }).eq("id", uid).execute()
+                track_event("topup_purchased", uid, {"credits": credits, "provider": "whop"})
+            elif mapped and mapped["plan"] in ("creator", "estudio", "agency"):
+                grant_monthly_allowance(uid, mapped["plan"])  # renovación → resetea pool
+    except Exception:
+        logger.exception("[whop] error procesando %s (%s)", action, ev_key)
         return "", 200
 
     return "", 200
