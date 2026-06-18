@@ -336,6 +336,62 @@ STRIPE_TOPUP_PRICES = {
 }
 STRIPE_TOPUP_PRICES.pop("", None)  # descarta los no configurados
 
+# ── Paddle (v0.22) — pasarela alternativa detrás del flag PAYMENT_PROVIDER ─────
+# Stripe queda DORMIDO (no se borra): si PAYMENT_PROVIDER=paddle, el checkout y el
+# webhook activos son los de Paddle. Credenciales por env (.env, nunca en git).
+PAYMENT_PROVIDER = (os.environ.get("PAYMENT_PROVIDER", "stripe") or "stripe").strip().lower()
+PADDLE_ENV = (os.environ.get("PADDLE_ENV", "sandbox") or "sandbox").strip().lower()
+PADDLE_API_KEY = os.environ.get("PADDLE_API_KEY", "")
+PADDLE_CLIENT_TOKEN = os.environ.get("PADDLE_CLIENT_TOKEN", "")  # token público (client-side)
+PADDLE_WEBHOOK_SECRET = os.environ.get("PADDLE_WEBHOOK_SECRET", "")  # se rellena al crear el destination
+PADDLE_API_BASE = "https://sandbox-api.paddle.com" if "sand" in PADDLE_ENV else "https://api.paddle.com"
+
+
+def payment_provider() -> str:
+    """Proveedor de pago activo: 'paddle' o 'stripe' (default)."""
+    return "paddle" if PAYMENT_PROVIDER == "paddle" else "stripe"
+
+
+# Suscripción: PADDLE_PRICE_<PLAN>_<CICLO>_<MONEDA>. Una price por (plan,ciclo,moneda)
+# para respetar el toggle manual EUR/USD de la UI (no localización por IP).
+def _pp(name):
+    return os.environ.get(name, "")
+
+
+PADDLE_PRICES = {
+    plan: {
+        cycle: {
+            cur: _pp(f"PADDLE_PRICE_{plan.upper()}_{cycle.upper()}_{cur}")
+            for cur in ("EUR", "USD")
+        }
+        for cycle in ("MONTH", "YEAR")
+    }
+    for plan in ("creator", "estudio", "agency")
+}
+# Add-on "Marca extra" (recurrente mensual)
+PADDLE_PRICE_ADDON_BRAND = {
+    "EUR": _pp("PADDLE_PRICE_ADDON_BRAND_EUR"),
+    "USD": _pp("PADDLE_PRICE_ADDON_BRAND_USD"),
+}
+# Topups one-time: price_id → créditos
+PADDLE_TOPUP_PRICES = {}
+for _n, _cr in (("100", 100), ("300", 300), ("1000", 1000)):
+    for _cur in ("EUR", "USD"):
+        _pid = _pp(f"PADDLE_TOPUP_{_n}_{_cur}")
+        if _pid:
+            PADDLE_TOPUP_PRICES[_pid] = _cr
+
+# price_id → (plan, intervalo) para el webhook. Add-on marcado como plan especial.
+PADDLE_PRICE_TO_PLAN = {}
+for _plan, _cycles in PADDLE_PRICES.items():
+    for _cycle, _curs in _cycles.items():
+        for _cur, _pid in _curs.items():
+            if _pid:
+                PADDLE_PRICE_TO_PLAN[_pid] = {"plan": _plan, "interval": _cycle.lower()}
+for _cur, _pid in PADDLE_PRICE_ADDON_BRAND.items():
+    if _pid:
+        PADDLE_PRICE_TO_PLAN[_pid] = {"plan": "brand_addon", "interval": "month"}
+
 db: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
@@ -1943,6 +1999,210 @@ def grant_monthly_allowance(user_id: str, plan: str) -> None:
     }).eq("id", user_id).execute()
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# PADDLE — checkout client-side (Paddle.js) + webhook server-side. Activo cuando
+# PAYMENT_PROVIDER=paddle. Comparte el modelo de planes/créditos con Stripe
+# (grant_monthly_allowance, get_profile, credits_cents, extra_brand_slots).
+# ══════════════════════════════════════════════════════════════════════════════
+def _paddle_api(method: str, path: str, body=None):
+    """Llamada a la API de Paddle Billing (server-side, con PADDLE_API_KEY)."""
+    try:
+        r = requests.request(
+            method, PADDLE_API_BASE + path,
+            headers={"Authorization": "Bearer " + PADDLE_API_KEY,
+                     "Content-Type": "application/json"},
+            json=body, timeout=20)
+        return r.status_code, (r.json() if r.content else {})
+    except Exception as e:
+        logger.warning("[paddle] api %s %s failed: %s", method, path, e)
+        return 0, {"error": str(e)}
+
+
+def _paddle_verify_signature(raw: bytes, sig_header: str) -> bool:
+    """Verifica Paddle-Signature: 'ts=<unix>;h1=<hmac_sha256_hex>'.
+    HMAC-SHA256 de f'{ts}:{raw}' con PADDLE_WEBHOOK_SECRET."""
+    import hmac
+    import hashlib
+    if not PADDLE_WEBHOOK_SECRET or not sig_header:
+        return False
+    try:
+        parts = dict(p.split("=", 1) for p in sig_header.split(";") if "=" in p)
+        ts, h1 = parts.get("ts", ""), parts.get("h1", "")
+        if not ts or not h1:
+            return False
+        signed = ts.encode() + b":" + raw
+        digest = hmac.new(PADDLE_WEBHOOK_SECRET.encode(), signed, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(digest, h1)
+    except Exception:
+        return False
+
+
+def _paddle_event_seen(event_id: str) -> bool:
+    """Idempotencia por event id (Redis, TTL 7d). True = ya procesado → skip.
+    Si Redis no está, no deduplica (best-effort, como el resto del sistema)."""
+    if not event_id or rds is None:
+        return False
+    try:
+        # SET NX devuelve True si la clave es nueva → NO visto aún.
+        was_new = rds.set("paddle:evt:" + event_id, "1", nx=True, ex=604800)
+        return not bool(was_new)
+    except Exception:
+        return False
+
+
+def _paddle_uid(data: dict):
+    """Extrae user_id del custom_data del evento (lo pasamos en Checkout.open)."""
+    cd = data.get("custom_data") or {}
+    return cd.get("user_id") if isinstance(cd, dict) else None
+
+
+def _paddle_first_price_id(data: dict):
+    items = data.get("items") or []
+    for it in items:
+        pr = it.get("price") or {}
+        if pr.get("id"):
+            return pr["id"]
+    return None
+
+
+@app.route("/api/billing/config", methods=["GET"])
+def billing_config():
+    """Config de pago para el front: proveedor activo + (Paddle) token cliente +
+    price IDs por plan/ciclo/moneda. El client_token y los price IDs son públicos
+    (uso client-side); la API key y el webhook secret NUNCA salen de aquí."""
+    prov = payment_provider()
+    out = {"provider": prov}
+    if prov == "paddle":
+        out["paddle"] = {
+            "client_token": PADDLE_CLIENT_TOKEN,
+            "environment": "sandbox" if "sand" in PADDLE_ENV else "production",
+            "prices": {
+                "creator": PADDLE_PRICES["creator"],
+                "estudio": PADDLE_PRICES["estudio"],
+                "agency": PADDLE_PRICES["agency"],
+                "addon_brand": PADDLE_PRICE_ADDON_BRAND,
+                "topup": {
+                    "100": {"EUR": _pp("PADDLE_TOPUP_100_EUR"), "USD": _pp("PADDLE_TOPUP_100_USD")},
+                    "300": {"EUR": _pp("PADDLE_TOPUP_300_EUR"), "USD": _pp("PADDLE_TOPUP_300_USD")},
+                    "1000": {"EUR": _pp("PADDLE_TOPUP_1000_EUR"), "USD": _pp("PADDLE_TOPUP_1000_USD")},
+                },
+            },
+        }
+    return jsonify(out)
+
+
+@app.route("/webhooks/paddle", methods=["POST"])
+@limiter.exempt
+def paddle_webhook():
+    """Webhook de Paddle. Verifica firma, deduplica por event id, y mapea los
+    eventos a profiles.plan / créditos (mismo modelo que el webhook de Stripe)."""
+    if not PADDLE_WEBHOOK_SECRET:
+        # Aún sin destination configurado (David lo crea en el dashboard y nos pasa
+        # el signing secret). 200 para no acumular reintentos en Paddle.
+        logger.info("[paddle] webhook recibido pero PADDLE_WEBHOOK_SECRET no está configurado")
+        return "", 200
+    raw = request.get_data()
+    if not _paddle_verify_signature(raw, request.headers.get("Paddle-Signature", "")):
+        logger.warning("[paddle] firma inválida desde %s", get_client_ip())
+        return jsonify({"error": "invalid signature"}), 400
+    try:
+        event = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return jsonify({"error": "invalid payload"}), 400
+
+    event_id = event.get("event_id") or event.get("notification_id") or ""
+    etype = event.get("event_type") or ""
+    data = event.get("data") or {}
+
+    if _paddle_event_seen(event_id):
+        logger.info("[paddle] evento %s (%s) ya procesado → skip", event_id, etype)
+        return "", 200
+
+    try:
+        uid = _paddle_uid(data)
+        price_id = _paddle_first_price_id(data)
+        mapped = PADDLE_PRICE_TO_PLAN.get(price_id or "")
+
+        if etype in ("subscription.created", "subscription.updated"):
+            status = (data.get("status") or "").lower()
+            sub_id = data.get("id")
+            cust_id = data.get("customer_id")
+            if not uid:
+                logger.warning("[paddle] %s sin user_id (sub=%s)", etype, sub_id)
+                return "", 200
+            if mapped and mapped["plan"] == "brand_addon":
+                # add-on "Marca extra": +1 slot SOLO al crearse (no en updates).
+                if etype == "subscription.created" and status in ("active", "trialing"):
+                    prof = db.table("profiles").select("extra_brand_slots").eq("id", uid).single().execute()
+                    cur = int((prof.data or {}).get("extra_brand_slots") or 0)
+                    db.table("profiles").update({"extra_brand_slots": cur + 1}).eq("id", uid).execute()
+                    track_event("brand_addon_purchased", uid, {"slots": cur + 1, "provider": "paddle"})
+            elif mapped and status in ("active", "trialing"):
+                plan = mapped["plan"]
+                upd = {"plan": plan}
+                # Guardamos los ids de Paddle (best-effort si faltan columnas).
+                try:
+                    db.table("profiles").update({**upd, "paddle_subscription_id": sub_id,
+                                                 "paddle_customer_id": cust_id}).eq("id", uid).execute()
+                except Exception:
+                    logger.warning("[paddle] cols paddle_* ausentes (¿migración?), set solo plan", exc_info=True)
+                    db.table("profiles").update(upd).eq("id", uid).execute()
+                grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
+                track_event("subscription_upgraded", uid, {"plan": plan, "price_id": price_id, "provider": "paddle"})
+            elif status in ("paused", "canceled"):
+                db.table("profiles").update({"plan": "free"}).eq("id", uid).execute()
+
+        elif etype == "subscription.past_due":
+            if uid:
+                track_event("payment_failed", uid, {"provider": "paddle", "sub": data.get("id")})
+                try:
+                    from tasks import send_payment_failed_email
+                    send_payment_failed_email.delay(uid, data.get("id"), 1)
+                except Exception:
+                    logger.warning("[paddle] dunning email dispatch failed uid=%s", uid, exc_info=True)
+
+        elif etype == "subscription.canceled":
+            sub_id = data.get("id")
+            if mapped and mapped["plan"] == "brand_addon":
+                if uid:
+                    prof = db.table("profiles").select("extra_brand_slots").eq("id", uid).single().execute()
+                    cur = int((prof.data or {}).get("extra_brand_slots") or 0)
+                    db.table("profiles").update({"extra_brand_slots": max(0, cur - 1)}).eq("id", uid).execute()
+            else:
+                q = db.table("profiles").update({"plan": "free", "paddle_subscription_id": None})
+                try:
+                    q.eq("paddle_subscription_id", sub_id).execute()
+                except Exception:
+                    if uid:
+                        db.table("profiles").update({"plan": "free"}).eq("id", uid).execute()
+                if uid:
+                    track_event("subscription_cancelled", uid, {"provider": "paddle", "reason": "period_end"})
+
+        elif etype == "transaction.completed":
+            if not uid:
+                logger.warning("[paddle] transaction.completed sin user_id (txn=%s)", data.get("id"))
+                return "", 200
+            credits = PADDLE_TOPUP_PRICES.get(price_id or "")
+            if credits:
+                # Topup one-time → suma créditos al saldo (credits_cents).
+                amount_cents = credits * get_cost_cents()
+                profile = get_profile(uid)
+                db.table("profiles").update({
+                    "credits_cents": (profile.get("credits_cents") or 0) + amount_cents
+                }).eq("id", uid).execute()
+                track_event("topup_purchased", uid, {"credits": credits, "provider": "paddle"})
+            elif mapped and mapped["plan"] in ("creator", "estudio", "agency"):
+                # Pago de suscripción (alta o renovación) → resetea el pool mensual.
+                grant_monthly_allowance(uid, mapped["plan"])
+
+    except Exception:
+        logger.exception("[paddle] error procesando %s (%s)", etype, event_id)
+        # 200: el evento ya quedó marcado como visto; reprocesar no lo arreglaría.
+        return "", 200
+
+    return "", 200
+
+
 @app.route("/create-subscription-checkout", methods=["POST"])
 @limiter.limit("5 per minute;20 per hour")
 @require_auth
@@ -2021,7 +2281,25 @@ def add_brand_addon():
 @app.route("/manage-subscription", methods=["POST"])
 @require_auth
 def manage_subscription():
-    """Create a Stripe Customer Portal session so users can manage/cancel."""
+    """Portal de gestión de suscripción. Paddle o Stripe según PAYMENT_PROVIDER."""
+    if payment_provider() == "paddle":
+        user = current_user()
+        profile = get_profile(user["id"])
+        cust_id = profile.get("paddle_customer_id")
+        sub_id = profile.get("paddle_subscription_id")
+        if not cust_id:
+            return jsonify({"error": "No active subscription"}), 400
+        body = {"subscription_ids": [sub_id]} if sub_id else None
+        st, d = _paddle_api("POST", f"/customers/{cust_id}/portal-sessions", body or {})
+        if st < 300:
+            urls = (d.get("data") or {}).get("urls") or {}
+            url = ((urls.get("general") or {}).get("overview")) or (urls.get("general") if isinstance(urls.get("general"), str) else None)
+            if url:
+                return jsonify({"url": url})
+        logger.error("[paddle] portal-session fallo %s: %s", st, str(d)[:200])
+        return jsonify({"error": "Internal server error. Please try again."}), 500
+
+    # ── Stripe (dormido salvo PAYMENT_PROVIDER=stripe) ──
     if not STRIPE_OK:
         return jsonify({"error": "Payments unavailable"}), 503
 

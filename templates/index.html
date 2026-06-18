@@ -23143,10 +23143,61 @@ function pickTopupPack(el) {
   topupKey = el.dataset.key || null;
 }
 
+// ── Paddle (v0.22): checkout client-side cuando PAYMENT_PROVIDER=paddle ───────
+// El proveedor activo, el client token (público) y los price IDs vienen de
+// /api/billing/config. Stripe sigue intacto: si provider!=='paddle' no cambia nada.
+let _billingCfg = null, _paddleReady = null;
+async function billingCfg() {
+  if (_billingCfg) return _billingCfg;
+  try { const r = await fetch("/api/billing/config"); _billingCfg = await r.json(); }
+  catch (e) { _billingCfg = { provider: "stripe" }; }
+  return _billingCfg;
+}
+function ensurePaddle(cfg) {
+  if (_paddleReady) return _paddleReady;
+  _paddleReady = new Promise((resolve, reject) => {
+    function init() {
+      try {
+        if (cfg.paddle && cfg.paddle.environment === "sandbox") window.Paddle.Environment.set("sandbox");
+        window.Paddle.Initialize({ token: cfg.paddle.client_token });
+        resolve();
+      } catch (e) { reject(e); }
+    }
+    if (window.Paddle) return init();
+    const s = document.createElement("script");
+    s.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
+    s.onload = init; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return _paddleReady;
+}
+async function paddleCheckoutOpen(priceId) {
+  if (!priceId) { showToast(currentLang === "es" ? "Plan no configurado" : "Plan not configured"); return; }
+  const cfg = await billingCfg();
+  await ensurePaddle(cfg);
+  window.Paddle.Checkout.open({
+    items: [{ priceId: priceId, quantity: 1 }],
+    customer: (st.user && st.user.email) ? { email: st.user.email } : undefined,
+    customData: { user_id: (st.user && st.user.id) || "" },
+  });
+}
+function paddlePrice(cfg, plan, cycle, cur) {
+  try { return cfg.paddle.prices[plan][cycle === "year" ? "YEAR" : "MONTH"][(cur || "eur").toUpperCase()]; }
+  catch (e) { return ""; }
+}
+
 async function submitTopup() {
   const btn = document.getElementById("btnTopupOk");
   const err = document.getElementById("topupErr");
   err.classList.remove("on"); btn.disabled = true; btn.textContent = currentLang === "es" ? "Redirigiendo…" : "Redirecting…";
+  const cfg = await billingCfg();
+  if (cfg.provider === "paddle") {
+    btn.disabled = false; btn.textContent = t("topup.go");
+    if (!topupKey) { err.textContent = currentLang === "es" ? "Elige un pack de créditos." : "Pick a credit pack."; err.classList.add("on"); return; }
+    const pid = (((cfg.paddle.prices.topup || {})[topupKey]) || {})[(CUR || "eur").toUpperCase()];
+    return paddleCheckoutOpen(pid);
+  }
+  // ── Stripe (dormido salvo provider==='stripe') ──
   // Si hay un pack elegido manda {topup_key}; el server resuelve precio/créditos
   // vía load_topups_config(). Sin pack utilizable → solo {currency} (legacy 7 usos).
   const payload = { currency: CUR };
@@ -23173,9 +23224,14 @@ async function subscribePlan(priceId) {
 }
 
 async function subscribePlanFromCard(planKey) {
-  // v0.19: el cliente NO conoce price IDs. Manda {plan, cycle} y el server los
-  // resuelve desde env (STRIPE_PRICE_*). Stripe elige la divisa del cliente.
   if (!st.user) { openAuth("register"); return; }
+  const cfg = await billingCfg();
+  if (cfg.provider === "paddle") {
+    // Paddle: checkout client-side con el priceId resuelto por plan/ciclo/moneda.
+    return paddleCheckoutOpen(paddlePrice(cfg, planKey, billingCycle, CUR));
+  }
+  // ── Stripe (dormido): el cliente manda {plan, cycle} y el server resuelve el
+  // price IID desde env (STRIPE_PRICE_*). ──
   const res = await fetch("/create-subscription-checkout", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ plan: planKey, cycle: billingCycle, currency: CUR }),
