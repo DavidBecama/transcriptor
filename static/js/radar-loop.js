@@ -912,6 +912,8 @@
   var _icPlay='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
   var _icGift='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>';
   var _icUsers='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+  var _icTrophy='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>';
+  var _icWarn='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
   function _demoThumbs(){
     return (isDemo() && window.__DEMO_THUMBS__ && window.__DEMO_THUMBS__.length) ? window.__DEMO_THUMBS__ : null;
   }
@@ -1089,7 +1091,7 @@
     if(isDemo()){
       if(isFree() || (S.user.credits||0)<COST){ return showPaywall("force_scrape"); }
       spend(COST); render(); flashSpark(-COST);
-      showToast("🔎 Análisis de tu perfil encolado — si publicaste algo nuevo, tu nivel sube en cuanto termine.");
+      showToast("Análisis de tu perfil encolado — si publicaste algo nuevo, tu nivel sube en cuanto termine.");
       return;
     }
     // Real: el backend cobra los créditos y encola el scrape del propio perfil.
@@ -1100,7 +1102,7 @@
       }
       if(r.d && r.d.credits!=null) S.user.credits=r.d.credits;
       render(); flashSpark(-COST);
-      showToast((r.d&&r.d.message)||"🔎 Análisis de tu perfil encolado — tu nivel sube en cuanto termine.");
+      showToast((r.d&&r.d.message)||"Análisis de tu perfil encolado — tu nivel sube en cuanto termine.");
     });
   }
 
@@ -1117,7 +1119,7 @@
       '<div class="brow-id"><div class="brow-name">'+ESC(b.name)+'</div><div class="brow-handle">@'+ESC(b.handle||"")+' · Nivel '+(b.level||1)+'</div></div>'+
       '<div class="brow-sig">'+sig+'</div>'+
       '<div class="brow-voice"><span class="bv-k">VOZ</span><span class="bv-v">'+(b.voice||40)+'%</span></div>'+
-      (att?'<span class="brow-attn">⚠ Atención</span>':'<span class="brow-attn ok"></span>')+
+      (att?'<span class="brow-attn">'+_icWarn+' Atención</span>':'<span class="brow-attn ok"></span>')+
       '<span class="brow-open">Abrir '+IC.arr+'</span>'+
     '</button>';
   }
@@ -1559,6 +1561,12 @@
     '</div></div>';
   }
   function fmtK(n){ n=Number(n||0); if(n>=1000){ var v=n/1000; return (v>=10?Math.round(v):v.toFixed(1).replace(/\.0$/,"")).toString().replace(".",",")+"k"; } return String(n); }
+  // KPIs de Métricas: SIEMPRE k/M con 1 decimal (187,4k · 1,5k · 1,2M) → formato
+  // unificado en todas las cifras (no unas en k y otras en crudo).
+  function fmtKM(n){ n=Number(n||0);
+    if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,"").replace(".",",")+"M";
+    if(n>=1e3) return (n/1e3).toFixed(1).replace(/\.0$/,"").replace(".",",")+"k";
+    return String(n); }
   function _mean(a){ if(!a.length) return 0; return Math.round(a.reduce(function(s,x){return s+x;},0)/a.length); }
   function _median(a){ if(!a.length) return 0; var b=a.slice().sort(function(x,y){return x-y;}); var n=b.length; return n%2?b[(n-1)/2]:Math.round((b[n/2-1]+b[n/2])/2); }
   function metricVideos(){ return (S.metrics&&S.metrics.videos)||[]; }
@@ -1576,10 +1584,10 @@
     // Paleta AZUL en los gráficos/KPIs (decisión cliente); el verde se reserva para
     // deltas positivos y el × de «explota». Labels en frase (regla 2).
     var cards=[
-      [fmtK(_mean(views)), "Media views", fmtK(totalV)+" total", "var(--brand-500)"],
-      [fmtK(_median(views)), "Mediana views", "", "var(--brand-400)"],
-      [String(totalL), "Total likes", "", "var(--brand-400)"],
-      [String(totalC), "Total comentarios", "", "var(--brand-300)"],
+      [fmtKM(_mean(views)), "Media views", fmtKM(totalV)+" total", "var(--brand-500)"],
+      [fmtKM(_median(views)), "Mediana views", "", "var(--brand-400)"],
+      [fmtKM(totalL), "Total likes", "", "var(--brand-400)"],
+      [fmtKM(totalC), "Total comentarios", "", "var(--brand-300)"],
       [eng.toFixed(1).replace(".",",")+"%", "Engagement", "", "var(--brand-500)"]
     ];
     return '<div class="met-cards">'+cards.map(function(c){ return '<div class="met-card" style="--c:'+c[3]+'"><div class="met-card-n">'+ESC(c[0])+'</div>'+(c[2]?'<div class="met-card-sub">'+ESC(c[2])+'</div>':'')+'<div class="met-card-l">'+c[1]+'</div></div>'; }).join("")+'</div>';
@@ -1750,7 +1758,7 @@
     if(lv===S._lvlSeen) return;
     if(lv<S._lvlSeen){ S._lvlSeen=lv; return; }   // bajó (p.ej. descartó guiones): sin fanfarria
     S._lvlSeen=lv;
-    showToast("🧠 Nivel "+lv+" · "+ecoLevelName(lv)+" — el sistema te conoce mejor: guiones con menos retoques.");
+    showToast("Nivel "+lv+" · "+ecoLevelName(lv)+" — el sistema te conoce mejor: guiones con menos retoques.");
     try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}   // destello global del cerebro 3D
     var orb=document.querySelector(".brain-orb"); if(orb){ orb.classList.add("lvlup"); setTimeout(function(){ orb.classList.remove("lvlup"); },1600); }
     var fill=document.querySelector(".brain-hero .eco-fill");
@@ -1946,7 +1954,7 @@
   function versusHintHTML(){
     if(S.versus) return '';
     return '<div class="versus-hint">'+IC.spark+' '+L("Ponte un objetivo","Set a goal")+' — '+
-      L("supera la <b>media de views</b> de un rival con tus reels. Pulsa <b>Supéralo</b> en cualquiera 👇","beat a rival's <b>average views</b> with your reels. Hit <b>Beat it</b> on anyone 👇")+'</div>';
+      L("supera la <b>media de views</b> de un rival con tus reels. Pulsa <b>Supéralo</b> en cualquiera","beat a rival's <b>average views</b> with your reels. Hit <b>Beat it</b> on anyone")+'</div>';
   }
   /* "Supéralo" (no reto mutuo): los competidores son cuentas de Instagram que NO usan
      la app, así que no se les puede retar. Es un OBJETIVO personal — superar su media
@@ -1966,7 +1974,7 @@
       '<div class="versus-bar"><i style="width:'+pct+'%"></i></div>'+
       '<div class="versus-foot"><span class="versus-metric">'+L("Views medias por reel","Avg views per reel")+'</span>'+
         (beat
-          ? '<span class="versus-prize">🏆 '+L("¡Lo superas! Mantén el ritmo","You beat it! Keep it up")+'</span>'
+          ? '<span class="versus-prize">'+_icTrophy+' '+L("¡Lo superas! Mantén el ritmo","You beat it! Keep it up")+'</span>'
           : '<button class="btn btn-sm btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Roba y publica más","Steal & publish more")+'</button>')+'</div>'+
     '</div>';
   }
@@ -1988,28 +1996,28 @@
     }
     var goal;
     if(realV && !me.hasData){
-      goal='<div class="lb-goal">🔗 '+L("Conecta tu Instagram para ver tu posición y tu objetivo.","Connect your Instagram to see your rank and goal.")+'</div>';
+      goal='<div class="lb-goal">'+IC.ig+' '+L("Conecta tu Instagram para ver tu posición y tu objetivo.","Connect your Instagram to see your rank and goal.")+'</div>';
     } else if(realV && !above && rows.length<=1){
       goal='<div class="lb-goal">'+IC.spark+' '+L("Sigue a competidores y deja que scrapeemos sus reels para ver tu ranking.","Follow competitors and let us scrape their reels to see your ranking.")+'</div>';
     } else {
       goal=above
         ? '<div class="lb-goal">'+IC.spark+' '+L("Te faltan <b>"+_fmtK(gap)+"</b> "+unit+" para superar a <b>@"+ESC(above.handle)+"</b>","<b>"+_fmtK(gap)+"</b> "+unit+" to overtake <b>@"+ESC(above.handle)+"</b>")+proj+'</div>'
-        : '<div class="lb-goal">🏆 '+L("Lideras tu nicho — sigue así","You lead your niche — keep it up")+'</div>';
+        : '<div class="lb-goal">'+_icTrophy+' '+L("Lideras tu nicho — sigue así","You lead your niche — keep it up")+'</div>';
     }
     // #3 momentum: racha de crecimiento (refuerzo positivo). Real: % de tus reels
     // recientes (sin semanas inventadas). Demo: semanas deterministas.
     var momentum='';
     if(me.growth>0){
       if(realV){
-        momentum='<div class="lb-momentum">📈 '+L("Subiendo · <b>+"+me.growth+"%</b> en tus reels recientes","Rising · <b>+"+me.growth+"%</b> on your recent reels")+'</div>';
+        momentum='<div class="lb-momentum">'+IC.chart+' '+L("Subiendo · <b>+"+me.growth+"%</b> en tus reels recientes","Rising · <b>+"+me.growth+"%</b> on your recent reels")+'</div>';
       } else {
         var streakW=2+_lbHash((b.handle||"x")+"s",0,4);
-        momentum='<div class="lb-momentum">📈 '+L("Subiendo · <b>+"+me.growth+"%</b> este mes · llevas <b>"+streakW+" semanas</b> creciendo","Rising · <b>+"+me.growth+"%</b> this month · <b>"+streakW+" weeks</b> growing")+'</div>';
+        momentum='<div class="lb-momentum">'+IC.chart+' '+L("Subiendo · <b>+"+me.growth+"%</b> este mes · llevas <b>"+streakW+" semanas</b> creciendo","Rising · <b>+"+me.growth+"%</b> this month · <b>"+streakW+" weeks</b> growing")+'</div>';
       }
     }
     var items=rows.map(function(r,i){
       var g=r.growth, gtxt=(g>=0?'↑':'↓')+Math.abs(g)+'%';
-      var pos=i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1);
+      var pos=String(i+1);
       return '<div class="lb-row'+(r.you?' me':'')+'">'+
         '<span class="lb-pos">'+pos+'</span>'+
         '<span class="ava bava">'+ESC(initialsOf(r.handle))+'</span>'+
@@ -2051,9 +2059,9 @@
       : '<div class="soon-cta"><button class="btn btn-sm btn-secondary" data-act="community-interest">'+IC.spark+' '+L("Avísame cuando llegue","Notify me when it's live")+'</button></div>';
     return '<div class="sec-soon-t">'+L("Comunidad de creadores","Creator community")+' <span class="brain-tag">'+L("en camino","on the way")+'</span></div>'+
       '<div class="soon-grid">'+
-        card('🎁', L("Pushea tus reels a tu nicho","Push your reels to your niche"),
+        card(_icGift, L("Pushea tus reels a tu nicho","Push your reels to your niche"),
              L("Comparte tu mejor reel con creadores de tu nicho — y recibe los suyos como <b>regalo</b>, ya analizados para que los robes.","Share your best reel with creators in your niche — and get theirs as a <b>gift</b>, already analyzed to steal."))+
-        card('👥', L("Grupos de creadores","Creator groups"),
+        card(_icUsers, L("Grupos de creadores","Creator groups"),
              L("Únete a un grupo de tu nicho: <b>comparte métricas</b> y mira en directo qué le está funcionando a los demás.","Join a niche group: <b>share metrics</b> and see live what's working for everyone else."))+
       '</div>'+cta;
   }
@@ -2185,7 +2193,7 @@
     if(isDemo()){ try{ localStorage.setItem("rs_brain_progress",String(np)); localStorage.setItem("rs_brain_ex_date",day); localStorage.setItem("rs_brain_ex_gain",String(gain)); }catch(e){} }
     else { S.user.brainProgress=np; S.user.brainExDate=day; S.user.brainLastGain=gain; try{ apiPost('/api/brain/exercise-done',{}); }catch(e){} }
     try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
-    showToast(L("🧠 +"+gain+"% · Cerebro entrenado hoy. Vuelve mañana para subir más.","🧠 +"+gain+"% · Brain trained today. Come back tomorrow for more."));
+    showToast(L("+"+gain+"% · Cerebro entrenado hoy. Vuelve mañana para subir más.","+"+gain+"% · Brain trained today. Come back tomorrow for more."));
   }
   function brainTrainMode(){
     // El DÍA decide (alterna hooks/guiones); el usuario no elige (1 ejercicio/día).
@@ -2311,7 +2319,7 @@
     if(gt.i>=gt.cards.length){
       // Completó la baraja → cuenta como el ejercicio del día (sube el Cerebro, 1/día).
       if(!brainExDoneToday()) _brainCompleteExercise();
-      else showToast(L("🃏 Baraja completada. El Cerebro ya subió hoy — vuelve mañana.","🃏 Deck done. Your Brain already leveled today — come back tomorrow."));
+      else showToast(L("Baraja completada. El Cerebro ya subió hoy — vuelve mañana.","Deck done. Your Brain already leveled today — come back tomorrow."));
     }
     render();
   }
@@ -2399,7 +2407,7 @@
       '<div class="brain-hero">'+
         '<div id="rsBrainStage" class="brain3d-stage"><div class="brain-orb brain3d-fallback">'+IC.brain+'</div></div>'+
         '<div class="brain-hero-body">'+
-          '<div class="brain-lvl">Nivel '+lv.level+' · '+ESC(ecoLevelName(lv.level))+(lv.level>=4?' <span class="brain-pro" title="Eres Pro Reelscript — acceso a grupos solo-pros">🏅 Pro</span>':'')+'</div>'+
+          '<div class="brain-lvl">Nivel '+lv.level+' · '+ESC(ecoLevelName(lv.level))+(lv.level>=4?' <span class="brain-pro" title="Eres Pro Reelscript — acceso a grupos solo-pros">'+IC.star+' Pro</span>':'')+'</div>'+
           '<div class="brain-voiceline">Te conozco al <b>'+brainProgress()+'%</b></div>'+
           '<div class="eco-bar" style="margin:10px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,brainProgress())+'%"></div></div>'+
           // B2: umbrales VISIBLES del siguiente nivel (checklist ✓/○) + UNA acción primaria
