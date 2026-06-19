@@ -1573,12 +1573,14 @@
     var v=metricVideos(); var views=v.map(function(x){return x.views||0;}), likes=v.map(function(x){return x.likes||0;}), comments=v.map(function(x){return x.comments||0;});
     var totalV=views.reduce(function(s,x){return s+x;},0), totalL=likes.reduce(function(s,x){return s+x;},0), totalC=comments.reduce(function(s,x){return s+x;},0);
     var eng = totalV>0 ? ((totalL+totalC)/totalV*100) : 0;
+    // Paleta AZUL en los gráficos/KPIs (decisión cliente); el verde se reserva para
+    // deltas positivos y el × de «explota». Labels en frase (regla 2).
     var cards=[
-      [fmtK(_mean(views)), "MEDIA VIEWS", fmtK(totalV)+" total", "var(--brand-500)"],
-      [fmtK(_median(views)), "MEDIANA VIEWS", "", "#6f93ff"],
-      [String(totalL), "TOTAL LIKES", "", "#12a37c"],
-      [String(totalC), "TOTAL COMENTARIOS", "", "#5e7d97"],
-      [eng.toFixed(1).replace(".",",")+"%", "ENGAGEMENT", "", "#46b277"]
+      [fmtK(_mean(views)), "Media views", fmtK(totalV)+" total", "var(--brand-500)"],
+      [fmtK(_median(views)), "Mediana views", "", "var(--brand-400)"],
+      [String(totalL), "Total likes", "", "var(--brand-400)"],
+      [String(totalC), "Total comentarios", "", "var(--brand-300)"],
+      [eng.toFixed(1).replace(".",",")+"%", "Engagement", "", "var(--brand-500)"]
     ];
     return '<div class="met-cards">'+cards.map(function(c){ return '<div class="met-card" style="--c:'+c[3]+'"><div class="met-card-n">'+ESC(c[0])+'</div>'+(c[2]?'<div class="met-card-sub">'+ESC(c[2])+'</div>':'')+'<div class="met-card-l">'+c[1]+'</div></div>'; }).join("")+'</div>';
   }
@@ -1610,7 +1612,7 @@
       var thumbInner=x.thumb?'<img src="'+ESC(x.thumb)+'" alt="">':'<div class="play"></div>';
       var badges=(x.top?'<span class="vid-badge top">TOP</span>':"")+(x.viral?'<span class="vid-badge viral">VIRAL</span>':"");
       var link=x.from_guion
-        ? '<div class="pub-link"'+(x.vsMedian?' title="'+x.vsMedian+'× tu media"':'')+'>'+IC.doc+' de tu guion «'+ESC(x.from_guion)+'»'+(x.vsMedian?' · <b>'+x.vsMedian+'×</b> tu media':'')+'</div>'
+        ? '<div class="pub-link"'+(x.vsMedian?' title="'+x.vsMedian+'× tu media"':'')+'>'+IC.doc+' de tu guion «'+ESC(x.from_guion)+'»'+(x.vsMedian?' · <span class="gp-mult'+(x.vsMedian>1?" up":"")+'">'+x.vsMedian+'×</span> tu media':'')+'</div>'
         : '<div class="pub-link organic">○ orgánico · sin guion</div>';
       return '<div class="vid-card"><div class="vid-thumb thumb">'+thumbInner+'<span class="dur">'+ESC(x.dur||"0:30")+'</span>'+(badges?'<div class="vid-badges">'+badges+'</div>':"")+'</div>'+
         '<div class="vid-body"><div class="vid-cap">'+ESC(x.cap)+'</div>'+
@@ -1681,7 +1683,7 @@
     if(!S.igConnected) return connectIgHTML();
     var m=S.metrics||{}; var b=brand();
     var learned=(m.learned||[]).map(function(l){ return '<div class="learn-item">'+IC.check+'<span>'+ESC(l)+'</span></div>'; }).join("");
-    var top=m.top?('<div class="met-top">🏆 <b>Top:</b> '+ESC(m.top.title)+' — '+ESC(m.top.views)+' views ↗</div>'):"";
+    var top=m.top?('<div class="met-top">'+IC.spark+' <b>Top:</b> '+ESC(m.top.title)+' — '+ESC(m.top.views)+' views</div>'):"";
     var hasVideos=metricVideos().length>0;
     // El panel de datos (stats + chart + grid) es lo premium → borroso en free.
     var data=hasVideos?(metricStatsHTML()+metricChartHTML()+metricGridHTML()):'<div class="rs-empty">Pulsa “Actualizar reels” para traer tus métricas.</div>';

@@ -10846,7 +10846,9 @@
     .rs[data-theme="dark"] {
       /* Superficies (azul muy oscuro, no near-black neutro) */
       --surface-base:#090C15; --surface-raised:#111726; --surface-overlay:#172032; --surface-sunken:#0A0E18;
-      --text-primary:#F3F6FC; --text-secondary:#A6B1C6; --text-tertiary:#69748C; --text-disabled:#454F63;
+      --text-primary:#F3F6FC; --text-secondary:#A6B1C6; --text-tertiary:#7E8799; --text-disabled:#454F63;
+      /* --text-tertiary subido de #69748C (prototipo) a #7E8799: el -3 se quedaba en
+         ~3.8:1 sobre surface-raised (<4.5) en small text. Sube todos los labels dim a AA. */
       --border-subtle:rgba(255,255,255,.07); --border-default:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.13);
       /* Azul = marca + acción + navegación activa (regla 4) */
       --brand-50:#0E1730; --brand-100:#13204a; --brand-200:#1A2C66; --brand-300:#23409C;
@@ -11054,6 +11056,15 @@
     @keyframes ciGift { 0%,100%{ transform:translateY(0) rotate(-5deg); } 50%{ transform:translateY(-8px) rotate(5deg); } }
     @keyframes ciFade { from{ opacity:0; } to{ opacity:1; } }
     @keyframes ciPop { from{ opacity:0; transform:translateY(12px) scale(.97); } to{ opacity:1; transform:none; } }
+
+    /* ── MÉTRICAS (v3) ──────────────────────────────────────────────────────
+       Labels en frase (no MAYÚSCULA-mono, regla 2) · paleta AZUL en gráficos
+       (decisión cliente) · verde solo en el × de «explota» · mediana neutra. */
+    .rs .met-card-l { text-transform:none; letter-spacing:0; font-size:11.5px; color:var(--text-secondary); font-family:var(--font-body); }
+    .rs .bar-fill.is-top { background:linear-gradient(90deg, var(--brand-500), var(--brand-400)); }
+    .rs .bar-line.mediana { border-color:var(--text-tertiary); }
+    .rs .bar-line.mediana span { color:var(--text-secondary); }
+    .rs .pub-link .gp-mult.up { color:var(--success-fg); font-weight:700; }
   </style>
 
   {% if clarity_project_id %}
