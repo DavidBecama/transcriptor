@@ -10925,6 +10925,29 @@
        Reforzamos el carácter "detección" de la eyebrow y el contador en directo. ── */
     .rs .eyebrow, .rs .opp-count, .rs .feature-eyebrow { font-family: var(--font-mono); letter-spacing:.02em; }
     .rs .pip { background: var(--success); }
+
+    /* ── GUIONES (pantalla 2 del rediseño) ──────────────────────────────── */
+    /* Regla 3: el hook/título del guion en Clash */
+    .rs .gui-title { font-family: var(--font-display); letter-spacing:-.01em; font-size:15.5px; font-weight:600; }
+    /* Badges de estado: Por grabar=azul · Grabado=verde · (Cocinando=naranja) */
+    .rs .gui-pill { background: var(--brand-100); color: var(--brand-400); }
+    .rs[data-theme="light"] .gui-pill { color: var(--brand-700); }
+    .rs .gui-pill.done { background: var(--success-bg); color: var(--success-fg); }
+    .rs .gui-pill.cooking { background: var(--warning-bg); color: var(--warning-fg); }
+    /* Regla 6: el multiplicador "× tu media" en verde cuando pega */
+    .rs .gui-pub.hot { color: var(--success-fg); }
+    /* Explosión creativa: CTA del bloque con tokens nuevos + botón 3D (regla 7) */
+    .rs .explosion-btn { background: var(--brand-100); border:1px solid var(--brand-500);
+      border-bottom:3px solid var(--brand-700); color: var(--text-primary); font-family: var(--font-body); }
+    .rs .explosion-btn:hover { box-shadow: var(--glow); }
+    .rs .explosion-btn:active { transform: translateY(2px); border-bottom-width:2px; }
+    .rs .explosion-btn .ex-head { display:inline-flex; align-items:center; gap:8px; font-size:16px; font-weight:700; color: var(--text-primary); }
+    .rs .explosion-btn .ex-head svg { color: var(--brand-400); }
+    [data-theme="light"] .rs .explosion-btn .ex-head svg, .rs[data-theme="light"] .explosion-btn .ex-head svg { color: var(--brand-600); }
+    .rs .explosion-btn .ex-sub { font-size:12px; font-weight:600; color: var(--text-secondary); }
+    /* Empty state con voz (titular en Syne — el "momento" de la regla 3) */
+    .rs .rs-empty .rs-empty-title { font-family: var(--font-accent); font-weight:700; font-size:18px; color: var(--text-primary); margin-bottom:6px; }
+    .rs .rs-empty .rs-empty-sub { color: var(--text-secondary); line-height:1.5; }
   </style>
 
   {% if clarity_project_id %}

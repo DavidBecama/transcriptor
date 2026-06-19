@@ -1205,7 +1205,7 @@
     var dev=ideas.filter(ideaIsDeveloped);
     var rawList=raw.length
       ? '<div class="ideas-list">'+raw.map(rawIdeaHTML).join("")+'</div>'
-      : '<div class="rs-empty" style="margin-top:10px">Nada pendiente. Apunta una idea con 💡 «Apunta una idea» (arriba).</div>';
+      : '<div class="rs-empty" style="margin-top:10px">Nada pendiente. Usa «Apunta una idea» (arriba) para empezar.</div>';
     var devList=dev.length
       ? '<div class="ideas-list">'+dev.map(ideaBlockHTML).join("")+'</div>'
       : '<div class="rs-empty" style="margin-top:10px">Aún ninguna desarrollada. Desarrolla una de arriba o genera 5 de golpe.</div>';
@@ -1214,7 +1214,7 @@
         '<button class="btn btn-sm btn-secondary" data-act="gen5ideas">'+IC.spark+' 5 ideas</button>'+
       '</div>'+
       '<p class="ideas-zone-sub">Ideas en bruto, guardadas gratis. Desarrolla cuando quieras (cuesta '+COST.scripts5+' créditos).</p>'+
-      '<button class="explosion-btn" data-act="explosion">💥 Explosión creativa<span>5 ideas × 5 guiones × 5 hooks — '+COST.explosion+' créditos</span></button>'+
+      '<button class="explosion-btn" data-act="explosion"><span class="ex-head">'+IC.spark+' Explosión creativa</span><span class="ex-sub">5 ideas × 5 guiones × 5 hooks — '+COST.explosion+' créditos</span></button>'+
       rawList+
       '<div class="feed-head" style="margin-top:30px"><span class="feed-title">'+IC.doc+' Desarrolladas'+(dev.length?' <span class="ct">· '+dev.length+'</span>':'')+'</span></div>'+
       devList+
@@ -1443,7 +1443,7 @@
     }
     var body=items.length===0
       ? '<div class="rs-empty" style="margin-top:24px">'+(cAll===0
-          ? 'Aún no tienes guiones. Roba un reel en el <b>Radar</b> o apunta una idea (💡 arriba) — todo lo que generes aterriza aquí.'
+          ? '<div class="rs-empty-title">Aún nada aquí. Roba tu primera señal.</div><div class="rs-empty-sub">Roba un reel en el <b>Radar</b> o apunta una idea — todo lo que generes aterriza aquí.</div>'
           : 'Nada en este filtro.')+'</div>'
       : '<div class="gui-list">'+items.map(guiCardHTML).join("")+'</div>';
     return '<div class="scroll"><div class="canvas">'+
@@ -1854,7 +1854,7 @@
      En prod: tabla `challenges` + comparar las vistas reales de la semana. */
   function versusHintHTML(){
     if(S.versus) return '';
-    return '<div class="versus-hint">🎯 '+L("Ponte un objetivo","Set a goal")+' — '+
+    return '<div class="versus-hint">'+IC.spark+' '+L("Ponte un objetivo","Set a goal")+' — '+
       L("supera la <b>media de views</b> de un rival con tus reels. Pulsa <b>Supéralo</b> en cualquiera 👇","beat a rival's <b>average views</b> with your reels. Hit <b>Beat it</b> on anyone 👇")+'</div>';
   }
   /* "Supéralo" (no reto mutuo): los competidores son cuentas de Instagram que NO usan
@@ -1864,7 +1864,7 @@
     if(!S.versus) return '';
     var v=S.versus, beat=v.mine>=v.oppAvg, pct=Math.min(100,Math.round(v.mine/(v.oppAvg||1)*100)), gap=Math.max(0,v.oppAvg-v.mine);
     return '<div class="versus-card">'+
-      '<div class="versus-head"><span class="versus-ico">🎯</span><b>'+L("Tu objetivo","Your goal")+'</b>'+
+      '<div class="versus-head"><span class="versus-ico">'+IC.bolt+'</span><b>'+L("Tu objetivo","Your goal")+'</b>'+
         '<span class="versus-day">'+L("supera a","beat")+' @'+ESC(v.opp)+'</span>'+
         '<button class="versus-quit" data-act="versus-quit" aria-label="'+L("Quitar objetivo","Remove goal")+'">'+IC.x+'</button></div>'+
       '<div class="versus-vs">'+
@@ -1899,10 +1899,10 @@
     if(realV && !me.hasData){
       goal='<div class="lb-goal">🔗 '+L("Conecta tu Instagram para ver tu posición y tu objetivo.","Connect your Instagram to see your rank and goal.")+'</div>';
     } else if(realV && !above && rows.length<=1){
-      goal='<div class="lb-goal">🎯 '+L("Sigue a competidores y deja que scrapeemos sus reels para ver tu ranking.","Follow competitors and let us scrape their reels to see your ranking.")+'</div>';
+      goal='<div class="lb-goal">'+IC.spark+' '+L("Sigue a competidores y deja que scrapeemos sus reels para ver tu ranking.","Follow competitors and let us scrape their reels to see your ranking.")+'</div>';
     } else {
       goal=above
-        ? '<div class="lb-goal">🎯 '+L("Te faltan <b>"+_fmtK(gap)+"</b> "+unit+" para superar a <b>@"+ESC(above.handle)+"</b>","<b>"+_fmtK(gap)+"</b> "+unit+" to overtake <b>@"+ESC(above.handle)+"</b>")+proj+'</div>'
+        ? '<div class="lb-goal">'+IC.spark+' '+L("Te faltan <b>"+_fmtK(gap)+"</b> "+unit+" para superar a <b>@"+ESC(above.handle)+"</b>","<b>"+_fmtK(gap)+"</b> "+unit+" to overtake <b>@"+ESC(above.handle)+"</b>")+proj+'</div>'
         : '<div class="lb-goal">🏆 '+L("Lideras tu nicho — sigue así","You lead your niche — keep it up")+'</div>';
     }
     // #3 momentum: racha de crecimiento (refuerzo positivo). Real: % de tus reels
@@ -1925,7 +1925,7 @@
         '<span class="lb-h">@'+ESC(r.handle)+(r.you?' <b>('+L("tú","you")+')</b>':'')+'</span>'+
         '<span class="lb-f">'+_fmtK(r.followers)+'</span>'+
         '<span class="lb-g '+(g>=0?'up':'down')+'">'+gtxt+'</span>'+
-        ((!r.you && !S.versus)?'<button class="lb-challenge" data-act="versus-start" data-id="'+ESC(r.handle)+'">🎯 '+L("Supéralo","Beat it")+'</button>':'<span class="lb-challenge-sp"></span>')+
+        ((!r.you && !S.versus)?'<button class="lb-challenge" data-act="versus-start" data-id="'+ESC(r.handle)+'">'+IC.bolt+' '+L("Supéralo","Beat it")+'</button>':'<span class="lb-challenge-sp"></span>')+
       '</div>';
     }).join("");
     return '<div class="scroll"><div class="canvas">'+
@@ -1956,7 +1956,7 @@
         '<div class="soon-desc">'+desc+'</div></div></div>';
     };
     var cta=interested
-      ? '<div class="soon-cta done">'+IC.check+' '+L("Te avisaremos en cuanto llegue ✨","We'll let you know when it lands ✨")+'</div>'
+      ? '<div class="soon-cta done">'+IC.check+' '+L("Te avisaremos en cuanto llegue","We'll let you know when it lands")+'</div>'
       : '<div class="soon-cta"><button class="btn btn-sm btn-secondary" data-act="community-interest">'+IC.spark+' '+L("Avísame cuando llegue","Notify me when it's live")+'</button></div>';
     return '<div class="sec-soon-t">'+L("Comunidad de creadores","Creator community")+' <span class="brain-tag">'+L("en camino","on the way")+'</span></div>'+
       '<div class="soon-grid">'+
@@ -3442,10 +3442,10 @@
     if(isDemo()){
       spend(COST.explosion); var seed=Date.now()%89;
       var ideasD=pick(BANK_IDEAS,5,seed).map(function(t,i){ var idea=makeIdea(t,seed+i*5); for(var j=0;j<5;j++){ var sc=makeScript(t,seed+i*5+j); sc.hooks=pick(BANK_HOOKS,5,seed+i+j); idea.scripts.push(sc); } return idea; });
-      S.ideas=ideasD.concat(S.ideas); bumpEco(25,0); render(); flashSpark(-COST.explosion); showToast("💥 5 ideas × 5 guiones × 5 hooks. La semana entera, de un golpe."); return;
+      S.ideas=ideasD.concat(S.ideas); bumpEco(25,0); render(); flashSpark(-COST.explosion); showToast("5 ideas × 5 guiones × 5 hooks. La semana entera, de un golpe."); return;
     }
     var restore=_btnLoading(btn);
-    showToast("💥 Explosión en marcha… esto tarda un poco.");
+    showToast("Explosión en marcha… esto tarda un poco.");
     apiPost("/ideas/explosion",{project_id:S.brandId&&S.brandId!=="default"?S.brandId:null, language:rsLang()}).then(function(r){
       if(!r.ok || !r.d || !Array.isArray(r.d.ideas)){ restore(); return showPaywallOrError(r); }
       // Reconstruye el árbol idea→guiones→hooks desde la respuesta (scripts traen idea_id).
@@ -3457,7 +3457,7 @@
         return it;
       });
       S.ideas=fresh.concat(S.ideas); applyCredits(r.d, COST.explosion); render();
-      showToast("💥 5 ideas × 5 guiones × 5 hooks. La semana entera, de un golpe.");
+      showToast("5 ideas × 5 guiones × 5 hooks. La semana entera, de un golpe.");
     });
   }
   // Distingue muro de pago (402/free_limit) de error genérico, reusando showPaywall.
@@ -3996,7 +3996,7 @@
         oppAvg=_lbHash(opp+"avg",40000,160000); mine=_lbHash((S.user.handle||"me")+"best",50000,190000);
       }
       S.versus={ opp:opp, youHandle:(brand().handle||S.user.handle||"tu_cuenta"), oppAvg:oppAvg, mine:mine };
-      showToast(L("🎯 Objetivo fijado: supera la media de @"+opp+".","🎯 Goal set: beat @"+opp+"'s average."));
+      showToast(L("Objetivo fijado: supera la media de @"+opp+".","Goal set: beat @"+opp+"'s average."));
       return render();
     }
     if(act==="versus-quit"){ S.versus=null; showToast(L("Objetivo quitado.","Goal removed.")); return render(); }
