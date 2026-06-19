@@ -11070,6 +11070,39 @@
        papel se queda en ~3.75:1; subir a -600/-700 para AA). ── */
     [data-theme="light"] .rs .onb-eyebrow, .rs[data-theme="light"] .onb-eyebrow { color: var(--brand-600); }
     [data-theme="light"] .rs .onb-chip.on, .rs[data-theme="light"] .onb-chip.on { color: var(--brand-700); }
+
+    /* ── AJUSTES (v3) — el panel vive en el chrome legacy (#profPanelSettings), fuera
+       de .rs. Mismo truco: redefinir los tokens v3 scoped al panel (ID gana a :root;
+       los alias legacy --text/--brand siguen porque son var(--text-primary)/...).
+       Solo afecta a #profPanelSettings → la landing y el resto del chrome intactos. */
+    #profPanelSettings {
+      --surface-base:#090C15; --surface-raised:#111726; --surface-overlay:#172032; --surface-sunken:#0A0E18;
+      --text-primary:#F3F6FC; --text-secondary:#A6B1C6; --text-tertiary:#7E8799; --text-disabled:#454F63;
+      --border-subtle:rgba(255,255,255,.07); --border-default:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.13);
+      --brand-50:#0E1730; --brand-100:#13204a; --brand-200:#1A2C66; --brand-300:#23409C;
+      --brand-400:#6E92FF; --brand-500:#2F5BFF; --brand-600:#2F5BFF; --brand-700:#1B3FD6; --brand-800:#152FA6; --brand-900:#0F236E;
+      --success:#2FD18A; --success-bg:rgba(47,209,138,.12); --success-fg:#3FE0A0; --success-border:rgba(47,209,138,.30);
+      --font-display:'Clash Display','Space Grotesk',system-ui,sans-serif;
+      --font-display-2:'Clash Display','Space Grotesk',system-ui,sans-serif;
+      --font-body:'Schibsted Grotesk',system-ui,-apple-system,sans-serif;
+      --font-mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    }
+    [data-theme="light"] #profPanelSettings {
+      --surface-base:#FAF7F1; --surface-raised:#FFFFFF; --surface-overlay:#F4EFE6; --surface-sunken:#F0EBE0;
+      --text-primary:#171511; --text-secondary:#574F42; --text-tertiary:#6A6350; --text-disabled:#9A917E;
+      --border-subtle:rgba(24,22,14,.08); --border-default:rgba(24,22,14,.12); --border-strong:rgba(24,22,14,.18);
+      --brand-50:#EDF1FF; --brand-100:#DCE4FF; --brand-200:#BFCFFF; --brand-300:#90AEFF;
+      --brand-400:#4A74FF; --brand-500:#2348E6; --brand-600:#2348E6; --brand-700:#1A37B8; --brand-800:#142B8F; --brand-900:#0F2070;
+      --success:#0E8A5A; --success-bg:rgba(14,138,90,.10); --success-fg:#0A6B45; --success-border:rgba(14,138,90,.28);
+    }
+    /* Titular en Clash; eyebrow en mono (telemetría); tab activo azul v3 */
+    #profPanelSettings .heading-1 { font-family: var(--font-display); letter-spacing:-.02em; }
+    #profPanelSettings .panel-header .eyebrow { font-family: var(--font-mono); }
+    #profPanelSettings .settings-tab.on { border-bottom-color: var(--brand-500); color: var(--text-primary); }
+    [data-theme="light"] #profPanelSettings .settings-tab.on { border-bottom-color: var(--brand-600); }
+    /* toggle de tema (☀🖥🌙 → iconos de trazo): centra y dimensiona los SVG */
+    .theme-seg-opt { display:inline-flex; align-items:center; justify-content:center; }
+    .theme-seg-opt svg { width:16px; height:16px; }
   </style>
 
   {% if clarity_project_id %}
@@ -11217,9 +11250,9 @@
       <span data-i18n-es="Tema" data-i18n-en="Theme">Tema</span>
     </span>
     <div class="theme-seg" role="group" aria-label="Theme">
-      <button type="button" class="theme-seg-opt" data-val="light" onclick="setThemeBinary('light', event)" data-i18n-aria-es="Claro" data-i18n-aria-en="Light" aria-label="Light">☀️</button>
-      <button type="button" class="theme-seg-opt" data-val="system" onclick="setThemeBinary('system', event)" data-i18n-aria-es="Sistema" data-i18n-aria-en="System" aria-label="System">🖥️</button>
-      <button type="button" class="theme-seg-opt" data-val="dark" onclick="setThemeBinary('dark', event)" data-i18n-aria-es="Oscuro" data-i18n-aria-en="Dark" aria-label="Dark">🌙</button>
+      <button type="button" class="theme-seg-opt" data-val="light" onclick="setThemeBinary('light', event)" data-i18n-aria-es="Claro" data-i18n-aria-en="Light" aria-label="Light"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+      <button type="button" class="theme-seg-opt" data-val="system" onclick="setThemeBinary('system', event)" data-i18n-aria-es="Sistema" data-i18n-aria-en="System" aria-label="System"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
+      <button type="button" class="theme-seg-opt" data-val="dark" onclick="setThemeBinary('dark', event)" data-i18n-aria-es="Oscuro" data-i18n-aria-en="Dark" aria-label="Dark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button>
     </div>
   </div>
 
@@ -13653,9 +13686,9 @@
             <div class="settings-card-sub" data-i18n-es="Claro, oscuro o automático según tu sistema." data-i18n-en="Light, dark or auto based on your system.">Claro, oscuro o automático según tu sistema.</div>
           </div>
           <div class="theme-seg settings-seg" role="group" aria-label="Theme">
-            <button type="button" class="theme-seg-opt" data-val="light" onclick="setThemeBinary('light', event)" data-i18n-aria-es="Claro" data-i18n-aria-en="Light" aria-label="Light">☀️</button>
-            <button type="button" class="theme-seg-opt" data-val="system" onclick="setThemeBinary('system', event)" data-i18n-aria-es="Sistema" data-i18n-aria-en="System" aria-label="System">🖥️</button>
-            <button type="button" class="theme-seg-opt" data-val="dark" onclick="setThemeBinary('dark', event)" data-i18n-aria-es="Oscuro" data-i18n-aria-en="Dark" aria-label="Dark">🌙</button>
+            <button type="button" class="theme-seg-opt" data-val="light" onclick="setThemeBinary('light', event)" data-i18n-aria-es="Claro" data-i18n-aria-en="Light" aria-label="Light"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+            <button type="button" class="theme-seg-opt" data-val="system" onclick="setThemeBinary('system', event)" data-i18n-aria-es="Sistema" data-i18n-aria-en="System" aria-label="System"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
+            <button type="button" class="theme-seg-opt" data-val="dark" onclick="setThemeBinary('dark', event)" data-i18n-aria-es="Oscuro" data-i18n-aria-en="Dark" aria-label="Dark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button>
           </div>
         </div>
         </div><!-- /#settingsTabGeneral -->
