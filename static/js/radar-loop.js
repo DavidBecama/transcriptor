@@ -906,6 +906,93 @@
     else a.sort(function(x,y){return (y.explosion||0)-(x.explosion||0);});
     return a;
   }
+
+  // ── GALERÍAS de miniaturas + modal Comunidad (port de Leonard, restylado v3) ──
+  // Iconos de trazo 2px en vez de emojis (regla 8).
+  var _icPlay='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
+  var _icGift='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>';
+  var _icUsers='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+  function _demoThumbs(){
+    return (isDemo() && window.__DEMO_THUMBS__ && window.__DEMO_THUMBS__.length) ? window.__DEMO_THUMBS__ : null;
+  }
+  function _galGrad(seed){
+    var h=[['#ff6a3d','#ff2d55'],['#5b8cff','#7b3dff'],['#1dd3b0','#0e9f87'],['#ffb648','#ff7a00'],['#6f93ff','#4f7cff'],['#b06cff','#7b3dff'],['#23c4ff','#3d6bff'],['#ff5db1','#ff2d55']];
+    var g=h[_lbHash(String(seed),0,h.length)];
+    return 'linear-gradient(150deg,'+g[0]+','+g[1]+')';
+  }
+  function galleryCardHTML(c){
+    var inner=c.thumb
+      ? '<img src="'+ESC(c.thumb)+'" alt="" loading="lazy">'
+      : '<div class="gcard-ph" style="background:'+_galGrad(c.key||c.handle)+'">'+_icPlay+'</div>';
+    return '<div class="gcard"'+(c.act?(' data-act="'+c.act+'" data-id="'+ESC(String(c.id||""))+'"'+(c.handle?' data-handle="'+ESC(c.handle)+'"':'')):'')+' role="button" tabindex="0" aria-label="@'+ESC(c.handle)+'">'+
+      inner+
+      (c.badge?'<span class="gcard-badge">'+ESC(c.badge)+'</span>':'')+
+      (c.soon?'<span class="gcard-soon">'+L('Próximamente','Soon')+'</span>':'')+
+      '<div class="gcard-ov"><div class="gcard-h">@'+ESC(c.handle)+'</div>'+(c.cap?'<div class="gcard-cap">'+ESC(c.cap)+'</div>':'')+'</div>'+
+    '</div>';
+  }
+  function galleryHTML(title, sub, cards, moreHTML){
+    if(!cards) return '';
+    return '<section class="rgal"><div class="rgal-head"><div class="rgal-t">'+ESC(title)+
+      (sub?'<span class="rgal-sub">'+ESC(sub)+'</span>':'')+'</div>'+(moreHTML||'')+'</div>'+
+      '<div class="rgal-track">'+cards+'</div></section>';
+  }
+  function competitorGalleryHTML(){
+    var reels=feedReels();
+    var imgs=_demoThumbs();
+    var n=imgs?(imgs.length+3):Math.min(12, reels.length);
+    if(!n) return '';
+    var cards="";
+    for(var i=0;i<n;i++){
+      var r=reels.length?reels[i%reels.length]:null;
+      cards+=galleryCardHTML({
+        id:(r?r.id:""), handle:(r?r.creator.handle:"creador"), cap:(r?r.cap:""),
+        thumb:(imgs?(i<imgs.length?imgs[i]:null):(r&&r.thumb)),
+        badge:(r&&r.explosionTxt!=null?r.explosionTxt+'×':''),
+        key:(r?(r.id||r.creator.handle):"c"+i), act:(r?"reel-detail":"")
+      });
+    }
+    var arrows='<div class="rgal-arrows">'+
+      '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
+      '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
+    '</div>';
+    return galleryHTML(L("Lo último de tu competencia","Latest from your rivals"), "", cards, arrows);
+  }
+  function communityGalleryHTML(){
+    return '<section class="rgal"><div class="rgal-head"><div class="rgal-t">'+
+      L("Creaciones de la comunidad","Community creations")+'</div></div>'+
+      '<div class="rgal-soon">'+
+        '<span class="rgal-soon-pill">'+IC.spark+' '+L("Próximamente","Coming soon")+'</span>'+
+        '<button class="rgal-more rgal-more-info" data-act="community-info">'+L("Más información","Learn more")+'</button>'+
+        '<button class="rgal-more" data-act="community-interest">'+L("Avísame cuando esté","Notify me")+' →</button>'+
+      '</div></section>';
+  }
+  function communityInfoModalHTML(){
+    var thumbs=_demoThumbs()||[];
+    var mini=function(i){
+      var t=thumbs.length?thumbs[i%thumbs.length]:null;
+      return '<div class="ci-mini"'+(t?'':(' style="background:'+_galGrad("ci"+i)+'"'))+'>'+(t?'<img src="'+ESC(t)+'" alt="">':_icPlay)+'</div>';
+    };
+    var strip=''; for(var i=0;i<7;i++) strip+=mini(i);
+    var interested=!!S.user.communityWaitlist; if(!interested){ try{ interested=localStorage.getItem("rs_community_interest")==="1"; }catch(e){} }
+    return '<div class="ci-overlay" data-act="ci-close">'+
+      '<div class="ci-card" role="dialog" aria-modal="true" aria-label="'+L("Comunidad de creadores","Creator community")+'" data-act="ci-stop">'+
+        '<button class="ci-x" data-act="ci-close" aria-label="'+L("Cerrar","Close")+'">'+IC.x+'</button>'+
+        '<div class="ci-stage"><div class="ci-strip">'+strip+strip+'</div><div class="ci-gift">'+_icGift+'</div></div>'+
+        '<span class="ci-pill">'+IC.spark+' '+L("Próximamente","Coming soon")+'</span>'+
+        '<h3 class="ci-h">'+L("Comunidad de creadores","Creator community")+'</h3>'+
+        '<p class="ci-sub">'+L("Reelscript dejará de ser solo tú y tu radar: una red entre creadores de tu nicho para crecer juntos.","Reelscript won't just be you and your radar — a network of creators in your niche, growing together.")+'</p>'+
+        '<ul class="ci-feats">'+
+          '<li><span class="ci-fi">'+_icGift+'</span><div><b>'+L("Pushea tus reels → recibe regalos","Push your reels → get gifts")+'</b>'+L("Comparte tu mejor reel con tu nicho y recibe los suyos ya analizados, listos para robar.","Share your best reel with your niche and get theirs back, already analyzed and ready to steal.")+'</div></li>'+
+          '<li><span class="ci-fi">'+_icUsers+'</span><div><b>'+L("Grupos de creadores","Creator groups")+'</b>'+L("Únete a un grupo de tu nicho: comparte métricas y ve en directo qué funciona.","Join a niche group: share metrics and see live what works.")+'</div></li>'+
+          '<li><span class="ci-fi">'+IC.spark+'</span><div><b>'+L("Creaciones de la comunidad","Community creations")+'</b>'+L("Un muro con lo que crean otros con Reelscript — inspiración real de tu nicho.","A wall of what others build with Reelscript — real inspiration from your niche.")+'</div></li>'+
+        '</ul>'+
+        (interested
+          ? '<div class="ci-done">'+IC.check+' '+L("Te avisaremos en cuanto llegue","We'll let you know when it lands")+'</div>'
+          : '<button class="btn btn-md btn-primary ci-go" data-act="community-interest">'+IC.spark+' '+L("Avísame cuando llegue","Notify me when it's live")+'</button>')+
+      '</div>'+
+    '</div>';
+  }
   function reelCardHTML(r){
     var hi=(r.explosion||0)>=3, isFav=!!S.favs[r.id];
     var thumbInner=r.thumb?'<img src="'+ESC(r.thumb)+'" alt="">':'<div class="play"></div>';
@@ -1178,7 +1265,9 @@
       voiceOnboardCardHTML()+   // B6+T1: banner de voz BAJO la oportunidad — no empuja el hero bajo el fold
       nextSeriesHTML("dash")+   // B1+T1: "tu próxima serie" con CTA secundario en el Dashboard
       (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+
-      (rest.length?('<div class="feed-head"><span class="feed-title">Más señales <span class="ct">· '+rest.length+'</span></span>'+filtersHTML()+'</div><div class="feed">'+rows+'</div>'+moreToggle):"")+
+      // Galerías de miniaturas (port de Leonard) en lugar de la lista "Más señales":
+      // los filtros (fchip) se conservan y filtran la galería vía feedReels().
+      (S.reels.length?(filtersHTML()+competitorGalleryHTML()+communityGalleryHTML()):"")+
     '</div></div>';
   }
 
@@ -2646,6 +2735,7 @@
     else if(S.view==="perf") html+=overlayShellHTML(guiPerfHTML(),"Rendimiento del guion","close-feed",true);
     else if(S.view==="prompter") html+=teleprompterHTML();
     else if(S.view==="fillweek") html+='<div class="overlay" role="dialog" aria-modal="true" aria-label="Llena mi semana"><div class="obar"><button class="back" data-act="close-feed" aria-label="Cerrar">'+IC.x+'</button><span class="otitle">Llena mi semana</span></div><div class="oscroll" id="rsFillHost">'+fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase)+'</div></div>';
+    if(S.communityInfo) html+=communityInfoModalHTML();   // mini-modal «Más información» Comunidad
     if(S.sheet) html+=sheetHTML();   // T2: el sheet de entrada va SOBRE cualquier overlay
     view.innerHTML=html;
     // T4: el error persistente sobrevive a los re-render mutando el nodo estable.
@@ -3856,6 +3946,7 @@
       if(S.sheet){ e.preventDefault(); return closeSheet(); }
       if(S.acctMenu){ e.preventDefault(); S.acctMenu=false; return render(); }
       if(S.brandMenu){ e.preventDefault(); S.brandMenu=false; return render(); }
+      if(S.communityInfo){ e.preventDefault(); S.communityInfo=false; return render(); }
       if(S.view && S.view!=="feed"){
         e.preventDefault();
         if(S.view==="result"){ S.view="script"; return render(); }
@@ -4007,6 +4098,14 @@
       if(!isDemo()){ try{ apiPost('/api/community/interest',{}); }catch(e){} }   // persiste en backend
       showToast(L("¡Hecho! Te avisaremos en cuanto la comunidad esté lista.","Done! We'll let you know when the community is ready."));
       return render();
+    }
+    if(act==="community-info"){ S.communityInfo=true; return render(); }   // abre mini-modal Comunidad
+    if(act==="ci-close"){ S.communityInfo=false; return render(); }
+    if(act==="ci-stop") return;   // clic DENTRO del modal no lo cierra
+    if(act==="rgal-scroll"){
+      var _sec=btn.closest&&btn.closest(".rgal"); var _tr=_sec&&_sec.querySelector(".rgal-track");
+      if(_tr){ var _dir=(btn.getAttribute("data-dir")==="next")?1:-1; _tr.scrollBy({left:_dir*Math.round(_tr.clientWidth*0.82), behavior:"smooth"}); }
+      return;
     }
     if(act==="expand-feed"){ S.feedExpanded=true; return render(); }
     if(act==="add-reel") return addReelManual();

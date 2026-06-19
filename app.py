@@ -693,12 +693,31 @@ def paid_features_active(profile: dict, user: dict | None = None) -> bool:
     return email in UNLIMITED_EMAILS
 
 
+def _demo_thumb_urls():
+    """SOLO DEMO: URLs de static/img/demo-thumbs/ para sembrar las galerías del Radar.
+    Se inyecta en la plantilla (sin pasar por el shim de fetch del demo). En prod
+    (sin DEMO_MODE) → lista vacía → placeholders de color."""
+    if not DEMO_MODE:
+        return []
+    import glob as _glob
+    base = os.path.join(app.static_folder or "static", "img", "demo-thumbs")
+    out = []
+    try:
+        for f in sorted(_glob.glob(os.path.join(base, "*"))):
+            if os.path.splitext(f)[1].lower() in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"):
+                out.append("/static/img/demo-thumbs/" + os.path.basename(f))
+    except Exception:
+        logger.warning("demo_thumb_urls: listing failed")
+    return out
+
+
 @app.context_processor
 def inject_analytics():
     return dict(
         clarity_project_id=CLARITY_PROJECT_ID,
         posthog_api_key=POSTHOG_API_KEY,
         demo=DEMO_MODE,
+        demo_thumbs=_demo_thumb_urls(),
     )
 
 
