@@ -10948,6 +10948,41 @@
     /* Empty state con voz (titular en Syne — el "momento" de la regla 3) */
     .rs .rs-empty .rs-empty-title { font-family: var(--font-accent); font-weight:700; font-size:18px; color: var(--text-primary); margin-bottom:6px; }
     .rs .rs-empty .rs-empty-sub { color: var(--text-secondary); line-height:1.5; }
+
+    /* ── A) multiplicador "× tu media" en VERDE cuando supera la media (Guiones) ──
+       El botón entero deja de recolorearse; solo el número va en verde (color+número,
+       como en el Radar). Neutraliza el azul whole-button de .gui-pub.hot (dark+light). */
+    .rs .gui-pub.hot { color: var(--text-secondary); }
+    .rs[data-theme="light"] .gui-pub.hot { color: var(--text-secondary); }
+    .rs .gui-pub .gp-mult.up { color: var(--success-fg); font-weight:600; }
+
+    /* ── EDITOR DE GUION (overlay de generación + reveal del guion) ──────────────
+       Hereda Clash en .script-hook/.serif y mono en .beat .n. Ajustes propios: */
+    /* telemetría: la procedencia del guion ("Robado de @…") en mono (regla 1).
+       Sube de text-tertiary a text-secondary: en oscuro el -3 sobre surface-base
+       se quedaba en 4.16:1 (<4.5). */
+    .rs .script-src { font-family: var(--font-mono); letter-spacing:.01em; color: var(--text-secondary); }
+    /* descripción de cada paso de la cinta: text-secondary (el -3 sobre el azul de
+       chain-feature daba 3.36:1). Igualar la especificidad de .chain .ctext .cd. */
+    .rs .chain .ctext .cd { color: var(--text-secondary); }
+    /* estado de generación "Cocinando el guion…" en naranja (regla: .cooking) */
+    .rs .gen.cooking .gtitle { color: var(--warning-fg); }
+    .rs .gen.cooking .gstep { color: var(--warning-fg); opacity:.85; }
+    /* éxito: "Manifestando viralidad" — momento aha en Syne sobre verde (regla 3) */
+    .rs .reveal-aha { display:inline-flex; align-items:center; gap:7px; font-family: var(--font-accent);
+      font-weight:700; font-size:13px; letter-spacing:.01em; color: var(--success-fg);
+      background: var(--success-bg); border:1px solid var(--success-border);
+      padding:5px 12px; border-radius:999px; margin:0 0 14px; }
+    .rs .reveal-aha svg { color: var(--success); width:15px; height:15px; }
+    /* voice-tag legible en oscuro (brand-700 sobre brand-100 se quedaba flojo) */
+    .rs[data-theme="dark"] .voice-tag { color: var(--brand-400); }
+    /* cinta "¿Y ahora?": botones 3D + una sola primaria fuerte (Grábalo = .chain-prim) */
+    .rs .chain { border-bottom:3px solid var(--border-strong); }
+    .rs .chain:active { transform: translateY(2px); border-bottom-width:2px; }
+    .rs .chain.chain-feature { background: var(--brand-100); border-color: var(--brand-500); border-bottom-color: var(--brand-700); }
+    .rs .chain.chain-feature:not(.chain-prim) .cic { background: var(--brand-100); color: var(--brand-400); }
+    .rs[data-theme="light"] .chain.chain-feature:not(.chain-prim) .cic { color: var(--brand-600); }
+    .rs .chain.chain-prim .cic { background: var(--brand-600); color:#fff; }
   </style>
 
   {% if clarity_project_id %}
