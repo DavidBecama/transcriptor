@@ -11065,6 +11065,11 @@
     .rs .bar-line.mediana { border-color:var(--text-tertiary); }
     .rs .bar-line.mediana span { color:var(--text-secondary); }
     .rs .pub-link .gp-mult.up { color:var(--success-fg); font-weight:700; }
+
+    /* ── ONBOARDING (v3): acentos azules legibles en tema claro (brand-400 sobre
+       papel se queda en ~3.75:1; subir a -600/-700 para AA). ── */
+    [data-theme="light"] .rs .onb-eyebrow, .rs[data-theme="light"] .onb-eyebrow { color: var(--brand-600); }
+    [data-theme="light"] .rs .onb-chip.on, .rs[data-theme="light"] .onb-chip.on { color: var(--brand-700); }
   </style>
 
   {% if clarity_project_id %}

@@ -598,7 +598,7 @@
         '<li>'+IC.check+' '+L("2 competidores en el radar, trayendo sus reels","2 competitors on your radar, bringing their reels")+'</li>'+
         '<li>'+IC.check+' '+L("Tu primer guión, esperándote en el radar","Your first script, waiting on your radar")+'</li>'+
       '</ul>'+
-      '<p class="onb-path">'+L("El resto se gana: <b>enséñame tu voz</b> con tus propios reels y subimos del 50% al 100%.","The rest is earned: <b>teach me your voice</b> with your own reels and we go from 50% to 100%.")+'</p>'+
+      '<p class="onb-path">'+L("El resto se gana: <b>enséñame tu voz</b> con tus propios reels y subimos del 35% al 100%.","The rest is earned: <b>teach me your voice</b> with your own reels and we go from 35% to 100%.")+'</p>'+
       onbErr()+
       '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-finish"'+(S.onb.busy?' disabled':'')+'>'+(S.onb.busy?'<span class="mini-spin"></span> '+L("Preparando…","Preparing…"):IC.bolt+' '+L("Entrar a mi radar","Enter my radar"))+'</button>');
   }
@@ -743,7 +743,7 @@
       try{ var b=brand(); if(b){ b.voice=Math.max(b.voice||0,50); b.level=Math.max(b.level||1,2); } }catch(e){}
       if(typeof seedDemoContent==="function" && !(S.reels||[]).length){ try{ seedDemoContent(); }catch(e){} }
       S.tab="dashboard"; render(); onbStartTour();
-      showToast(L("Cerebro al 50% · tu primer guión está listo. Róbalo →","Brain at 50% · your first script is ready. Steal it →"));
+      showToast(L("Cerebro al 35% · tu primer guión está listo. Róbalo →","Brain at 35% · your first script is ready. Steal it →"));
       return;
     }
     S.onb.busy=true; render();
