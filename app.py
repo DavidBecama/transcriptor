@@ -27,14 +27,32 @@ load_dotenv()
 
 # ── Validate required env vars ───────────────────────────────────────────────
 
+# Las claves se validan SOLO para el proveedor de pago activo: si PAYMENT_PROVIDER=whop,
+# que falten las de Stripe (proveedor inactivo) NO debe tumbar el arranque, y viceversa.
+# PAYMENT_PROVIDER se resuelve aquí leyendo el entorno directo (la constante se define más abajo).
+_active_provider = (os.environ.get("PAYMENT_PROVIDER", "stripe") or "stripe").strip().lower()
+if _active_provider not in ("stripe", "paddle", "whop"):
+    _active_provider = "stripe"
+
+# Clave primaria del proveedor activo (sin ella no puede cobrar) → obligatoria. El secreto
+# del webhook de Paddle/Whop se rellena tras crear el destination en su panel, así que no es
+# fatal al boot (el handler tolera su ausencia y responde 200); solo se avisa.
+_PROVIDER_REQUIRED = {
+    "stripe": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+    "paddle": ["PADDLE_API_KEY"],
+    "whop":   ["WHOP_API_KEY"],
+}
 REQUIRED_ENV_VARS = [
-    "GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
-    "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "FLASK_SECRET_KEY",
-]
+    "GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY", "FLASK_SECRET_KEY",
+] + _PROVIDER_REQUIRED[_active_provider]
 missing = [v for v in REQUIRED_ENV_VARS if not os.environ.get(v)]
 if missing:
-    print(f"[FATAL] Missing required environment variables: {', '.join(missing)}", file=sys.stderr)
+    print(f"[FATAL] Missing required environment variables ({_active_provider}): {', '.join(missing)}", file=sys.stderr)
     sys.exit(1)
+
+_wh_secret = {"paddle": "PADDLE_WEBHOOK_SECRET", "whop": "WHOP_WEBHOOK_SECRET"}.get(_active_provider)
+if _wh_secret and not os.environ.get(_wh_secret):
+    print(f"[WARN] {_wh_secret} sin configurar: el webhook de {_active_provider} no verificará firmas hasta definirlo.", file=sys.stderr)
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 
