@@ -339,8 +339,22 @@ async function main() {
     return out;
   })()`);
   check("móvil: targets táctiles ≥44px", t8.mobile && t8.cortos.length === 0, JSON.stringify(t8));
-  const t8b = await evaluate(`(function(){ var s=document.querySelector('#radarRoot .row-score.hi .sx'); return s?s.textContent:null; })()`);
-  check("reel explosivo identificable por etiqueta (no solo color)", !!t8b && /explota/.test(t8b), String(t8b));
+  // El reel explosivo debe leerse por ETIQUETA (texto), no solo por color (colorblind).
+  // Tras Radar v2 los más explosivos viven en el card destacado (carrusel), no en la
+  // lista: vale la etiqueta del card (.opp-mega «el más explosivo» / .feature-data
+  // .dmetric.big con label «Explosión» + multiplicador ×) O la del row (.row-score.hi
+  // .sx «explota»). Cualquiera satisface la regla (canal redundante al color).
+  const t8b = await evaluate(`(function(){
+    var rowSx=document.querySelector('#radarRoot .row-score.hi .sx');
+    if(rowSx && /explota/i.test(rowSx.textContent)) return 'row:'+rowSx.textContent.trim();
+    var mega=document.querySelector('#radarRoot .feature .opp-mega');
+    if(mega && /explosiv/i.test(mega.textContent)) return 'feat:'+mega.textContent.trim();
+    var big=document.querySelector('#radarRoot .feature-data .dmetric.big');
+    if(big){ var dk=big.querySelector('.dk'), dv=big.querySelector('.dv');
+      if(dk && /explos/i.test(dk.textContent) && dv && /×/.test(dv.textContent)) return 'data:'+dk.textContent.trim()+' '+dv.textContent.trim(); }
+    return null;
+  })()`);
+  check("reel explosivo identificable por etiqueta (no solo color)", !!t8b, String(t8b));
   // Fix review (T8): el botón cerrar de los overlays también debe llegar a 44px.
   await click('.feature [data-act="steal"]'); await sleep(400);
   const backH = await evaluate(`(function(){ var b=document.querySelector('#radarRoot .overlay .obar .back'); return b?Math.round(b.getBoundingClientRect().height):0; })()`);

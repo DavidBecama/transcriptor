@@ -365,6 +365,13 @@
        Eliminadas Fraunces y JetBrains Mono (no usadas, ahorro bandwidth ~30%).
        --font-mono ahora resuelve a ui-monospace del sistema. -->
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <!-- Redesign v3 (feature/redesign): sistema nuevo SOLO para la isla .rs (Radar y
+       siguientes pantallas de la app). La landing conserva sus fuentes de arriba.
+       Display: Clash Display (Fontshare) · UI/cuerpo: Schibsted Grotesk · acento: Syne ·
+       mono (solo telemetría): Geist Mono. -->
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+  <link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     /* ── Reset & tokens ─────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -10811,6 +10818,171 @@
     body.rs-takeover #profPanelIdeas { display:block !important; }
     body.rs-takeover #profPanelIdeas > :not(#ideasPanelCompetitors) { display:none !important; }
     body.rs-takeover #ideasPanelCompetitors { display:block !important; }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       REDESIGN v3 · Sistema de diseño nuevo — SOLO la isla .rs (Radar).
+       Estrategia: REDEFINIR los tokens existentes dentro del scope .rs, así
+       todo el CSS del radar (que ya usa var(--surface-raised), var(--brand-600),
+       var(--font-display)…) adopta el sistema nuevo sin reescribir selectores.
+       La landing (fuera de .rs) queda intacta. Tokens claro + oscuro.
+       Reglas de oro: mono solo telemetría · labels Schibsted sentence-case ·
+       titulares Clash · botones 3D · multiplicadores en verde · cero emojis.
+       ═══════════════════════════════════════════════════════════════════════ */
+    /* Tipografía (theme-independiente; .rs basta porque el radar no redefine --font-*) */
+    .rs {
+      --font-display:   'Clash Display', 'Space Grotesk', system-ui, sans-serif;
+      --font-display-2: 'Clash Display', 'Space Grotesk', system-ui, sans-serif;
+      --font-body:      'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
+      --font-accent:    'Syne', 'Clash Display', sans-serif;
+      --font-mono:      'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+      font-family: var(--font-body);
+      font-variant-numeric: tabular-nums;
+    }
+    /* Colores/superficies: hay que igualar la especificidad de los tokens del radar
+       (.rs[data-theme="dark"]/[light], 0,2,0) — un .rs simple pierde. */
+    .rs[data-theme="dark"] {
+      /* Superficies (azul muy oscuro, no near-black neutro) */
+      --surface-base:#090C15; --surface-raised:#111726; --surface-overlay:#172032; --surface-sunken:#0A0E18;
+      --text-primary:#F3F6FC; --text-secondary:#A6B1C6; --text-tertiary:#69748C; --text-disabled:#454F63;
+      --border-subtle:rgba(255,255,255,.07); --border-default:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.13);
+      /* Azul = marca + acción + navegación activa (regla 4) */
+      --brand-50:#0E1730; --brand-100:#13204a; --brand-200:#1A2C66; --brand-300:#23409C;
+      --brand-400:#6E92FF; --brand-500:#2F5BFF; --brand-600:#2F5BFF; --brand-700:#1B3FD6;
+      --brand-800:#152FA6; --brand-900:#0F236E;
+      /* Verde = "explota"/multiplicadores (regla 6) · Naranja = chispazo (regla 5) */
+      --success:#2FD18A; --success-bg:rgba(47,209,138,.12); --success-fg:#3FE0A0; --success-border:rgba(47,209,138,.30);
+      --danger:#FF5C72;  --danger-bg:rgba(255,92,114,.12); --danger-fg:#FF7C8E; --danger-border:rgba(255,92,114,.30);
+      --warning:#FF8A3D; --warning-bg:rgba(255,138,61,.14); --warning-fg:#FFA463; --warning-border:rgba(255,138,61,.30);
+      --info:#2F5BFF;    --info-bg:rgba(47,91,255,.14); --info-fg:#6E92FF; --info-border:rgba(47,91,255,.30);
+      --glow:0 0 0 1px rgba(47,91,255,.35), 0 8px 30px rgba(47,91,255,.22);
+      --shadow-glow:0 0 0 1px color-mix(in srgb, var(--brand-500) 50%, transparent), 0 0 32px rgba(47,91,255,.22);
+    }
+    /* Tema CLARO (papel cálido) — regla: ambos temas AA */
+    .rs[data-theme="light"] {
+      --surface-base:    #FAF7F1;
+      --surface-raised:  #FFFFFF;
+      --surface-overlay: #F4EFE6;
+      --surface-sunken:  #F0EBE0;
+      --text-primary:   #171511;
+      --text-secondary: #574F42;
+      --text-tertiary:  #6A6350;   /* AA: #8E8472 del prototipo se queda en ~3.4:1 sobre papel; bajado a -700 para 4.5:1 en labels/eyebrow/telemetría */
+      --text-disabled:  #9A917E;
+      --border-subtle:  rgba(24,22,14,.08);
+      --border-default: rgba(24,22,14,.12);
+      --border-strong:  rgba(24,22,14,.18);
+      --brand-50:#EDF1FF; --brand-100:#DCE4FF; --brand-200:#BFCFFF; --brand-300:#90AEFF;
+      --brand-400:#4A74FF; --brand-500:#2348E6; --brand-600:#2348E6; --brand-700:#1A37B8;
+      --brand-800:#142B8F; --brand-900:#0F2070;
+      --success:#0E8A5A; --success-bg:rgba(14,138,90,.10); --success-fg:#0A6B45; --success-border:rgba(14,138,90,.28);
+      --danger:#C8324A;  --danger-bg:rgba(200,50,74,.08); --danger-fg:#C8324A; --danger-border:rgba(200,50,74,.26);
+      --warning:#BE5510; --warning-bg:rgba(190,85,16,.10); --warning-fg:#BE5510; --warning-border:rgba(190,85,16,.28);
+      --info:#2348E6;    --info-bg:rgba(35,72,230,.10); --info-fg:#2348E6; --info-border:rgba(35,72,230,.28);
+      --glow:0 0 0 1px rgba(35,72,230,.30), 0 8px 30px rgba(35,72,230,.16);
+      --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--brand-500) 40%, transparent), 0 0 24px rgba(35,72,230,.14);
+    }
+
+    /* ── Regla 3: titulares y cifras grandes en Clash Display ── */
+    .rs .h-title, .rs .feature-cap, .rs .feature-data .dv,
+    .rs h1, .rs h2 { font-family: var(--font-display); letter-spacing:-.012em; }
+    .rs .h-title { font-weight:600; }
+    .rs .feature-cap { font-weight:600; }
+
+    /* ── Regla 6: multiplicadores en VERDE (color + número, canal redundante) ── */
+    .rs .row-score .sv,
+    .rs .row-score.hi .sv,
+    .rs .feature-data .dmetric.big .dv { color: var(--success); }
+    .rs .row-score.hi .sx { color: var(--success); font-weight:600; }
+    /* el badge "el más explosivo": verde (multiplicador) con chispa naranja */
+    .rs .opp-mega { background: var(--success-bg); color: var(--success-fg);
+      border:1px solid var(--success-border); }
+    .rs .opp-mega svg { color: var(--warning); }
+
+    /* ── Regla 7: botones 3D en TODAS las variantes ── */
+    .rs .btn-primary {
+      background: var(--brand-600); color:#fff; border:none;
+      border-bottom: 4px solid var(--brand-800); border-radius:14px; font-weight:600;
+      transition: transform .12s cubic-bezier(.16,1,.3,1), background .15s ease, filter .15s ease;
+    }
+    .rs .btn-primary:hover { background: var(--brand-500); }
+    .rs .btn-primary:active { transform: translateY(2px); border-bottom-width:2px; }
+    .rs .btn-secondary {
+      background: var(--surface-overlay);
+      border:1px solid var(--border-strong); border-bottom:3px solid var(--border-strong);
+      transition: transform .12s cubic-bezier(.16,1,.3,1), background .15s ease;
+    }
+    .rs .btn-secondary:active { transform: translateY(2px); border-bottom-width:2px; }
+    .rs .btn-sm { border-bottom-width:2px; }
+    .rs .btn-sm:active { border-bottom-width:1px; transform:translateY(1px); }
+    .rs .fchip { border-bottom:2px solid var(--border-strong); }
+    .rs .fchip:active { transform:translateY(1px); border-bottom-width:1px; }
+
+    /* ── Regla 4: chip/tab activo = azul (blue-soft + borde azul + texto azul) ── */
+    .rs .fchip.on { background: var(--brand-100); border-color: var(--brand-500); color: var(--brand-400); }
+    [data-theme="light"] .rs .fchip.on { color: var(--brand-600); }
+
+    /* ── Reglas 1/2: la telemetría (mono) ya está en .eyebrow/.stat-v/.dur/.opp-count
+       vía var(--font-mono); los labels van en Schibsted (var(--font-body)) por defecto.
+       Reforzamos el carácter "detección" de la eyebrow y el contador en directo. ── */
+    .rs .eyebrow, .rs .opp-count, .rs .feature-eyebrow { font-family: var(--font-mono); letter-spacing:.02em; }
+    .rs .pip { background: var(--success); }
+
+    /* ── GUIONES (pantalla 2 del rediseño) ──────────────────────────────── */
+    /* Regla 3: el hook/título del guion en Clash */
+    .rs .gui-title { font-family: var(--font-display); letter-spacing:-.01em; font-size:15.5px; font-weight:600; }
+    /* Badges de estado: Por grabar=azul · Grabado=verde · (Cocinando=naranja) */
+    .rs .gui-pill { background: var(--brand-100); color: var(--brand-400); }
+    .rs[data-theme="light"] .gui-pill { color: var(--brand-700); }
+    .rs .gui-pill.done { background: var(--success-bg); color: var(--success-fg); }
+    .rs .gui-pill.cooking { background: var(--warning-bg); color: var(--warning-fg); }
+    /* Regla 6: el multiplicador "× tu media" en verde cuando pega */
+    .rs .gui-pub.hot { color: var(--success-fg); }
+    /* Explosión creativa: CTA del bloque con tokens nuevos + botón 3D (regla 7) */
+    .rs .explosion-btn { background: var(--brand-100); border:1px solid var(--brand-500);
+      border-bottom:3px solid var(--brand-700); color: var(--text-primary); font-family: var(--font-body); }
+    .rs .explosion-btn:hover { box-shadow: var(--glow); }
+    .rs .explosion-btn:active { transform: translateY(2px); border-bottom-width:2px; }
+    .rs .explosion-btn .ex-head { display:inline-flex; align-items:center; gap:8px; font-size:16px; font-weight:700; color: var(--text-primary); }
+    .rs .explosion-btn .ex-head svg { color: var(--brand-400); }
+    [data-theme="light"] .rs .explosion-btn .ex-head svg, .rs[data-theme="light"] .explosion-btn .ex-head svg { color: var(--brand-600); }
+    .rs .explosion-btn .ex-sub { font-size:12px; font-weight:600; color: var(--text-secondary); }
+    /* Empty state con voz (titular en Syne — el "momento" de la regla 3) */
+    .rs .rs-empty .rs-empty-title { font-family: var(--font-accent); font-weight:700; font-size:18px; color: var(--text-primary); margin-bottom:6px; }
+    .rs .rs-empty .rs-empty-sub { color: var(--text-secondary); line-height:1.5; }
+
+    /* ── A) multiplicador "× tu media" en VERDE cuando supera la media (Guiones) ──
+       El botón entero deja de recolorearse; solo el número va en verde (color+número,
+       como en el Radar). Neutraliza el azul whole-button de .gui-pub.hot (dark+light). */
+    .rs .gui-pub.hot { color: var(--text-secondary); }
+    .rs[data-theme="light"] .gui-pub.hot { color: var(--text-secondary); }
+    .rs .gui-pub .gp-mult.up { color: var(--success-fg); font-weight:600; }
+
+    /* ── EDITOR DE GUION (overlay de generación + reveal del guion) ──────────────
+       Hereda Clash en .script-hook/.serif y mono en .beat .n. Ajustes propios: */
+    /* telemetría: la procedencia del guion ("Robado de @…") en mono (regla 1).
+       Sube de text-tertiary a text-secondary: en oscuro el -3 sobre surface-base
+       se quedaba en 4.16:1 (<4.5). */
+    .rs .script-src { font-family: var(--font-mono); letter-spacing:.01em; color: var(--text-secondary); }
+    /* descripción de cada paso de la cinta: text-secondary (el -3 sobre el azul de
+       chain-feature daba 3.36:1). Igualar la especificidad de .chain .ctext .cd. */
+    .rs .chain .ctext .cd { color: var(--text-secondary); }
+    /* estado de generación "Cocinando el guion…" en naranja (regla: .cooking) */
+    .rs .gen.cooking .gtitle { color: var(--warning-fg); }
+    .rs .gen.cooking .gstep { color: var(--warning-fg); opacity:.85; }
+    /* éxito: "Manifestando viralidad" — momento aha en Syne sobre verde (regla 3) */
+    .rs .reveal-aha { display:inline-flex; align-items:center; gap:7px; font-family: var(--font-accent);
+      font-weight:700; font-size:13px; letter-spacing:.01em; color: var(--success-fg);
+      background: var(--success-bg); border:1px solid var(--success-border);
+      padding:5px 12px; border-radius:999px; margin:0 0 14px; }
+    .rs .reveal-aha svg { color: var(--success); width:15px; height:15px; }
+    /* voice-tag legible en oscuro (brand-700 sobre brand-100 se quedaba flojo) */
+    .rs[data-theme="dark"] .voice-tag { color: var(--brand-400); }
+    /* cinta "¿Y ahora?": botones 3D + una sola primaria fuerte (Grábalo = .chain-prim) */
+    .rs .chain { border-bottom:3px solid var(--border-strong); }
+    .rs .chain:active { transform: translateY(2px); border-bottom-width:2px; }
+    .rs .chain.chain-feature { background: var(--brand-100); border-color: var(--brand-500); border-bottom-color: var(--brand-700); }
+    .rs .chain.chain-feature:not(.chain-prim) .cic { background: var(--brand-100); color: var(--brand-400); }
+    .rs[data-theme="light"] .chain.chain-feature:not(.chain-prim) .cic { color: var(--brand-600); }
+    .rs .chain.chain-prim .cic { background: var(--brand-600); color:#fff; }
   </style>
 
   {% if clarity_project_id %}
