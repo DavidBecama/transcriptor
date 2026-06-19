@@ -2348,10 +2348,7 @@ def whop_webhook():
         return "", 200
     raw = request.get_data()
     if not _whop_verify_signature(raw, request.headers):
-        # Diagnóstico QA: nombres+valores de cabeceras de firma (el HMAC NO es secreto)
-        # para confirmar el esquema real de Whop en la primera entrega real.
-        _sh = {k: v for k, v in request.headers.items() if ("whop" in k.lower() or "sign" in k.lower() or "webhook" in k.lower())}
-        logger.warning("[whop] firma inválida desde %s · hdrs=%s · body[:140]=%s", get_client_ip(), _sh, raw[:140])
+        logger.warning("[whop] firma inválida desde %s", get_client_ip())
         return jsonify({"error": "invalid signature"}), 400
     try:
         event = json.loads(raw.decode("utf-8"))
@@ -2365,9 +2362,6 @@ def whop_webhook():
     _memb = data.get("membership") if isinstance(data.get("membership"), dict) else {}
     plan_id = (_whop_str_id(data.get("plan")) or _whop_str_id(data.get("plan_id"))
                or _whop_str_id(_memb.get("plan")) or _whop_str_id(_memb.get("plan_id")))
-    # QA temporal: shape real del payload para confirmar mapeo (quitar antes de prod).
-    logger.info("[whop] %s · plan_id=%r · data.keys=%s · plan.type=%s",
-                action, plan_id, sorted(data.keys()), type(data.get("plan")).__name__)
     md = data.get("metadata")
     if not (isinstance(md, dict) and md.get("user_id")):
         md = _memb.get("metadata") if isinstance(_memb.get("metadata"), dict) else (md if isinstance(md, dict) else {})
