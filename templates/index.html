@@ -10693,7 +10693,7 @@
     <a class="nav-mob-cta nav-mob-cta-primary" id="navMobApp" href="/app" onclick="ctaWorkspaceClick()" style="display:none" data-i18n-es="Entrar app" data-i18n-en="Open app">Entrar app</a>
     <button class="nav-mob-cta" id="navMobLoginBtn" onclick="openAuth('login','nav_mob')" data-i18n-es="Entrar" data-i18n-en="Sign in">Entrar</button>
     <button class="nav-mob-cta nav-mob-cta-primary" id="navMobRegBtn" onclick="openAuth('register','nav_mob')" data-i18n-es="Empezar gratis" data-i18n-en="Get started">Empezar gratis</button>
-    {% if workspace %}<button class="nav-upgrade-btn" id="navUpgradeBtn" onclick="openUpgradeModal('nav')" style="display:none" data-i18n-es="✦ Upgrade" data-i18n-en="✦ Upgrade">✦ Upgrade</button>{% endif %}
+    {% if workspace %}<button class="nav-upgrade-btn" id="navUpgradeBtn" onclick="openPlanOrUpgrade('nav')" style="display:none">✦ Mejorar plan</button>{% endif %}
     <button class="theme-btn" id="themeBtn" title="Theme">🌙</button>
     <div class="user-menu-wrap">
       <div class="user-pill" id="userPill" onclick="toggleUserMenu(event)" style="cursor:pointer" data-tour="user-profile">
@@ -15172,6 +15172,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   setLang(currentLang);
   initPrices();
   highlightActiveLang();
+  billingCfg();   // precarga el proveedor activo → el checkout abre sin await dentro del click (gesto de usuario)
   await refreshMe();
   highlightActiveLang();
   if (st.user) { loadHistory(); loadAssistants(); loadProjects(); }
@@ -15832,9 +15833,15 @@ function renderProfileHub() {
   // Manage sub button in sidebar
   document.getElementById("profManageSubSidebar").style.display = st.hasStripeSub ? "" : "none";
 
-  // Nav Upgrade button — visible in workspace when not on highest tier
+  // Nav Upgrade button — persistente en el workspace (conversión). En el tier más
+  // alto se convierte en acceso a "Mi plan"; en el resto, a "Mejorar plan".
   const navUp = document.getElementById("navUpgradeBtn");
-  if (navUp) navUp.style.display = (plan !== "agency") ? "" : "none";
+  if (navUp) {
+    navUp.style.display = "";
+    navUp.textContent = (plan === "agency")
+      ? (currentLang === "es" ? "Mi plan" : "My plan")
+      : (currentLang === "es" ? "✦ Mejorar plan" : "✦ Upgrade");
+  }
 
   // Settings: Plan & Billing card
   const setPlanBadge = document.getElementById("settingsPlanBadge");
@@ -23149,8 +23156,15 @@ function pickTopupPack(el) {
 let _billingCfg = null, _paddleReady = null;
 async function billingCfg() {
   if (_billingCfg) return _billingCfg;
-  try { const r = await fetch("/api/billing/config"); _billingCfg = await r.json(); }
-  catch (e) { _billingCfg = { provider: "stripe" }; }
+  try {
+    const r = await fetch("/api/billing/config");
+    if (!r.ok) throw new Error("billing/config " + r.status);
+    _billingCfg = await r.json();
+  } catch (e) {
+    // Fallback transitorio: NO lo cacheamos. Si lo guardáramos, un fallo puntual
+    // del primer fetch dejaría toda la sesión pillada en Stripe aunque el flag sea whop.
+    return { provider: "stripe" };
+  }
   return _billingCfg;
 }
 function ensurePaddle(cfg) {
@@ -23190,13 +23204,27 @@ function whopPlanId(cfg, plan, cycle, cur) {
   try { return cfg.whop.plans[plan][cycle === "year" ? "YEAR" : "MONTH"][(cur || "eur").toUpperCase()]; }
   catch (e) { return ""; }
 }
+let _whopCheckoutPending = false;
 function whopCheckout(planId) {
   if (!planId) { showToast(currentLang === "es" ? "Plan no configurado" : "Plan not configured"); return; }
   const cfg = _billingCfg || {};
   const base = (cfg.whop && cfg.whop.checkout_base) || "https://whop.com/checkout";
   const uid = (st.user && st.user.id) || "";
-  window.location.href = base + "/" + planId + "?metadata[user_id]=" + encodeURIComponent(uid);
+  const url = base + "/" + planId + "?metadata[user_id]=" + encodeURIComponent(uid);
+  // Pestaña nueva: la app se queda intacta (el «atrás» del checkout ya no saca a la
+  // landing). Si el navegador bloquea el popup, fallback al mismo tab.
+  const w = window.open(url, "_blank");
+  if (w) _whopCheckoutPending = true;
+  else window.location.href = url;
 }
+// Al volver al tab de la app tras el checkout de Whop, refrescamos plan/créditos
+// (el webhook ya habrá actualizado el perfil server-side).
+window.addEventListener("focus", () => {
+  if (!_whopCheckoutPending) return;
+  _whopCheckoutPending = false;
+  if (typeof refreshMe === "function") refreshMe();
+  if (typeof loadSubscriptionInfo === "function") loadSubscriptionInfo();
+});
 
 async function submitTopup() {
   const btn = document.getElementById("btnTopupOk");
@@ -23476,6 +23504,19 @@ const PLAN_META = {
 };
 
 const PLAN_RANK = { free: 0, pro: 1, creator: 2, estudio: 3, agency: 4 };
+
+// Entrada única del botón persistente de la nav: en el tier tope lleva a "Mi plan"
+// (ajustes), en el resto abre el modal de mejora. Para conversión y para que el
+// usuario de pago siempre tenga a un clic su plan, cambiarlo o gestionarlo.
+function openPlanOrUpgrade(source) {
+  if (!st.user) { openAuth("register"); return; }
+  if (st.plan === "agency") {
+    if (typeof profTab === "function") profTab("settings");
+    if (typeof loadSubscriptionInfo === "function") loadSubscriptionInfo();
+    return;
+  }
+  openUpgradeModal(source);
+}
 
 function openUpgradeModal(source) {
   if (!st.user) { openAuth("register"); return; }
