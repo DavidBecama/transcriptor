@@ -3826,6 +3826,7 @@ def adapt():
         else:
             return jsonify({"error": "Assistant not found"}), 404
     cost_cents = 0
+    charge_mode = "none"   # none | monthly | credits — qué cobrará el task tras generar
 
     # ── Comprobar límites / saldo (adapt usa free_adapt_used_today) ──────────
     if user and user.get("email", "").lower() in UNLIMITED_EMAILS:
@@ -3841,8 +3842,10 @@ def adapt():
             if not ok:
                 return jsonify({"error": err_msg}), 429
             cost_cents = 0
+            charge_mode = "monthly"
         elif profile["credits_cents"] >= COST_CENTS:
             cost_cents = COST_CENTS
+            charge_mode = "credits"
         else:
             # A3: «Hazlo tuyo» es de pago. Free sin créditos → muro de planes.
             # growth-1: paywall_shown. after_first_value=False — este muro bloquea
@@ -3858,38 +3861,15 @@ def adapt():
                 "message": "«Hazlo tuyo» es una función de pago. Sube a Creador o recarga créditos."
             }), 402
 
-    try:
-        result = adapt_with_ai(text, style, custom_prompt, voice=(get_voice_profile(user["id"]) if user else None), user_id=(user["id"] if user else None))
-    except requests.HTTPError as e:
-        return jsonify({"error": f"Error de la API: {e}"}), 502
-    except Exception as e:
-        logger.error(f"Error: {e}", exc_info=True)
-        return jsonify({"error": "Internal server error. Please try again."}), 500
-
-    # Actualizar contadores — BAJO LOCK por-usuario (Redis) + re-lectura, para que
-    # dos workers no doblen el gasto (carrera read-then-write entre workers).
-    is_unlimited = user and user.get("email", "").lower() in UNLIMITED_EMAILS
-    if not is_unlimited and user:
-        _aclock = acquire_credit_lock(user["id"])
-        try:
-            fresh = get_profile(user["id"])
-            if paid_features_active(fresh, user):
-                db.table("profiles").update({
-                    "monthly_usage": (fresh.get("monthly_usage") or 0) + 1
-                }).eq("id", user["id"]).execute()
-            elif cost_cents > 0:
-                db.table("profiles").update(
-                    {"credits_cents": (fresh.get("credits_cents") or 0) - cost_cents}
-                ).eq("id", user["id"]).execute()
-        finally:
-            release_credit_lock(user["id"], _aclock)
-
-    payload: dict = {"result": result, "cost_cents": cost_cents}
-    if user:
-        updated = get_profile(user["id"])
-        payload["credits_cents"]   = updated["credits_cents"]
-        payload["free_used_today"] = updated["free_used_today"]
-    return jsonify(payload)
+    # ── ASYNC: Gemini 2.5 Pro tarda >60s en guiones largos; el request sync cruzaba
+    # el readTimeout (~60s) de Traefik → 502. Encolamos como el resto de generación
+    # (espejo de /api/.../generate-script → /task/script/<id>). El gating ya se hizo
+    # arriba (fast-reject); el COBRO lo hace el task tras éxito (no aquí) → sin doble
+    # cobro entre polls. Frontend hace polling a /task/adapt/<task_id>.
+    from tasks import adapt_task  # noqa: E402
+    ar = adapt_task.delay(text, style, custom_prompt,
+                          user["id"] if user else None, charge_mode, cost_cents)
+    return jsonify({"task_id": ar.id, "status": "queued"}), 202
 
 
 def _extract_hook(raw: str) -> str:
@@ -8999,6 +8979,36 @@ def task_script_status(task_id: str):
     if state == "FAILURE":
         return jsonify({"state": "failed", "error": "task_failure",
                         "message": "Error procesando el reel. Inténtalo de nuevo."})
+    return jsonify({"state": "pending"})
+
+
+@app.route("/task/adapt/<task_id>", methods=["GET"])
+@require_auth
+@limiter.limit("60 per minute")
+def task_adapt_status(task_id: str):
+    """Polling de adapt_task (/adapt async). En éxito devuelve la MISMA shape que la
+    respuesta sync de antes: {state:"success", result, cost_cents, credits_cents,
+    free_used_today}, para que los callers del frontend no cambien su contrato."""
+    from tasks import adapt_task  # noqa: E402
+    task = adapt_task.AsyncResult(task_id)
+    state = task.state
+    if state in ("PENDING", "STARTED", "PROGRESS"):
+        return jsonify({"state": "pending"})
+    if state == "SUCCESS":
+        r = task.result or {}
+        if not isinstance(r, dict):
+            return jsonify({"state": "failed", "error": "bad_result"})
+        if r.get("ok"):
+            out = {"state": "success", "result": r.get("result"), "cost_cents": r.get("cost_cents", 0)}
+            if "credits_cents" in r:   out["credits_cents"]   = r["credits_cents"]
+            if "free_used_today" in r: out["free_used_today"] = r["free_used_today"]
+            return jsonify(out)
+        # ok=False → error controlado del task (gating/llm).
+        return jsonify({"state": "failed", "error": r.get("error") or "unknown",
+                        "message": r.get("message") or "No se pudo generar. Inténtalo de nuevo."})
+    if state == "FAILURE":
+        return jsonify({"state": "failed", "error": "task_failure",
+                        "message": "Internal server error. Please try again."})
     return jsonify({"state": "pending"})
 
 

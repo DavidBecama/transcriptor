@@ -15268,11 +15268,8 @@ async function runAdaptWithAssistant(id) {
   const _rot = startLoadingRotator(document.getElementById("previewSpinnerMsg"));
 
   try {
-    const r = await fetch("/adapt", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, style: "custom", assistant_id: id }),
-    });
-    const d = await r.json();
+    const r = await adaptViaTask({ text, style: "custom", assistant_id: id });
+    const d = r;
     stopLoadingRotator(_rot);
     previewSpinner.classList.remove("on");
     previewContent.style.visibility = "visible";
@@ -15944,6 +15941,32 @@ function initScrollReveal() {
 }
 
 // ── Auth state ────────────────────────────────────────────────────────────
+// /adapt es async (202 + task_id): Gemini 2.5 Pro tarda >60s y Traefik cortaba la
+// conexión a ~60s → 502. Hace polling a /task/adapt/<id> y devuelve la MISMA forma que
+// la respuesta sync de antes ({ ok, status, result, credits_cents, free_used_today,
+// error }) → los callers no cambian su contrato (r.ok / d.result / d.error / d.credits).
+async function adaptViaTask(payload) {
+  const r0 = await fetch("/adapt", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (r0.status !== 202) {                         // gating 4xx (402/429/…): shape antigua
+    const d = await r0.json().catch(() => ({}));
+    return { ok: r0.ok, status: r0.status, ...d };
+  }
+  const { task_id } = await r0.json();
+  for (let i = 0; i < 90; i++) {                   // ~3 min @ 2s (cubre los hangs largos de Gemini)
+    await new Promise((res) => setTimeout(res, 2000));
+    let d;
+    try { d = await (await fetch("/task/adapt/" + encodeURIComponent(task_id), { credentials: "same-origin" })).json(); }
+    catch (e) { continue; }
+    if (d.state === "pending") continue;
+    if (d.state === "success") return { ok: true, status: 200, ...d };
+    return { ok: false, status: 500, error: d.message || d.error || "Error" };
+  }
+  return { ok: false, status: 504, error: (typeof t === "function" ? t("toast.error_transform") : "Tardó demasiado. Inténtalo de nuevo.") };
+}
+
 async function refreshMe() {
   const res = await fetch("/auth/me");
   const d = await res.json();
@@ -20846,11 +20869,8 @@ async function rsQuickTransform(idx, style, btn) {
   btn.textContent = "...";
 
   try {
-    const res = await fetch("/adapt", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: item.text, style, custom_prompt: "", assistant_id: selectedAssistantId || "" }),
-    });
-    const d = await res.json();
+    const res = await adaptViaTask({ text: item.text, style, custom_prompt: "", assistant_id: selectedAssistantId || "" });
+    const d = res;
     chips.forEach(c => c.classList.remove("loading"));
     btn.textContent = { viral: "🔥 Viral", divertido: "😂 Funny", linkedin: "💼 LinkedIn", storytelling: "📖 Story", hooks: "🪝 Hooks" }[style] || style;
 
@@ -21187,11 +21207,8 @@ async function runInlineAdapt() {
 
   try { if (activeChip === "custom" && selectedAssistantId) { window.track && window.track.styleCustomUsed({ assistant_id: selectedAssistantId }); } } catch(e){}
   try {
-    const r = await fetch("/adapt", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, style: activeChip, custom_prompt: custom, assistant_id: selectedAssistantId }),
-    });
-    const d = await r.json();
+    const r = await adaptViaTask({ text, style: activeChip, custom_prompt: custom, assistant_id: selectedAssistantId });
+    const d = r;
     if (!r.ok) { showToast(d.error || t("toast.error_transform")); }
     else {
       body.textContent = d.result;
@@ -21437,11 +21454,8 @@ async function runAdapt() {
   _lastAdaptText = text;
   try { if (activeStyle === "custom" && selectedAssistantId) { window.track && window.track.styleCustomUsed({ assistant_id: selectedAssistantId }); } } catch(e){}
   try {
-    const r = await fetch("/adapt", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, style: activeStyle, custom_prompt: custom, assistant_id: selectedAssistantId }),
-    });
-    const d = await r.json();
+    const r = await adaptViaTask({ text, style: activeStyle, custom_prompt: custom, assistant_id: selectedAssistantId });
+    const d = r;
     stopLoadingRotator(_rot);
     previewSpinner.classList.remove("on");
     previewContent.style.visibility = "visible";
