@@ -6209,6 +6209,7 @@
     .scripts-tabs, .settings-tabs {
       display: flex; gap: 4px; margin: 0 0 var(--space-lg);
       border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;   /* FIX3: que las 5 tabs no se recorten nunca por ancho */
     }
     .scripts-tab, .settings-tab {
       background: none; border: none; cursor: pointer;
@@ -18081,7 +18082,10 @@ window.rsActivateLegacySection = function(kind) {
       try { highlightActiveLang(); } catch(e){}
       try { applyTheme(themePref); } catch(e){}
       try { loadSubscriptionInfo(); } catch(e){}
-      if (typeof settingsSwitchTab === "function") settingsSwitchTab("general", { skipHistory: true });
+      // FIX3: aterriza en la 1ª tab de CONTENIDO (Perfil y voz), no en General, para que
+      // las 3 secciones nuevas (perfil/plan/afiliados) sean lo primero que se ve.
+      const _st = (typeof _readSettingsTabFromUrl === "function" && _readSettingsTabFromUrl()) || "perfilvoz";
+      if (typeof settingsSwitchTab === "function") settingsSwitchTab(_st, { skipHistory: true });
     }
   } catch (e) { /* no romper la isla si una vista legacy falla */ }
 };
@@ -18098,7 +18102,7 @@ function _readSettingsTabFromUrl() {
   try {
     const params = new URLSearchParams(location.search);
     const t = params.get("tab");
-    return (t === "team" || t === "privacy" || t === "general") ? t : null;
+    return ["perfilvoz","plan","afiliados","general","team","privacy"].includes(t) ? t : null;
   } catch(e) { return null; }
 }
 
