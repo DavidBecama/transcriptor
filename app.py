@@ -2907,9 +2907,12 @@ _JSON_SCRIPT_SCHEMA = (
     '{"title": "título sacado del hook: su dato o ángulo específico en 3-8 palabras '
     '(p.ej. si el hook habla de 10 millones de tokens, el título menciona los tokens; '
     'nada de resúmenes temáticos genéricos; sin comillas, sin emojis)", '
-    '"hook": "las primeras 1-3 líneas que paran el scroll", '
-    '"body": ["línea 1 del desarrollo", "línea 2", "..."], '
-    '"closing": "la línea final que ancla"}. '
+    '"hook": "el MEJOR de 3 hooks — 1 línea del tirón que para el scroll", '
+    '"alt_hooks": ["2º hook con un DEVICE DISTINTO al del hook", "3er hook con OTRO device distinto"], '
+    '"body": ["frase 1 del guión", "frase 2", "..."], '
+    '"closing": "DOS cierres separados por  /  (variante 1 / variante 2; p.ej. un comment-CTA y un cierre suave)"}. '
+    'Reglas de salida: los 3 hooks (hook + los 2 de alt_hooks) usan 3 devices DISTINTOS. '
+    'body = frase a frase (cada elemento del array es UNA frase, se renderiza con ▸). '
     'Sin markdown, sin ```json, sin texto antes ni después. Solo el JSON.'
 )
 
@@ -2922,6 +2925,115 @@ _JSON_HOOKS_SCHEMA = (
     '{"type": "PROMESA", "text": "hook aquí"}]}. '
     'Sin markdown, sin ```json, sin texto antes ni después. Solo el JSON.'
 )
+
+# ── MÉTODO del cerebro (GENERADOR.md + METODO.md, cerebro/cerebro-instrucciones) ──
+# System prompt base que aplica el método de David. Se antepone al registro/tono.
+_METODO_BASE = (
+    "Eres el cerebro de guiones de ReelScript. Escribes guiones de reels que SEGMENTAN en "
+    "el primer segundo, dispersan el valor con loops, suenan al USUARIO (su voz) y NO suenan "
+    "a vendedor ni a IA. Replicas el PORQUÉ de lo que funciona, no plantillas.\n\n"
+    "MÉTODO (obligatorio):\n"
+    "1. Segmenta en la 1ª frase: que un colectivo concreto se sienta identificado YA (nunca genérico). "
+    "Vale 'para mujeres de +40', 'si juegas a Fortnite', 'infoproductor que…'.\n"
+    "2. Abre un loop y NO sueltes el valor entero de golpe; dispérsalo y ciérralo al final.\n"
+    "3. Conecta con 'pero' / 'por lo tanto', NUNCA con 'y además'. Ramifica, no apiles (regla South Park).\n"
+    "4. Rota el DEVICE de apertura entre los 3 hooks: kill-excuse, pregunta, antes-pensaba/hasta-que, "
+    "afirmación seca/contrarian, anécdota, enumeración+loop, promesa, newsjack, reflexivo ('profe curioso'). "
+    "No repitas molde.\n"
+    "5. NO mendigues retención: nada de 'te lo digo al final', 'el último es el mejor', 'aguanta'. "
+    "El loop se abre por curiosidad real.\n"
+    "6. Mete 1 recurso de concreción: un caso/persona, 'imagínate esto', antes/ahora, meme/actualidad.\n"
+    "7. Humaniza con coletillas reales ('si no, luego tenemos un problema', 'y ya está', 'tal cual', "
+    "'sin comerte la cabeza'); tacos suaves SOLO si el estilo del usuario lo pide. NADA de metáforas "
+    "forzadas tipo 'producción ardiendo'.\n"
+    "8. Cuerpo: segmenta → abre loop → valor disperso (pero/por-lo-tanto) → giro/insight (reencuadra: "
+    "el problema no era lo obvio) → sentencia memorable (corta, citable, guardable). Frase por frase.\n"
+    "9. Cierra según el OBJETIVO: Vender → comment-CTA ('comenta X y te paso…'); Crecer/Educar/Entretener "
+    "→ suave o sin CTA. Dosifica el CTA, no en todos.\n"
+    "10. Cero AI slop. Si suena a comunicado o a motivacional, reescríbelo.\n"
+    "Conserva datos, cifras, nombres y el ÁNGULO concreto del material fuente: un guion que valdría para "
+    "cualquier nicho es un guion fallido."
+)
+
+# Few-shot: imitar el PATRÓN (cadencia, loops, pero/por-lo-tanto, coletillas), NO copiar.
+_FEWSHOT_GUIONES = (
+    "\n\n=== EJEMPLOS DE REGISTRO (imita el PATRÓN, NO los copies) ===\n"
+    "[Fitness · device kill-excuse]\n"
+    "Hook: A los 25 estás fofo por una sola razón.\n"
+    "▸ A los 18 te saltabas la cena y ya estabas seco.\n"
+    "▸ Pero a los 25 te cambió la vida entera, no el cuerpo.\n"
+    "▸ De lunes a viernes comes bien y entrenas; pero el sábado te metes 3.000 calorías en birras.\n"
+    "▸ Por lo tanto en dos días borras lo que hiciste en cinco.\n"
+    "▸ Te pesas el lunes, no baja, y le echas la culpa al metabolismo.\n"
+    "▸ No es el metabolismo. Es que tu finde pesa más que tu semana.\n"
+    "Cierre: comenta FINDE y te paso el plan.\n\n"
+    "[Marketing · device reflexivo 'profe curioso']\n"
+    "Hook: Siempre me ha llamado la atención el Instagram de los negocios locales.\n"
+    "▸ Suben cuatro fotos del local y pagan a una agencia para que lo lleve.\n"
+    "▸ Pero, ¿hasta qué punto eso funciona de verdad?\n"
+    "▸ Imagina un reel que llega a 10.000 personas, la mitad de tu zona.\n"
+    "▸ Instagram, por diseño, enseña mucho más los vídeos que las fotos.\n"
+    "▸ Bueno, tampoco es que los posts no sirvan.\n"
+    "▸ Así que igual el error no es hacer posts; es esperar que hagan el trabajo del vídeo.\n"
+    "Cierre: No sé, a mí me cuadra así. ¿Tú cómo lo ves?"
+)
+
+# Semilla por nicho (BANCO-nichos-hooks.md): hooks de referencia (fórmula, no copiar).
+_NICHE_SEED = {
+    "fitness":  ["¿Por qué a los 25 dejas de marcar aunque entrenes más que nunca?",
+                 "El cardio en ayunas a los 25 te quema músculo, no grasa."],
+    "nutri":    ["¿Comes sano y no bajas de peso? El problema no está en el plato.",
+                 "Tu desayuno 'saludable' te tiene con hambre a las 11."],
+    "finanz":   ["¿Cobras 2.000 y no llegas a fin de mes? No gastas de más, gastas mal.",
+                 "Tu dinero parado en el banco pierde valor cada mes."],
+    "marketing":["¿Buen producto y no vendes? El precio no es el problema.",
+                 "Bajar precios para vender más te está haciendo vender menos."],
+    "negocio":  ["¿Buen producto y no vendes? El precio no es el problema.",
+                 "El reel trae a la gente, pero el perfil es el que cierra."],
+    "desarrollo":["¿Empiezas hábitos y los dejas en 2 semanas? No es falta de disciplina.",
+                  "Si necesitas motivación para empezar, ya empezaste mal."],
+    "mentalidad":["Si necesitas motivación para empezar, ya empezaste mal.",
+                  "La motivación no viene antes de la acción, viene después."],
+    "skincare": ["¿7 productos y la piel sigue mal? Sobran 5.",
+                 "Si tu piel tira después de lavarte la cara, lo estás haciendo mal."],
+    "belleza":  ["¿7 productos y la piel sigue mal? Sobran 5.",
+                 "3 errores que te envejecen la piel, y el 3º lo haces cada mañana."],
+}
+
+
+def _match_niche_seed(niche: str):
+    """Devuelve los hooks-semilla del nicho que mejor casa (substring), o None."""
+    n = (niche or "").strip().lower()
+    if not n:
+        return None
+    for key, hooks in _NICHE_SEED.items():
+        if key in n or n in key:
+            return hooks
+    return None
+
+
+def _user_method_context(user_id) -> str:
+    """Bloque de contexto del usuario para el generador: nicho + objetivo + hooks-semilla
+    del nicho (BANCO). El tono/voz se inyecta aparte (voice_prompt_block)."""
+    try:
+        prof = get_profile(user_id)
+    except Exception:
+        return ""
+    niche = (prof.get("niche") or "").strip()
+    goal = (prof.get("goal") or "").strip()
+    subs = prof.get("subniches") or []
+    out = ""
+    if niche or goal:
+        out += "\n\n=== TU CONTEXTO ===\n"
+        if niche:
+            out += "Nicho: " + niche + (("" if not subs else " (sub: " + ", ".join([str(s) for s in subs[:3]]) + ")")) + "\n"
+        if goal:
+            out += "Objetivo: " + goal + " — condiciona el ángulo y el CTA según esto.\n"
+    seed = _match_niche_seed(niche)
+    if seed:
+        out += "Hooks-semilla de tu nicho (referencia de FÓRMULA, NO los copies): " + " · ".join(seed) + "\n"
+    return out
+
 
 STYLE_PROMPTS = {
 
@@ -3572,11 +3684,17 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
     if style == "custom":
         if not custom_prompt:
             raise ValueError("Escribe tus instrucciones en el campo Custom")
-        system = CUSTOM_BASE + custom_prompt + _JSON_CUSTOM_SUFFIX
+        registro = CUSTOM_BASE + custom_prompt + _JSON_CUSTOM_SUFFIX
     else:
-        system = STYLE_PROMPTS.get(style)
-        if not system:
+        registro = STYLE_PROMPTS.get(style)
+        if not registro:
             raise ValueError("Estilo no válido")
+
+    # GENERADOR (cerebro/cerebro-instrucciones): el MÉTODO va primero como base, con el
+    # contexto del usuario (nicho/objetivo + semilla de nicho) y few-shot; el registro/tono
+    # pedido va después. La voz del usuario se inyecta como CONTEXTO más abajo (ctx).
+    method = _METODO_BASE + (_user_method_context(user_id) if user_id else "") + _FEWSHOT_GUIONES
+    system = method + "\n\n=== REGISTRO / TONO PEDIDO ===\n" + registro
 
     # Moat: CONTEXTO de estilo (no cambia el formato de salida). Se reafirma el JSON al final.
     ctx = ""
@@ -3594,8 +3712,8 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
         ctx += brain_voice_block(user_id)                     # gusto del Brain «Entrenar» (👍/👎 + sugerencias)
     if ctx:
         system = (system + ctx +
-                  "\n\nIMPORTANTE: lo anterior es CONTEXTO de estilo. Responde SOLO con el "
-                  "JSON pedido (hook, body, closing). No copies los ejemplos literalmente.")
+                  "\n\nIMPORTANTE: lo anterior es CONTEXTO (voz, ejemplos, método). Responde SOLO "
+                  "con el JSON pedido. No copies los ejemplos literalmente: imita el PATRÓN.")
 
     raw = _call_llm(system, text)
     return _parse_ai_json(raw, style)

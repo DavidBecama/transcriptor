@@ -1677,8 +1677,13 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             return _fail("llm_error", "No se pudo generar el guion. Inténtalo de nuevo.")
 
         llm_title = ""
-        if isinstance(result, dict) and result.get("title"):
-            llm_title = str(result["title"]).strip()[:80]
+        _alt_hooks = None   # 3 hooks (device distinto): persistimos los 2 alternativos.
+        if isinstance(result, dict):
+            if result.get("title"):
+                llm_title = str(result["title"]).strip()[:80]
+            _ah = result.get("alt_hooks")
+            if isinstance(_ah, list):
+                _alt_hooks = [str(h).strip() for h in _ah if str(h or "").strip()][:4] or None
         if isinstance(result, dict) and "hook" in result:
             flat = (result["hook"] + "\n" +
                     "\n".join(result.get("body", [])) + "\n" +
@@ -1737,6 +1742,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                 "from_competitor_reel_id": reel["id"],
                 "from_competitor_username": ig_username,
                 "assistant_name":         _TASK_LABELS.get(style_label, style_label) if style_label else None,
+                "alt_hooks":              _alt_hooks,   # 2 hooks alternativos (device distinto)
             }).execute()
             if ins.data:
                 script_id = ins.data[0].get("id")
