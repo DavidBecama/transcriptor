@@ -2242,6 +2242,23 @@ def _paddle_api(method: str, path: str, body=None):
         return 0, {"error": str(e)}
 
 
+def _whop_api(method: str, path: str, body=None):
+    """Llamada a la API de Whop (server-side, con WHOP_API_KEY). Mismo contrato que
+    _paddle_api: devuelve (status_code, json|{})."""
+    if not WHOP_API_KEY:
+        return 0, {"error": "no_api_key"}
+    try:
+        r = requests.request(
+            method, WHOP_API_BASE + path,
+            headers={"Authorization": "Bearer " + WHOP_API_KEY,
+                     "Content-Type": "application/json"},
+            json=body, timeout=20)
+        return r.status_code, (r.json() if r.content else {})
+    except Exception as e:
+        logger.warning("[whop] api %s %s failed: %s", method, path, e)
+        return 0, {"error": str(e)}
+
+
 def _paddle_verify_signature(raw: bytes, sig_header: str) -> bool:
     """Verifica Paddle-Signature: 'ts=<unix>;h1=<hmac_sha256_hex>'.
     HMAC-SHA256 de f'{ts}:{raw}' con PADDLE_WEBHOOK_SECRET."""
@@ -2574,7 +2591,14 @@ def whop_webhook():
                 track_event("brand_addon_purchased", uid, {"slots": cur + 1, "provider": "whop"})
             elif mapped:
                 plan = mapped["plan"]
-                db.table("profiles").update({"plan": plan}).eq("id", uid).execute()
+                # Guardamos el id de membresía en stripe_subscription_id (columna genérica
+                # de "sub activa"): habilita la cancelación self-serve por API y hace que
+                # paid_features_active reconozca al usuario Whop como pago REAL.
+                _upd = {"plan": plan}
+                _mid = _whop_str_id(_memb.get("id")) or _whop_str_id(data.get("id"))
+                if _mid:
+                    _upd["stripe_subscription_id"] = _mid
+                db.table("profiles").update(_upd).eq("id", uid).execute()
                 grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
                 track_event("subscription_upgraded", uid, {"plan": plan, "plan_id": plan_id, "provider": "whop"})
 
@@ -2753,15 +2777,39 @@ def manage_subscription():
 @app.route("/cancel-subscription", methods=["POST"])
 @require_auth
 def cancel_subscription():
-    if not STRIPE_OK:
-        return jsonify({"error": "Pagos no disponibles"}), 503
-
+    """Cancelación self-serve. Política: acceso hasta el fin del periodo ya pagado,
+    sin reembolso de la renovación en curso. Por proveedor:
+      - Whop  → API cancel-at-period-end con el id de membresía (stripe_subscription_id);
+                si no hay id o la API falla, se devuelve el portal de Whop (self-serve).
+      - Stripe→ Subscription.modify(cancel_at_period_end=True)."""
     user = current_user()
     profile = get_profile(user["id"])
     sub_id = profile.get("stripe_subscription_id")
+    _msg_ok = ("Suscripción cancelada. Conservas el acceso hasta el final del periodo "
+               "que ya pagaste; no se renovará.")
+
+    # ── Whop ──────────────────────────────────────────────────────────────────
+    if _active_provider == "whop":
+        if sub_id:
+            code, _resp = _whop_api("POST", f"/api/v2/memberships/{sub_id}/cancel")
+            if 200 <= code < 300:
+                track_event("subscription_cancel_requested", user["id"], {
+                    "from_plan": profile.get("plan"), "provider": "whop"})
+                return jsonify({"ok": True, "mode": "api", "message": _msg_ok})
+            logger.warning("[whop] cancel API code=%s sub=%s → portal fallback", code, sub_id)
+        # Sin id de membresía o API no disponible → portal de Whop (self-serve real).
+        portal = os.environ.get("WHOP_PORTAL_URL", "https://whop.com/orders")
+        track_event("subscription_cancel_requested", user["id"], {
+            "from_plan": profile.get("plan"), "provider": "whop", "mode": "portal"})
+        return jsonify({"ok": True, "mode": "portal", "portal_url": portal,
+                        "message": "Gestiona la baja en tu portal de Whop. "
+                                   "Conservas el acceso hasta el fin del periodo pagado."})
+
+    # ── Stripe (proveedor por defecto) ─────────────────────────────────────────
+    if not STRIPE_OK:
+        return jsonify({"error": "Pagos no disponibles"}), 503
     if not sub_id:
         return jsonify({"error": "No tienes suscripción activa"}), 400
-
     try:
         stripe_lib.Subscription.modify(sub_id, cancel_at_period_end=True)
         # growth-1: solicitud de baja (a fin de periodo). Distinto de la
@@ -2769,7 +2817,7 @@ def cancel_subscription():
         track_event("subscription_cancel_requested", user["id"], {
             "from_plan": profile.get("plan"),
         })
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "mode": "api", "message": _msg_ok})
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
         return jsonify({"error": "Internal server error. Please try again."}), 500

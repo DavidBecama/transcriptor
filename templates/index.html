@@ -11237,6 +11237,10 @@
     #profPanelSettings .set-plan-credits-row { display:flex; justify-content:space-between; font-size:13.5px; color:var(--text-secondary); margin-bottom:8px; }
     #profPanelSettings .set-plan-bar { height:9px; border-radius:999px; background:var(--surface-overlay); overflow:hidden; }
     #profPanelSettings .set-plan-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--brand-500),var(--brand-400)); }
+    #profPanelSettings .set-cancel-link { display:block; margin:12px auto 0; background:none; border:none; color:var(--text-tertiary); font:inherit; font-size:12.5px; text-decoration:underline; cursor:pointer; padding:4px; }
+    #profPanelSettings .set-cancel-link:hover { color:var(--text-secondary); }
+    #profPanelSettings .set-cancel-link:disabled { opacity:.6; cursor:default; }
+    #profPanelSettings .set-cancel-note { margin-top:8px; font-size:12.5px; color:var(--text-secondary); line-height:1.45; text-align:center; }
     #profPanelSettings .set-plan-hint { font-size:12.5px; color:var(--text-tertiary); display:block; margin-top:7px; }
     #profPanelSettings .set-plan-actions { display:flex; gap:10px; flex-wrap:wrap; }
     #profPanelSettings .set-plan-usage { padding:22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:20px; display:flex; flex-direction:column; gap:6px; }
@@ -13833,6 +13837,8 @@
                 <button class="btn-3d btn-3d-primary set-btn" onclick="settingsRecharge()">Recargar créditos</button>
                 <button class="btn-3d btn-3d-secondary set-btn" onclick="settingsChangePlan()">Cambiar plan</button>
               </div>
+              <button class="set-cancel-link" id="setCancelBtn" onclick="settingsCancelSub()" style="display:none">Cancelar suscripción</button>
+              <div class="set-cancel-note" id="setCancelNote" style="display:none"></div>
             </div>
             <div class="set-plan-usage">
               <span class="set-plan-usage-t">Este mes</span>
@@ -18229,6 +18235,28 @@ function fillSettingsPlan() {
       <div class="plan-card-feat">${p.feat}</div>
       ${p.key===cur?'<div class="plan-card-cur">Tu plan</div>':""}
     </div>`).join("");
+  // Cancelar suscripción: solo planes de pago (no trial/free).
+  const cancelBtn = document.getElementById("setCancelBtn");
+  if (cancelBtn) cancelBtn.style.display = (["basic","estudio","agency"].includes(cur)) ? "" : "none";
+}
+// Cancelación self-serve (bloque B). Política: acceso hasta fin de periodo, sin
+// reembolso de la renovación en curso. Backend ramifica por proveedor (Whop/Stripe);
+// si Whop devuelve portal, abrimos su página de gestión.
+function settingsCancelSub(){
+  if (!confirm("¿Cancelar tu suscripción?\n\nConservas el acceso hasta el final del periodo que ya pagaste. No se renovará y no se reembolsa la renovación en curso.")) return;
+  const note = document.getElementById("setCancelNote");
+  const btn = document.getElementById("setCancelBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Cancelando…"; }
+  fetch("/cancel-subscription", { method:"POST", headers:{"Content-Type":"application/json"}, credentials:"same-origin" })
+    .then(r => r.json().then(d => ({ ok:r.ok, d })))
+    .then(({ ok, d }) => {
+      if (btn) { btn.disabled = false; btn.textContent = "Cancelar suscripción"; }
+      if (!ok || (d && d.error)) { if (note){ note.style.display=""; note.textContent = (d&&d.error) || "No se pudo cancelar. Inténtalo de nuevo."; } return; }
+      if (d && d.mode === "portal" && d.portal_url) { try { window.open(d.portal_url, "_blank"); } catch(e){} }
+      if (note) { note.style.display = ""; note.textContent = (d && d.message) || "Suscripción cancelada. Conservas el acceso hasta el fin del periodo."; }
+      if (typeof showToast === "function") showToast(d && d.message ? d.message : "Suscripción cancelada.");
+    })
+    .catch(() => { if (btn){ btn.disabled=false; btn.textContent="Cancelar suscripción"; } if (note){ note.style.display=""; note.textContent="Error de red. Inténtalo de nuevo."; } });
 }
 function settingsChangePlan(){ if (typeof openUpgradeModal==="function") openUpgradeModal("settings"); else if (typeof openPlanOrUpgrade==="function") openPlanOrUpgrade("settings"); }
 function settingsRecharge(pack){
