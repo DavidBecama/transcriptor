@@ -1257,6 +1257,13 @@
       '<div class="act-prog-steps">'+chips+'</div>'+
     '</div>';
   }
+  // Parse de views formateadas ("1,4 M" / "680 K" / "35432") → número, para sumar alcance.
+  function _parseViews(s){
+    if(typeof s==="number") return s;
+    var t=String(s||"").replace(/[, ]/g,"").toLowerCase();
+    var m=parseFloat(t)||0;
+    if(t.indexOf("m")>=0) return m*1e6; if(t.indexOf("k")>=0) return m*1e3; return m;
+  }
   /* RADAR HERO v3 (mockup David «RADAR exploración»): eyebrow mono + título Clash
      46px + sub + stats en línea + SCOPE animado (barrido cónico + blips). Sustituye
      al phead + statbar viejos. Tokens del island (azul=brand-500, verde=success-fg). */
@@ -1277,17 +1284,22 @@
     var line = st.exploded_week>0
       ? L("Mientras no mirabas, <b>"+st.exploded_week+" reel"+(st.exploded_week>1?"es":"")+" explotaron</b> en tu nicho. Esto es lo que merece tu próximo guion.","While you looked away, <b>"+st.exploded_week+" reel"+(st.exploded_week>1?"s":"")+" blew up</b> in your niche. This is what deserves your next script.")
       : L("Tus <b>"+n+" rivales</b> publicaron "+(st.reels_week||0)+" reels esta semana. Esto es lo que merece tu próximo guion.","Your <b>"+n+" rivals</b> posted "+(st.reels_week||0)+" reels this week. This is what deserves your next script.");
+    // Stats del mockup David: «explotaron hoy» · «la mayor explosión» · «alcance
+    // robable · en directo» (los dos primeros en verde; el tercero primario + dot live).
+    var _reels=feedReels(), maxMult=0, reach=0;
+    _reels.forEach(function(r){ if((r.explosion||0)>maxMult) maxMult=r.explosion||0; reach+=_parseViews(r.views); });
+    var multTxt = maxMult>0 ? (maxMult>=10?Math.round(maxMult):(Math.round(maxMult*10)/10))+"×" : "–";
+    var reachTxt = reach>0 ? String(Math.round(reach)).replace(/\B(?=(\d{3})+(?!\d))/g," ") : _fmtK(st.reels_week||0);
     var stats=[
-      {v:st.exploded_week||0, l:L("explotando ahora","exploding now"), c:"var(--success-fg)", live:true},
-      {v:n, l:L("rivales en el radar","rivals on radar"), c:"var(--text-primary)", live:false},
-      {v:st.reels_week||0, l:L("reels · 7 días","reels · 7 days"), c:"var(--brand-500)", live:false}
+      {v:_fmtK(st.exploded_week||0), l:L("explotaron hoy","blew up today"), c:"var(--success-fg)", live:false},
+      {v:multTxt, l:L("la mayor explosión","biggest blow-up"), c:"var(--success-fg)", live:false},
+      {v:reachTxt, l:L("alcance robable · en directo","stealable reach · live"), c:"var(--text-primary)", live:true}
     ];
     var statsH=stats.map(function(s){
-      return '<div class="rdr-stat"><span class="rdr-stat-v" style="color:'+s.c+'">'+_fmtK(s.v)+'</span>'+
+      return '<div class="rdr-stat"><span class="rdr-stat-v" style="color:'+s.c+'">'+ESC(String(s.v))+'</span>'+
         '<span class="rdr-stat-l">'+(s.live?'<span class="rdr-livedot"></span>':'')+ESC(s.l)+'</span></div>';
     }).join("");
-    var cap = n>0 ? L("vigilando "+n+" cuenta"+(n===1?"":"s")+" · en vivo","watching "+n+" account"+(n===1?"":"s")+" · live")
-                  : L("añade competidores para escanear","add competitors to scan");
+    var cap = L("robando lo que explota en tu nicho","stealing what explodes in your niche");
     return '<div class="rdr-hero">'+
       '<div class="rdr-hero-l">'+
         '<div class="rdr-eyebrow"><span class="rdr-eye-dot"></span>Radar · '+L("escaneando","scanning")+' '+n+' '+L("competidor"+(n===1?"":"es"),"competitor"+(n===1?"":"s"))+'</div>'+
