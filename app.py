@@ -8456,21 +8456,20 @@ def post_tracked_creator():
     if not limits["enabled"]:
         return jsonify({"error": "tc.error.upgrade_required"}), 403
 
-    # 3. project_id según plan
+    # 3. project_id según plan (B5: competidores aislados por MARCA en multi-marca).
     if plan == "agency":
         if not project_id:
             return jsonify({"error": "tc.error.project_required"}), 400
-        # Ownership: SOLO el owner del proyecto (no agency members).
+    if project_id:
+        # Ownership: SOLO el owner del proyecto (vale para agency Y estudio multi-marca).
         proj = (db.table("projects")
                   .select("id, user_id")
                   .eq("id", project_id)
                   .eq("user_id", user["id"])
                   .execute())
         if not proj.data:
-            return jsonify({"error": "tc.error.project_not_found"}), 404
-    else:
-        # Pro y Creator ignoran project_id si llega.
-        project_id = None
+            # Creator (1 marca) o project_id ajeno/centinela → competidor global del user.
+            project_id = None
 
     # 4. Validar límites
     extra_slots = get_user_extra_slots(user["id"])
