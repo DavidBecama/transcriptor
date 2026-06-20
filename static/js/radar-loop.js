@@ -897,8 +897,40 @@
     return '<details class="comp-manage"><summary>Tus competidores · '+t.length+'</summary><div class="comp-manage-list">'+rows+'</div></details>';
   }
 
+  // v3 (mockup David «llena mi semana»): fila degradada con icono azul + chispa
+  // naranja, título Clash, píldora «EN LOTE · 1 TOQUE» y CTA azul «Generar N guiones».
   function whaleHTML(count){
-    return '<div class="whale"><div class="wicon">'+IC.bolt+'</div><div class="wtext"><h4>Llena mi semana</h4><p>Convierte los '+count+' reels más explosivos en '+count+' guiones con tu voz, listos para grabar. De golpe.</p></div><button class="btn btn-md btn-secondary" data-act="fillweek">Hazlo</button></div>';
+    count=count||5;
+    return '<div class="whale">'+
+      '<div class="whale-l">'+
+        '<div class="whale-ic">'+IC.bolt+'</div>'+
+        '<div class="whale-tx">'+
+          '<div class="whale-h"><span class="whale-title">'+L("Llena mi semana","Fill my week")+'</span>'+
+            '<span class="whale-pill">'+L("EN LOTE · 1 TOQUE","BATCH · 1 TAP")+'</span></div>'+
+          '<p class="whale-sub">'+L("Cojo tus <b>"+count+" reels más explosivos</b> y te los devuelvo como <b>"+count+" guiones con tu voz</b>, listos para grabar. Sin ir uno a uno.","I grab your <b>"+count+" most explosive reels</b> and hand them back as <b>"+count+" scripts in your voice</b>, ready to record. No going one by one.")+'</p>'+
+        '</div>'+
+      '</div>'+
+      '<button class="btn btn-lg btn-primary" data-act="fillweek">'+IC.bolt+' '+L("Generar "+count+" guiones","Generate "+count+" scripts")+'</button>'+
+    '</div>';
+  }
+  /* v3 (mockup David «progreso / cerebro»): fila con icono cerebro azul, nivel +
+     contador «N/3 guiones para Nx», descripción y 3 segmentos de progreso, CTA
+     «Crear guion». Usa brainLevel() (señales reales) — no inventa el nivel. */
+  function radarCerebroRowHTML(){
+    var bl=brainLevel();
+    var g=Math.min(3,(bl.signals&&bl.signals.guiones)||0);
+    var nx=bl.next||bl.level;
+    var segs=''; for(var i=0;i<3;i++){ segs+='<span class="rcb-seg'+(i<g?' on':'')+'"></span>'; }
+    return '<div class="rcb">'+
+      '<div class="rcb-ic">'+IC.brain+'</div>'+
+      '<div class="rcb-body">'+
+        '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · nivel "+bl.level,"Your brain · level "+bl.level)+'</span>'+
+          '<span class="rcb-prog">'+g+'/3 '+L("guiones para N"+nx,"scripts to L"+nx)+'</span></div>'+
+        '<div class="rcb-desc">'+L("Cada guion que creas afina tu voz: el Cerebro clava mejor tu tono. Crea 3 para subir a <b>Nivel "+nx+"</b>.","Every script you make tunes your voice: the Brain nails your tone better. Make 3 to reach <b>Level "+nx+"</b>.")+'</div>'+
+        '<div class="rcb-bars">'+segs+'</div>'+
+      '</div>'+
+      '<button class="btn btn-md btn-secondary" data-act="tab" data-k="guiones">'+IC.plus+' '+L("Crear guion","Create script")+'</button>'+
+    '</div>';
   }
   function filtersHTML(){
     var base=[["explosion",IC.spark+' Explotando'],["recent","Recientes"],["fav",IC.starO+' Favoritos']];
@@ -1085,9 +1117,10 @@
      degrada a la card suelta de siempre. */
   function opportunityCarouselHTML(reels){
     if(!reels || !reels.length) return '';
-    if(reels.length===1) return opportunityHTML(reels[0],1);
+    var _th=_demoThumbs();
+    if(reels.length===1) return opportunityHTML(reels[0],1,_th?_th[0]:null);
     var slides=reels.map(function(r,i){
-      return '<div class="opp-slide" role="group" aria-label="Oportunidad '+(i+1)+' de '+reels.length+'">'+opportunityHTML(r,i+1)+'</div>';
+      return '<div class="opp-slide" role="group" aria-label="Oportunidad '+(i+1)+' de '+reels.length+'">'+opportunityHTML(r,i+1,_th?_th[i%_th.length]:null)+'</div>';
     }).join("");
     var dots=reels.map(function(r,i){
       return '<button class="opp-dot'+(i===0?" on":"")+'" data-act="opp-nav" data-k="'+i+'" aria-label="Ir a la oportunidad '+(i+1)+'"></button>';
@@ -1100,11 +1133,16 @@
     '</section>';
   }
 
-  /* card destacada — "tu oportunidad de hoy" (principio I: una respuesta) */
-  function opportunityHTML(r,idx){
+  /* card destacada — "tu oportunidad de hoy" (principio I: una respuesta).
+     v3 (mockup David «featured opportunity»): thumb limpio (foto/degradado + play
+     + «reel · handle» + dur), cuerpo (eyebrow azul · titular Clash · insight con
+     chispazo naranja · «Roba la idea» + estrella) y columna de stats 150px
+     (Explosión verde + barra · Views · Likes). Sin píldora «más explosivo». */
+  function opportunityHTML(r,idx,thumb){
     idx=idx||1;
     var mega=(r.explosion||0)>=5;
-    var thumbInner=r.thumb?'<img src="'+ESC(r.thumb)+'" alt="">':'<div class="play"></div>';
+    var t=thumb||r.thumb;
+    var thumbInner=t?'<img src="'+ESC(t)+'" alt="" loading="lazy">':'<div class="feat-ph" style="background:'+_galGrad(r.id||r.creator.handle)+'"></div>';
     var why = mega
       ? "Está reventando: "+ (r.explosionTxt!=null?r.explosionTxt:"")+"× lo normal de @"+r.creator.handle+". Si hay uno que robar hoy, es este."
       : "Por encima de la media de @"+r.creator.handle+". Buen punto de partida para hoy.";
@@ -1116,12 +1154,11 @@
         ? '<button class="feat-scarce out feat-scarce-btn" data-act="open-plans">'+IC.bolt+' '+L("Hechos tus 3 guiones de hoy — vuelve mañana o desbloquéalos","Today's 3 scripts done — come back tomorrow or unlock them")+' '+IC.arr+'</button>'
         : '<div class="feat-scarce">'+IC.bolt+' '+L("Te queda"+(_fl===1?"":"n")+" <b>"+_fl+"</b> guion"+(_fl===1?"":"es")+" hoy","<b>"+_fl+"</b> script"+(_fl===1?"":"s")+" left today")+'</div>');
     return '<article class="feature">'+
-      '<div class="feature-thumb"><div class="thumb">'+thumbInner+'<span class="thumb-tag">reel · '+ESC(r.creator.handle.slice(0,6))+'</span><span class="dur">'+ESC(r.dur)+'</span></div></div>'+
+      '<div class="feature-thumb"><div class="thumb">'+thumbInner+
+        '<span class="feat-play">'+_icPlay+'</span>'+
+        '<span class="thumb-tag">reel · @'+ESC(r.creator.handle)+'</span><span class="dur">'+ESC(r.dur)+'</span></div></div>'+
       '<div class="feature-main">'+
         '<div class="feature-eyebrow">Oportunidad #'+idx+' <span class="who">· @'+ESC(r.creator.handle)+' · '+ESC(r.when)+'</span></div>'+
-        // #1 core-loop (variar recompensa): cuando aparece un bombazo, la vuelta se
-        // siente especial (novedad genuina, no siempre igual). Solo si es excepcional.
-        (mega?'<div class="opp-mega">'+IC.spark+' '+L("El más explosivo de la semana","The week's biggest blow-up")+'</div>':'')+
         '<h2 class="feature-cap">'+ESC(r.cap)+'</h2>'+
         (r.sum?'<p class="feature-sum">'+ESC(r.sum)+'</p>':'')+
         '<div class="feature-why">'+IC.spark+'<span>'+ESC(why)+'</span></div>'+
@@ -1378,23 +1415,26 @@
       ? '<button class="see-all" data-act="expand-feed">'+IC.repeat+' Ver las '+rest.length+' oportunidades</button>'
       : '';
 
+    // v3 — espina del mockup David (Layout A), de arriba abajo:
+    //   hero → oportunidad → competidores+galería → cerebro/progreso → llena mi
+    //   semana → más señales. Los banners promo (flash/seed/activación/voz/serie)
+    //   se DEMOTAN bajo la espina para no romper la jerarquía visual de David.
     return '<div class="scroll"><div class="canvas">'+
-      radarHeroHTML()+            // v3 (mockup David): hero con scope animado + stats (sustituye phead+statbar)
+      radarHeroHTML()+            // hero con scope animado + stats (sustituye phead+statbar)
       (isAgency()?brandTabsHTML():"")+
-      // v3 (mockup David): la OPORTUNIDAD va justo tras el hero (acción «Roba la idea»
-      // arriba, sobre el fold). Los banners promo bajan debajo.
-      opportunityCarouselHTML(heroN)+
+      opportunityCarouselHTML(heroN)+   // OPORTUNIDAD justo tras el hero (acción sobre el fold)
+      (S.reels.length?(radarAddBarHTML()+filtersHTML()+competitorGalleryHTML()):"")+   // competidores + galería
+      radarCerebroRowHTML()+     // progreso/cerebro (nivel + barra + Crear guion)
+      (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+   // llena mi semana
+      // ── banners promo demotados (features reales, fuera de la espina) ──
       flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro
       trackedManageHTML()+
       activationProgressHTML()+   // endowed progress: «1/4 · Roba tu primera idea»
       seedBannerHTML()+           // SPEC #3: aviso «esto petó en tu nicho» con seed
-      suggestedCompHTML()+      // sugerir competidores proactivamente (Fathom 18/06)
-      voiceOnboardCardHTML()+   // B6+T1: banner de voz BAJO la oportunidad — no empuja el hero bajo el fold
-      nextSeriesHTML("dash")+   // B1+T1: "tu próxima serie" con CTA secundario en el Dashboard
-      (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+
-      // Galerías de miniaturas (port de Leonard) en lugar de la lista "Más señales":
-      // los filtros (fchip) se conservan y filtran la galería vía feedReels().
-      (S.reels.length?(radarAddBarHTML()+filtersHTML()+competitorGalleryHTML()+communityGalleryHTML()):"")+
+      suggestedCompHTML()+        // sugerir competidores proactivamente (Fathom 18/06)
+      voiceOnboardCardHTML()+     // B6+T1: banner de voz
+      nextSeriesHTML("dash")+     // B1+T1: "tu próxima serie"
+      (S.reels.length?communityGalleryHTML():"")+   // muro comunidad (≈ «más señales»)
     '</div></div>';
   }
 
