@@ -9901,6 +9901,15 @@
     /* nicho: chips + texto libre */
     .rs .onb-chips { display:flex; flex-wrap:wrap; gap:9px; margin-bottom:14px; }
     .rs .onb-chip { min-height:44px; padding:0 16px; border-radius:99px; border:1px solid var(--border-default); background:var(--surface-base); color:var(--text-secondary); font:inherit; font-family:var(--font-body); font-weight:600; font-size:14px; cursor:pointer; transition:all .14s ease; }
+    /* v3 (mockup David): nicho como grid de icon-cards (inicial en caja). */
+    .rs .onb-niche-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:14px; }
+    .rs .onb-ncard { display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding:16px; border-radius:15px; cursor:pointer; text-align:left; background:var(--surface-base); border:1px solid var(--border-default); color:var(--text-primary); font-family:var(--font-body); transition:border-color .18s var(--ease), background .18s var(--ease); }
+    .rs .onb-ncard:hover { border-color:var(--brand-400); }
+    .rs .onb-ncard.on { background:color-mix(in srgb, var(--brand-500) 12%, transparent); border-color:var(--brand-500); }
+    .rs .onb-ncard-ic { display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:var(--surface-overlay); color:var(--text-secondary); font-family:var(--font-display); font-weight:600; font-size:17px; }
+    .rs .onb-ncard.on .onb-ncard-ic { background:var(--brand-500); color:#fff; }
+    .rs .onb-ncard-l { font-weight:600; font-size:14.5px; }
+    @media (max-width:560px){ .rs .onb-niche-grid { grid-template-columns:1fr 1fr; } }
     .rs .onb-chip:hover { border-color:var(--brand-400); color:var(--text-primary); }
     .rs .onb-chip.on { background:color-mix(in srgb, var(--brand-500) 16%, transparent); border-color:var(--brand-500); color:var(--brand-200); }
     .rs[data-theme="light"] .onb-chip.on { color:var(--brand-700); }
@@ -9958,6 +9967,14 @@
     .rs .onb-brain-ring { display:flex; justify-content:center; margin:6px 0 22px; }
     .rs .onb-brain-ring .brain-ring { width:150px; height:150px; }
     .rs .onb-ring-pct { font-family:var(--font-display); font-size:34px; font-weight:600; line-height:1; letter-spacing:-.02em; color:var(--text-primary); }
+    /* Cierre centrado (mockup David): anillo + acento Syne + título + sub + CTA. */
+    .rs .onb-box--center { text-align:center; display:flex; flex-direction:column; align-items:center; }
+    .rs .onb-box--center .onb-h { max-width:460px; }
+    .rs .onb-box--center .onb-sub { max-width:440px; margin-bottom:4px; }
+    .rs .onb-box--center .onb-cta { margin-top:18px; max-width:340px; }
+    .rs .onb-close-ring { display:flex; justify-content:center; margin-bottom:18px; }
+    .rs .onb-close-ring .brain-ring { width:150px; height:150px; }
+    .rs .onb-close-accent { font-family:var(--font-accent); font-weight:700; font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--brand-500); margin-bottom:13px; }
     .rs[data-theme="light"] .onb-brain-v { color:var(--brand-700); }
     .rs .onb-checklist { list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:9px; }
     .rs .onb-checklist li { display:flex; align-items:flex-start; gap:9px; font-size:14px; color:var(--text-secondary); }
@@ -26904,6 +26921,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=34"></script>
+<script src="/static/js/radar-loop.js?v=35"></script>
 </body>
 </html>

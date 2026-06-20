@@ -480,11 +480,13 @@
   // Paso 2 — nicho (OBLIGATORIO): chips amplios + texto libre.
   function onbNicheHTML(){
     var _nc=nicheChips();
-    var chips=_nc.map(function(n){ var on=_norm(S.onb.niche)===_norm(n); return '<button class="onb-chip'+(on?" on":"")+'" data-act="onb-pick-niche" data-k="'+ESC(n)+'">'+ESC(n)+'</button>'; }).join("");
+    // v3 (mockup David): grid de icon-cards (icono = inicial del nicho) en vez de pills.
+    var chips=_nc.map(function(n){ var on=_norm(S.onb.niche)===_norm(n);
+      return '<button class="onb-ncard'+(on?" on":"")+'" data-act="onb-pick-niche" data-k="'+ESC(n)+'"><span class="onb-ncard-ic">'+ESC(n.charAt(0).toUpperCase())+'</span><span class="onb-ncard-l">'+ESC(n)+'</span></button>'; }).join("");
     var custom=(_nc.some(function(n){return _norm(n)===_norm(S.onb.niche);})||!S.onb.niche)?"":S.onb.niche;
     return onbCardWrap(onbEyebrow(L("tu terreno","your turf")),L("¿De qué va tu contenido?","What's your content about?"),
-      L("Elige tu nicho o escríbelo. Con esto encuentro qué está petando ahí — y a quién deberías vigilar.","Pick your niche or type it. With this I find what's blowing up there — and who you should be watching."),
-      '<div class="onb-chips">'+chips+'</div>'+
+      L("Elige el que más se acerque. Afinamos en el siguiente paso.","Pick the closest one. We refine it in the next step."),
+      '<div class="onb-niche-grid">'+chips+'</div>'+
       '<input id="rsOnbNiche" class="onb-text" type="text" placeholder="'+L("…o escríbelo (ej: nutrición deportiva)","…or type it (e.g. sports nutrition)")+'" value="'+ESC(custom)+'" aria-label="'+L("Tu nicho","Your niche")+'">'+
       onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-niche-next">'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
@@ -494,7 +496,7 @@
     var sel=(S.onb.subniches||[]).map(function(t){ return '<span class="onb-tag on" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+' <b>×</b></span>'; }).join("");
     var sugg=onbSubSuggest().slice(0,8).map(function(t){ return '<button class="onb-tag" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+'</button>'; }).join("");
     return onbCardWrap(onbEyebrow(L("afinemos","refine it")),L("¿Qué tratas dentro de "+(S.onb.niche||"lo tuyo")+"?","What do you cover in "+(S.onb.niche||"your niche")+"?"),
-      L("Cuanto más específico, mejor el match: <b>cosmética orgánica</b> es mejor que <b>cosmética</b>. Elige varias o añade las tuyas.","The more specific, the better the match: <b>organic skincare</b> beats <b>skincare</b>. Pick a few or add your own."),
+      L("Marca todo lo que toques. Cuanto más fino, mejor te leo el nicho.","The more specific, the better the match: <b>organic skincare</b> beats <b>skincare</b>. Pick a few or add your own."),
       '<div class="onb-tags" id="rsOnbTags">'+(sel||'<span class="onb-tags-ph">'+L("Tus etiquetas aparecerán aquí…","Your tags will show up here…")+'</span>')+'</div>'+
       '<div class="onb-tagadd"><span class="onb-hash">#</span><input id="rsOnbTagInput" class="onb-text onb-text--tag" type="text" placeholder="'+L("añade una etiqueta y Enter","add a tag and hit Enter")+'" aria-label="'+L("Añadir subnicho","Add subniche")+'"><button class="onb-tagadd-btn" data-act="onb-tag-add">'+IC.plus+'</button></div>'+
       (sugg?'<div class="onb-sugg-lbl">'+L("Sugerencias para tu nicho","Suggestions for your niche")+'</div><div class="onb-tags onb-tags--sugg">'+sugg+'</div>':'')+
@@ -583,7 +585,7 @@
     var compCta=S.onb.compLoading ? ''
       : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick+" y seguir","Follow "+nPick+" and continue")+'</button>';
     return onbCardWrap(onbEyebrow(L("a quién vigilamos","who to watch")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
-      L("Pre-elegí a 2 de tu subnicho. Seguiré sus reels que petan para que robes el primero en tu voz. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
+      L("Los que más explotan en tu nicho. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
       body+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+compCta+'</div>');
   }
@@ -592,35 +594,31 @@
     var cards=ONB_GOALS.map(function(g){ var on=S.onb.goal===g.key; return '<button class="onb-goal'+(on?" on":"")+'" data-act="onb-pick-goal" data-k="'+g.key+'">'+
       '<span class="onb-goal-ic">'+(IC[g.ic]||IC.spark)+'</span><span class="onb-goal-l">'+ESC(L(g.label,g.label_en))+'</span><span class="onb-goal-d">'+ESC(L(g.desc,g.desc_en))+'</span></button>'; }).join("");
     return onbCardWrap(onbEyebrow(L("para qué","what for")),L("¿Qué buscas con esto?","What are you after?"),
-      L("Con esto ajusto el tono y la estructura de tus guiones — vender no se escribe como entretener.","With this I tune the tone and structure of your scripts — selling isn't written like entertaining."),
+      L("Ajusto el tono de tus guiones a tu objetivo. Solo uno.","With this I tune the tone and structure of your scripts — selling isn't written like entertaining."),
       '<div class="onb-goals">'+cards+'</div>'+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-goal-next"'+(S.onb.goal?'':' disabled')+'>'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
   }
   // Paso 7 — CIERRE: Cerebro 35% + primer guión + camino a 100%.
   // Brief David v3: el cierre NO afirma en pasado lo que aún es async (el scrape del
   // perfil propio + competidores corre en segundo plano) → copy en presente/continuo.
+  // Paso 7 CIERRE (mockup David): centrado — anillo azul al 35% con «Cerebro · N1» +
+  // acento Syne «Manifestando viralidad» + título + sub corto + «Abrir mi primer guion».
   function onbCloseHTML(){
     var pct=35;
-    return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Listo","Ready")+'</div>',
-      L("Tu Cerebro ya sabe lo justo para empezar","Your Brain now knows just enough to start"),
-      L("Estoy leyendo tu cuenta y a tus 2 competidores ahora mismo. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía). Cada día, con <b>un ejercicio de 1 minuto</b>, subo un poco más — hasta sonar clavado a ti.","I'm reading your account and your 2 competitors right now. Your Brain is a <b>context profile</b> (not a full clone of your voice yet). Each day, with a <b>1-minute exercise</b>, it climbs a bit more — until it sounds just like you."),
-      // v3: anillo del Cerebro al 35% (mismo componente .brain-ring que el Cerebro),
-      // en vez de la barra plana — alinea el cierre al design system v3.
-      '<div class="onb-brain-ring"><div class="brain-ring">'+
+    return '<section class="onb-box onb-box--center">'+
+      '<div class="onb-close-ring"><div class="brain-ring">'+
         '<svg width="150" height="150" viewBox="0 0 172 172" class="brain-ring-svg" aria-hidden="true">'+
           '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
           '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+Math.round(465*(1-pct/100))+'" class="brain-ring-prog"/>'+
         '</svg>'+
-        '<div class="brain-ring-c"><span class="onb-ring-pct">'+pct+'%</span><span class="brain-ring-lvl">'+L("CEREBRO","BRAIN")+'</span></div>'+
+        '<div class="brain-ring-c"><span class="onb-ring-pct">'+pct+'%</span><span class="brain-ring-lvl">'+L("Cerebro · N1","Brain · N1")+'</span></div>'+
       '</div></div>'+
-      '<ul class="onb-checklist">'+
-        '<li>'+IC.check+' '+L("Tu panel llenándose con lo que peta en tu subnicho","Your panel filling with what's blowing up in your subniche")+'</li>'+
-        '<li>'+IC.check+' '+L("2 competidores en el radar, trayendo sus reels","2 competitors on your radar, bringing their reels")+'</li>'+
-        '<li>'+IC.check+' '+L("Tu primer guión, listo para robar en el radar","Your first script, ready to steal on your radar")+'</li>'+
-      '</ul>'+
-      '<p class="onb-path">'+L("El resto se gana: <b>enséñame tu voz</b> con tus propios reels y subimos del 35% al 100%.","The rest is earned: <b>teach me your voice</b> with your own reels and we go from 35% to 100%.")+'</p>'+
+      '<div class="onb-close-accent">'+L("Manifestando viralidad","Manifesting virality")+'</div>'+
+      '<h2 class="onb-h">'+L("Tu Cerebro ya sabe lo justo para empezar","Your Brain now knows just enough to start")+'</h2>'+
+      '<p class="onb-sub">'+L("Cada guion que crees lo afina. Vamos con el primero — el resto es cuesta abajo.","Every script you make sharpens it. Let's do the first one — the rest is downhill.")+'</p>'+
       onbErr()+
-      '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-finish"'+(S.onb.busy?' disabled':'')+'>'+(S.onb.busy?'<span class="mini-spin"></span> '+L("Preparando…","Preparing…"):IC.bolt+' '+L("Entrar a mi radar","Enter my radar"))+'</button>');
+      '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-finish"'+(S.onb.busy?' disabled':'')+'>'+(S.onb.busy?'<span class="mini-spin"></span> '+L("Preparando…","Preparing…"):IC.bolt+' '+L("Abrir mi primer guion","Open my first script"))+'</button>'+
+    '</section>';
   }
   function onbStepHTML(){
     switch(S.onb.step){
