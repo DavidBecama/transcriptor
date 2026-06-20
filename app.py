@@ -5342,6 +5342,73 @@ def regenerate_idea(idea_id):
 # 30-45s). El estilo sigue disponible vía /adapt directo para retrocompat.
 _BUILTIN_SCRIPT_STYLES = {"viral", "divertido", "storytelling", "hooks", "educacional", "informativo"}
 
+
+@app.route("/scripts/<script_id>/regenerate", methods=["POST"])
+@require_auth
+@limiter.limit("10 per minute")
+def regenerate_script(script_id):
+    """econ (gap D1): regenerar un guión YA creado = REGEN_UNITS (1 cr), no un guión
+    nuevo (3). Re-tira del MISMO material: el reel original si lo hay, si no el propio
+    texto. En la voz del usuario. Sync, mismo patrón que /ideas/<id>/regenerate."""
+    user = current_user()
+    uid = user["id"]
+    row = db.table("scripts").select("*").eq("id", script_id).eq("user_id", uid).execute()
+    if not row.data:
+        return jsonify({"error": "Not found"}), 404
+    sc = row.data[0]
+
+    # Material de origen: el reel del que salió (re-tira del mismo reel) o el propio texto.
+    source = ""
+    reel_id = sc.get("from_competitor_reel_id")
+    if reel_id:
+        try:
+            rr = (db.table("creator_reels_global")
+                    .select("caption, transcript").eq("id", reel_id).single().execute())
+            if rr.data:
+                source = ((rr.data.get("transcript") or "") + "\n"
+                          + (rr.data.get("caption") or "")).strip()
+        except Exception:
+            pass
+    if not source:
+        source = (sc.get("script") or "").strip()
+    if not source:
+        return jsonify({"error": "no_source",
+                        "message": "No hay material para regenerar este guion."}), 400
+
+    # econ: cobra 1 crédito ANTES; refunda si el LLM falla.
+    err, refund, _ = _charge_units_locked(uid, REGEN_UNITS, user)
+    if err:
+        return err
+
+    style = str(sc.get("assistant_name") or "viral").lower()
+    style_arg = style if style in _BUILTIN_SCRIPT_STYLES else "viral"
+    try:
+        result = adapt_with_ai(source, style_arg, "", voice=get_voice_profile(uid), user_id=uid)
+    except Exception as e:
+        refund()
+        logger.error("regenerate_script LLM failed script=%s: %s", script_id, e, exc_info=True)
+        return jsonify({"error": "llm_error",
+                        "message": "No se pudo regenerar. Inténtalo de nuevo."}), 502
+    if not (isinstance(result, dict) and result.get("hook")):
+        refund()
+        return jsonify({"error": "llm_error",
+                        "message": "No se pudo regenerar. Inténtalo de nuevo."}), 502
+
+    flat = (result["hook"] + "\n"
+            + "\n".join(result.get("body", [])) + "\n"
+            + result.get("closing", "")).strip()
+    upd = {"script": flat, "updated_at": datetime.now(timezone.utc).isoformat()}
+    if result.get("title"):
+        upd["title"] = str(result["title"]).strip()[:80]
+    try:
+        db.table("scripts").update(upd).eq("id", script_id).eq("user_id", uid).execute()
+    except Exception as e:
+        logger.error("regenerate_script persist failed script=%s: %s", script_id, e)
+
+    return jsonify({"ok": True, "script": flat, "title": upd.get("title", sc.get("title")),
+                    "hook": result["hook"], "body": result.get("body", []),
+                    "closing": result.get("closing", ""), **_credits_display(uid)})
+
 # v0.15.7.b: umbral mínimo de chars en custom_prompt antes de invocar al LLM.
 # Custom prompts demasiado cortos ("instruccion base", 16 chars) provocan que
 # Gemini devuelva content=null tras 4s — refund OK, pero UX confusa. Cortar

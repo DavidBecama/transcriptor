@@ -13827,7 +13827,7 @@
                 <div class="set-plan-credits-row"><span>Créditos del mes</span><span class="mono" id="setPlanCredits">0 / 0</span></div>
                 <div class="set-plan-credits-row"><span>Te dan para</span><span class="mono" id="setPlanScripts">—</span></div>
                 <div class="set-plan-bar"><div class="set-plan-fill" id="setPlanFill" style="width:0%"></div></div>
-                <span class="set-plan-hint">1 guión = 3 créditos. Ver el radar y las métricas no gasta créditos.</span>
+                <span class="set-plan-hint">1 robo = 3 créditos · ver el radar y las métricas no gasta créditos.</span>
               </div>
               <div class="set-plan-actions">
                 <button class="btn-3d btn-3d-primary set-btn" onclick="settingsRecharge()">Recargar créditos</button>
@@ -18196,14 +18196,14 @@ function settingsSaveVoice(){
     .catch(()=>{ if(typeof showToast==="function") showToast("Voz guardada."); });
 }
 
-// econ (economia-creditos.md): 1 guión = 3 créditos. El feat muestra el equivalente
-// en guiones para que se lea el valor real (no un número abstracto de créditos).
+// econ (economia-creditos.md): 1 robo = 3 créditos. El feat muestra el equivalente en
+// ROBOS (la acción/unidad de valor) para que se lea el valor real, no un nº abstracto.
 const SETTINGS_PLANS = [
-  { key:"trial",   name:"Trial",          price:"0€",   feat:"3 días Pro · 30 créditos (~10 guiones) · sin tarjeta" },
-  { key:"free",    name:"Free",           price:"0€",   feat:"9 créditos/mes (~3 guiones) · radar y métricas gratis" },
-  { key:"basic",   name:"Basic",          price:"29€",  feat:"120 créditos/mes (~40 guiones) · voz · métricas", featured:true },
-  { key:"estudio", name:"Content Creator",price:"59€",  feat:"360 créditos/mes (~120 guiones) · 3 marcas · prioridad" },
-  { key:"agency",  name:"Agency",         price:"129€", feat:"960 créditos/mes (~320 guiones) · 10 marcas · +96 cr/extra" },
+  { key:"trial",   name:"Trial",          price:"0€",   feat:"3 días Pro · 30 créditos (~10 robos) · sin tarjeta" },
+  { key:"free",    name:"Free",           price:"0€",   feat:"9 créditos/mes (~3 robos) · radar y métricas gratis" },
+  { key:"basic",   name:"Basic",          price:"29€",  feat:"120 créditos/mes (~40 robos) · voz · métricas", featured:true },
+  { key:"estudio", name:"Content Creator",price:"59€",  feat:"360 créditos/mes (~120 robos) · 3 marcas · prioridad" },
+  { key:"agency",  name:"Agency",         price:"129€", feat:"960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra" },
 ];
 function _curPlanKey(){ const p = (window.st && (st.plan)) || "free"; if (p==="creator"||p==="pro"||p==="basic") return "basic"; if (p==="estudio") return "estudio"; if (p==="agency") return "agency"; if (p==="trial") return "trial"; return "free"; }
 function fillSettingsPlan() {
@@ -18215,8 +18215,8 @@ function fillSettingsPlan() {
   const used = (window.st && st.monthlyUsage) || 0;
   const avail = (window.st && st.creditsAvail!=null) ? st.creditsAvail : Math.max(0, limit-used);
   _setText("setPlanCredits", (limit?(Math.max(0,limit-used)+" / "+limit+" cr"):"—"));
-  // Equivalente en guiones (1 guión = 3 créditos) — el número que de verdad importa.
-  _setText("setPlanScripts", limit ? ("~"+Math.floor(Math.max(0,limit-used)/3)+" guiones") : "");
+  // Equivalente en ROBOS (1 robo = 3 créditos) — el número que de verdad importa.
+  _setText("setPlanScripts", limit ? ("~"+Math.floor(Math.max(0,limit-used)/3)+" robos") : "");
   const fill = document.getElementById("setPlanFill"); if (fill) fill.style.width = (limit? Math.round(Math.min(100,(limit-used)/limit*100)) : 0) + "%";
   _setText("setUseScripts", used || "0");
   _setText("setUseSteals", used || "0");

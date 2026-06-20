@@ -1668,7 +1668,7 @@
     return '<div class="flash-offer" data-act="open-plans" role="button" tabindex="0" aria-label="Oferta: pack de '+FLASH_PACK_CR+' créditos a '+FLASH_PACK_EUR+' euros">'+
       '<span class="flash-badge">−'+pct+'%</span>'+
       '<div class="flash-txt"><b>'+L(FLASH_PACK_CR+" créditos por €"+FLASH_PACK_EUR,FLASH_PACK_CR+" credits for €"+FLASH_PACK_EUR)+'</b>'+
-        '<span>'+L("~100 guiones · solo por cruzar el muro hoy","~100 scripts · just for hitting the wall today")+' · <s>€'+FLASH_PACK_WAS+'</s> → <b>€'+FLASH_PACK_EUR+'</b></span></div>'+
+        '<span>'+L("~100 robos · solo por cruzar el muro hoy","~100 steals · just for hitting the wall today")+' · <s>€'+FLASH_PACK_WAS+'</s> → <b>€'+FLASH_PACK_EUR+'</b></span></div>'+
       '<div class="flash-cd-wrap"><span class="flash-cd-k">'+L("Termina en","Ends in")+'</span><span class="flash-cd" id="rsFlashCd">'+flashRemainStr()+'</span></div>'+
       '<span class="flash-cta">'+L("Recárgalo","Grab it")+' '+IC.arr+'</span>'+
     '</div>';
@@ -3280,11 +3280,11 @@
     });
   }
   /* Editor · "Regenerar guion" = re-tira del mismo material por COST.regen (1 cr),
-     más barato que un guión nuevo (3 cr). En demo descuenta local y refresca el guion;
-     en prod, de momento re-genera vía steal (gap: falta endpoint de regen-guion barato). */
+     más barato que un guión nuevo (3 cr). Demo: descuenta local y refresca. Prod:
+     endpoint dedicado /scripts/<id>/regenerate (gap D1 cerrado) — cobra 1, no 3. */
   function regenInEditor(id){
+    var g = guionById(id) || (S.activeGuionId && guionById(S.activeGuionId));
     if(isDemo()){
-      var g = guionById(id) || (S.activeGuionId && guionById(S.activeGuionId));
       if(!isTrial()){
         if((S.user.credits||0) < COST.regen){ return showPaywall("no_credits"); }
         spend(COST.regen);
@@ -3293,7 +3293,15 @@
       render(); flashSpark(-COST.regen); showToast("Guion regenerado (−"+COST.regen+" créd.).");
       return;
     }
-    return steal(id);
+    var sid = g && g._sid;
+    if(!sid){ return showToast(L("Este guion aún no está guardado.","This script isn't saved yet.")); }
+    showToast(L("Regenerando…","Regenerating…"));
+    apiPost("/scripts/"+encodeURIComponent(sid)+"/regenerate", {}).then(function(r){
+      if(!r.ok || !r.d || !r.d.script){ return showPaywallOrError(r); }
+      if(g){ g.hook=r.d.hook||g.hook; g.title=r.d.title||g.title; g.beats=Array.isArray(r.d.body)?r.d.body:g.beats; g.close=r.d.closing||g.close; }
+      applyCredits(r.d, COST.regen); render(); showToast(L("Guion regenerado.","Script regenerated."));
+    });
+    return;
   }
   /* Loop continuity (Fathom): al robar/descartar, el reel sale del radar y entra el
      siguiente con más explosión (sorted[0] promueve el próximo). En demo, si el feed
