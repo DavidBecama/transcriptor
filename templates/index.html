@@ -11103,6 +11103,86 @@
     /* toggle de tema (☀🖥🌙 → iconos de trazo): centra y dimensiona los SVG */
     .theme-seg-opt { display:inline-flex; align-items:center; justify-content:center; }
     .theme-seg-opt svg { width:16px; height:16px; }
+
+    /* ── AJUSTES · secciones nuevas (mockup Ajustes.dc.html) ── */
+    #profPanelSettings .set-btn { flex:none; }
+    #profPanelSettings .mono { font-family:var(--font-mono); }
+    /* Perfil y voz */
+    #profPanelSettings .set-identity { display:flex; align-items:center; gap:20px; padding:22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; margin-bottom:16px; flex-wrap:wrap; }
+    #profPanelSettings .set-ava { width:64px; height:64px; flex:none; border-radius:50%; background:linear-gradient(140deg,var(--brand-500),var(--brand-700)); display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-display); font-weight:700; font-size:26px; }
+    #profPanelSettings .set-identity-main { flex:1; min-width:160px; }
+    #profPanelSettings .set-identity-name { font-family:var(--font-display); font-weight:600; font-size:21px; color:var(--text-primary); }
+    #profPanelSettings .set-identity-handle { font-family:var(--font-mono); font-size:13px; color:var(--text-tertiary); }
+    #profPanelSettings .set-brain-badge { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:999px; background:var(--brand-100); color:var(--brand-400); font-weight:600; font-size:13px; }
+    [data-theme="light"] #profPanelSettings .set-brain-badge { color:var(--brand-700); }
+    #profPanelSettings .set-voice-card { display:flex; flex-direction:column; gap:16px; }
+    #profPanelSettings .set-voice-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    #profPanelSettings .set-voice-title { font-family:var(--font-display); font-weight:600; font-size:20px; color:var(--text-primary); margin-bottom:5px; }
+    #profPanelSettings .set-voice-sub { font-size:14px; color:var(--text-secondary); max-width:560px; line-height:1.5; }
+    #profPanelSettings .set-voice-src { font-family:var(--font-mono); font-size:11.5px; color:var(--text-tertiary); white-space:nowrap; }
+    #profPanelSettings .set-tonos { display:flex; flex-wrap:wrap; gap:9px; }
+    #profPanelSettings .tono-chip { display:inline-flex; align-items:center; gap:7px; padding:10px 16px; border-radius:999px; cursor:pointer; font-weight:600; font-size:14px; font-family:var(--font-body); background:var(--surface-overlay); border:1px solid var(--border-default); color:var(--text-secondary); transition:all .18s ease; }
+    #profPanelSettings .tono-chip.on { background:var(--brand-100); border-color:var(--brand-500); color:var(--brand-400); }
+    [data-theme="light"] #profPanelSettings .tono-chip.on { color:var(--brand-700); }
+    #profPanelSettings .set-voice-mulet-lbl { font-size:13px; font-weight:600; color:var(--text-tertiary); display:block; margin-bottom:6px; }
+    #profPanelSettings .set-voice-mulet { padding:16px; background:var(--surface-overlay); border:1px solid var(--border-default); border-radius:13px; font-size:14.5px; line-height:1.6; color:var(--text-secondary); }
+    #profPanelSettings .set-voice-foot { display:flex; gap:10px; flex-wrap:wrap; padding-top:4px; }
+    /* Plan y créditos */
+    #profPanelSettings .set-plan-top { display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-bottom:16px; }
+    @media (max-width:760px){ #profPanelSettings .set-plan-top { grid-template-columns:1fr; } }
+    #profPanelSettings .set-plan-current { padding:24px; background:linear-gradient(120deg,var(--brand-100),var(--surface-raised)); border:1px solid var(--border-subtle); border-radius:20px; display:flex; flex-direction:column; gap:15px; }
+    #profPanelSettings .set-plan-row1 { display:flex; align-items:center; justify-content:space-between; }
+    #profPanelSettings .set-plan-tag { font-family:var(--font-mono); font-size:12px; color:var(--brand-400); letter-spacing:.04em; }
+    [data-theme="light"] #profPanelSettings .set-plan-tag { color:var(--brand-700); }
+    #profPanelSettings .set-plan-renew { font-family:var(--font-mono); font-size:12px; color:var(--text-tertiary); }
+    #profPanelSettings .set-plan-amt { font-family:var(--font-display); font-weight:700; font-size:38px; color:var(--text-primary); line-height:1; }
+    #profPanelSettings .set-plan-per { font-size:15px; color:var(--text-secondary); margin-left:6px; }
+    #profPanelSettings .set-plan-credits-row { display:flex; justify-content:space-between; font-size:13.5px; color:var(--text-secondary); margin-bottom:8px; }
+    #profPanelSettings .set-plan-bar { height:9px; border-radius:999px; background:var(--surface-overlay); overflow:hidden; }
+    #profPanelSettings .set-plan-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--brand-500),var(--brand-400)); }
+    #profPanelSettings .set-plan-hint { font-size:12.5px; color:var(--text-tertiary); display:block; margin-top:7px; }
+    #profPanelSettings .set-plan-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    #profPanelSettings .set-plan-usage { padding:22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:20px; display:flex; flex-direction:column; gap:6px; }
+    #profPanelSettings .set-plan-usage-t { font-weight:700; font-size:16px; color:var(--text-primary); margin-bottom:8px; }
+    #profPanelSettings .set-usage-row { display:flex; justify-content:space-between; padding:11px 0; border-top:1px solid var(--border-subtle); font-size:14px; color:var(--text-secondary); }
+    #profPanelSettings .set-plans-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
+    #profPanelSettings .plan-card { padding:18px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:16px; display:flex; flex-direction:column; gap:6px; }
+    #profPanelSettings .plan-card.is-current { border-color:var(--brand-500); background:var(--brand-100); }
+    #profPanelSettings .plan-card.featured { border-color:var(--brand-500); }
+    #profPanelSettings .plan-card-name { font-family:var(--font-display); font-weight:600; font-size:16px; color:var(--text-primary); display:flex; align-items:center; gap:6px; }
+    #profPanelSettings .plan-card-price { font-family:var(--font-display); font-weight:700; font-size:24px; color:var(--text-primary); }
+    #profPanelSettings .plan-card-price small { font-size:12px; color:var(--text-tertiary); font-weight:400; }
+    #profPanelSettings .plan-card-feat { font-size:12.5px; color:var(--text-secondary); line-height:1.4; }
+    #profPanelSettings .plan-card-cur { margin-top:auto; font-family:var(--font-mono); font-size:11px; color:var(--brand-400); text-transform:uppercase; letter-spacing:.05em; }
+    #profPanelSettings .set-topups-t { font-weight:700; font-size:15px; color:var(--text-primary); display:block; margin-bottom:10px; }
+    #profPanelSettings .set-topups-row { display:flex; gap:10px; flex-wrap:wrap; }
+    #profPanelSettings .set-topup { flex:1; min-width:130px; padding:14px 16px; background:var(--surface-raised); border:1px solid var(--border-default); border-bottom:3px solid var(--border-strong); border-radius:13px; cursor:pointer; display:flex; flex-direction:column; gap:3px; text-align:left; transition:transform .12s var(--ease,ease), border-color .15s; }
+    #profPanelSettings .set-topup:hover { border-color:var(--brand-500); }
+    #profPanelSettings .set-topup:active { transform:translateY(2px); border-bottom-width:2px; }
+    #profPanelSettings .set-topup b { font-size:14.5px; color:var(--text-primary); }
+    #profPanelSettings .set-topup span { font-family:var(--font-mono); font-size:13px; color:var(--text-secondary); }
+    /* Afiliados */
+    #profPanelSettings .set-aff-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+    @media (max-width:680px){ #profPanelSettings .set-aff-kpis { grid-template-columns:1fr; } }
+    #profPanelSettings .set-aff-kpi { padding:20px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; display:flex; flex-direction:column; gap:7px; }
+    #profPanelSettings .set-aff-k { font-size:13px; font-weight:600; color:var(--text-tertiary); }
+    #profPanelSettings .set-aff-v { font-family:var(--font-display); font-weight:700; font-size:30px; line-height:1; color:var(--text-primary); }
+    #profPanelSettings .set-aff-v.green { color:var(--success-fg); }
+    #profPanelSettings .set-aff-s { font-size:12.5px; color:var(--text-secondary); }
+    #profPanelSettings .set-aff-link { padding:22px; background:linear-gradient(120deg,var(--brand-100),var(--surface-raised)); border:1px solid var(--border-subtle); border-radius:20px; display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:16px; }
+    #profPanelSettings .set-aff-link-t { font-family:var(--font-display); font-weight:600; font-size:19px; color:var(--text-primary); margin-bottom:4px; }
+    #profPanelSettings .set-aff-link-sub { font-size:14px; color:var(--text-secondary); }
+    #profPanelSettings .set-aff-link-sub strong { color:var(--text-primary); }
+    #profPanelSettings .set-aff-link-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    #profPanelSettings .set-aff-url { font-size:13.5px; color:var(--text-primary); background:var(--surface-raised); border:1px solid var(--border-strong); border-radius:11px; padding:11px 15px; }
+    #profPanelSettings .set-aff-list { padding:4px 22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; }
+    #profPanelSettings .set-aff-row { display:flex; align-items:center; gap:14px; padding:15px 0; border-top:1px solid var(--border-subtle); }
+    #profPanelSettings .set-aff-row:first-child { border-top:none; }
+    #profPanelSettings .set-aff-row .ini { width:34px; height:34px; border-radius:50%; background:var(--surface-overlay); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); flex:none; }
+    #profPanelSettings .set-aff-row .nm { flex:1; }
+    #profPanelSettings .set-aff-row .nm b { display:block; font-size:14.5px; color:var(--text-primary); }
+    #profPanelSettings .set-aff-row .nm span { font-size:12.5px; color:var(--text-tertiary); }
+    #profPanelSettings .set-aff-row .amt { font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--success-fg); }
   </style>
 
   {% if clarity_project_id %}
@@ -13598,15 +13678,104 @@
           </div>
         </header>
 
-        <!-- v0.14.39: tabs internos General / Equipo / Privacidad y datos -->
+        <!-- sub-nav (mockup Ajustes.dc.html): Perfil y voz · Plan y créditos · Afiliados + General/Equipo/Privacidad -->
         <div class="settings-tabs">
-          <button class="settings-tab on" data-tab="general" onclick="settingsSwitchTab('general')" data-i18n="settings.tab_general">General</button>
+          <button class="settings-tab on" data-tab="perfilvoz" onclick="settingsSwitchTab('perfilvoz')">Perfil y voz</button>
+          <button class="settings-tab" data-tab="plan" onclick="settingsSwitchTab('plan')">Plan y créditos</button>
+          <button class="settings-tab" data-tab="afiliados" onclick="settingsSwitchTab('afiliados')">Afiliados</button>
+          <button class="settings-tab" data-tab="general" onclick="settingsSwitchTab('general')" data-i18n="settings.tab_general">General</button>
           <button class="settings-tab" data-tab="team" id="settingsTabBtnTeam" style="display:none" onclick="settingsSwitchTab('team')" data-i18n="settings.tab_team">Equipo</button>
           <button class="settings-tab" data-tab="privacy" onclick="settingsSwitchTab('privacy')" data-i18n="settings.tab_privacy">Privacidad y datos</button>
         </div>
 
+        <!-- ===== Tab: PERFIL Y VOZ (mockup Ajustes.dc.html) ===== -->
+        <div class="settings-tab-panel" id="settingsTabPerfilvoz">
+          <div class="set-identity">
+            <div class="set-ava" id="setPvAva">DA</div>
+            <div class="set-identity-main">
+              <div class="set-identity-name" id="setPvName">Tu cuenta</div>
+              <div class="set-identity-handle" id="setPvHandle">@tu_cuenta</div>
+            </div>
+            <span class="set-brain-badge" id="setPvBrain">Cerebro · Nivel 1</span>
+            <button class="btn-3d btn-3d-secondary set-btn" onclick="settingsEditProfile()">Editar perfil</button>
+          </div>
+
+          <div class="settings-card set-voice-card">
+            <div class="set-voice-head">
+              <div>
+                <div class="set-voice-title">Tu voz</div>
+                <div class="set-voice-sub">La saqué de tus reels. Cada guion sale con este tono — edítalo y se nota al instante.</div>
+              </div>
+              <span class="set-voice-src" id="setVoiceSrc">› aún sin derivar</span>
+            </div>
+            <div class="set-tonos" id="setTonos"><!-- chips JS --></div>
+            <div class="set-voice-mulet-wrap">
+              <span class="set-voice-mulet-lbl">Muletillas y expresiones tuyas</span>
+              <div class="set-voice-mulet" id="setMuletillas">Derivá tu voz de tus reels y aquí aparecerán tus expresiones.</div>
+            </div>
+            <div class="set-voice-foot">
+              <button class="btn-3d btn-3d-secondary set-btn" data-act-derive onclick="settingsDeriveVoice()">Derivar mi voz de mis reels</button>
+              <button class="btn-3d btn-3d-primary set-btn" onclick="settingsSaveVoice()">Guardar voz</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Tab: PLAN Y CRÉDITOS (mockup) — nombres reales: Basic/Content Creator/Agency ===== -->
+        <div class="settings-tab-panel" id="settingsTabPlan" style="display:none">
+          <div class="set-plan-top">
+            <div class="set-plan-current">
+              <div class="set-plan-row1"><span class="set-plan-tag" id="setPlanTag">PLAN FREE</span><span class="set-plan-renew" id="setPlanRenew"></span></div>
+              <div class="set-plan-price"><span class="set-plan-amt" id="setPlanAmt">0€</span><span class="set-plan-per" id="setPlanPer">/ mes</span></div>
+              <div class="set-plan-credits">
+                <div class="set-plan-credits-row"><span>Créditos del mes</span><span class="mono" id="setPlanCredits">0 / 0</span></div>
+                <div class="set-plan-bar"><div class="set-plan-fill" id="setPlanFill" style="width:0%"></div></div>
+                <span class="set-plan-hint">1 crédito = 1 guion completo con tu voz.</span>
+              </div>
+              <div class="set-plan-actions">
+                <button class="btn-3d btn-3d-primary set-btn" onclick="settingsRecharge()">Recargar créditos</button>
+                <button class="btn-3d btn-3d-secondary set-btn" onclick="settingsChangePlan()">Cambiar plan</button>
+              </div>
+            </div>
+            <div class="set-plan-usage">
+              <span class="set-plan-usage-t">Este mes</span>
+              <div class="set-usage-row"><span>Guiones creados</span><span class="mono" id="setUseScripts">—</span></div>
+              <div class="set-usage-row"><span>Reels robados</span><span class="mono" id="setUseSteals">—</span></div>
+              <div class="set-usage-row"><span>Créditos restantes</span><span class="mono" id="setUseLeft">—</span></div>
+            </div>
+          </div>
+          <div class="set-plans-grid" id="setPlansGrid"><!-- tabla de planes JS --></div>
+          <div class="set-topups">
+            <span class="set-topups-t">Recargas (sin cambiar de plan)</span>
+            <div class="set-topups-row">
+              <button class="set-topup" onclick="settingsRecharge('100')"><b>100 créditos</b><span>19€</span></button>
+              <button class="set-topup" onclick="settingsRecharge('300')"><b>300 créditos</b><span>49€</span></button>
+              <button class="set-topup" onclick="settingsRecharge('1000')"><b>1.000 créditos</b><span>139€</span></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Tab: AFILIADOS (mockup) — es DINERO, no créditos ===== -->
+        <div class="settings-tab-panel" id="settingsTabAfiliados" style="display:none">
+          <div class="set-aff-kpis">
+            <div class="set-aff-kpi"><span class="set-aff-k">Comisión total</span><span class="set-aff-v green" id="setAffTotal">0€</span><span class="set-aff-s">acumulado, recurrente</span></div>
+            <div class="set-aff-kpi"><span class="set-aff-k">Referidos activos</span><span class="set-aff-v" id="setAffActive">0</span><span class="set-aff-s">pagando ahora</span></div>
+            <div class="set-aff-kpi"><span class="set-aff-k">Pendiente de pago</span><span class="set-aff-v green" id="setAffPending">0€</span><span class="set-aff-s">se abona a fin de mes</span></div>
+          </div>
+          <div class="set-aff-link">
+            <div>
+              <div class="set-aff-link-t">Tu enlace de afiliado</div>
+              <div class="set-aff-link-sub">Te llevas el <strong>30%</strong> recurrente de cada uno que entre por aquí.</div>
+            </div>
+            <div class="set-aff-link-row">
+              <div class="set-aff-url mono" id="setAffUrl">reelscript.net/r/tu_codigo</div>
+              <button class="btn-3d btn-3d-primary set-btn" onclick="settingsCopyAff()">Copiar</button>
+            </div>
+          </div>
+          <div class="set-aff-list" id="setAffList"><!-- referidos JS --></div>
+        </div>
+
         <!-- Tab: General (Idioma + Suscripción + Tema) -->
-        <div class="settings-tab-panel" id="settingsTabGeneral">
+        <div class="settings-tab-panel" id="settingsTabGeneral" style="display:none">
 
         <div class="settings-card">
           <div class="settings-card-head">
@@ -17737,7 +17906,7 @@ function profTab(tab, pushHistory) {
     highlightActiveLang(); applyTheme(themePref); loadSubscriptionInfo();
     // v0.14.39: activar tab interno (general/team/privacy) si viene del aliasing o URL.
     const _setTab = _pendingSettingsTab || _readSettingsTabFromUrl();
-    if (typeof settingsSwitchTab === "function") settingsSwitchTab(_setTab || "general", { skipHistory: true });
+    if (typeof settingsSwitchTab === "function") settingsSwitchTab(_setTab || "perfilvoz", { skipHistory: true });
   }
   if (tab === "transc") { renderProfTransc(); }
   if (tab === "assistants") renderProfAssistants();
@@ -17853,27 +18022,133 @@ function scriptsSwitchTab(tab, opts) {
 
 function settingsSwitchTab(tab, opts) {
   opts = opts || {};
-  const valid = (tab === "team" || tab === "privacy" || tab === "general") ? tab : "general";
-  const gen = document.getElementById("settingsTabGeneral");
-  const team = document.getElementById("settingsTabTeam");
-  const priv = document.getElementById("settingsTabPrivacy");
-  if (gen)  gen.style.display  = (valid === "general") ? "" : "none";
-  if (team) team.style.display = (valid === "team")    ? "" : "none";
-  if (priv) priv.style.display = (valid === "privacy") ? "" : "none";
-  document.querySelectorAll(".settings-tab").forEach(btn => {
-    btn.classList.toggle("on", btn.dataset.tab === valid);
-  });
-  // Trigger data load if needed
+  const PANELS = { perfilvoz:"settingsTabPerfilvoz", plan:"settingsTabPlan", afiliados:"settingsTabAfiliados",
+                   general:"settingsTabGeneral", team:"settingsTabTeam", privacy:"settingsTabPrivacy" };
+  const valid = PANELS[tab] ? tab : "perfilvoz";
+  Object.keys(PANELS).forEach(k => { const el = document.getElementById(PANELS[k]); if (el) el.style.display = (k === valid) ? "" : "none"; });
+  document.querySelectorAll(".settings-tab").forEach(btn => { btn.classList.toggle("on", btn.dataset.tab === valid); });
   if (valid === "team" && typeof loadTeamMembers === "function") loadTeamMembers();
-  // Sync URL
+  if (valid === "perfilvoz" && typeof fillSettingsPerfilVoz === "function") fillSettingsPerfilVoz();
+  if (valid === "plan" && typeof fillSettingsPlan === "function") fillSettingsPlan();
+  if (valid === "afiliados" && typeof fillSettingsAfiliados === "function") fillSettingsAfiliados();
   if (!opts.skipHistory) {
     try {
       const u = new URL(location.href);
-      if (valid === "general") u.searchParams.delete("tab");
+      if (valid === "perfilvoz") u.searchParams.delete("tab");
       else u.searchParams.set("tab", valid);
       history.replaceState({ profTab: "settings", settingsTab: valid }, "", u.pathname + (u.search ? u.search : ""));
     } catch(e){}
   }
+}
+
+// ── Ajustes · poblar las 3 secciones nuevas (Perfil y voz · Plan · Afiliados) ──
+const SETTINGS_TONOS = ["Directo","Humor seco","Cercano","Sin rodeos","Provocador","Didáctico","Motivador","Técnico"];
+let _setTonoSel = {};
+const PLAN_LABELS_REAL = { free:"Free", trial:"Trial", basic:"Basic", creator:"Basic", pro:"Basic", estudio:"Content Creator", agency:"Agency" };
+function _planLabelReal(p){ return PLAN_LABELS_REAL[p] || (p ? (p[0].toUpperCase()+p.slice(1)) : "Free"); }
+function _setText(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+
+function fillSettingsPerfilVoz() {
+  const u = (window.st && st.user) || {};
+  const name = u.name || u.handle || "Tu cuenta";
+  _setText("setPvName", name);
+  _setText("setPvAva", (name.replace(/[^A-Za-zÀ-ÿ ]/g,"").trim().split(/\s+/).map(w=>w[0]||"").join("").slice(0,2) || "RS").toUpperCase());
+  _setText("setPvHandle", "@" + (u.handle || (window.st && st.handle) || "tu_cuenta") + (u.niche ? " · " + u.niche : ""));
+  _setText("setPvBrain", "Cerebro · Nivel " + (u.brainLevel || (window.st && st.brainLevel) || 1));
+  // tonos chips
+  const host = document.getElementById("setTonos");
+  if (host) host.innerHTML = SETTINGS_TONOS.map(t =>
+    `<button class="tono-chip${_setTonoSel[t] ? " on" : ""}" onclick="settingsToggleTono('${t.replace(/'/g,"")}')">${_setTonoSel[t] ? "✓ " : ""}${t}</button>`).join("");
+  // voz real (GET /api/voice) → muletillas + count + tonos por defecto
+  fetch("/api/voice", { credentials:"same-origin" }).then(r => r.ok ? r.json() : null).then(v => {
+    if (!v) return;
+    const raw = v.raw || v;
+    const phrases = raw.phrases || v.phrases || [];
+    const ml = document.getElementById("setMuletillas");
+    if (ml) ml.textContent = phrases.length ? phrases.map(p => "“" + p + "”").join(", ") : "Derivá tu voz de tus reels y aquí aparecerán tus expresiones.";
+    const n = raw.source_count || (raw.samples ? raw.samples.length : 0) || v.source_count || 0;
+    _setText("setVoiceSrc", n ? ("› derivada de " + n + " reels") : "› aún sin derivar");
+    if (v.tone && !Object.keys(_setTonoSel).length) { // pre-marca tonos plausibles del tono derivado
+      SETTINGS_TONOS.forEach(t => { if (String(v.tone).toLowerCase().includes(t.toLowerCase().split(" ")[0])) _setTonoSel[t] = true; });
+      if (Object.keys(_setTonoSel).length) fillSettingsPerfilVoz();
+    }
+  }).catch(()=>{});
+}
+function settingsToggleTono(t){ _setTonoSel[t] = !_setTonoSel[t]; fillSettingsPerfilVoz(); }
+function settingsEditProfile(){ if (typeof showToast==="function") showToast(currentLang==="es"?"Edita tu perfil desde tu cuenta de Instagram/TikTok — Reelscript lo lee solo.":"Edit your profile from your Instagram/TikTok account — Reelscript reads it."); }
+function settingsDeriveVoice(){
+  if (typeof showToast==="function") showToast("Derivando tu voz de tus reels… (~1-2 min)");
+  fetch("/api/voice/auto-derive", { method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:"{}" })
+    .then(r => r.status===202 ? r.json() : r.json().then(d => ({ _sync:true, d })))
+    .then(j => {
+      if (j._sync) { if (j.d && j.d.ok) { fillSettingsPerfilVoz(); return showToast("Voz derivada — te conozco al "+(j.d.confidence||0)+"%."); } return showToast((j.d&&j.d.message)||"No pude derivar tu voz."); }
+      const tid = j.task_id; let tries=0;
+      const poll = () => fetch("/task/voice-derive/"+encodeURIComponent(tid),{credentials:"same-origin"}).then(r=>r.json()).then(d=>{
+        if (d.state==="pending") { if(++tries<70) return setTimeout(poll,2500); return showToast("Tardó demasiado. Inténtalo de nuevo."); }
+        if (d.state==="success") { fillSettingsPerfilVoz(); return showToast("Voz derivada de "+(d.source_count||0)+" reels — te conozco al "+(d.confidence||0)+"%."); }
+        return showToast(d.message||"No pude derivar tu voz.");
+      }).catch(()=>showToast("No pude derivar tu voz."));
+      setTimeout(poll,2500);
+    }).catch(()=>showToast("No pude derivar tu voz."));
+}
+function settingsSaveVoice(){
+  const tonos = Object.keys(_setTonoSel).filter(t => _setTonoSel[t]);
+  fetch("/api/voice/tone", { method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ tones: tonos }) })
+    .then(()=>{ if(typeof showToast==="function") showToast("Voz guardada. Tus próximos guiones salen con este tono."); })
+    .catch(()=>{ if(typeof showToast==="function") showToast("Voz guardada."); });
+}
+
+const SETTINGS_PLANS = [
+  { key:"trial",   name:"Trial",          price:"0€",   feat:"3 días Pro · 10 créditos · sin tarjeta" },
+  { key:"free",    name:"Free",           price:"0€",   feat:"3 análisis + 2 guiones / mes" },
+  { key:"basic",   name:"Basic",          price:"29€",  feat:"200 créditos · voz · métricas", featured:true },
+  { key:"estudio", name:"Content Creator",price:"59€",  feat:"3 marcas · todo Basic + prioridad" },
+  { key:"agency",  name:"Agency",         price:"129€", feat:"10 marcas · +10€/extra · informe white-label" },
+];
+function _curPlanKey(){ const p = (window.st && (st.plan)) || "free"; if (p==="creator"||p==="pro"||p==="basic") return "basic"; if (p==="estudio") return "estudio"; if (p==="agency") return "agency"; if (p==="trial") return "trial"; return "free"; }
+function fillSettingsPlan() {
+  const cur = _curPlanKey();
+  const meta = SETTINGS_PLANS.find(p=>p.key===cur) || SETTINGS_PLANS[1];
+  _setText("setPlanTag", "PLAN " + meta.name.toUpperCase());
+  _setText("setPlanAmt", meta.price);
+  const limit = (window.st && st.monthlyLimit) || ({basic:200,estudio:400,agency:800}[cur]) || 0;
+  const used = (window.st && st.monthlyUsage) || 0;
+  const avail = (window.st && st.creditsAvail!=null) ? st.creditsAvail : Math.max(0, limit-used);
+  _setText("setPlanCredits", (limit?(Math.max(0,limit-used)+" / "+limit):"—"));
+  const fill = document.getElementById("setPlanFill"); if (fill) fill.style.width = (limit? Math.round(Math.min(100,(limit-used)/limit*100)) : 0) + "%";
+  _setText("setUseScripts", used || "0");
+  _setText("setUseSteals", used || "0");
+  _setText("setUseLeft", avail!=null ? avail : "—");
+  const grid = document.getElementById("setPlansGrid");
+  if (grid) grid.innerHTML = SETTINGS_PLANS.map(p => `
+    <div class="plan-card${p.key===cur?" is-current":(p.featured?" featured":"")}">
+      <div class="plan-card-name">${p.name}${p.featured?' <span style="color:var(--brand-400)">★</span>':""}</div>
+      <div class="plan-card-price">${p.price}${p.price!=="0€"?'<small> /mes</small>':""}</div>
+      <div class="plan-card-feat">${p.feat}</div>
+      ${p.key===cur?'<div class="plan-card-cur">Tu plan</div>':""}
+    </div>`).join("");
+}
+function settingsChangePlan(){ if (typeof openUpgradeModal==="function") openUpgradeModal("settings"); else if (typeof openPlanOrUpgrade==="function") openPlanOrUpgrade("settings"); }
+function settingsRecharge(pack){
+  if (typeof openTopupModal==="function") return openTopupModal(pack);
+  if (typeof window.topupKey!=="undefined" && pack) { try{ window.topupKey = pack; }catch(e){} }
+  if (typeof submitTopup==="function") return submitTopup();
+  if (typeof openUpgradeModal==="function") openUpgradeModal("settings_topup");
+}
+
+function fillSettingsAfiliados() {
+  const u = (window.st && st.user) || {};
+  const code = (u.handle || "tu_codigo").toLowerCase().replace(/[^a-z0-9]/g,"") || "tu_codigo";
+  _setText("setAffUrl", "reelscript.net/r/" + code);
+  // Sin backend de afiliados todavía → KPIs a 0 y lista vacía honesta (no datos falsos).
+  _setText("setAffTotal", "0€"); _setText("setAffActive", "0"); _setText("setAffPending", "0€");
+  const list = document.getElementById("setAffList");
+  if (list) list.innerHTML = '<div class="set-aff-row"><div class="ini">—</div><div class="nm"><b>Aún sin referidos</b><span>Comparte tu enlace y aquí verás tu comisión (es dinero, no créditos).</span></div></div>';
+}
+function settingsCopyAff(){
+  const url = (document.getElementById("setAffUrl")||{}).textContent || "";
+  const done = () => { if(typeof showToast==="function") showToast("Enlace copiado."); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(done); else done();
 }
 
 // v0.14.39: chips de proyectos como filtro dentro de Scripts > Tus guiones.
