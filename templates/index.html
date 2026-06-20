@@ -11222,6 +11222,21 @@
     .rs .crd-metrics svg { width:15px; height:15px; }
     .rs .crd-steal { flex:none; background:var(--brand-500); border:none; border-bottom:3px solid var(--brand-700); color:#fff; padding:10px 13px; }
     .rs .crd-steal svg { width:15px; height:15px; }
+    .rs .crd-metrics.on { border-color:var(--brand-500); color:var(--brand-500); }
+    /* Expand inline de la card (mockup David): main 212 + panel 282 a la derecha. */
+    .rs .crd-main { display:flex; flex-direction:column; min-width:0; width:100%; }
+    .rs .crd--open { flex-basis:auto; flex-direction:row; max-width:none; }
+    .rs .crd--open .crd-main { width:212px; flex:none; }
+    .rs .crd-panel { width:282px; flex:none; border-left:1px solid var(--border-default); background:var(--surface-overlay); padding:18px; display:flex; flex-direction:column; gap:14px; }
+    .rs .crd-pgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .rs .crd-stat-k { font-size:11.5px; font-weight:600; color:var(--text-tertiary); margin-bottom:3px; }
+    .rs .crd-stat-v { font-family:var(--font-display); font-weight:700; font-size:22px; line-height:1; color:var(--text-primary); }
+    .rs .crd-stat-v.g { color:var(--success-fg); }
+    .rs .crd-txwrap { display:flex; flex-direction:column; gap:7px; flex:1; min-height:0; }
+    .rs .crd-tx-lbl { font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; color:var(--text-tertiary); }
+    .rs .crd-tx { font-size:13.5px; line-height:1.55; color:var(--text-secondary); background:var(--surface-raised); border:1px solid var(--border-default); border-radius:12px; padding:12px; max-height:158px; overflow-y:auto; }
+    .rs .crd-tx--wait { display:flex; align-items:center; gap:8px; color:var(--text-tertiary); font-size:13px; }
+    .rs .crd-steal-full { width:100%; }
     .rs .gcard { position:relative; flex:0 0 220px; aspect-ratio:9/16; border-radius:16px; overflow:hidden; cursor:pointer; background:var(--surface-overlay); border:1px solid var(--border-subtle); scroll-snap-align:start; transition:transform .16s var(--ease), box-shadow .16s var(--ease); }
     .rs .gcard:hover { transform:translateY(-4px); box-shadow:var(--shadow-lg); }
     .rs .gcard:focus-visible { outline:2px solid var(--brand-500); outline-offset:2px; }
@@ -26921,6 +26936,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=36"></script>
+<script src="/static/js/radar-loop.js?v=37"></script>
 </body>
 </html>

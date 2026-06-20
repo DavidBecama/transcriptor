@@ -974,20 +974,45 @@
     var t=thumb||r.thumb;
     var thumbInner=t?'<img src="'+ESC(t)+'" alt="" loading="lazy">':'<div class="crd-ph" style="background:'+_galGrad(r.id||r.creator.handle)+'">'+_icPlay+'</div>';
     var mult=(r.explosionTxt!=null)?(r.explosionTxt+'×'):'';
-    return '<div class="crd">'+
-      '<div class="crd-thumb">'+thumbInner+
-        (mult?'<span class="crd-mult">'+IC.bolt+' '+ESC(mult)+'</span>':'')+
-        (r.dur?'<span class="crd-dur">'+ESC(r.dur)+'</span>':'')+
-        '<span class="crd-play">'+_icPlay+'</span>'+
-      '</div>'+
-      '<div class="crd-body">'+
-        '<span class="crd-meta">@'+ESC(r.creator.handle)+' · '+ESC(r.when)+'</span>'+
-        '<h3 class="crd-title">'+ESC(r.cap)+'</h3>'+
-        '<div class="crd-acts">'+
-          '<button class="crd-btn crd-metrics" data-act="reel-detail" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver métricas","See metrics")+'</button>'+
-          '<button class="crd-btn crd-steal" data-act="steal" data-id="'+ESC(r.id)+'" aria-label="'+L("Roba la idea","Steal the idea")+'">'+IC.bolt+'</button>'+
+    var open=(S._galOpen===r.id);
+    return '<div class="crd'+(open?' crd--open':'')+'">'+
+      '<div class="crd-main">'+
+        '<div class="crd-thumb">'+thumbInner+
+          (mult?'<span class="crd-mult">'+IC.bolt+' '+ESC(mult)+'</span>':'')+
+          (r.dur?'<span class="crd-dur">'+ESC(r.dur)+'</span>':'')+
+          '<span class="crd-play">'+_icPlay+'</span>'+
+        '</div>'+
+        '<div class="crd-body">'+
+          '<span class="crd-meta">@'+ESC(r.creator.handle)+' · '+ESC(r.when)+'</span>'+
+          '<h3 class="crd-title">'+ESC(r.cap)+'</h3>'+
+          '<div class="crd-acts">'+
+            '<button class="crd-btn crd-metrics'+(open?' on':'')+'" data-act="gal-expand" data-id="'+ESC(r.id)+'">'+IC.eye+' '+(open?L("Ocultar","Hide"):L("Ver métricas","See metrics"))+'</button>'+
+            '<button class="crd-btn crd-steal" data-act="steal" data-id="'+ESC(r.id)+'" aria-label="'+L("Roba la idea","Steal the idea")+'">'+IC.bolt+'</button>'+
+          '</div>'+
         '</div>'+
       '</div>'+
+      (open?competitorPanelHTML(r):'')+
+    '</div>';
+  }
+  /* Panel expandible (mockup David «EXPANDIBLE · Ver métricas · transcripción»):
+     stats 2×2 (Explosión verde, Views, Likes, Comentarios) + transcripción + robar. */
+  function competitorPanelHTML(r){
+    var tx=(S._tx&&S._tx.id===r.id)?S._tx:{status:"idle"};
+    var txBody;
+    if(tx.status==="ok") txBody='<div class="crd-tx">'+ESC(tx.text)+'</div>';
+    else if(tx.status==="loading") txBody='<div class="crd-tx crd-tx--wait"><span class="rs-ldr"></span> '+L("Transcribiendo el audio…","Transcribing audio…")+'</div>';
+    else if(tx.status==="error") txBody='<div class="crd-tx crd-tx--wait">'+L("No se pudo transcribir.","Couldn't transcribe.")+' <button class="btn btn-sm btn-secondary" data-act="reel-tx" data-id="'+ESC(r.id)+'">'+L("Reintentar","Retry")+'</button></div>';
+    else txBody='<button class="btn btn-sm btn-secondary" data-act="reel-tx" data-id="'+ESC(r.id)+'">'+IC.doc+' '+L("Ver transcripción","See transcript")+'</button>';
+    var stat=function(k,v,green){ return '<div class="crd-stat"><div class="crd-stat-k">'+ESC(k)+'</div><div class="crd-stat-v'+(green?' g':'')+'">'+ESC(String(v))+'</div></div>'; };
+    return '<div class="crd-panel">'+
+      '<div class="crd-pgrid">'+
+        stat(L("Explosión","Explosion"), (r.explosionTxt!=null?r.explosionTxt+'×':'–'), true)+
+        stat(L("Views","Views"), r.views)+
+        stat(L("Likes","Likes"), r.likes)+
+        stat(L("Comentarios","Comments"), (r.comments!=null?r.comments:'–'))+
+      '</div>'+
+      '<div class="crd-txwrap"><span class="crd-tx-lbl">'+L("TRANSCRIPCIÓN · DETECTADA","TRANSCRIPT · DETECTED")+'</span>'+txBody+'</div>'+
+      '<button class="btn btn-md btn-primary crd-steal-full" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba la idea","Steal the idea")+'</button>'+
     '</div>';
   }
   function competitorGalleryHTML(){
@@ -4488,6 +4513,7 @@
       if(_tr){ var _dir=(btn.getAttribute("data-dir")==="next")?1:-1; _tr.scrollBy({left:_dir*Math.round(_tr.clientWidth*0.82), behavior:"smooth"}); }
       return;
     }
+    if(act==="gal-expand"){ S._galOpen=(S._galOpen===id)?null:id; return render(); }   // expand inline de la galería (mockup David)
     if(act==="expand-feed"){ S.feedExpanded=true; return render(); }
     if(act==="add-reel") return addReelManual();
     // growth-2: onboarding de activación
