@@ -9628,6 +9628,7 @@
     .rs--mobile .whale .btn { width:100%; }
     /* filters */
     .rs .filters { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+    .rs .radar-addbar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
     .rs .fchip { display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 14px; border-radius:99px; border:1px solid var(--border-default); background:transparent; font-size:13px; font-weight:600; color:var(--text-secondary); cursor:pointer; transition: all .15s var(--ease); }
     .rs .fchip:hover { color:var(--text-primary); border-color:var(--border-strong); }
     .rs .fchip.on { background:var(--surface-overlay); color:var(--text-primary); border-color:var(--border-strong); box-shadow:inset 2px 0 0 var(--brand-500); }
@@ -9653,8 +9654,10 @@
     .rs .reel .iconbtn:hover { border-color:var(--border-strong); color:var(--text-primary); }
     .rs .reel .iconbtn.on { color:var(--warning-fg); border-color:var(--warning-fg); }
     .rs .cost-whisper { font-size:11px; color:var(--text-tertiary); opacity:.7; }
-    /* overlays */
-    .rs .overlay { position:absolute; inset:0; z-index:30; background:var(--surface-base); display:flex; flex-direction:column; animation: rsSheetUp .42s var(--ease-out); }
+    /* overlays — B2: NO cubren el rail (inset left:64px, como #rs-legacy) → la barra
+       lateral sigue clicable con un overlay abierto (gen/guion) dentro de un proyecto;
+       al pulsar el rail, switchTab cierra el overlay. */
+    .rs .overlay { position:absolute; inset:0 0 0 64px; z-index:30; background:var(--surface-base); display:flex; flex-direction:column; animation: rsSheetUp .42s var(--ease-out); }
     @keyframes rsSheetUp { from{ transform:translateY(24px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
     .rs .overlay .obar { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border-subtle); flex-shrink:0; }
     .rs .overlay .obar .back { width:38px; height:38px; border-radius:99px; border:1px solid var(--border-default); background:transparent; color:var(--text-primary); display:flex; align-items:center; justify-content:center; cursor:pointer; }
@@ -10293,6 +10296,7 @@
     .rs .seed-banner .btn { flex-shrink:0; }
     /* FIX2 · añadir competidor inline desde el Radar + estado "analizando" */
     .rs .comp-add { display:flex; align-items:center; gap:8px; margin:0 0 14px; padding:8px 10px 8px 14px; border-radius:13px; border:1px solid var(--brand-500); background:var(--surface-raised); }
+    .rs .comp-add.hidden { display:none; }
     .rs .comp-add-at { font-family:var(--font-mono); color:var(--text-tertiary); font-size:15px; }
     .rs .comp-add-input { flex:1; min-width:0; height:34px; border:none; background:transparent; color:var(--text-primary); font:inherit; font-size:14px; outline:none; }
     .rs .comp-add-input::placeholder { color:var(--text-tertiary); }
@@ -10811,6 +10815,7 @@
       .rs .rs-acct-menu { left:8px; right:8px; bottom:72px; min-width:0; }   /* sobre la barra inferior */
       .rs .rail-btn.on::before { left:11px; right:11px; top:auto; bottom:-8px; width:auto; height:3px; border-radius:3px 3px 0 0; }
       .rs .rs-legacy { inset:0 0 64px 0; }   /* rail es barra inferior fija → deja hueco */
+      .rs .overlay { inset:0; }   /* B2 móvil: rail es barra inferior fija (z:40 > overlay) → ya clicable */
       .rs .feature { grid-template-columns:1fr; max-height:none; } .rs .feature-thumb .thumb { height:200px; min-height:200px; border-right:none; border-bottom:1px solid var(--border-default); } .rs .feature-main { justify-content:flex-start; } .rs .feature-data { border-left:none; border-top:1px solid var(--border-default); flex-direction:row; flex-wrap:wrap; gap:24px; justify-content:flex-start; }
       .rs .opp-slide { flex-basis:calc(100% - 30px); }
       .rs .statbar { grid-template-columns:1fr 1fr; } .rs .stat:nth-child(2n){ border-right:none; }

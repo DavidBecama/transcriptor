@@ -222,7 +222,7 @@
     var menu="";
     if(S.brandMenu){
       var items="";
-      if(isAgency()) items+='<button class="brand-opt'+(portfolio?" on":"")+'" data-act="all-brands"><span class="brand-dot multi"></span>Todas las marcas</button>';
+      // B3: sin "Todas las marcas" (portfolio eliminado) — el menú solo cambia de marca.
       // Cada marca: clic = cambiar de contexto (datos aislados por project_id).
       // Renombrar / borrar inline (× con confirmación). 'default' (marca única
       // sin project real) no se renombra/borra.
@@ -285,9 +285,9 @@
     // momento oculto del rail; el backend (invite/join/roles) y teamHTML se quedan.
     //   ...,["team",IC.users,"Equipo"]
     var _tro='<svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M6 4h12v4a6 6 0 11-12 0V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M6 6H4v1a3 3 0 003 3M18 6h2v1a3 3 0 01-3 3M9.5 14h5M12 14v3.5M8.5 20h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    var navTabs = isAgency()
-      ? [["portfolio",IC.layers,"Portfolio"],["dashboard",IC.grid,"Radar"],["guiones",IC.doc,"Guiones"],["metrics",IC.chart,"Métricas"],["leaderboard",_tro,"Ranking"],["brain",IC.brain,"Cerebro"]]
-      : [["dashboard",IC.grid,"Radar"],["guiones",IC.doc,"Guiones"],["metrics",IC.chart,"Métricas"],["leaderboard",_tro,"Ranking"],["brain",IC.brain,"Cerebro"]];
+    // B3: mismo rail para todos (sin Portfolio). El Radar es la pantalla principal;
+    // las marcas se cambian con el switcher de la command bar, no con una pantalla aparte.
+    var navTabs = [["dashboard",IC.grid,"Radar"],["guiones",IC.doc,"Guiones"],["metrics",IC.chart,"Métricas"],["leaderboard",_tro,"Ranking"],["brain",IC.brain,"Cerebro"]];
     return '<nav class="rail">'+
       '<img class="rail-logo" src="/static/img/branding/isotipo-128.png" srcset="/static/img/branding/isotipo-128.png 1x, /static/img/branding/isotipo-256.png 2x" alt="Reelscript">'+
       navTabs.map(function(t){return '<button class="rail-btn'+(S.tab===t[0]&&!S.legacy?" on":"")+'" data-act="tab" data-k="'+t[0]+'" data-tour="tab-'+t[0]+'">'+t[1]+'<span class="tip">'+t[2]+'</span></button>';}).join("")+
@@ -304,9 +304,7 @@
   function cmdHTML(){
     var tabName=({dashboard:"RADAR",ideas:"IDEAS",guiones:"GUIONES",metrics:"MÉTRICAS",leaderboard:"RANKING",brain:"CEREBRO",team:"EQUIPO"})[S.tab]||"";
     var crumb;
-    if(isMacro()) crumb='<span class="crumb">/ PORTFOLIO</span>';
-    else if(isAgency()) crumb='<button class="crumb crumb-link" data-act="all-brands">Todas las marcas</button><span class="crumb">/ '+tabName+'</span>';
-    else crumb='<span class="crumb">/ '+tabName+'</span>';
+    crumb='<span class="crumb">/ '+tabName+'</span>';   // B3: sin portfolio/"Todas las marcas"
     var streak=(S.user.streak>0)?'<span class="cmd-streak" title="Días seguidos creando">'+IC.spark+' Racha '+S.user.streak+'</span>':'';
     var demoToggle=isDemo()?'<div class="demo-plan" title="Solo demo: cambia de plan"><span class="dp-k">DEMO</span>'+
       '<button class="dp'+(S._demoFree===true?" on":"")+'" data-act="demo-plan" data-k="free">Free</button>'+
@@ -891,12 +889,20 @@
   }
   function filtersHTML(){
     var base=[["explosion",IC.spark+' Explotando'],["recent","Recientes"],["fav",IC.starO+' Favoritos']];
-    return '<div class="filters">'+base.map(function(f){return '<button class="fchip'+(S.filter===f[0]?" on":"")+'" data-act="filter" data-k="'+f[0]+'">'+f[1]+'</button>';}).join("")+
-      '<button class="fchip ghost'+(S.addCompOpen?" on":"")+'" data-act="add-comp" title="Sigue a un creador para ver sus reels en el Radar">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
-      '<button class="fchip ghost" data-act="add-reel" title="Pega la URL de un reel para meterlo al ecosistema">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
+    // B1: añadir/actualizar viven en radarAddBarHTML (siempre presente). Aquí solo filtros.
+    return '<div class="filters">'+base.map(function(f){return '<button class="fchip'+(S.filter===f[0]?" on":"")+'" data-act="filter" data-k="'+f[0]+'">'+f[1]+'</button>';}).join("")+'</div>';
+  }
+  // B1: barra de "añadir competidor" SIEMPRE disponible (también con el radar vacío,
+  // que es justo cuando hace falta). El input inline + el banner "analizando" viven aquí,
+  // no dentro de filtersHTML (que no se renderiza sin reels). Incluye "Actualizar radar".
+  function radarAddBarHTML(){
+    var bar='<div class="radar-addbar">'+
+      '<button class="fchip ghost'+(S.addCompOpen?" on":"")+'" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+      '<button class="fchip ghost" data-act="add-reel">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
       '<span style="flex:1"></span>'+
       '<button class="fchip ghost" data-act="refresh-radar" title="'+L("Busca lo nuevo de tus competidores","Check what\'s new from your competitors")+'">'+IC.repeat+' '+L("Actualizar radar","Refresh radar")+'</button>'+
-    '</div>'+addCompInlineHTML()+analyzingBannerHTML();
+    '</div>';
+    return bar+addCompInlineHTML()+analyzingBannerHTML();
   }
 
   // SPEC #3: cuando el radar se llena con el SEED del nicho (user sin competidores
@@ -1160,10 +1166,9 @@
   }
 
   // Tira de pestañas de marca — SOLO en el Radar de Agencia. Salto rápido entre
-  // los dashboards de cada marca + "Todas" para volver al macro (portfolio).
+  // los dashboards de cada marca (B3: sin "Todas" — portfolio eliminado).
   function brandTabsHTML(){
     return '<div class="brand-tabs">'+
-      '<button class="btab btab-all" data-act="all-brands" title="Ver todas las marcas">'+IC.layers+' Todas</button>'+
       S.brands.map(function(b){
         var on=b.id===S.brandId;
         return '<button class="btab'+(on?" on":"")+'" data-act="open-brand" data-id="'+ESC(b.id)+'">'+
@@ -1247,10 +1252,11 @@
         return '<div class="scroll"><div class="canvas">'+head+onboardingHTML()+'</div></div>';
       }
       return '<div class="scroll"><div class="canvas">'+head+(isAgency()?brandTabsHTML():"")+statbarHTML()+
+        radarAddBarHTML()+        // B1: añadir competidor SIEMPRE accesible, también con el radar vacío
         trackedManageHTML()+
         voiceOnboardCardHTML()+   // B6: en first-run sin reels, el banner de voz es lo primero que aporta
         nextSeriesHTML("dash")+   // B1+T1: CTA secundario en el Dashboard
-        '<div class="rs-empty">'+(S.filter==="fav"?"Sin favoritos aún. Toca la estrella en una señal.":"Sin reels todavía. Añade un competidor o pega un reel para empezar.")+'</div>'+
+        '<div class="rs-empty">'+(S.filter==="fav"?"Sin favoritos aún. Toca la estrella en una señal.":"Sin reels todavía. Añade un competidor arriba o pulsa «Actualizar radar» — sus reels entrarán solos.")+'</div>'+
       '</div></div>';
     }
 
@@ -1278,7 +1284,7 @@
       (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+
       // Galerías de miniaturas (port de Leonard) en lugar de la lista "Más señales":
       // los filtros (fchip) se conservan y filtran la galería vía feedReels().
-      (S.reels.length?(filtersHTML()+competitorGalleryHTML()+communityGalleryHTML()):"")+
+      (S.reels.length?(radarAddBarHTML()+filtersHTML()+competitorGalleryHTML()+communityGalleryHTML()):"")+
     '</div></div>';
   }
 
@@ -2173,8 +2179,9 @@
      tu nicho…" no bloqueante; cuando el scrape termina, sus reels entran en el radar.
      Más el botón "Actualizar radar" (refresca a demanda, reusa caché). ── */
   function addCompInlineHTML(){
-    if(!S.addCompOpen) return '';
-    return '<div class="comp-add"><span class="comp-add-at">@</span>'+
+    // SIEMPRE en el DOM (oculto con .hidden si está cerrado) → toggleAddComp lo muestra
+    // in-place sin re-render, así no hay salto de scroll al abrirlo.
+    return '<div class="comp-add'+(S.addCompOpen?'':' hidden')+'" id="rsCompAdd"><span class="comp-add-at">@</span>'+
       '<input id="rsCompAddInput" class="comp-add-input" type="text" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="'+L("usuario de Instagram y Enter","Instagram handle, then Enter")+'" aria-label="'+L("Añadir competidor","Add competitor")+'">'+
       '<button class="btn btn-sm btn-primary" data-act="comp-add-submit">'+IC.bolt+' '+L("Analizar","Analyze")+'</button>'+
       '<button class="comp-add-x" data-act="add-comp" aria-label="'+L("Cerrar","Close")+'">'+IC.x+'</button>'+
@@ -2186,7 +2193,15 @@
       '<span class="analyzing-txt"><b>'+L("Analizando tu nicho","Analyzing your niche")+'</b> — '+hs.map(function(h){return '@'+ESC(h);}).join(", ")+
       '. '+L("Sus reels entrarán en el radar en cuanto termine.","Their reels hit the radar as soon as it's done.")+'</span></div>';
   }
-  function toggleAddComp(){ S.addCompOpen=!S.addCompOpen; render(); if(S.addCompOpen){ setTimeout(function(){ var i=document.getElementById("rsCompAddInput"); if(i) i.focus(); },30); } }
+  function toggleAddComp(){
+    S.addCompOpen=!S.addCompOpen;
+    var box=document.getElementById("rsCompAdd");
+    if(!box){ return render(); }   // aún no montado (p.ej. radar vacío recién entrado) → render normal
+    // Toggle in-place (sin re-render → SIN salto de scroll). Marca el botón y enfoca.
+    box.classList.toggle("hidden", !S.addCompOpen);
+    var _el=root(); var btn=_el&&_el.querySelector('[data-act="add-comp"]'); if(btn) btn.classList.toggle("on", S.addCompOpen);
+    if(S.addCompOpen){ var i=document.getElementById("rsCompAddInput"); if(i){ try{ i.focus({preventScroll:true}); }catch(e){ i.focus(); } } }
+  }
   function submitAddComp(){ var i=document.getElementById("rsCompAddInput"); addCompetitorFromRadar(i?i.value:""); }
   function addCompetitorFromRadar(handle){
     handle=(handle||"").trim().replace(/^@+/,"").toLowerCase();
@@ -2199,7 +2214,7 @@
       return;
     }
     var body={ ig_username:handle, source:"radar" };
-    var _pid=_pidOf(S.brandId); if(isAgency()&&_pid) body.project_id=_pid;
+    var _pid=_pidOf(S.brandId); if(_pid) body.project_id=_pid;   // B5: aísla por marca activa (agency + estudio)
     showToast(L("Añadiendo a @"+handle+"…","Adding @"+handle+"…"));
     apiPost("/api/tracked-creators", body).then(function(r){
       if(!r.ok){
@@ -2928,9 +2943,12 @@
     // T1: "ideas" dejó de ser una vista propia — la Fábrica de ideas vive dentro
     // de Radar. Normalizamos cualquier ruta/deep-link heredado (/profile/ideas, ?t=ideas).
     if(S.tab==="ideas") S.tab="dashboard";
+    // B3: Portfolio eliminado (redundante) — el Radar es la pantalla principal. Cualquier
+    // ruta/deep-link/entrada a portfolio se normaliza al Radar (sin romper rutas).
+    if(S.tab==="portfolio") S.tab="dashboard";
     // Equipo oculto temporalmente (ver TODO en railHTML): cualquier deep-link a
-    // team se normaliza al Radar/Portfolio para no dejar una vista huérfana.
-    if(S.tab==="team") S.tab=isAgency()?"portfolio":"dashboard";
+    // team se normaliza al Radar para no dejar una vista huérfana.
+    if(S.tab==="team") S.tab="dashboard";
     // A) Onboarding v2 = pantalla dedicada (sin rail/cmd/statbar): el radar vacío
     // (0 rivales · 0 reels) NO se ve detrás. Short-circuit antes de montar la isla.
     if(showOnboarding()){
@@ -3198,7 +3216,7 @@
     // Free = trial Pro de 5 días con tope de 3 guiones/día (Fathom 18/06): el free ES el trial.
     if(toFree){ S.user.trialActive=true; S.user.trialDaysLeft=5; S.user.dayLeft=3; }
     else { S.user.trialActive=false; }
-    if(plan==="agencia"){ S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="portfolio"; }   // macro
+    if(plan==="agencia"){ S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="dashboard"; }   // B3: directo al Radar
     else { S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab=toFree?"metrics":"dashboard"; applyDemoBrand(); }
     render();
   }
@@ -4276,7 +4294,7 @@
     if(act==="legacy-back") return closeLegacy();
     if(act==="brand-toggle"){ S.brandMenu=!S.brandMenu; return render(); }
     if(act==="brand") return openBrand(id);
-    if(act==="all-brands"){ S.tab="portfolio"; S.brandMenu=false; S.view="feed"; return render(); }
+    if(act==="all-brands"){ S.brandMenu=false; S.view="feed"; S.tab="dashboard"; return render(); }   // B3: portfolio fuera → al Radar
     if(act==="open-brand") return openBrand(id);
     if(act==="demo-plan") return setDemoPlan(k);
     if(act==="brain-rate") return brainRate(parseInt(btn.getAttribute("data-k"),10)||0);
@@ -4662,7 +4680,7 @@
     // Cualquier /profile/<x> con sección → tab del rail. Sin equivalente → "dashboard" (Radar).
     // team: oculto temporalmente → cae al default (render lo re-normaliza también).
     S.tab = ({scripts:"guiones", guiones:"guiones", ideas:"dashboard", metrics:"metrics",
-              brain:"brain", cerebro:"brain", portfolio:"portfolio",
+              brain:"brain", cerebro:"brain", portfolio:"dashboard",
               radar:"dashboard", overview:"dashboard", dashboard:"dashboard"})[seg] || "dashboard";
   }
   function loadAll(){
@@ -4711,14 +4729,14 @@
       S.brands=(bd.brands&&bd.brands.length)?bd.brands:[{id:"default",name:(me.user&&me.user.name)?me.user.name:"Mi marca",handle:S.user.handle,color:"#f97316",level:1,voice:40,reelsAnalyzed:0,scripts:0}];
       if(isDemo()){ S.brands = isAgency() ? demoBrands() : [demoBrands()[0]]; }
       S.brandId=S.brands[0].id;
-      S.tab = isAgency() ? "portfolio" : "dashboard";   // agencia entra en MACRO
+      S.tab = "dashboard";   // B3: todos entran directos al Radar (sin portfolio)
       _routeFromPath();   // la isla muestra la sección de /profile/<x> en el rail
       // Demo deep-link: ?plan= ?t=<tab> ?b=<brandId> para previsualizar cualquier vista.
       if(isDemo()){ try{ var qs=new URLSearchParams(location.search);
         // econ demo: el saldo del contador refleja los grants del plan (Creator 120 ·
         // Agency 960). Sin ?plan → un saldo medio para ver el contador en acción.
         if(!S.user.credits) S.user.credits=120;
-        var qp=qs.get("plan"); if(qp==="creador"){ S.plan="creador"; S.user.credits=120; S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab="dashboard"; } else if(qp==="agencia"){ S.plan="agencia"; S.user.credits=960; S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="portfolio"; }
+        var qp=qs.get("plan"); if(qp==="creador"){ S.plan="creador"; S.user.credits=120; S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab="dashboard"; } else if(qp==="agencia"){ S.plan="agencia"; S.user.credits=960; S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="dashboard"; }
         var qb=qs.get("b"); if(qb && S.brands.some(function(x){return x.id===qb;})){ S.brandId=qb; S.tab="dashboard"; }
         var qt=qs.get("t"); if(qt==="perf"){ S.tab="guiones"; S.view="perf"; S.perfGuion="gd1"; } else if(qt){ S.tab=qt; }
         // ?onb=1 → fuerza el onboarding v2 en demo (sin tocar el flujo normal/harness)
