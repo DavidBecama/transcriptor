@@ -1417,7 +1417,8 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
     GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-    SCRIPT_COST = 18
+    SCRIPT_UNITS = 3                 # econ: 1 guión = 3 créditos (economia-creditos.md)
+    SCRIPT_COST = SCRIPT_UNITS * 18  # 54 cents = 3 créditos
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
     def _fail(error, message):
@@ -1749,7 +1750,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         try:
             if is_paid_unlimited:
                 db.table("profiles").update({
-                    "monthly_usage": (profile.get("monthly_usage") or 0) + 1
+                    "monthly_usage": (profile.get("monthly_usage") or 0) + SCRIPT_UNITS
                 }).eq("id", user_id).execute()
             elif _fll and _fll(profile) > 0:
                 # Consumo del free MENSUAL (espejo de app._free_month_consume) con
@@ -1995,7 +1996,8 @@ def adapt_task(text, style, custom_prompt, user_id, charge_mode, cost_cents):
         try:
             fresh = get_profile(user_id)
             if charge_mode == "monthly":
-                db.table("profiles").update({"monthly_usage": (fresh.get("monthly_usage") or 0) + 1}).eq("id", user_id).execute()
+                # econ: guión = 3 créditos (monthly_usage cuenta créditos, no guiones).
+                db.table("profiles").update({"monthly_usage": (fresh.get("monthly_usage") or 0) + 3}).eq("id", user_id).execute()
             elif charge_mode == "credits":
                 db.table("profiles").update({"credits_cents": (fresh.get("credits_cents") or 0) - cost_cents}).eq("id", user_id).execute()
         except Exception as e:
@@ -2026,7 +2028,9 @@ def voice_auto_derive_task(uid, email, project_id):
         from app import (_voice_auto_candidates, get_profile, check_monthly_limit,
                          download_audio, transcribe_with_groq, derive_voice_profile,
                          save_voice_profile, get_voice_profile,
-                         COST_CENTS, FREE_DAILY_USER, UNLIMITED_EMAILS, _VOICE_AUTO_SAMPLE)
+                         COST_CENTS, FREE_DAILY_USER, UNLIMITED_EMAILS, _VOICE_AUTO_SAMPLE,
+                         _voice_reels_used, _voice_mark_reel, credits_available,
+                         _charge_units_locked, VOICE_FREE_REELS, VOICE_REEL_UNITS)
     except Exception as e:
         logger.exception("voice_auto_derive_task import failed: %s", e)
         return {"ok": False, "error": "import", "message": "Servicio no disponible.", "http": 500}
@@ -2036,6 +2040,7 @@ def voice_auto_derive_task(uid, email, project_id):
         return {"ok": False, "error": "no_videos",
                 "message": "No encuentro reels publicados tuyos. Conecta tu Instagram en Métricas.", "http": 404}
     is_unlimited = (email or "").lower() in UNLIMITED_EMAILS
+    _user = {"id": uid, "email": email}
     texts, transcribed_now = [], 0
     for v in vids:
         txt = (v.get("transcription") or "").strip()
@@ -2043,18 +2048,12 @@ def voice_auto_derive_task(uid, email, project_id):
             texts.append(txt); continue
         if not v.get("ig_url"):
             continue
-        profile = get_profile(uid)
-        if not is_unlimited:
-            user_plan = profile.get("plan", "free")
-            if user_plan in ("pro", "creator", "agency"):
-                ok, _ = check_monthly_limit(profile)
-                if not ok:
-                    break
-            elif profile["credits_cents"] >= COST_CENTS:
-                pass
-            elif profile["free_used_today"] < FREE_DAILY_USER:
-                pass
-            else:
+        # econ: primeros VOICE_FREE_REELS reels de voz GRATIS (de por vida), luego
+        # VOICE_REEL_UNITS/reel. Sin presupuesto para el siguiente → para.
+        reel_units = 0
+        if not is_unlimited and _voice_reels_used(uid) >= VOICE_FREE_REELS:
+            reel_units = VOICE_REEL_UNITS
+            if credits_available(get_profile(uid)) < reel_units:
                 break
         try:
             with tempfile.TemporaryDirectory() as tmp:
@@ -2072,14 +2071,12 @@ def voice_auto_derive_task(uid, email, project_id):
             }).eq("ig_video_id", v["ig_video_id"]).eq("user_id", uid).execute()
         except Exception:
             pass
+        if reel_units and not is_unlimited:
+            _err, _r, _ = _charge_units_locked(uid, reel_units, _user)
+            if _err:
+                break
         if not is_unlimited:
-            user_plan = profile.get("plan", "free")
-            if user_plan in ("pro", "creator", "agency"):
-                db.table("profiles").update({"monthly_usage": profile.get("monthly_usage", 0) + 1}).eq("id", uid).execute()
-            elif profile["credits_cents"] >= COST_CENTS:
-                db.table("profiles").update({"credits_cents": profile["credits_cents"] - COST_CENTS}).eq("id", uid).execute()
-            else:
-                db.table("profiles").update({"free_used_today": profile["free_used_today"] + 1}).eq("id", uid).execute()
+            _voice_mark_reel(uid)
         transcribed_now += 1
         texts.append(txt)
 

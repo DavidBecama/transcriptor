@@ -99,12 +99,40 @@ def track_event(event, distinct_id, properties=None):
         _t(event, distinct_id, properties or {})
     except Exception:
         pass
+    # econ: el primer muro arranca el flash del Pack 300 (48h). Un solo chokepoint.
+    if event == "paywall_shown" and distinct_id:
+        try:
+            _mark_first_wall(distinct_id)
+        except Exception:
+            pass
 
 FREE_DAILY_ANON  = 5   # transcripciones gratis para anónimos
 FREE_DAILY_USER  = 5   # transcripciones gratis para registrados
 FREE_DAILY_ADAPT = 0   # v0.19: "Hazlo tuyo" (adapt) es de compromiso → cuesta créditos/plan
                        # (política A3: transcribir = gancho gratis; adapt/Hazlo mío = cuesta)
 COST_CENTS       = 18   # $0.18 por uso de pago (~7 usos por $1.29)
+
+# ── Economía de créditos (economia-creditos.md, 2026-06-20) ───────────────────
+# Moneda única = crédito (1 crédito = COST_CENTS de saldo). 1 guión = 3 créditos:
+# el ×3 da granularidad (regenerar y hooks cuestan menos que un guión entero).
+# Los sinks de "mirar" (Radar, métricas, refresh diario) son GRATIS por diseño.
+SCRIPT_UNITS          = 3    # generar guión (Roba la idea / desde idea / desde competidor)
+REGEN_UNITS           = 1    # regenerar guión (re-tira del mismo reel)
+HOOKS_EXTRA_UNITS     = 1    # "3 hooks más" tras agotar el cupo diario gratis
+HOOKS_FREE_PER_DAY    = 2    # hooks-extra gratis por usuario y día
+FILL_WEEK_UNITS       = 12   # "Llena mi semana" (5 guiones de golpe; vs 15 sueltos)
+ADD_COMPETITOR_UNITS  = 2    # añadir competidor NUEVO más allá del cupo del plan
+VOICE_FREE_REELS      = 5    # primeros reels de voz gratis (llegar al aha sin fricción)
+VOICE_REEL_UNITS      = 2    # por reel de voz transcrito tras el cupo gratis
+AGENCY_EXTRA_BRAND_CREDITS = 96   # +96 cr/mes por marca extra de Agencia (+10€/marca)
+
+# Flash por-usuario (economia-creditos.md §4): tras chocar el PRIMER muro, el Pack 300
+# baja a TOPUP_FLASH_EUR € (vs 49 €) durante TOPUP_FLASH_HOURS h. Urgencia + ancla.
+# El price del checkout a 29 € lo crea David en Whop → env WHOP_TOPUP_300_FLASH_*; si no
+# está, la oferta se MUESTRA pero el checkout cae al pack normal (degradado seguro).
+TOPUP_FLASH_PACK      = "300"
+TOPUP_FLASH_EUR       = 29
+TOPUP_FLASH_HOURS     = 48
 
 UNLIMITED_EMAILS = {"davidmiragito@gmail.com"}  # sin límite ni coste
 
@@ -160,11 +188,12 @@ def admin_required(f):
 # (1 «Hazlo mío» · 3 análisis · 1 competidor — nada resetea).
 PLANS = {
     "free": {
-        "credits_month": 0,
+        # econ 2026-06-20 (economia-creditos.md): Free 9 cr/mes ≈ 3 guiones (guión=3cr).
+        "credits_month": 9,
         # reverse-trial: tras los 7 días de Pro, el FREE es MENSUAL (resetea cada mes),
         # ya no una cata de por vida. Contadores: free_lifetime_uses=guiones del mes,
         # free_analysis_uses=análisis del mes (reset por free_month_reset_at).
-        "free_scripts_monthly": 2,     # 2 "Hazlo mío"/mes
+        "free_scripts_monthly": 3,     # 3 "Hazlo mío"/mes (= 9 cr a 3 cr/guion)
         "free_analysis_monthly": 3,    # 3 análisis (transcripciones)/mes
         "monthly_uses": 0,             # → PLAN_LIMITS None (sin límite mensual; usa los free_*_monthly)
         "daily_free": 0,
@@ -178,10 +207,10 @@ PLANS = {
         "support": None,
     },
     "creator": {
-        "credits_month": 100,
+        "credits_month": 120,
         "price_month_eur": 29,
         "price_year_eur": 276,
-        "monthly_uses": 200,           # 200 créditos/mes
+        "monthly_uses": 120,           # econ: 120 cr/mes ≈ 40 guiones (guión=3cr)
         "daily_free": 0,
         "scripts_max": None,           # ilimitado
         "projects_max": None,
@@ -195,10 +224,10 @@ PLANS = {
     # Estudio (nuevo): puente 29→129. "creador pro" para quien factura: 3 marcas
     # y más créditos. Precio anual por defecto (~20% off → 47€/mes).
     "estudio": {
-        "credits_month": 200,
+        "credits_month": 360,
         "price_month_eur": 59,
         "price_year_eur": 564,         # 47€/mes facturado anual (~20% off)
-        "monthly_uses": 400,           # 400 créditos/mes (el doble que Creator)
+        "monthly_uses": 360,           # econ: 360 cr/mes ≈ 120 guiones (~120/marca · 3 marcas)
         "daily_free": 0,
         "scripts_max": None,
         "projects_max": 3,             # 3 marcas
@@ -211,10 +240,10 @@ PLANS = {
         "name": "Estudio",
     },
     "agency": {
-        "credits_month": 500,
+        "credits_month": 960,
         "price_month_eur": 129,
         "price_year_eur": 1290,
-        "monthly_uses": 800,           # pool 800 créditos/mes (cuenta, no por marca)
+        "monthly_uses": 960,           # econ: 960 cr/mes ≈ 320 guiones (~96/marca · 10) · +96 cr/marca extra
         "daily_free": 0,
         "scripts_max": None,
         # base 10 marcas; +10€/marca extra. NOTA: la compra per-marca (Stripe)
@@ -270,7 +299,7 @@ PLAN_LIMITS = {p: v["monthly_uses"] or None for p, v in PLANS.items()}
 # como backstop total del trial (= 5×3). NO toca los planes de pago.
 TRIAL_DAYS = 5
 TRIAL_DAILY_SCRIPTS = 3      # tope de guiones/día durante el trial (reset diario, UTC)
-TRIAL_CREDIT_CAP = 15        # backstop total del trial (= TRIAL_DAYS × TRIAL_DAILY_SCRIPTS)
+TRIAL_CREDIT_CAP = 30        # econ: 30 cr ≈ 10 guiones (guión=3cr) de prueba
 TRIAL_PLAN = "creator"       # tier cuyos límites/feature-set ve el trial (Pro completo)
 RESCRAPE_COST_CREDITS = 10   # coste de forzar el re-scrape del propio perfil (Fathom 18/06)
 
@@ -676,6 +705,80 @@ def release_credit_lock(uid: str, token) -> None:
         pass
 
 
+# ── econ · cupo diario de "3 hooks más" (gratis HOOKS_FREE_PER_DAY/día, luego cobra) ──
+# Contador diario por usuario en Redis (sin tocar schema). Si Redis no está → cobra
+# siempre (degradado seguro). El contador solo avanza tras entregar (mark_used).
+def _hooks_extra_units(uid: str) -> int:
+    """Créditos a cobrar por un 'hooks más' AHORA: 0 mientras queden gratis hoy,
+    si no HOOKS_EXTRA_UNITS."""
+    try:
+        day = datetime.now(timezone.utc).strftime("%Y%m%d")
+        used = int(rds.get(f"hooks:{uid}:{day}") or 0)
+        return 0 if used < HOOKS_FREE_PER_DAY else HOOKS_EXTRA_UNITS
+    except Exception:
+        return HOOKS_EXTRA_UNITS
+
+
+def _hooks_mark_used(uid: str) -> None:
+    """Suma 1 al contador diario de hooks (TTL 48h cubre husos horarios)."""
+    try:
+        day = datetime.now(timezone.utc).strftime("%Y%m%d")
+        key = f"hooks:{uid}:{day}"
+        if rds.incr(key) == 1:
+            rds.expire(key, 172800)
+    except Exception:
+        pass
+
+
+# ── econ · cupo de entrenamiento de voz (VOICE_FREE_REELS gratis de por vida) ──
+# Contador acumulado por usuario en Redis (sin tocar schema). Si Redis no está →
+# trata todos como gratis (degradado seguro: nunca cobra de más por un fallo de infra).
+def _voice_reels_used(uid: str) -> int:
+    try:
+        return int(rds.get(f"voicereels:{uid}") or 0)
+    except Exception:
+        return 0
+
+
+def _voice_mark_reel(uid: str) -> None:
+    try:
+        rds.incr(f"voicereels:{uid}")
+    except Exception:
+        pass
+
+
+# ── econ · flash del 1er muro (Pack 300 → 29 € durante 48 h) ──────────────────
+def _mark_first_wall(uid: str) -> None:
+    """Marca el instante del PRIMER muro del usuario (solo la 1ª vez). Arranca la
+    ventana del flash. Redis con TTL holgado; si no está → no hay flash (degradado)."""
+    try:
+        key = f"firstwall:{uid}"
+        if rds.set(key, datetime.now(timezone.utc).isoformat(), nx=True):
+            rds.expire(key, TOPUP_FLASH_HOURS * 3600 + 86400)
+    except Exception:
+        pass
+
+
+def topup_flash_state(uid: str) -> dict:
+    """Estado del flash para este usuario: {active, pack, eur, regular_eur, expires_at}.
+    Activo si chocó su primer muro hace < TOPUP_FLASH_HOURS."""
+    off = {"active": False, "pack": TOPUP_FLASH_PACK, "eur": TOPUP_FLASH_EUR,
+           "regular_eur": TOPUPS[TOPUP_FLASH_PACK]["eur"]}
+    try:
+        raw = rds.get(f"firstwall:{uid}")
+        if not raw:
+            return off
+        started = _parse_ts(raw.decode() if isinstance(raw, (bytes, bytearray)) else raw)
+        if not started:
+            return off
+        expires = started + timedelta(hours=TOPUP_FLASH_HOURS)
+        if datetime.now(timezone.utc) >= expires:
+            return off
+        return {**off, "active": True, "expires_at": expires.isoformat()}
+    except Exception:
+        return off
+
+
 def paid_features_active(profile: dict, user: dict | None = None) -> bool:
     """Funciones de pago activas. Bloquea 'fantasmas' (plan seteado sin pagar).
     Activo si:
@@ -884,7 +987,7 @@ def check_monthly_limit(profile: dict) -> tuple[bool, str | None]:
     """Comprueba si el usuario con plan de pago ha superado su límite mensual.
     Resetea el contador si toca. Devuelve (ok, error_msg)."""
     plan = profile.get("plan", "free")
-    limit = PLAN_LIMITS.get(plan)
+    limit = plan_credit_limit(profile)   # incl. +96 cr/marca extra (Agencia)
     if limit is None:
         return True, None  # plan free usa otro sistema
 
@@ -909,18 +1012,30 @@ def check_monthly_limit(profile: dict) -> tuple[bool, str | None]:
 
     usage = profile.get("monthly_usage", 0)
     if usage >= limit:
-        return False, f"Has alcanzado el límite de {limit} transcripciones/mes de tu plan. Mejora tu plan para continuar."
+        return False, f"Has alcanzado el límite de {limit} créditos/mes de tu plan. Mejora tu plan o recarga créditos."
     return True, None
 
 
 # TODO(econ): credits_available usa PLAN_LIMITS, derivado del dict PLANS hardcodeado.
 # Lo ideal es que lea de load_plans_config() (tabla `plans` de la DB) para tener una
 # única fuente de verdad y no mantener PLANS sincronizado a mano. No implementar ahora.
+def plan_credit_limit(profile: dict) -> int | None:
+    """Límite mensual de créditos del plan, incluyendo el extra por marcas de Agencia
+    (+AGENCY_EXTRA_BRAND_CREDITS por cada extra_brand_slot). None = sin pool mensual."""
+    plan = profile.get("plan", "free")
+    base = PLAN_LIMITS.get(plan)
+    if not base:
+        return base
+    if plan == "agency":
+        extra = int(profile.get("extra_brand_slots") or 0)
+        return base + extra * AGENCY_EXTRA_BRAND_CREDITS
+    return base
+
+
 def credits_available(profile: dict) -> int:
     """Créditos disponibles = restante de la asignación mensual del plan + topups.
     1 crédito = COST_CENTS de saldo. Es el número que muestra la pill del radar."""
-    plan = profile.get("plan", "free")
-    limit = PLAN_LIMITS.get(plan)
+    limit = plan_credit_limit(profile)
     monthly_rem = max(0, limit - (profile.get("monthly_usage", 0) or 0)) if limit else 0
     topup = (profile.get("credits_cents", 0) or 0) // COST_CENTS
     return monthly_rem + topup
@@ -1296,9 +1411,11 @@ def auth_me():
         "free_daily_limit": FREE_DAILY_USER,
         "plan": plan,
         "monthly_usage": profile.get("monthly_usage", 0),
-        "monthly_limit": PLAN_LIMITS.get(plan),
+        "monthly_limit": plan_credit_limit(profile),   # incl. +96 cr/marca extra (Agencia)
         # v0.19: créditos unificados (mensual restante + topups) para la pill del radar.
         "credits": credits_available(profile),
+        # econ §4: flash del Pack 300 a 29€ (48h tras el 1er muro) — el front lo muestra.
+        "topup_flash": topup_flash_state(user["id"]),
         # reverse-trial: estado del trial (Pro capado sin tarjeta) + free MENSUAL.
         # trial_active = usable (dentro de ventana Y con tope disponible).
         "trial_active": trial_usable(profile),
@@ -2209,6 +2326,9 @@ def billing_config():
                     "100": {"EUR": _pp("WHOP_TOPUP_100_EUR"), "USD": _pp("WHOP_TOPUP_100_USD")},
                     "300": {"EUR": _pp("WHOP_TOPUP_300_EUR"), "USD": _pp("WHOP_TOPUP_300_USD")},
                     "1000": {"EUR": _pp("WHOP_TOPUP_1000_EUR"), "USD": _pp("WHOP_TOPUP_1000_USD")},
+                    # econ §4: Pack 300 a 29€ del flash. David crea el plan en Whop y pone
+                    # estas env; vacío → el front usa el "300" normal (degradado seguro).
+                    "300_flash": {"EUR": _pp("WHOP_TOPUP_300_FLASH_EUR"), "USD": _pp("WHOP_TOPUP_300_FLASH_USD")},
                 },
             },
         }
@@ -3711,31 +3831,22 @@ def api_voice_from_urls():
         if cached:
             texts.append(cached)
             continue
-        # Cobro por transcripción — mismo patrón que voice/auto-derive y metrics.
-        if not is_unlimited:
-            profile = get_profile(uid)
-            plan = profile.get("plan", "free")
-            if paid_features_active(profile, user):
-                ok, _e = check_monthly_limit(profile)
-                if not ok:
-                    break
-            elif (profile.get("credits_cents") or 0) >= COST_CENTS:
-                pass
-            elif (profile.get("free_used_today") or 0) < FREE_DAILY_USER:
-                pass
-            else:
-                break   # sin presupuesto → deriva con lo que haya
+        # econ: primeros VOICE_FREE_REELS reels de voz GRATIS (de por vida), luego
+        # VOICE_REEL_UNITS/reel. Sin presupuesto para el siguiente → deriva con lo que haya.
+        reel_units = 0
+        if not is_unlimited and _voice_reels_used(uid) >= VOICE_FREE_REELS:
+            reel_units = VOICE_REEL_UNITS
+            if credits_available(get_profile(uid)) < reel_units:
+                break
         txt = _transcribe_reel(uid, url)
         if not (txt or "").strip():
             continue
+        if reel_units and not is_unlimited:
+            _err, _r, _ = _charge_units_locked(uid, reel_units, user)
+            if _err:
+                break
         if not is_unlimited:
-            profile = get_profile(uid)
-            if paid_features_active(profile, user):
-                db.table("profiles").update({"monthly_usage": (profile.get("monthly_usage") or 0) + 1}).eq("id", uid).execute()
-            elif (profile.get("credits_cents") or 0) >= COST_CENTS:
-                db.table("profiles").update({"credits_cents": profile["credits_cents"] - COST_CENTS}).eq("id", uid).execute()
-            else:
-                db.table("profiles").update({"free_used_today": (profile.get("free_used_today") or 0) + 1}).eq("id", uid).execute()
+            _voice_mark_reel(uid)
         charged += 1
         texts.append(txt)
 
@@ -3815,8 +3926,8 @@ def adapt():
                 return jsonify({"error": err_msg}), 429
             cost_cents = 0
             charge_mode = "monthly"
-        elif profile["credits_cents"] >= COST_CENTS:
-            cost_cents = COST_CENTS
+        elif profile["credits_cents"] >= SCRIPT_UNITS * COST_CENTS:
+            cost_cents = SCRIPT_UNITS * COST_CENTS   # econ: 3 créditos por guión
             charge_mode = "credits"
         else:
             # A3: «Hazlo tuyo» es de pago. Free sin créditos → muro de planes.
@@ -5203,9 +5314,15 @@ def regenerate_idea(idea_id):
     assistant_id = body.get("assistant_id") or idea.get("assistant_id")
     language = body.get("language", "es")
 
+    # econ: regenerar = REGEN_UNITS (1 cr), más barato que un guión nuevo (3 cr).
+    _err, _refund, _ = _charge_units_locked(user["id"], REGEN_UNITS, user)
+    if _err:
+        return _err
+
     try:
         result = develop_idea(idea["raw_text"], assistant_id, user["id"], language)
     except Exception as e:
+        _refund()
         logger.error(f"Idea regeneration failed: {e}", exc_info=True)
         return jsonify({"error": "Failed to regenerate. Try again."}), 502
 
@@ -5273,13 +5390,13 @@ def idea_to_script(idea_id):
     plan = profile.get("plan", "free")
 
     # v0.14.29: cobro 1 crédito (patrón de /api/ideas/suggest pero con 1 unit).
-    SCRIPT_COST = COST_CENTS              # 18 cents por guion
-    SCRIPT_USAGE_UNITS = 1
-    is_paid_unlimited = plan in ("pro", "creator", "agency")
+    SCRIPT_COST = SCRIPT_UNITS * COST_CENTS   # econ: 3 créditos por guión
+    SCRIPT_USAGE_UNITS = SCRIPT_UNITS
+    is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
     if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SCRIPT_COST:
         return jsonify({
             "error": "no_credits",
-            "message": "Necesitas 1 crédito para generar un guion. Compra créditos o sube de plan.",
+            "message": "Necesitas 3 créditos para generar un guion. Compra créditos o sube de plan.",
         }), 402
 
     # Resolución de asistente: body > idea.assistant_id > profile.default > None
@@ -5462,13 +5579,13 @@ def transcription_to_script(t_id):
     plan = profile.get("plan", "free")
 
     # Cobro 1 crédito (mismo patrón v0.14.29 idea_to_script).
-    SCRIPT_COST = COST_CENTS              # 18 cents por guion
-    SCRIPT_USAGE_UNITS = 1
-    is_paid_unlimited = plan in ("pro", "creator", "agency")
+    SCRIPT_COST = SCRIPT_UNITS * COST_CENTS   # econ: 3 créditos por guión
+    SCRIPT_USAGE_UNITS = SCRIPT_UNITS
+    is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
     if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SCRIPT_COST:
         return jsonify({
             "error": "no_credits",
-            "message": "Necesitas 1 crédito para generar un guion. Compra créditos o sube de plan.",
+            "message": "Necesitas 3 créditos para generar un guion. Compra créditos o sube de plan.",
         }), 402
 
     # Resolución de asistente: body > profile.default > None.
@@ -8089,14 +8206,20 @@ def post_tracked_creator():
     extra_slots = get_user_extra_slots(user["id"])
     cap_global = limits["base_slots_global"] + extra_slots
 
+    # econ: más allá del cupo del plan, añadir un competidor NUEVO cuesta
+    # ADD_COMPETITOR_UNITS cr (scrape+transcribe inicial). Cupo blando: el free
+    # sin créditos sigue topando con el muro; con saldo, paga y expande.
+    charge_competitor = False
     if count_active_tracked(user["id"], scope="global") >= cap_global:
-        # growth-1: paywall_shown. El free llega aquí al intentar el 2º competidor
-        # (slot=1). after_first_value=True: ya tiene 1 competidor dándole señales.
-        track_event("paywall_shown", user["id"], {
-            "wall": "tracked_creators", "plan": plan, "limit": cap_global,
-            "after_first_value": cap_global >= 1,
-        })
-        return jsonify({"error": "tc.error.plan_limit_reached", "limit": cap_global}), 403
+        if credits_available(profile) < ADD_COMPETITOR_UNITS:
+            # growth-1: paywall_shown. El free llega aquí al intentar el 2º competidor
+            # (slot=1). after_first_value=True: ya tiene 1 competidor dándole señales.
+            track_event("paywall_shown", user["id"], {
+                "wall": "tracked_creators", "plan": plan, "limit": cap_global,
+                "after_first_value": cap_global >= 1,
+            })
+            return jsonify({"error": "tc.error.plan_limit_reached", "limit": cap_global}), 403
+        charge_competitor = True
 
     if plan == "agency":
         active_in_project = count_active_tracked(user["id"], project_id=project_id, scope="project")
@@ -8135,6 +8258,13 @@ def post_tracked_creator():
     if existing.data:
         return jsonify({"error": "tc.error.already_tracking"}), 409
 
+    # 6.b econ: cobrar el competidor extra (más allá del cupo) ANTES del insert.
+    _comp_refund = lambda: None
+    if charge_competitor:
+        _err, _comp_refund, _ = _charge_units_locked(user["id"], ADD_COMPETITOR_UNITS, user)
+        if _err:
+            return _err
+
     # 7. INSERT tracking
     payload = {
         "user_id": user["id"],
@@ -8146,6 +8276,7 @@ def post_tracked_creator():
         tracking_row = tr.data[0]
     except Exception as e:
         logger.exception("insert user_tracked_creators failed: %s", e)
+        _comp_refund()   # revertir el cargo del competidor si el insert falla
         return jsonify({"error": "tc.error.internal"}), 500
 
     # growth-2: si este es el 1er competidor del usuario (0→1), el onboarding de
@@ -8454,8 +8585,8 @@ def generate_script_from_competitor_reel(reel_id: str):
     # 1-2. Quién puede generar y cómo se paga este guion (sin cobrar todavía).
     #   paid  → cuenta contra su asignación mensual (monthly_usage).
     #   free  → 2 guiones/mes (reverse-trial) → luego topups (credits_cents) → muro.
-    SCRIPT_COST = COST_CENTS  # 18 cents
-    SCRIPT_USAGE_UNITS = 1
+    SCRIPT_COST = SCRIPT_UNITS * COST_CENTS  # econ: 3 créditos por guión
+    SCRIPT_USAGE_UNITS = SCRIPT_UNITS
     is_paid_unlimited = paid_features_active(profile, user)  # plan de pago REAL (no fantasma)
     use_free_lifetime = False
     if not is_paid_unlimited:
@@ -10605,8 +10736,9 @@ def idea_scripts_generate_batch(idea_id):
     if style_arg == "hooks":
         style_arg = style_label = "viral"
 
-    # Coste del lote: COST.scripts5 = 5 créditos.
-    err, refund, _ = _charge_units_locked(uid, 5, user)
+    # Coste econ: lote de 5 guiones desde una idea = 12 cr en bloque (vs 15 sueltos),
+    # mismo precio que "Llena mi semana".
+    err, refund, _ = _charge_units_locked(uid, FILL_WEEK_UNITS, user)
     if err:
         return err
 
@@ -10735,8 +10867,9 @@ def script_hooks_generate_batch(script_id):
     original_text = script.get("hook") or (lines[0] if lines else "") or full
     user_msg = f"Guión actual:\n{context}\n\nTexto original del que salió:\n{original_text}"
 
-    # Coste del lote: COST.hooks5 = 1 crédito.
-    err, refund, _ = _charge_units_locked(uid, 1, user)
+    # Coste econ: gratis los primeros HOOKS_FREE_PER_DAY/día, luego HOOKS_EXTRA_UNITS.
+    _hk_units = _hooks_extra_units(uid)
+    err, refund, _ = _charge_units_locked(uid, _hk_units, user)
     if err:
         return err
 
@@ -10755,6 +10888,7 @@ def script_hooks_generate_batch(script_id):
         refund()
         return jsonify({"error": "llm_error",
                         "message": "No se pudieron generar hooks. Inténtalo de nuevo."}), 502
+    _hooks_mark_used(uid)   # solo avanza el cupo diario tras entregar
 
     # Persistir en alt_hooks (acumula sobre los existentes).
     existing = script.get("alt_hooks")
@@ -10832,7 +10966,9 @@ def hooks_from_source():
     user_msg = (f"Material fuente ({label}):\n{context}\n\n"
                 f"Texto base del que parte el hook:\n{original_text}")
 
-    err, refund, _ = _charge_units_locked(uid, 1, user)
+    # Coste econ: gratis los primeros HOOKS_FREE_PER_DAY/día, luego HOOKS_EXTRA_UNITS.
+    _hk_units = _hooks_extra_units(uid)
+    err, refund, _ = _charge_units_locked(uid, _hk_units, user)
     if err:
         return err
 
@@ -10851,6 +10987,7 @@ def hooks_from_source():
         refund()
         return jsonify({"error": "llm_error",
                         "message": "No se pudieron generar hooks. Inténtalo de nuevo."}), 502
+    _hooks_mark_used(uid)   # solo avanza el cupo diario tras entregar
 
     try:
         track_event("hooks_from_source", uid, {"source": source, "n": len(new_hooks)})
@@ -10942,8 +11079,10 @@ def reels_steal_batch():
         return jsonify({"error": "no_reels",
                         "message": "No hay reels válidos en tu radar para esta acción."}), 400
 
-    # Cobro: 1 crédito por reel que vamos a intentar.
-    err, refund, state = _charge_units_locked(uid, len(valid), user)
+    # Cobro econ: "Llena mi semana" = 12 cr en bloque (vs 15 sueltos). Para semanas
+    # parciales nunca cobra más que el suelto (3/reel): min(12, n×3).
+    week_units = min(FILL_WEEK_UNITS, len(valid) * SCRIPT_UNITS)
+    err, refund, state = _charge_units_locked(uid, week_units, user)
     if err:
         return err
 

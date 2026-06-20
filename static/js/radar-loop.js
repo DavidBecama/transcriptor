@@ -115,7 +115,14 @@
     serie:["Buscando 3 ángulos que encadenan…","Escribiendo la continuidad…","Dejándolos listos para grabar…"]
   };
   var GEN_TITLE = { script:"Cocinando el guion…", hooks:"Buscando tu hook", carousel:"Montando el carrusel", linkedin:"Pasando a LinkedIn", x:"Tejiendo el hilo", serie:"Creando tu serie" };
-  var COST = { script:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:1, scripts5:5, hooks5:1, explosion:30 };
+  // econ (economia-creditos.md): 1 guión = 3 créditos. hooks "3 más" = 2 gratis/día
+  // luego 1 (ver hooksUnitsToday). "Llena mi semana" 5 guiones = 12. Regenerar = 1.
+  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:1, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30 };
+  var HOOKS_FREE_PER_DAY = 2;   // primeros "3 hooks más" del día gratis (demo + prod)
+  function hooksUnitsToday(){   // demo: 0 mientras queden gratis hoy, luego COST.hooks5
+    if(typeof S.hooksToday!=="number") S.hooksToday=0;
+    return S.hooksToday < HOOKS_FREE_PER_DAY ? 0 : COST.hooks5;
+  }
 
   /* ── estado ──────────────────────────────────────────────────── */
   var S = {
@@ -1637,13 +1644,17 @@
   // #2 conversión: guiones restantes HOY (tope diario del trial). null si no es free.
   function freeStealsLeft(){ if(!isFree()) return null; return (S.user.dayLeft!=null ? S.user.dayLeft : 3); }
 
-  /* Flash de 1ª compra (Fathom 18/06, palanca nº1 de conversión): al cruzar el primer
-     muro, -30% el 1er mes de Creator durante 48h, con countdown HONESTO (deadline fijo
-     en localStorage → no se resetea al recargar). En prod: crear producto/precio temporal
-     en la pasarela y validar el % (David). */
-  var FLASH_PCT=30, FLASH_HOURS=48;
+  /* Flash por-usuario (economia-creditos.md §4): al cruzar el PRIMER muro, el Pack de
+     FLASH_PACK_CR créditos baja a €FLASH_PACK_EUR (antes €FLASH_PACK_WAS) durante 48h,
+     con countdown HONESTO (deadline fijo en localStorage → no se resetea al recargar).
+     En prod el price a 29€ lo crea David en Whop (env WHOP_TOPUP_300_FLASH_*). El estado
+     real llega en /auth/me.topup_flash; en demo arranca al cruzar el muro. */
+  var FLASH_HOURS=48, FLASH_PACK_CR=300, FLASH_PACK_EUR=29, FLASH_PACK_WAS=49;
   function flashKey(){ return isDemo()?"rs_flash_demo":"rs_flash_v1"; }
-  function flashDeadline(){ try{ var v=localStorage.getItem(flashKey()); return v?parseInt(v,10):(S._flashDl||0); }catch(e){ return S._flashDl||0; } }
+  function flashDeadline(){
+    var bk=S.user&&S.user.topupFlash; if(bk&&bk.active&&bk.expires_at){ var t=Date.parse(bk.expires_at); if(t>0) return t; }
+    try{ var v=localStorage.getItem(flashKey()); return v?parseInt(v,10):(S._flashDl||0); }catch(e){ return S._flashDl||0; }
+  }
   function startFlash(){ if(flashDeadline()>0) return; var dl=Date.now()+FLASH_HOURS*3600*1000; S._flashDl=dl; try{ localStorage.setItem(flashKey(),String(dl)); }catch(e){} }
   function flashActive(){ if(!isFree() && !isTrial()) return false; var dl=flashDeadline(); return dl>0 && (dl-Date.now())>1000; }
   function flashRemainStr(){
@@ -1653,13 +1664,13 @@
   }
   function flashBannerHTML(){
     if(!flashActive()) return '';
-    var price=Math.round(29*(1-FLASH_PCT/100));   // €29 → €20
-    return '<div class="flash-offer" data-act="open-plans" role="button" tabindex="0" aria-label="Oferta: primer mes de Creator con 30% de descuento">'+
-      '<span class="flash-badge">−'+FLASH_PCT+'%</span>'+
-      '<div class="flash-txt"><b>'+L("Tu primer mes de Creator a €"+price,"Your first month of Creator for €"+price)+'</b>'+
-        '<span>'+L("Solo por cruzar el muro hoy","Just for hitting the wall today")+' · <s>€29</s> → <b>€'+price+'</b></span></div>'+
+    var pct=Math.round((1-FLASH_PACK_EUR/FLASH_PACK_WAS)*100);   // 49→29 ≈ −41%
+    return '<div class="flash-offer" data-act="open-plans" role="button" tabindex="0" aria-label="Oferta: pack de '+FLASH_PACK_CR+' créditos a '+FLASH_PACK_EUR+' euros">'+
+      '<span class="flash-badge">−'+pct+'%</span>'+
+      '<div class="flash-txt"><b>'+L(FLASH_PACK_CR+" créditos por €"+FLASH_PACK_EUR,FLASH_PACK_CR+" credits for €"+FLASH_PACK_EUR)+'</b>'+
+        '<span>'+L("~100 guiones · solo por cruzar el muro hoy","~100 scripts · just for hitting the wall today")+' · <s>€'+FLASH_PACK_WAS+'</s> → <b>€'+FLASH_PACK_EUR+'</b></span></div>'+
       '<div class="flash-cd-wrap"><span class="flash-cd-k">'+L("Termina en","Ends in")+'</span><span class="flash-cd" id="rsFlashCd">'+flashRemainStr()+'</span></div>'+
-      '<span class="flash-cta">'+L("Aprovéchalo","Grab it")+' '+IC.arr+'</span>'+
+      '<span class="flash-cta">'+L("Recárgalo","Grab it")+' '+IC.arr+'</span>'+
     '</div>';
   }
   // Countdown vivo: actualiza el reloj cada segundo; al expirar, re-render (quita el banner).
@@ -3268,6 +3279,22 @@
       else { refreshCredits().then(function(){ flashSpark(0); }); }
     });
   }
+  /* Editor · "Regenerar guion" = re-tira del mismo material por COST.regen (1 cr),
+     más barato que un guión nuevo (3 cr). En demo descuenta local y refresca el guion;
+     en prod, de momento re-genera vía steal (gap: falta endpoint de regen-guion barato). */
+  function regenInEditor(id){
+    if(isDemo()){
+      var g = guionById(id) || (S.activeGuionId && guionById(S.activeGuionId));
+      if(!isTrial()){
+        if((S.user.credits||0) < COST.regen){ return showPaywall("no_credits"); }
+        spend(COST.regen);
+      }
+      if(g){ var ns=makeScript(g.title||g.hook||""); g.hook=ns.hook; g.title=ns.hook; g.beats=ns.beats; g.close=ns.close; }
+      render(); flashSpark(-COST.regen); showToast("Guion regenerado (−"+COST.regen+" créd.).");
+      return;
+    }
+    return steal(id);
+  }
   /* Loop continuity (Fathom): al robar/descartar, el reel sale del radar y entra el
      siguiente con más explosión (sorted[0] promueve el próximo). En demo, si el feed
      se vacía, re-siembra (sensación de "siempre hay señales nuevas"). */
@@ -3420,7 +3447,7 @@
   function startFillWeek(){
     var reels=fillReels();
     S._fillGuionIds=[]; S._fillResult=null; S._fillErr=null; S.view="fillweek"; S._fillPhase=0; render();
-    if(isDemo()){ spend(reels.length); bumpEco(reels.length,reels.length); flashSpark(-reels.length); runFillPhase(); return; }
+    if(isDemo()){ var fw=Math.min(COST.fillweek, reels.length*COST.script); spend(fw); bumpEco(reels.length,reels.length); flashSpark(-fw); runFillPhase(); return; }
     // Prod: dispara el lote real (/reels/steal-batch). La animación corre en
     // paralelo; al completar la fase, aterrizamos los guiones REALES del backend.
     apiPost("/reels/steal-batch",{count:Math.max(1,reels.length)||5}).then(function(r){
@@ -3625,7 +3652,7 @@
   }
   function gen5hooks(scriptId, btn){
     var sc=findScript(scriptId); if(!sc) return;
-    if(isDemo()){ spend(COST.hooks5); sc.hooks=pick(BANK_HOOKS,5,(sc.hook||"").length+ Object.keys(S.ideas).length); render(); flashSpark(-COST.hooks5); return; }
+    if(isDemo()){ var hu=hooksUnitsToday(); spend(hu); S.hooksToday=(S.hooksToday||0)+1; sc.hooks=pick(BANK_HOOKS,5,(sc.hook||"").length+ Object.keys(S.ideas).length); render(); flashSpark(-hu); if(!hu) showToast("Hooks gratis hoy ("+(HOOKS_FREE_PER_DAY-S.hooksToday)+" más)."); return; }
     if(!sc._sid){ return showToast("Este guion aún no está persistido."); }
     var restore=_btnLoading(btn);
     showToast("Generando 5 hooks…");
@@ -3642,9 +3669,10 @@
      endpoint unificado /api/hooks/from-source. assign(hooks) pega el resultado. */
   function _genHooks(payload, assign, btn){
     if(isDemo()){
-      spend(COST.hooks5);
+      var hu=hooksUnitsToday(); spend(hu); S.hooksToday=(S.hooksToday||0)+1;
       var seed=((payload.text||payload.reel_id||"")+"" ).length + Object.keys(S.ideas).length;
-      assign(pick(BANK_HOOKS,5,seed)); render(); flashSpark(-COST.hooks5); return;
+      assign(pick(BANK_HOOKS,5,seed)); render(); flashSpark(-hu);
+      if(!hu) showToast("Hooks gratis hoy ("+(HOOKS_FREE_PER_DAY-S.hooksToday)+" más)."); return;
     }
     var restore=_btnLoading(btn);
     showToast(L("Generando 5 hooks…","Generating 5 hooks…"));
@@ -4201,7 +4229,7 @@
       return showToast("Generando el informe del mes…");
     }
     if(act==="steal") return steal(id);
-    if(act==="regen") return steal(id);   // Editor: regenerar el guion del mismo reel
+    if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
     if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.ig_url||_ro.url||_ro.permalink; if(_u){ try{ window.open(_u,"_blank"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
     if(act==="reel-dismiss") return reelDismiss(id);
     if(act==="undo-dismiss") return undoDismiss();
@@ -4551,6 +4579,7 @@
       var me=res[0]||{}, bd=res[1]||{};
       if(me.user){ S.user.name=me.user.name||(me.user.email||"").split("@")[0]||""; S.user.handle=me.user.handle||(me.user.email||"").split("@")[0]||""; S.user.email=me.user.email||""; }
       if(me.credits!=null) S.user.credits=me.credits; else if(me.credits_cents!=null) S.user.credits=Math.round(me.credits_cents/18);
+      if(me.topup_flash) S.user.topupFlash=me.topup_flash;   // econ §4: flash Pack 300 @ 29€
       if(me.streak!=null) S.user.streak=me.streak;
       // Plan crudo de /auth/me (puede ser "free") + guiones gratis del mes restantes.
       S.user.plan=(me.plan||(me.user&&me.user.plan))||"";
@@ -4589,7 +4618,10 @@
       _routeFromPath();   // la isla muestra la sección de /profile/<x> en el rail
       // Demo deep-link: ?plan= ?t=<tab> ?b=<brandId> para previsualizar cualquier vista.
       if(isDemo()){ try{ var qs=new URLSearchParams(location.search);
-        var qp=qs.get("plan"); if(qp==="creador"){ S.plan="creador"; S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab="dashboard"; } else if(qp==="agencia"){ S.plan="agencia"; S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="portfolio"; }
+        // econ demo: el saldo del contador refleja los grants del plan (Creator 120 ·
+        // Agency 960). Sin ?plan → un saldo medio para ver el contador en acción.
+        if(!S.user.credits) S.user.credits=120;
+        var qp=qs.get("plan"); if(qp==="creador"){ S.plan="creador"; S.user.credits=120; S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab="dashboard"; } else if(qp==="agencia"){ S.plan="agencia"; S.user.credits=960; S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="portfolio"; }
         var qb=qs.get("b"); if(qb && S.brands.some(function(x){return x.id===qb;})){ S.brandId=qb; S.tab="dashboard"; }
         var qt=qs.get("t"); if(qt==="perf"){ S.tab="guiones"; S.view="perf"; S.perfGuion="gd1"; } else if(qt){ S.tab=qt; }
         // ?onb=1 → fuerza el onboarding v2 en demo (sin tocar el flujo normal/harness)
