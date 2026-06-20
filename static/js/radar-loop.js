@@ -450,7 +450,8 @@
   function onbBack(){ var i=onbIdx(); if(i>0) onbGoto(ONB_STEPS[i-1]); }
 
   /* ── helpers de markup ── */
-  function onbEyebrow(t){ return '<div class="onb-eyebrow">'+IC.spark+' '+ESC(t)+'</div>'; }
+  // v3 (mockup David): eyebrow en mono azul, minúscula, con prefijo «› » (no spark+MAYÚS).
+  function onbEyebrow(t){ return '<div class="onb-eyebrow">› '+ESC(t)+'</div>'; }
   function onbErr(){ return S.onb.error?'<div class="onb-err" role="alert">'+ESC(S.onb.error)+'</div>':''; }
   function onbCardWrap(eyebrow,h,sub,body,wide){ return '<section class="onb-box'+(wide?' onb-box--wide':'')+'">'+eyebrow+'<h2 class="onb-h">'+h+'</h2>'+(sub?'<p class="onb-sub">'+sub+'</p>':'')+body+'</section>'; }
   function onbBackBtn(){ return onbIdx()>0&&S.onb.step!=="close"?'<button class="onb-back-btn" data-act="onb-back" aria-label="'+L("Atrás","Back")+'">'+IC.back+' '+L("Atrás","Back")+'</button>':''; }
@@ -464,10 +465,15 @@
   }
   // Paso 1 — handle (OBLIGATORIO).
   function onbHandleHTML(){
-    return onbCardWrap(onbEyebrow(L("Empecemos por ti","Let's start with you")),L("¿Cuál es tu cuenta?","What's your account?"),
-      L("Tu usuario de Instagram o TikTok. Leo tus propios reels para que tu primer guión suene a ti, no genérico.","Your Instagram or TikTok handle. I read your own reels so your first script sounds like you, not generic."),
+    // Chip de validación (mockup David): verde cuando el formato del handle es válido.
+    // Honesto: «cuenta válida» (formato OK), no «encontrada» (no verificamos en vivo).
+    var _hv=(S.onb.handle||"").replace(/^@+/,"");
+    var _ok=/^[a-zA-Z0-9._]{2,30}$/.test(_hv);
+    var okChip='<span class="onb-handle-ok'+(_ok?' on':'')+'">'+IC.check+' '+L("cuenta válida","valid handle")+'</span>';
+    return onbCardWrap(onbEyebrow(L("empecemos","let's start")),L("¿Cuál es tu Instagram?","What's your Instagram?"),
+      L("Lo leo para entender tu voz y de qué va lo tuyo. No publico nada por ti, tranquilo.","I read it to understand your voice and what you're about. I don't post anything for you, promise."),
       '<div class="onb-pform"><div class="onb-handle"><span class="onb-at">@</span>'+
-        '<input id="rsOnbHandle" class="onb-input" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="'+L("tu_usuario","your_handle")+'" value="'+ESC(S.onb.handle||"")+'" aria-label="'+L("Tu usuario de Instagram o TikTok","Your Instagram or TikTok handle")+'"></div></div>'+
+        '<input id="rsOnbHandle" class="onb-input" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="'+L("tu_usuario","your_handle")+'" value="'+ESC(S.onb.handle||"")+'" aria-label="'+L("Tu usuario de Instagram","Your Instagram handle")+'">'+okChip+'</div></div>'+
       onbErr()+
       '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-handle-next">'+IC.arr+' '+L("Continuar","Continue")+'</button>');
   }
@@ -476,7 +482,7 @@
     var _nc=nicheChips();
     var chips=_nc.map(function(n){ var on=_norm(S.onb.niche)===_norm(n); return '<button class="onb-chip'+(on?" on":"")+'" data-act="onb-pick-niche" data-k="'+ESC(n)+'">'+ESC(n)+'</button>'; }).join("");
     var custom=(_nc.some(function(n){return _norm(n)===_norm(S.onb.niche);})||!S.onb.niche)?"":S.onb.niche;
-    return onbCardWrap(onbEyebrow(L("Tu terreno","Your turf")),L("¿De qué va tu contenido?","What's your content about?"),
+    return onbCardWrap(onbEyebrow(L("tu terreno","your turf")),L("¿De qué va tu contenido?","What's your content about?"),
       L("Elige tu nicho o escríbelo. Con esto encuentro qué está petando ahí — y a quién deberías vigilar.","Pick your niche or type it. With this I find what's blowing up there — and who you should be watching."),
       '<div class="onb-chips">'+chips+'</div>'+
       '<input id="rsOnbNiche" class="onb-text" type="text" placeholder="'+L("…o escríbelo (ej: nutrición deportiva)","…or type it (e.g. sports nutrition)")+'" value="'+ESC(custom)+'" aria-label="'+L("Tu nicho","Your niche")+'">'+
@@ -487,7 +493,7 @@
   function onbSubnicheHTML(){
     var sel=(S.onb.subniches||[]).map(function(t){ return '<span class="onb-tag on" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+' <b>×</b></span>'; }).join("");
     var sugg=onbSubSuggest().slice(0,8).map(function(t){ return '<button class="onb-tag" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+'</button>'; }).join("");
-    return onbCardWrap(onbEyebrow(L("Más concreto","Get specific")),L("¿Qué tratas dentro de "+(S.onb.niche||"lo tuyo")+"?","What do you cover in "+(S.onb.niche||"your niche")+"?"),
+    return onbCardWrap(onbEyebrow(L("afinemos","refine it")),L("¿Qué tratas dentro de "+(S.onb.niche||"lo tuyo")+"?","What do you cover in "+(S.onb.niche||"your niche")+"?"),
       L("Cuanto más específico, mejor el match: <b>cosmética orgánica</b> es mejor que <b>cosmética</b>. Elige varias o añade las tuyas.","The more specific, the better the match: <b>organic skincare</b> beats <b>skincare</b>. Pick a few or add your own."),
       '<div class="onb-tags" id="rsOnbTags">'+(sel||'<span class="onb-tags-ph">'+L("Tus etiquetas aparecerán aquí…","Your tags will show up here…")+'</span>')+'</div>'+
       '<div class="onb-tagadd"><span class="onb-hash">#</span><input id="rsOnbTagInput" class="onb-text onb-text--tag" type="text" placeholder="'+L("añade una etiqueta y Enter","add a tag and hit Enter")+'" aria-label="'+L("Añadir subnicho","Add subniche")+'"><button class="onb-tagadd-btn" data-act="onb-tag-add">'+IC.plus+'</button></div>'+
@@ -576,7 +582,7 @@
     // Cargando → SIN botón de avanzar (solo Atrás): no aparece antes que los resultados.
     var compCta=S.onb.compLoading ? ''
       : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick+" y seguir","Follow "+nPick+" and continue")+'</button>';
-    return onbCardWrap(onbEyebrow(L("Tu radar","Your radar")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
+    return onbCardWrap(onbEyebrow(L("a quién vigilamos","who to watch")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
       L("Pre-elegí a 2 de tu subnicho. Seguiré sus reels que petan para que robes el primero en tu voz. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
       body+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+compCta+'</div>');
@@ -585,7 +591,7 @@
   function onbGoalHTML(){
     var cards=ONB_GOALS.map(function(g){ var on=S.onb.goal===g.key; return '<button class="onb-goal'+(on?" on":"")+'" data-act="onb-pick-goal" data-k="'+g.key+'">'+
       '<span class="onb-goal-ic">'+(IC[g.ic]||IC.spark)+'</span><span class="onb-goal-l">'+ESC(L(g.label,g.label_en))+'</span><span class="onb-goal-d">'+ESC(L(g.desc,g.desc_en))+'</span></button>'; }).join("");
-    return onbCardWrap(onbEyebrow(L("El para qué","The why")),L("¿Qué buscas con esto?","What are you after?"),
+    return onbCardWrap(onbEyebrow(L("para qué","what for")),L("¿Qué buscas con esto?","What are you after?"),
       L("Con esto ajusto el tono y la estructura de tus guiones — vender no se escribe como entretener.","With this I tune the tone and structure of your scripts — selling isn't written like entertaining."),
       '<div class="onb-goals">'+cards+'</div>'+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-goal-next"'+(S.onb.goal?'':' disabled')+'>'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
@@ -2965,6 +2971,13 @@
       onbView();   // PostHog: 1 evento "viewed" por paso
       var _of=document.getElementById("rsOnbHandle")||document.getElementById("rsOnbNiche")||document.getElementById("rsOnbTagInput");
       if(_of && document.activeElement!==_of){ try{ _of.focus(); }catch(e){} }
+      // Chip «cuenta válida» reactivo al teclear (sin re-render): toggle directo en DOM.
+      var _hi=document.getElementById("rsOnbHandle");
+      if(_hi){ _hi.addEventListener("input", function(){
+        var v=this.value.replace(/^@+/,""); var ok=/^[a-zA-Z0-9._]{2,30}$/.test(v);
+        var box=this.closest(".onb-handle"); var chip=box&&box.querySelector(".onb-handle-ok");
+        if(chip) chip.classList.toggle("on", ok);
+      }); }
       return;
     }
     var html='';

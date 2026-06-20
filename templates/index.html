@@ -9800,7 +9800,8 @@
     .rs .onb { max-width:620px; margin:8px auto 40px; }
     .rs .onb-step { border:1px solid var(--border-strong); border-radius:22px; background:linear-gradient(160deg, color-mix(in srgb, var(--brand-500) 8%, var(--surface-raised)), var(--surface-raised)); padding:34px 32px; box-shadow:var(--shadow-lg); }
     .rs--mobile .onb-step { padding:26px 20px; border-radius:18px; }
-    .rs .onb-eyebrow { display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--brand-400); margin-bottom:14px; }
+    /* v3 (mockup David): mono azul, minúscula con «› », sin MAYÚS. */
+    .rs .onb-eyebrow { display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; color:var(--brand-500); margin-bottom:14px; }
     .rs .onb-eyebrow svg { width:14px; height:14px; }
     .rs .onb-h { font-family:var(--font-display); font-size:30px; line-height:1.05; letter-spacing:-.02em; margin:0 0 8px; color:var(--text-primary); }
     .rs--mobile .onb-h { font-size:25px; }
@@ -9811,6 +9812,10 @@
     .rs .onb-handle:focus-within { border-color:var(--brand-500); }
     .rs .onb-at { color:var(--text-tertiary); font-size:18px; font-weight:600; }
     .rs .onb-input { flex:1; border:none; background:transparent; outline:none; color:var(--text-primary); font-size:17px; padding:15px 4px; min-width:0; }
+    /* v3 (mockup David): chip verde de validación de handle, oculto hasta formato válido. */
+    .rs .onb-handle-ok { display:none; align-items:center; gap:6px; flex:none; padding:8px 12px; border-radius:10px; background:var(--success-bg, rgba(47,209,138,.12)); color:var(--success-fg, #3FE0A0); font-size:12.5px; font-weight:600; white-space:nowrap; }
+    .rs .onb-handle-ok.on { display:inline-flex; }
+    .rs .onb-handle-ok svg { width:14px; height:14px; }
     .rs .onb-go { flex:0 0 auto; white-space:nowrap; }
     .rs--mobile .onb-go { width:100%; justify-content:center; }
     .rs .onb-skip { display:block; margin:18px auto 0; background:none; border:none; color:var(--text-tertiary); font-size:13px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:8px; min-height:44px; }
@@ -26839,6 +26844,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=26"></script>
+<script src="/static/js/radar-loop.js?v=27"></script>
 </body>
 </html>
