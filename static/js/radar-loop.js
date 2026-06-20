@@ -533,9 +533,9 @@
     if(S.onb.valueLoading) cta='';
     else if((S.onb.valueReels||[]).length) cta='<span class="onb-hint" style="font-size:13px;opacity:.6;align-self:center">'+L("Toca un reel para robarlo y convertirlo en tu guion","Tap a reel to steal it and turn it into your script")+'</span>';
     else cta='<button class="btn btn-lg btn-primary onb-cta" data-act="onb-value-next">'+IC.arr+' '+L("Seguir","Continue")+'</button>';
-    return onbCardWrap('<div class="onb-eyebrow">'+IC.bolt+' '+ESC(subs||L("Tu subnicho","Your subniche"))+'</div>',
+    return onbCardWrap(onbEyebrow(L("inspirándome del éxito","learning from what works")),
       L("Esto es lo que explota en lo tuyo","This is what's blowing up in your space"),
-      L("Reels reales de creadores como tú que están explotando. Elige el que más te encaje — te lo convierto en guion tuyo al instante.","Real reels from creators like you that are blowing up. Pick the one that fits — I turn it into your script instantly."),
+      L("Ya estoy mirando a quién copiar bien. Mira el nivel que vas a poder robar:","I'm already scoping who to copy right. Look at the level you'll be able to steal:"),
       body+
       '<div class="onb-row">'+onbBackBtn()+cta+'</div>', true);
   }
