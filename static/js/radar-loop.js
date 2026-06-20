@@ -2179,8 +2179,9 @@
      tu nicho…" no bloqueante; cuando el scrape termina, sus reels entran en el radar.
      Más el botón "Actualizar radar" (refresca a demanda, reusa caché). ── */
   function addCompInlineHTML(){
-    if(!S.addCompOpen) return '';
-    return '<div class="comp-add"><span class="comp-add-at">@</span>'+
+    // SIEMPRE en el DOM (oculto con .hidden si está cerrado) → toggleAddComp lo muestra
+    // in-place sin re-render, así no hay salto de scroll al abrirlo.
+    return '<div class="comp-add'+(S.addCompOpen?'':' hidden')+'" id="rsCompAdd"><span class="comp-add-at">@</span>'+
       '<input id="rsCompAddInput" class="comp-add-input" type="text" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="'+L("usuario de Instagram y Enter","Instagram handle, then Enter")+'" aria-label="'+L("Añadir competidor","Add competitor")+'">'+
       '<button class="btn btn-sm btn-primary" data-act="comp-add-submit">'+IC.bolt+' '+L("Analizar","Analyze")+'</button>'+
       '<button class="comp-add-x" data-act="add-comp" aria-label="'+L("Cerrar","Close")+'">'+IC.x+'</button>'+
@@ -2192,7 +2193,15 @@
       '<span class="analyzing-txt"><b>'+L("Analizando tu nicho","Analyzing your niche")+'</b> — '+hs.map(function(h){return '@'+ESC(h);}).join(", ")+
       '. '+L("Sus reels entrarán en el radar en cuanto termine.","Their reels hit the radar as soon as it's done.")+'</span></div>';
   }
-  function toggleAddComp(){ S.addCompOpen=!S.addCompOpen; render(); if(S.addCompOpen){ setTimeout(function(){ var i=document.getElementById("rsCompAddInput"); if(i) i.focus(); },30); } }
+  function toggleAddComp(){
+    S.addCompOpen=!S.addCompOpen;
+    var box=document.getElementById("rsCompAdd");
+    if(!box){ return render(); }   // aún no montado (p.ej. radar vacío recién entrado) → render normal
+    // Toggle in-place (sin re-render → SIN salto de scroll). Marca el botón y enfoca.
+    box.classList.toggle("hidden", !S.addCompOpen);
+    var _el=root(); var btn=_el&&_el.querySelector('[data-act="add-comp"]'); if(btn) btn.classList.toggle("on", S.addCompOpen);
+    if(S.addCompOpen){ var i=document.getElementById("rsCompAddInput"); if(i){ try{ i.focus({preventScroll:true}); }catch(e){ i.focus(); } } }
+  }
   function submitAddComp(){ var i=document.getElementById("rsCompAddInput"); addCompetitorFromRadar(i?i.value:""); }
   function addCompetitorFromRadar(handle){
     handle=(handle||"").trim().replace(/^@+/,"").toLowerCase();
