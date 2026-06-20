@@ -1962,3 +1962,50 @@ def sweep_stale_resources():
     transc = _sweep_transcribing_stale(db)
     locks = _sweep_generation_locks(db)
     return {"transcribing_freed": transc, "locks_freed": locks}
+
+
+@celery_app.task(name="tasks.adapt_text")
+def adapt_task(text, style, custom_prompt, user_id, charge_mode, cost_cents):
+    """Async «Hazlo tuyo» (/adapt). Gemini 2.5 Pro tarda >60s en guiones largos y el
+    request sync cruzaba el readTimeout (~60s) de Traefik → 502 Bad Gateway. Espeja
+    generate_script_competitor_task: corre adapt_with_ai FUERA del request. El gating
+    ya lo hizo el endpoint (fast-reject); aquí se genera, se cobra UNA vez (charge_mode)
+    bajo lock por-usuario, y se devuelve la MISMA shape que la respuesta sync de antes."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        from app import (adapt_with_ai, get_voice_profile, get_profile,
+                         acquire_credit_lock, release_credit_lock)
+    except Exception as e:
+        logger.exception("adapt_task import failed: %s", e)
+        return {"ok": False, "error": "import", "message": "Servicio no disponible.", "http": 500}
+
+    # La parte lenta — ya estamos fuera del request HTTP, sin reloj de Traefik.
+    try:
+        voice = get_voice_profile(user_id) if user_id else None
+        result = adapt_with_ai(text, style, custom_prompt, voice=voice, user_id=user_id)
+    except Exception as e:
+        logger.exception("adapt_task generation failed user=%s: %s", user_id, e)
+        return {"ok": False, "error": "llm", "message": "No se pudo generar. Inténtalo de nuevo.", "http": 502}
+
+    # Cobro SOLO tras éxito, bajo lock por-usuario (igual que el endpoint sync).
+    if user_id and charge_mode in ("monthly", "credits"):
+        lock = acquire_credit_lock(user_id)
+        try:
+            fresh = get_profile(user_id)
+            if charge_mode == "monthly":
+                db.table("profiles").update({"monthly_usage": (fresh.get("monthly_usage") or 0) + 1}).eq("id", user_id).execute()
+            elif charge_mode == "credits":
+                db.table("profiles").update({"credits_cents": (fresh.get("credits_cents") or 0) - cost_cents}).eq("id", user_id).execute()
+        except Exception as e:
+            logger.error("adapt_task charge failed user=%s: %s", user_id, e)
+        finally:
+            release_credit_lock(user_id, lock)
+
+    out = {"ok": True, "result": result, "cost_cents": cost_cents}
+    if user_id:
+        updated = get_profile(user_id)
+        out["credits_cents"] = updated["credits_cents"]
+        out["free_used_today"] = updated["free_used_today"]
+    return out
