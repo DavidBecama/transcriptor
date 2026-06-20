@@ -3750,16 +3750,31 @@
         ? d.need_transcribe+" de ellos necesita"+(d.need_transcribe===1?"":"n")+" transcripción ("+d.need_transcribe+" uso"+(d.need_transcribe===1?"":"s")+"/crédito"+(d.need_transcribe===1?"":"s")+")."
         : "Todos ya están transcritos — derivar es gratis.";
       var go=function(){
-        showToast("Derivando tu voz de tus reels… (~1 min si hay que transcribir)");
+        showToast("Derivando tu voz de tus reels… (~1-2 min si hay que transcribir)");
+        var done=function(d){
+          return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
+            S.voice=v; render();
+            showToast("Voz derivada de "+(d.source_count||0)+" reels — te conozco al "+(d.confidence||v.confidence||0)+"%.");
+            setTimeout(brainLevelPulse,1600);
+          });
+        };
+        // /api/voice/auto-derive es async (202 + task_id): gemini-2.5-pro razona y
+        // transcribir reels tarda → Traefik cortaba a 60s. Polling a /task/voice-derive.
         apiPost("/api/voice/auto-derive",{project_id:_pidOf(S.brandId)}).then(function(r){
-          if(r.ok && r.d && r.d.ok){
-            return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
-              S.voice=v; render();
-              showToast("Voz derivada de "+(r.d.source_count||0)+" reels — te conozco al "+(r.d.confidence||v.confidence||0)+"%.");
-              setTimeout(brainLevelPulse,1600);
+          if(!r.ok || !r.d){ return showError("No pude derivar tu voz. Inténtalo de nuevo."); }
+          if(r.d.ok){ return done(r.d); }   // respuesta sync legacy, por si acaso
+          if(!r.d.task_id){ return showError(r.d.message||r.d.error||"No pude derivar tu voz. Inténtalo de nuevo."); }
+          var tid=r.d.task_id, tries=0;
+          var poll=function(){
+            apiGet("/task/voice-derive/"+encodeURIComponent(tid)).then(function(p){
+              var d=(p&&p.d)||{};
+              if(!p.ok){ if(++tries<60) return setTimeout(poll,2500); return showError("No pude derivar tu voz. Inténtalo de nuevo."); }
+              if(d.state==="pending"){ if(++tries<70) return setTimeout(poll,2500); return showError("Tardó demasiado. Inténtalo de nuevo."); }
+              if(d.state==="success"){ return done(d); }
+              return showError(d.message||d.error||"No pude derivar tu voz. Inténtalo de nuevo.");
             });
-          }
-          showError((r.d&&r.d.message)||(r.d&&r.d.error)||"No pude derivar tu voz. Inténtalo de nuevo.");
+          };
+          setTimeout(poll,2500);
         });
       };
       if(typeof window.confirmModal==="function"){

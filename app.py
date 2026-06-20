@@ -3081,7 +3081,10 @@ def derive_voice_profile(transcripts):
         return None
     user = "\n\n---\n\n".join("REEL %d:\n%s" % (i + 1, t[:2000]) for i, t in enumerate(texts))
     try:
-        raw = _call_llm(_VOICE_DERIVE_SYS, user, temperature=0.4, max_tokens=900)
+        # gemini-2.5-pro es de razonamiento: sus tokens de "thinking" consumen el
+        # budget ANTES del JSON. Con 900/1800 el JSON salía truncado (finish_reason=
+        # length → no parseable). 4000 deja sitio a razonamiento + el JSON (pequeño).
+        raw = _call_llm(_VOICE_DERIVE_SYS, user, temperature=0.4, max_tokens=4000)
     except Exception as e:
         logger.warning("derive_voice_profile LLM failed: %s", e)
         return None
@@ -3608,90 +3611,40 @@ def api_voice_auto_derive():
     body = request.get_json(silent=True) or {}
     project_id = body.get("project_id") or None
 
-    vids = _voice_auto_candidates(uid)
-    if not vids:
-        return jsonify({"error": "no_videos",
-                        "message": "No encuentro reels publicados tuyos. Conecta tu Instagram en Métricas."}), 404
+    # ASYNC: gemini-2.5-pro (razonamiento) + transcribir reels pueden tardar >60s →
+    # Traefik cerraba la conexión a su readTimeout. Encolamos (mismo patrón que /adapt
+    # y generate-script). El flujo completo, el cobro por transcripción y la derivación
+    # los hace el task; el front hace polling a /task/voice-derive/<task_id>.
+    from tasks import voice_auto_derive_task  # noqa: E402
+    ar = voice_auto_derive_task.delay(uid, user.get("email", ""), project_id)
+    return jsonify({"task_id": ar.id, "status": "queued"}), 202
 
-    texts, transcribed_now = [], 0
-    for v in vids:
-        txt = (v.get("transcription") or "").strip()
-        if txt:
-            texts.append(txt)
-            continue
-        if not v.get("ig_url"):
-            continue
-        # Cobro por transcripción — mismo patrón que metrics_transcribe_video
-        # (paid: límite mensual; si no: créditos; si no: cupo free del día).
-        profile = get_profile(uid)
-        is_unlimited = user.get("email", "").lower() in UNLIMITED_EMAILS
-        if not is_unlimited:
-            user_plan = profile.get("plan", "free")
-            if user_plan in ("pro", "creator", "agency"):
-                ok, err_msg = check_monthly_limit(profile)
-                if not ok:
-                    break   # sin presupuesto → deriva con lo que haya
-            elif profile["credits_cents"] >= COST_CENTS:
-                pass
-            elif profile["free_used_today"] < FREE_DAILY_USER:
-                pass
-            else:
-                break
-        try:
-            with tempfile.TemporaryDirectory() as tmp:
-                audio_path = download_audio(v["ig_url"], tmp, "instagram")
-                txt = transcribe_with_groq(audio_path, None)
-        except Exception as e:
-            logger.warning("voice_auto transcribe failed user=%s vid=%s err=%s", uid, v.get("ig_video_id"), e)
-            continue
-        if not (txt or "").strip():
-            continue
-        try:
-            db.table("ig_videos").update({
-                "transcription": txt,
-                "transcribed_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("ig_video_id", v["ig_video_id"]).eq("user_id", uid).execute()
-        except Exception:
-            pass
-        if not is_unlimited:
-            user_plan = profile.get("plan", "free")
-            if user_plan in ("pro", "creator", "agency"):
-                db.table("profiles").update({"monthly_usage": profile.get("monthly_usage", 0) + 1}).eq("id", uid).execute()
-            elif profile["credits_cents"] >= COST_CENTS:
-                db.table("profiles").update({"credits_cents": profile["credits_cents"] - COST_CENTS}).eq("id", uid).execute()
-            else:
-                db.table("profiles").update({"free_used_today": profile["free_used_today"] + 1}).eq("id", uid).execute()
-        transcribed_now += 1
-        texts.append(txt)
 
-    if not texts:
-        return jsonify({"error": "no_transcripts",
-                        "message": "No pude transcribir ninguno de tus reels. Inténtalo de nuevo."}), 502
-
-    vp = derive_voice_profile(texts[:_VOICE_AUTO_SAMPLE])
-    if not vp:
-        return jsonify({"error": "derive_failed",
-                        "message": "No pude derivar tu voz con esta muestra. Inténtalo de nuevo."}), 502
-    raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else dict(vp)
-    raw["samples"] = texts[:_VOICE_AUTO_SAMPLE]
-    raw["auto_derived"] = True
-    vp["raw"] = raw
-
-    save_voice_profile(uid, vp, brand_id=project_id)
-    # La generación (adapt_with_ai) lee la voz de la marca por defecto (brand_id="").
-    # Si esa aún no existe, guárdala también ahí para encender el moat ya.
-    if project_id and not get_voice_profile(uid):
-        save_voice_profile(uid, vp)
-
-    return jsonify({
-        "ok": True,
-        "confidence": vp.get("confidence"),
-        "source_count": len(texts[:_VOICE_AUTO_SAMPLE]),
-        "transcribed_now": transcribed_now,
-        "tone": vp.get("tone"),
-        "phrases": vp.get("phrases") or [],
-        "evidence": vp.get("evidence") or [],
-    })
+@app.route("/task/voice-derive/<task_id>", methods=["GET"])
+@require_auth
+@limiter.limit("60 per minute")
+def task_voice_derive_status(task_id: str):
+    """Polling de voice_auto_derive_task. En éxito devuelve la MISMA shape que el
+    endpoint sync de antes (ok/confidence/source_count/tone/phrases/evidence)."""
+    from tasks import voice_auto_derive_task  # noqa: E402
+    task = voice_auto_derive_task.AsyncResult(task_id)
+    state = task.state
+    if state in ("PENDING", "STARTED", "PROGRESS"):
+        return jsonify({"state": "pending"})
+    if state == "SUCCESS":
+        r = task.result or {}
+        if not isinstance(r, dict):
+            return jsonify({"state": "failed", "error": "bad_result"})
+        if r.get("ok"):
+            out = {k: v for k, v in r.items() if k != "http"}
+            out["state"] = "success"
+            return jsonify(out)
+        return jsonify({"state": "failed", "error": r.get("error"),
+                        "message": r.get("message") or "No pude derivar tu voz. Inténtalo de nuevo."})
+    if state == "FAILURE":
+        return jsonify({"state": "failed", "error": "task_failure",
+                        "message": "Error derivando tu voz. Inténtalo de nuevo."})
+    return jsonify({"state": "pending"})
 
 
 _VOICE_URL_MAX = 6   # máx URLs por entreno (muestra de sobra; controla coste)

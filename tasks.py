@@ -2009,3 +2009,94 @@ def adapt_task(text, style, custom_prompt, user_id, charge_mode, cost_cents):
         out["credits_cents"] = updated["credits_cents"]
         out["free_used_today"] = updated["free_used_today"]
     return out
+
+
+@celery_app.task(name="tasks.voice_auto_derive")
+def voice_auto_derive_task(uid, email, project_id):
+    """Async «Derivar mi voz de mis reels» (/api/voice/auto-derive). gemini-2.5-pro
+    (modelo de razonamiento) + transcribir reels son lentos (>60s posibles) → Traefik
+    cerraba a 60s. Espejo EXACTO del flujo sync (mismo cobro por transcripción).
+    Devuelve la misma shape que el endpoint sync de antes."""
+    import tempfile
+    from datetime import datetime, timezone
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        from app import (_voice_auto_candidates, get_profile, check_monthly_limit,
+                         download_audio, transcribe_with_groq, derive_voice_profile,
+                         save_voice_profile, get_voice_profile,
+                         COST_CENTS, FREE_DAILY_USER, UNLIMITED_EMAILS, _VOICE_AUTO_SAMPLE)
+    except Exception as e:
+        logger.exception("voice_auto_derive_task import failed: %s", e)
+        return {"ok": False, "error": "import", "message": "Servicio no disponible.", "http": 500}
+
+    vids = _voice_auto_candidates(uid)
+    if not vids:
+        return {"ok": False, "error": "no_videos",
+                "message": "No encuentro reels publicados tuyos. Conecta tu Instagram en Métricas.", "http": 404}
+    is_unlimited = (email or "").lower() in UNLIMITED_EMAILS
+    texts, transcribed_now = [], 0
+    for v in vids:
+        txt = (v.get("transcription") or "").strip()
+        if txt:
+            texts.append(txt); continue
+        if not v.get("ig_url"):
+            continue
+        profile = get_profile(uid)
+        if not is_unlimited:
+            user_plan = profile.get("plan", "free")
+            if user_plan in ("pro", "creator", "agency"):
+                ok, _ = check_monthly_limit(profile)
+                if not ok:
+                    break
+            elif profile["credits_cents"] >= COST_CENTS:
+                pass
+            elif profile["free_used_today"] < FREE_DAILY_USER:
+                pass
+            else:
+                break
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                audio_path = download_audio(v["ig_url"], tmp, "instagram")
+                txt = transcribe_with_groq(audio_path, None)
+        except Exception as e:
+            logger.warning("voice_auto_derive_task transcribe failed user=%s err=%s", uid, e)
+            continue
+        if not (txt or "").strip():
+            continue
+        try:
+            db.table("ig_videos").update({
+                "transcription": txt,
+                "transcribed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("ig_video_id", v["ig_video_id"]).eq("user_id", uid).execute()
+        except Exception:
+            pass
+        if not is_unlimited:
+            user_plan = profile.get("plan", "free")
+            if user_plan in ("pro", "creator", "agency"):
+                db.table("profiles").update({"monthly_usage": profile.get("monthly_usage", 0) + 1}).eq("id", uid).execute()
+            elif profile["credits_cents"] >= COST_CENTS:
+                db.table("profiles").update({"credits_cents": profile["credits_cents"] - COST_CENTS}).eq("id", uid).execute()
+            else:
+                db.table("profiles").update({"free_used_today": profile["free_used_today"] + 1}).eq("id", uid).execute()
+        transcribed_now += 1
+        texts.append(txt)
+
+    if not texts:
+        return {"ok": False, "error": "no_transcripts",
+                "message": "No pude transcribir ninguno de tus reels. Inténtalo de nuevo.", "http": 502}
+    vp = derive_voice_profile(texts[:_VOICE_AUTO_SAMPLE])
+    if not vp:
+        return {"ok": False, "error": "derive_failed",
+                "message": "No pude derivar tu voz con esta muestra. Inténtalo de nuevo.", "http": 502}
+    raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else dict(vp)
+    raw["samples"] = texts[:_VOICE_AUTO_SAMPLE]
+    raw["auto_derived"] = True
+    vp["raw"] = raw
+    save_voice_profile(uid, vp, brand_id=project_id)
+    if project_id and not get_voice_profile(uid):
+        save_voice_profile(uid, vp)
+    return {"ok": True, "confidence": vp.get("confidence"),
+            "source_count": len(texts[:_VOICE_AUTO_SAMPLE]), "transcribed_now": transcribed_now,
+            "tone": vp.get("tone"), "phrases": vp.get("phrases") or [], "evidence": vp.get("evidence") or []}
