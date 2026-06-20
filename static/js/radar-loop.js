@@ -2676,14 +2676,48 @@
   }
   function submitSheet(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSubmit); }
   function submitSheetSecondary(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSecondary); }
+  var _tpPlay='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
+  var _tpPause='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>';
+  function _tpMMSS(ms){ var t=Math.floor(ms/1000),m=Math.floor(t/60),x=t%60; return (m<10?'0':'')+m+':'+(x<10?'0':'')+x; }
   function teleprompterHTML(){
     var r=S.reel||{creator:{handle:""},script:{hook:"",beats:[],close:""}};
     var s=r.script||{hook:"",beats:[],close:""};
+    if(!S.tp) S.tp={ playing:false, speed:3, fontPx:34, mirror:false, recording:false, ms:0, countdown:0 };
+    var tp=S.tp;
     var body='<p class="hook">'+ESC(s.hook)+'</p>'+(s.beats||[]).map(function(b){return '<p>'+ESC(b)+'</p>';}).join("")+(s.close?'<p>'+ESC(s.close)+'</p>':"");
-    var src=(r.creator&&r.creator.handle)?'@'+ESC(r.creator.handle)+' · en tu voz':'en tu voz';
-    return '<div class="overlay prompter" role="dialog" aria-modal="true" aria-label="Teleprompter"><div class="obar"><button class="back" data-act="tp-back" aria-label="Volver">'+IC.back+'</button><span class="otitle">Teleprompter</span><span style="flex:1"></span><span style="font-size:12px;color:rgba(255,255,255,.5)">'+src+'</span></div>'+
-      '<div class="tp-scroll"><div class="tp-text">'+body+'</div></div>'+
-      '<div class="tp-foot"><button class="btn btn-lg" style="background:rgba(255,255,255,.12);color:#fff;border:none;flex:0 0 auto" data-act="tp-back">Aún no</button><button class="btn btn-lg btn-primary" data-act="recorded">'+IC.check+' Ya lo grabé</button></div></div>';
+    var rec = tp.recording ? '<span class="tp-rec"><span class="tp-rec-dot"></span>REC <b id="rsTpTimer">'+_tpMMSS(tp.ms)+'</b></span>' : '';
+    var cd = tp.countdown>0 ? '<div class="tp-cd"><span>'+tp.countdown+'</span></div>' : '';
+    return '<div class="overlay prompter" role="dialog" aria-modal="true" aria-label="Teleprompter">'+
+      '<div class="obar"><button class="back" data-act="tp-back" aria-label="Volver">'+IC.back+'</button>'+
+        '<span class="otitle">Teleprónter</span>'+
+        '<span class="tp-srctitle">'+ESC(s.hook||((r.creator&&r.creator.handle)?'@'+r.creator.handle:'tu guion'))+'</span>'+
+        '<span style="flex:1"></span>'+rec+'</div>'+
+      '<div class="tp-scroll" id="rsTpScroll"><div class="tp-guide"></div><div class="tp-text'+(tp.mirror?' mirror':'')+'" id="rsTpText" style="font-size:'+tp.fontPx+'px">'+body+'</div></div>'+
+      cd+
+      '<div class="tp-bar">'+
+        '<button class="tp-ctl'+(tp.playing?' on':'')+'" data-act="tp-play" aria-label="'+(tp.playing?'Pausa':'Play')+'">'+(tp.playing?_tpPause:_tpPlay)+'</button>'+
+        '<button class="tp-ctl" data-act="tp-restart" aria-label="Reiniciar">'+IC.repeat+'</button>'+
+        '<div class="tp-grp"><span class="tp-grp-l">Velocidad</span><button class="tp-mini" data-act="tp-speed" data-k="down" aria-label="Menos velocidad">−</button><span class="tp-grp-v">×'+tp.speed+'</span><button class="tp-mini" data-act="tp-speed" data-k="up" aria-label="Más velocidad">+</button></div>'+
+        '<div class="tp-grp"><span class="tp-grp-l">Texto</span><button class="tp-mini" data-act="tp-font" data-k="down" aria-label="Texto más pequeño">A−</button><button class="tp-mini" data-act="tp-font" data-k="up" aria-label="Texto más grande">A+</button></div>'+
+        '<button class="tp-ctl'+(tp.mirror?' on':'')+'" data-act="tp-mirror" aria-label="Espejo">'+IC.repeat+'</button>'+
+        '<span style="flex:1"></span>'+
+        '<button class="btn btn-lg '+(tp.recording?'tp-stop':'btn-primary')+'" data-act="tp-record">'+(tp.recording?'Detener':IC.mic+' Grabar')+'</button>'+
+        '<button class="btn btn-lg tp-done" data-act="recorded">'+IC.check+' Ya lo grabé</button>'+
+      '</div></div>';
+  }
+  // Auto-scroll + timer del teleprónter (manipulan el DOM directo → no re-render por tick).
+  function tpScrollStart(){ clearInterval(S.tpScrollTimer); S.tpScrollTimer=setInterval(function(){ var el=document.getElementById("rsTpScroll"); if(!el){ clearInterval(S.tpScrollTimer); return; } el.scrollTop += (S.tp?S.tp.speed:3); if(el.scrollTop+el.clientHeight>=el.scrollHeight-2 && S.tp){ S.tp.playing=false; clearInterval(S.tpScrollTimer); render(); } },32); }
+  function tpScrollStop(){ clearInterval(S.tpScrollTimer); }
+  function tpTimerStart(){ clearInterval(S.tpTimer); S.tpTimer=setInterval(function(){ if(!S.tp||!S.tp.recording){ clearInterval(S.tpTimer); return; } S.tp.ms+=250; var t=document.getElementById("rsTpTimer"); if(t) t.textContent=_tpMMSS(S.tp.ms); },250); }
+  function tpRecordCountdown(){
+    if(!S.tp) return; S.tp.countdown=3; render();
+    clearInterval(S.tpCdTimer);
+    S.tpCdTimer=setInterval(function(){
+      if(!S.tp){ clearInterval(S.tpCdTimer); return; }
+      S.tp.countdown-=1;
+      if(S.tp.countdown<=0){ clearInterval(S.tpCdTimer); S.tp.countdown=0; S.tp.recording=true; S.tp.ms=0; S.tp.playing=true; render(); tpTimerStart(); }
+      else render();
+    },1000);
   }
   function fillReels(){ return S.reels.slice().sort(function(a,b){return (b.explosion||0)-(a.explosion||0);}).slice(0,5); }
   function fillWeekHTML(reels,phase){
@@ -2756,11 +2790,18 @@
     else if(S.view==="fillweek") html+='<div class="overlay" role="dialog" aria-modal="true" aria-label="Llena mi semana"><div class="obar"><button class="back" data-act="close-feed" aria-label="Cerrar">'+IC.x+'</button><span class="otitle">Llena mi semana</span></div><div class="oscroll" id="rsFillHost">'+fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase)+'</div></div>';
     if(S.communityInfo) html+=communityInfoModalHTML();   // mini-modal «Más información» Comunidad
     if(S.sheet) html+=sheetHTML();   // T2: el sheet de entrada va SOBRE cualquier overlay
+    // Teleprónter: preservar la posición de scroll a través del re-render (los toggles
+    // de play/velocidad/texto re-pintan; sin esto el scroll saltaría a 0).
+    var _tpScroll=null; if(S.view==="prompter"){ var _tpe=document.getElementById("rsTpScroll"); if(_tpe) _tpScroll=_tpe.scrollTop; }
     view.innerHTML=html;
+    if(_tpScroll!=null){ var _tpe2=document.getElementById("rsTpScroll"); if(_tpe2) _tpe2.scrollTop=_tpScroll; }
     // T4: el error persistente sobrevive a los re-render mutando el nodo estable.
     var errN=document.getElementById("rsErr"),errM=document.getElementById("rsErrMsg");
     if(errN&&errM){ if(S.errMsg){ errM.textContent=S.errMsg; errN.classList.add("show"); } else { errN.classList.remove("show"); } }
     if(S.view==="gen") startGenSteps();
+    // Teleprónter: gestiona auto-scroll/timer según estado (sin re-render por tick).
+    if(S.view==="prompter"){ if(S.tp&&S.tp.playing) tpScrollStart(); else tpScrollStop(); if(S.tp&&S.tp.recording) tpTimerStart(); }
+    else { tpScrollStop(); clearInterval(S.tpTimer); clearInterval(S.tpCdTimer); if(S.tp){ S.tp.playing=false; S.tp.recording=false; } }
     // Cerebro 3D: monta/re-ancla al entrar en la pestaña Cerebro, pausa al salir.
     if(S.tab==="brain"){ ensureBrain3D(); ensureBrainTrain(); } else pauseBrain3D();
     ensureFlashCountdown();   // tic-tac del reloj de la oferta flash si está visible
@@ -4244,6 +4285,13 @@
     if(act==="back-script"){ S.view="script"; return render(); }
     if(act==="close-feed") return closeOverlay();
     if(act==="tp-back") return tpBack();
+    if(act && act.indexOf("tp-")===0 && !S.tp) S.tp={ playing:false, speed:3, fontPx:34, mirror:false, recording:false, ms:0, countdown:0 };
+    if(act==="tp-play"){ S.tp.playing=!S.tp.playing; return render(); }
+    if(act==="tp-restart"){ var _e=document.getElementById("rsTpScroll"); if(_e) _e.scrollTop=0; return; }
+    if(act==="tp-speed"){ S.tp.speed=Math.max(1,Math.min(6,S.tp.speed+(k==="up"?1:-1))); return render(); }
+    if(act==="tp-font"){ S.tp.fontPx=Math.max(22,Math.min(56,S.tp.fontPx+(k==="up"?4:-4))); return render(); }
+    if(act==="tp-mirror"){ S.tp.mirror=!S.tp.mirror; return render(); }
+    if(act==="tp-record"){ if(S.tp.recording){ S.tp.recording=false; S.tp.playing=false; clearInterval(S.tpTimer); return render(); } tpRecordCountdown(); return; }
     if(act==="ig-connect"){ if(!isDemo()) return igConnectProfile(); S.igConnected=true; bumpEco(0,0); render(); return showToast("Instagram conectado. El sistema empezará a aprender de lo que publicas."); }
     if(act==="ig-disconnect"){ S.igConnected=false; render(); return showToast("Instagram desvinculado."); }
     if(act==="metric-sort"){ S.metricSort=k; return render(); }

@@ -10945,6 +10945,30 @@
     .rs .brain-prog-row { display:flex; justify-content:space-between; gap:10px; font-size:13px; color:var(--text-secondary); margin-top:8px; }
     .rs .brain-prog-pct { font-family:var(--font-mono); color:var(--text-primary); }
 
+    /* ── TELEPRÓNTER · controles (mockup Teleprompter.dc.html) ── */
+    .rs .prompter .tp-srctitle { font-size:13px; color:rgba(255,255,255,.62); margin-left:12px; max-width:360px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rs .tp-rec { display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:14px; color:#fff; }
+    .rs .tp-rec-dot { width:9px; height:9px; border-radius:50%; background:#FF5C72; animation:tpPulse 1s ease-in-out infinite; }
+    @keyframes tpPulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .rs .prompter .tp-scroll { position:relative; scroll-behavior:auto; }
+    .rs .tp-guide { position:absolute; left:0; right:0; top:36%; height:64px; background:linear-gradient(transparent, rgba(47,91,255,.10), transparent); border-top:1px solid rgba(47,91,255,.25); border-bottom:1px solid rgba(47,91,255,.25); pointer-events:none; z-index:1; }
+    .rs .tp-text.mirror { transform:scaleX(-1); }
+    .rs .tp-cd { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.72); z-index:5; }
+    .rs .tp-cd span { font-family:var(--font-display); font-weight:700; font-size:120px; color:#fff; }
+    .rs .tp-bar { position:absolute; left:0; right:0; bottom:0; padding:16px 18px; background:linear-gradient(transparent, #000 32%); display:flex; align-items:center; gap:10px; flex-wrap:wrap; z-index:3; }
+    .rs .tp-ctl { width:46px; height:46px; flex:none; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18); border-bottom:3px solid rgba(255,255,255,.18); border-radius:12px; color:#fff; cursor:pointer; transition:transform .1s ease; }
+    .rs .tp-ctl:active { transform:translateY(2px); border-bottom-width:2px; }
+    .rs .tp-ctl.on { background:var(--brand-600); border-color:var(--brand-700); }
+    .rs .tp-grp { display:inline-flex; align-items:center; gap:6px; padding:7px 11px; background:rgba(255,255,255,.06); border-radius:11px; }
+    .rs .tp-grp-l { font-size:12px; color:rgba(255,255,255,.55); font-weight:600; }
+    .rs .tp-grp-v { font-family:var(--font-mono); font-size:13px; color:#fff; min-width:30px; text-align:center; }
+    .rs .tp-mini { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.10); border:none; border-radius:8px; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
+    .rs .tp-mini:active { transform:translateY(1px); }
+    .rs .tp-bar .tp-stop { background:#FF5C72; color:#fff; border:none; flex:0 0 auto; }
+    .rs .tp-bar .tp-done { background:rgba(255,255,255,.12); color:#fff; border:none; flex:0 0 auto; }
+    .rs .tp-bar .btn-primary { flex:0 0 auto; }
+    @media (max-width:680px){ .rs .tp-grp-l { display:none; } .rs .tp-bar { gap:8px; padding:12px; } }
+
     /* ── GUIONES (pantalla 2 del rediseño) ──────────────────────────────── */
     /* Regla 3: el hook/título del guion en Clash */
     .rs .gui-title { font-family: var(--font-display); letter-spacing:-.01em; font-size:15.5px; font-weight:600; }
