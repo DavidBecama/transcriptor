@@ -1409,11 +1409,6 @@
     // Fathom 18/06: el día enseña 2-3 oportunidades en carrusel (no una sola).
     var heroN=sorted.slice(0,Math.min(3,sorted.length)), rest=sorted.slice(heroN.length);
     var fillCount=Math.min(5,S.reels.length)||5;
-    var shown = S.feedExpanded ? rest : rest.slice(0,5);
-    var rows = shown.map(reelRowHTML).join("");   // A: card + detalle inline si está abierto
-    var moreToggle = (!S.feedExpanded && rest.length>5)
-      ? '<button class="see-all" data-act="expand-feed">'+IC.repeat+' Ver las '+rest.length+' oportunidades</button>'
-      : '';
 
     // v3 — espina del mockup David (Layout A), de arriba abajo:
     //   hero → oportunidad → competidores+galería → cerebro/progreso → llena mi
@@ -1434,7 +1429,8 @@
       suggestedCompHTML()+        // sugerir competidores proactivamente (Fathom 18/06)
       voiceOnboardCardHTML()+     // B6+T1: banner de voz
       nextSeriesHTML("dash")+     // B1+T1: "tu próxima serie"
-      (S.reels.length?communityGalleryHTML():"")+   // muro comunidad (≈ «más señales»)
+      radarSignalsListHTML(rest)+ // «Más señales · N» — el resto de señales del día (mockup David)
+      (S.reels.length?communityGalleryHTML():"")+   // muro comunidad
     '</div></div>';
   }
 
@@ -3435,6 +3431,19 @@
   // Una card + su detalle inline si está abierto (se usa en feed y en vista de competidor).
   function reelRowHTML(r){
     return reelCardHTML(r)+(S.detailReelId===r.id?reelDetailHTML(r):'');
+  }
+  /* v3 (mockup David «Más señales · N»): lista de las señales restantes (las que no
+     son la oportunidad destacada) con cabecera + toggle «Ver las N oportunidades».
+     Reusa reelCardHTML (fila .row con explosión verde, fav y «Roba la idea»). */
+  function radarSignalsListHTML(rest){
+    if(!rest || !rest.length) return '';
+    var shown = S.feedExpanded ? rest : rest.slice(0,5);
+    var rows = shown.map(reelRowHTML).join("");
+    var moreToggle = (!S.feedExpanded && rest.length>5)
+      ? '<div class="signals-more"><button class="see-all" data-act="expand-feed">'+IC.repeat+' '+L("Ver las "+rest.length+" oportunidades","See all "+rest.length+" opportunities")+'</button></div>'
+      : '';
+    return '<section class="signals"><div class="signals-head"><span class="signals-t">'+L("Más señales · "+rest.length,"More signals · "+rest.length)+'</span></div>'+
+      '<div class="signals-list">'+rows+'</div>'+moreToggle+'</section>';
   }
   function loadReelTranscript(id){
     var r=reelById(id); if(!r) return;
