@@ -482,7 +482,7 @@
   function onbSubnicheHTML(){
     var sel=(S.onb.subniches||[]).map(function(t){ return '<span class="onb-tag on" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+' <b>×</b></span>'; }).join("");
     var sugg=onbSubSuggest().slice(0,8).map(function(t){ return '<button class="onb-tag" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+'</button>'; }).join("");
-    return onbCardWrap(onbEyebrow(L("Más concreto","Get specific")),L("Ponle 2-3 subcategorías","Add 2-3 subcategories"),
+    return onbCardWrap(onbEyebrow(L("Más concreto","Get specific")),L("¿Qué tratas dentro de "+(S.onb.niche||"lo tuyo")+"?","What do you cover in "+(S.onb.niche||"your niche")+"?"),
       L("Cuanto más específico, mejor el match: <b>cosmética orgánica</b> es mejor que <b>cosmética</b>. Elige varias o añade las tuyas.","The more specific, the better the match: <b>organic skincare</b> beats <b>skincare</b>. Pick a few or add your own."),
       '<div class="onb-tags" id="rsOnbTags">'+(sel||'<span class="onb-tags-ph">'+L("Tus etiquetas aparecerán aquí…","Your tags will show up here…")+'</span>')+'</div>'+
       '<div class="onb-tagadd"><span class="onb-hash">#</span><input id="rsOnbTagInput" class="onb-text onb-text--tag" type="text" placeholder="'+L("añade una etiqueta y Enter","add a tag and hit Enter")+'" aria-label="'+L("Añadir subnicho","Add subniche")+'"><button class="onb-tagadd-btn" data-act="onb-tag-add">'+IC.plus+'</button></div>'+
@@ -521,7 +521,7 @@
     else if((S.onb.valueReels||[]).length) cta='<span class="onb-hint" style="font-size:13px;opacity:.6;align-self:center">'+L("Toca un reel para robarlo y convertirlo en tu guion","Tap a reel to steal it and turn it into your script")+'</span>';
     else cta='<button class="btn btn-lg btn-primary onb-cta" data-act="onb-value-next">'+IC.arr+' '+L("Seguir","Continue")+'</button>';
     return onbCardWrap('<div class="onb-eyebrow">'+IC.bolt+' '+ESC(subs||L("Tu subnicho","Your subniche"))+'</div>',
-      L("Roba uno y hazlo tuyo","Steal one and make it yours"),
+      L("Esto es lo que explota en lo tuyo","This is what's blowing up in your space"),
       L("Reels reales de creadores como tú que están explotando. Elige el que más te encaje — te lo convierto en guion tuyo al instante.","Real reels from creators like you that are blowing up. Pick the one that fits — I turn it into your script instantly."),
       body+
       '<div class="onb-row">'+onbBackBtn()+cta+'</div>', true);
@@ -571,7 +571,7 @@
     // Cargando → SIN botón de avanzar (solo Atrás): no aparece antes que los resultados.
     var compCta=S.onb.compLoading ? ''
       : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick+" y seguir","Follow "+nPick+" and continue")+'</button>';
-    return onbCardWrap(onbEyebrow(L("Tu radar","Your radar")),L("¿A quién sigues de cerca?","Who do you keep an eye on?"),
+    return onbCardWrap(onbEyebrow(L("Tu radar","Your radar")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
       L("Pre-elegí a 2 de tu subnicho. Seguiré sus reels que petan para que robes el primero en tu voz. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
       body+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+compCta+'</div>');
@@ -580,7 +580,7 @@
   function onbGoalHTML(){
     var cards=ONB_GOALS.map(function(g){ var on=S.onb.goal===g.key; return '<button class="onb-goal'+(on?" on":"")+'" data-act="onb-pick-goal" data-k="'+g.key+'">'+
       '<span class="onb-goal-ic">'+(IC[g.ic]||IC.spark)+'</span><span class="onb-goal-l">'+ESC(L(g.label,g.label_en))+'</span><span class="onb-goal-d">'+ESC(L(g.desc,g.desc_en))+'</span></button>'; }).join("");
-    return onbCardWrap(onbEyebrow(L("El para qué","The why")),L("¿Qué quieres conseguir?","What do you want to achieve?"),
+    return onbCardWrap(onbEyebrow(L("El para qué","The why")),L("¿Qué buscas con esto?","What are you after?"),
       L("Con esto ajusto el tono y la estructura de tus guiones — vender no se escribe como entretener.","With this I tune the tone and structure of your scripts — selling isn't written like entertaining."),
       '<div class="onb-goals">'+cards+'</div>'+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-goal-next"'+(S.onb.goal?'':' disabled')+'>'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
@@ -589,7 +589,7 @@
   function onbCloseHTML(){
     var pct=35;
     return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Listo","Ready")+'</div>',
-      L("Listo. Te conozco al 35%.","Done. I know you at 35%."),
+      L("Tu Cerebro ya sabe lo justo para empezar","Your Brain now knows just enough to start"),
       L("Ya leí tu cuenta y a tus 2 competidores. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía). Cada día, con <b>un ejercicio de 1 minuto</b>, subo un poco más — hasta sonar clavado a ti.","I've read your account and your 2 competitors. Your Brain is a <b>context profile</b> (not a full clone of your voice yet). Each day, with a <b>1-minute exercise</b>, it climbs a bit more — until it sounds just like you."),
       '<div class="onb-brain"><div class="onb-brain-bar"><div class="onb-brain-fill" style="width:'+pct+'%"></div></div>'+
         '<div class="onb-brain-row"><span class="onb-brain-k">'+IC.brain+' '+L("Cerebro","Brain")+'</span><span class="onb-brain-v">'+pct+'%</span></div></div>'+
@@ -2605,6 +2605,8 @@
     var r=S.reel,s=r.script||{hook:"",beats:[],close:""};
     var beats=(s.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
     return '<div class="script-wrap fade-in"><div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div><div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
+      '<div class="script-acts"><button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>'+
+        '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
       '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+conveyorHTML()+'</div>';
   }
   function formatResultHTML(kind){
@@ -4126,6 +4128,8 @@
       return showToast("Generando el informe del mes…");
     }
     if(act==="steal") return steal(id);
+    if(act==="regen") return steal(id);   // Editor: regenerar el guion del mismo reel
+    if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.ig_url||_ro.url||_ro.permalink; if(_u){ try{ window.open(_u,"_blank"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
     if(act==="reel-dismiss") return reelDismiss(id);
     if(act==="undo-dismiss") return undoDismiss();
     if(act==="reel-detail") return openReelDetail(id);

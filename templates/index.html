@@ -10969,6 +10969,13 @@
     .rs .tp-bar .btn-primary { flex:0 0 auto; }
     @media (max-width:680px){ .rs .tp-grp-l { display:none; } .rs .tp-bar { gap:8px; padding:12px; } }
 
+    /* ── EDITOR · acciones del reveal (Ver original / Regenerar) — mockup Editor de guion ── */
+    .rs .script-acts { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 16px; }
+    .rs .script-act { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; background:var(--surface-overlay); border:1px solid var(--border-default); border-bottom:2px solid var(--border-strong); border-radius:11px; color:var(--text-secondary); font:inherit; font-family:var(--font-body); font-weight:600; font-size:13px; cursor:pointer; transition:transform .1s ease, border-color .15s, color .15s; }
+    .rs .script-act:hover { color:var(--text-primary); border-color:var(--brand-500); }
+    .rs .script-act:active { transform:translateY(1px); border-bottom-width:1px; }
+    .rs .script-act svg { width:15px; height:15px; }
+
     /* ── GUIONES (pantalla 2 del rediseño) ──────────────────────────────── */
     /* Regla 3: el hook/título del guion en Clash */
     .rs .gui-title { font-family: var(--font-display); letter-spacing:-.01em; font-size:15.5px; font-weight:600; }
