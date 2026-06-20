@@ -1649,7 +1649,8 @@
      con countdown HONESTO (deadline fijo en localStorage → no se resetea al recargar).
      En prod el price a 29€ lo crea David en Whop (env WHOP_TOPUP_300_FLASH_*). El estado
      real llega en /auth/me.topup_flash; en demo arranca al cruzar el muro. */
-  var FLASH_HOURS=48, FLASH_PACK_CR=300, FLASH_PACK_EUR=29, FLASH_PACK_WAS=49;
+  var FLASH_HOURS=48, FLASH_PLAN_PCT=40, FLASH_PLAN_EUR=29;
+  var FLASH_PACK_CR=300, FLASH_PACK_EUR=29, FLASH_PACK_WAS=49;
   function flashKey(){ return isDemo()?"rs_flash_demo":"rs_flash_v1"; }
   function flashDeadline(){
     var bk=S.user&&S.user.topupFlash; if(bk&&bk.active&&bk.expires_at){ var t=Date.parse(bk.expires_at); if(t>0) return t; }
@@ -1662,16 +1663,20 @@
     var h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60, p=function(n){return (n<10?"0":"")+n;};
     return p(h)+":"+p(m)+":"+p(ss);
   }
+  // popups-flash.html · muro in-app: LIDERA con el PLAN (Creator −40%, "lo que ChatGPT
+  // no hace"), WELCOME auto-aplicado; el top-up 300 queda como alternativa secundaria.
   function flashBannerHTML(){
     if(!flashActive()) return '';
-    var pct=Math.round((1-FLASH_PACK_EUR/FLASH_PACK_WAS)*100);   // 49→29 ≈ −41%
-    return '<div class="flash-offer" data-act="open-plans" role="button" tabindex="0" aria-label="Oferta: pack de '+FLASH_PACK_CR+' créditos a '+FLASH_PACK_EUR+' euros">'+
-      '<span class="flash-badge">−'+pct+'%</span>'+
-      '<div class="flash-txt"><b>'+L(FLASH_PACK_CR+" créditos por €"+FLASH_PACK_EUR,FLASH_PACK_CR+" credits for €"+FLASH_PACK_EUR)+'</b>'+
-        '<span>'+L("~100 robos · solo por cruzar el muro hoy","~100 steals · just for hitting the wall today")+' · <s>€'+FLASH_PACK_WAS+'</s> → <b>€'+FLASH_PACK_EUR+'</b></span></div>'+
+    var now=Math.round(FLASH_PLAN_EUR*(1-FLASH_PLAN_PCT/100)*100)/100;        // 29 → 17.40
+    var nowTxt=(now%1?String(now.toFixed(2)).replace(".",","):String(now));
+    return '<div class="flash-offer" data-act="flash-cta" role="button" tabindex="0" aria-label="Oferta: Creator a −40% el primer mes">'+
+      '<span class="flash-badge">−'+FLASH_PLAN_PCT+'%</span>'+
+      '<div class="flash-txt"><b>'+L("Sigue con Creator · −40% tu primer mes","Stay on Creator · −40% your first month")+'</b>'+
+        '<span>'+L("Lo que ChatGPT no hace: te digo qué explota y te lo robo en tu voz","What ChatGPT won't: I tell you what's blowing up and steal it in your voice")+' · <s>€'+FLASH_PLAN_EUR+'</s> → <b>€'+nowTxt+'</b> · WELCOME ✓</span></div>'+
       '<div class="flash-cd-wrap"><span class="flash-cd-k">'+L("Termina en","Ends in")+'</span><span class="flash-cd" id="rsFlashCd">'+flashRemainStr()+'</span></div>'+
-      '<span class="flash-cta">'+L("Recárgalo","Grab it")+' '+IC.arr+'</span>'+
-    '</div>';
+      '<span class="flash-cta">'+L("Quiero el −40%","Grab −40%")+' '+IC.arr+'</span>'+
+    '</div>'+
+    '<button class="flash-alt" data-act="flash-topup">'+L("¿Solo un empujón? "+FLASH_PACK_CR+" créditos (~100 robos) por €"+FLASH_PACK_EUR,"Just a boost? "+FLASH_PACK_CR+" credits (~100 steals) for €"+FLASH_PACK_EUR)+'</button>';
   }
   // Countdown vivo: actualiza el reloj cada segundo; al expirar, re-render (quita el banner).
   function ensureFlashCountdown(){
@@ -4327,6 +4332,10 @@
     // recarga el Radar vía window.RS_reloadRadar (puente en loadBrandData).
     if(act==="add-comp"){ if(typeof window.openAddCompetitorModal==="function") window.openAddCompetitorModal(); return; }
     if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){} } return; }
+    // Flash del muro: CTA principal = Creator −40% con WELCOME auto-aplicado (rsFlashSubscribe
+    // del chrome); secundario = top-up 300. En demo no hay checkout → abre el modal de planes.
+    if(act==="flash-cta"){ if(!isDemo() && typeof window.rsFlashSubscribe==="function"){ try{ window.rsFlashSubscribe("creator"); return; }catch(e){} } if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("flash_creator"); }catch(e){} } return; }
+    if(act==="flash-topup"){ if(typeof window.openTopupModal==="function"){ try{ window.openTopupModal("300"); return; }catch(e){} } if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("flash_topup"); }catch(e){} } return; }
     // B2: CTA «Entrenar mi voz» — lleva al Cerebro y deja el cursor en el textarea
     // de captura (la acción de verdad), no en la pestaña a secas.
     if(act==="voice-focus"){
