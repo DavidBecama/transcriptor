@@ -2402,14 +2402,23 @@
     }
 
     return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Cerebro · @"+(b.handle||S.user.handle||""), "El cerebro de "+b.name, "Todo lo que el sistema sabe de esta marca, y cómo crece. Cuanto más creas y publicas, más tuyo suena todo.")+
-      // hero de nivel + voz
+      pheadHTML("Cerebro · @"+(b.handle||S.user.handle||""), "Tu Cerebro", "Aprende tu voz reel a reel. Cuanto más creas, más clava tu tono — y antes escribe solo.")+
+      // hero: ANILLO circular (brainProgress%) + nivel + voz (mockup Cerebro.dc.html).
+      // El 3D se conserva oculto (la lógica de ensureBrain3D sigue, sin saturar el render).
       '<div class="brain-hero">'+
-        '<div id="rsBrainStage" class="brain3d-stage"><div class="brain-orb brain3d-fallback">'+IC.brain+'</div></div>'+
+        '<div class="brain-ring">'+
+          '<svg width="158" height="158" viewBox="0 0 172 172" class="brain-ring-svg" aria-hidden="true">'+
+            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
+            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+Math.round(465*(1-brainProgress()/100))+'" class="brain-ring-prog"/>'+
+          '</svg>'+
+          '<div class="brain-ring-c">'+IC.brain+'<span class="brain-ring-lvl">NIVEL <b>'+lv.level+'</b></span></div>'+
+        '</div>'+
+        '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
         '<div class="brain-hero-body">'+
-          '<div class="brain-lvl">Nivel '+lv.level+' · '+ESC(ecoLevelName(lv.level))+(lv.level>=4?' <span class="brain-pro" title="Eres Pro Reelscript — acceso a grupos solo-pros">'+IC.star+' Pro</span>':'')+'</div>'+
+          '<div class="brain-kicker">'+ESC(ecoLevelName(lv.level))+(lv.level>=4?' · '+IC.star+' Pro':'')+'</div>'+
           '<div class="brain-voiceline">Te conozco al <b>'+brainProgress()+'%</b></div>'+
-          '<div class="eco-bar" style="margin:10px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,brainProgress())+'%"></div></div>'+
+          (lv.next?'<div class="brain-prog-row"><span>Progreso al Nivel '+lv.next+'</span><span class="brain-prog-pct">'+brainProgress()+'%</span></div>':'')+
+          '<div class="eco-bar" style="margin:6px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,brainProgress())+'%"></div></div>'+
           // B2: umbrales VISIBLES del siguiente nivel (checklist ✓/○) + UNA acción primaria
           // (la primera carencia). B4: el beneficio es real — voz y ganadores entran en el prompt.
           (lv.next
