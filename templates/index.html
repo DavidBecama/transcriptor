@@ -11182,6 +11182,29 @@
     .rs .rgal-arrow svg { width:17px; height:17px; }
     .rs .rgal-track { display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x proximity; scroll-behavior:smooth; -ms-overflow-style:none; scrollbar-width:none; padding:2px 2px 6px; margin:0 -2px; }
     .rs .rgal-track::-webkit-scrollbar { display:none; }
+    /* ── Tarjeta de reel de competidor (mockup David): thumb 9:16 + body + acciones ── */
+    .rs .crd-track { gap:16px; }
+    .rs .crd { flex:0 0 212px; display:flex; flex-direction:column; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:18px; overflow:hidden; transition:transform .18s var(--ease); scroll-snap-align:start; }
+    .rs .crd:hover { transform:translateY(-2px); }
+    .rs .crd-thumb { position:relative; height:284px; background:linear-gradient(160deg, var(--surface-overlay), var(--surface-raised)); }
+    .rs .crd-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .crd-ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+    .rs .crd-ph svg { width:30px; height:30px; color:rgba(255,255,255,.9); }
+    .rs .crd-mult { position:absolute; top:12px; left:12px; display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:9px; background:rgba(0,0,0,.55); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); font-family:var(--font-mono); font-size:13px; font-weight:600; color:var(--success-fg); }
+    .rs .crd-mult svg { width:13px; height:13px; color:#FF8A3D; }
+    .rs .crd-dur { position:absolute; right:12px; bottom:12px; padding:2px 7px; border-radius:6px; background:rgba(0,0,0,.6); color:#fff; font-family:var(--font-mono); font-size:11px; }
+    .rs .crd-play { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:44px; height:44px; border-radius:9999px; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; }
+    .rs .crd-play svg { width:15px; height:15px; color:#fff; }
+    .rs .crd-body { padding:16px; display:flex; flex-direction:column; gap:11px; flex:1; }
+    .rs .crd-meta { font-family:var(--font-mono); font-size:11px; color:var(--text-tertiary); }
+    .rs .crd-title { font-family:var(--font-display); font-weight:700; font-size:17px; line-height:1.15; color:var(--text-primary); margin:0; flex:1; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .rs .crd-acts { display:flex; gap:8px; }
+    .rs .crd-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:11px; font-family:var(--font-body); font-weight:600; font-size:13px; cursor:pointer; padding:10px; transition:transform .1s var(--ease); }
+    .rs .crd-btn:active { transform:translateY(1px); border-bottom-width:1px; }
+    .rs .crd-metrics { flex:1; background:var(--surface-overlay); border:1px solid var(--border-strong); border-bottom:3px solid var(--border-strong); color:var(--text-primary); }
+    .rs .crd-metrics svg { width:15px; height:15px; }
+    .rs .crd-steal { flex:none; background:var(--brand-500); border:none; border-bottom:3px solid var(--brand-700); color:#fff; padding:10px 13px; }
+    .rs .crd-steal svg { width:15px; height:15px; }
     .rs .gcard { position:relative; flex:0 0 220px; aspect-ratio:9/16; border-radius:16px; overflow:hidden; cursor:pointer; background:var(--surface-overlay); border:1px solid var(--border-subtle); scroll-snap-align:start; transition:transform .16s var(--ease), box-shadow .16s var(--ease); }
     .rs .gcard:hover { transform:translateY(-4px); box-shadow:var(--shadow-lg); }
     .rs .gcard:focus-visible { outline:2px solid var(--brand-500); outline-offset:2px; }
@@ -26881,6 +26904,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=32"></script>
+<script src="/static/js/radar-loop.js?v=33"></script>
 </body>
 </html>

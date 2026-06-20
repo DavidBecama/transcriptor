@@ -969,26 +969,42 @@
       (sub?'<span class="rgal-sub">'+ESC(sub)+'</span>':'')+'</div>'+(moreHTML||'')+'</div>'+
       '<div class="rgal-track">'+cards+'</div></section>';
   }
+  /* Tarjeta de reel de competidor (mockup David «RADAR exploración»): thumb 9:16
+     arriba (badge mult verde + chispazo naranja + dur mono + play), body con
+     handle·time mono + título Clash + «Ver métricas»/robar. */
+  function competitorReelCardHTML(r, thumb){
+    var t=thumb||r.thumb;
+    var thumbInner=t?'<img src="'+ESC(t)+'" alt="" loading="lazy">':'<div class="crd-ph" style="background:'+_galGrad(r.id||r.creator.handle)+'">'+_icPlay+'</div>';
+    var mult=(r.explosionTxt!=null)?(r.explosionTxt+'×'):'';
+    return '<div class="crd">'+
+      '<div class="crd-thumb">'+thumbInner+
+        (mult?'<span class="crd-mult">'+IC.bolt+' '+ESC(mult)+'</span>':'')+
+        (r.dur?'<span class="crd-dur">'+ESC(r.dur)+'</span>':'')+
+        '<span class="crd-play">'+_icPlay+'</span>'+
+      '</div>'+
+      '<div class="crd-body">'+
+        '<span class="crd-meta">@'+ESC(r.creator.handle)+' · '+ESC(r.when)+'</span>'+
+        '<h3 class="crd-title">'+ESC(r.cap)+'</h3>'+
+        '<div class="crd-acts">'+
+          '<button class="crd-btn crd-metrics" data-act="reel-detail" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver métricas","See metrics")+'</button>'+
+          '<button class="crd-btn crd-steal" data-act="steal" data-id="'+ESC(r.id)+'" aria-label="'+L("Roba la idea","Steal the idea")+'">'+IC.bolt+'</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
   function competitorGalleryHTML(){
-    var reels=feedReels();
+    var reels=feedReels(); if(!reels.length) return '';
     var imgs=_demoThumbs();
-    var n=imgs?(imgs.length+3):Math.min(12, reels.length);
-    if(!n) return '';
-    var cards="";
-    for(var i=0;i<n;i++){
-      var r=reels.length?reels[i%reels.length]:null;
-      cards+=galleryCardHTML({
-        id:(r?r.id:""), handle:(r?r.creator.handle:"creador"), cap:(r?r.cap:""),
-        thumb:(imgs?(i<imgs.length?imgs[i]:null):(r&&r.thumb)),
-        badge:(r&&r.explosionTxt!=null?r.explosionTxt+'×':''),
-        key:(r?(r.id||r.creator.handle):"c"+i), act:(r?"reel-detail":"")
-      });
-    }
+    var cards=reels.slice(0,12).map(function(r,i){
+      return competitorReelCardHTML(r, imgs?imgs[i%imgs.length]:null);
+    }).join("");
     var arrows='<div class="rgal-arrows">'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
     '</div>';
-    return galleryHTML(L("Lo último de tu competencia","Latest from your rivals"), "", cards, arrows);
+    return '<section class="rgal"><div class="rgal-head"><div class="rgal-t">'+L("Tu competencia","Your competition")+
+      '<span class="rgal-sub">'+L("pulsa «Ver métricas» para transcripción y datos","tap «See metrics» for transcript and data")+'</span></div>'+arrows+'</div>'+
+      '<div class="rgal-track crd-track">'+cards+'</div></section>';
   }
   function communityGalleryHTML(){
     return '<section class="rgal"><div class="rgal-head"><div class="rgal-t">'+
