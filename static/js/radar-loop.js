@@ -590,12 +590,14 @@
       '<div class="onb-goals">'+cards+'</div>'+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-goal-next"'+(S.onb.goal?'':' disabled')+'>'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
   }
-  // Paso 7 — CIERRE: Cerebro 50% + primer guión + camino a 100%.
+  // Paso 7 — CIERRE: Cerebro 35% + primer guión + camino a 100%.
+  // Brief David v3: el cierre NO afirma en pasado lo que aún es async (el scrape del
+  // perfil propio + competidores corre en segundo plano) → copy en presente/continuo.
   function onbCloseHTML(){
     var pct=35;
     return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Listo","Ready")+'</div>',
       L("Tu Cerebro ya sabe lo justo para empezar","Your Brain now knows just enough to start"),
-      L("Ya leí tu cuenta y a tus 2 competidores. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía). Cada día, con <b>un ejercicio de 1 minuto</b>, subo un poco más — hasta sonar clavado a ti.","I've read your account and your 2 competitors. Your Brain is a <b>context profile</b> (not a full clone of your voice yet). Each day, with a <b>1-minute exercise</b>, it climbs a bit more — until it sounds just like you."),
+      L("Estoy leyendo tu cuenta y a tus 2 competidores ahora mismo. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía). Cada día, con <b>un ejercicio de 1 minuto</b>, subo un poco más — hasta sonar clavado a ti.","I'm reading your account and your 2 competitors right now. Your Brain is a <b>context profile</b> (not a full clone of your voice yet). Each day, with a <b>1-minute exercise</b>, it climbs a bit more — until it sounds just like you."),
       // v3: anillo del Cerebro al 35% (mismo componente .brain-ring que el Cerebro),
       // en vez de la barra plana — alinea el cierre al design system v3.
       '<div class="onb-brain-ring"><div class="brain-ring">'+
@@ -606,9 +608,9 @@
         '<div class="brain-ring-c"><span class="onb-ring-pct">'+pct+'%</span><span class="brain-ring-lvl">'+L("CEREBRO","BRAIN")+'</span></div>'+
       '</div></div>'+
       '<ul class="onb-checklist">'+
-        '<li>'+IC.check+' '+L("Panel lleno con reels que petan en tu subnicho","Panel full of reels blowing up in your subniche")+'</li>'+
+        '<li>'+IC.check+' '+L("Tu panel llenándose con lo que peta en tu subnicho","Your panel filling with what's blowing up in your subniche")+'</li>'+
         '<li>'+IC.check+' '+L("2 competidores en el radar, trayendo sus reels","2 competitors on your radar, bringing their reels")+'</li>'+
-        '<li>'+IC.check+' '+L("Tu primer guión, esperándote en el radar","Your first script, waiting on your radar")+'</li>'+
+        '<li>'+IC.check+' '+L("Tu primer guión, listo para robar en el radar","Your first script, ready to steal on your radar")+'</li>'+
       '</ul>'+
       '<p class="onb-path">'+L("El resto se gana: <b>enséñame tu voz</b> con tus propios reels y subimos del 35% al 100%.","The rest is earned: <b>teach me your voice</b> with your own reels and we go from 35% to 100%.")+'</p>'+
       onbErr()+
