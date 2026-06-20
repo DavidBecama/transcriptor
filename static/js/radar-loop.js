@@ -4093,7 +4093,7 @@
   // (POST /metrics/analyze-one) y refrescamos las métricas del guion.
   function linkReelPublished(g, url){
     showToast("Analizando tu reel… esto entrena tu Cerebro.");
-    fetch("/metrics/analyze-one",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:url})})
+    fetch("/metrics/analyze-one",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(_pidOf(S.brandId)?{url:url,project_id:_pidOf(S.brandId)}:{url:url})})
       .then(function(r){ return r.json().catch(function(){return{};}); })
       .then(function(d){
         if(d&&d.ok){
@@ -4120,7 +4120,7 @@
   }
   function igConnectWith(u){
     showToast("Conectando @"+u+"…");
-    fetch("/metrics/ig-profile",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u})})
+    fetch("/metrics/ig-profile",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(_pidOf(S.brandId)?{username:u,project_id:_pidOf(S.brandId)}:{username:u})})
       .then(function(r){ return r.json().catch(function(){return{};}); })
       .then(function(d){
         if(d&&d.ok){
@@ -4134,7 +4134,7 @@
   }
   function refreshReels(){
     showToast("Actualizando tus reels…");
-    return fetch("/metrics/analyze",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({})})
+    return fetch("/metrics/analyze",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(_pidOf(S.brandId)?{project_id:_pidOf(S.brandId)}:{})})
       .then(function(r){ return r.json().catch(function(){return{};}); })
       .then(function(d){
         if(d&&d.ok){

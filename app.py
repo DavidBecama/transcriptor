@@ -5111,6 +5111,46 @@ def api_me_overview():
 
 # ── Metrics ──────────────────────────────────────────────────────────────────
 
+# ── FIX1 · Métricas por MARCA ────────────────────────────────────────────────
+# El IG conectado y sus reels pertenecen a la marca (project), no a la cuenta global.
+# Modelo: ig_profiles.project_id (1 perfil de IG por marca); ig_videos cuelga del
+# ig_profile_id → queda auto-scopeado. project_id NULL = cuenta por defecto (creadores
+# de 1 marca y datos previos a la migración). REQUIERE la columna ig_profiles.project_id
+# (migración Supabase en docs/migration-metrics-por-marca.sql).
+def _req_project_id():
+    """project_id de la request (query ?project_id/?brand o body), validado como UUID.
+    'default' o cualquier no-UUID → None (cuenta por defecto)."""
+    pid = request.args.get("project_id") or request.args.get("brand")
+    if not pid:
+        try:
+            _b = request.get_json(silent=True) or {}
+            pid = _b.get("project_id") or _b.get("brand")
+        except Exception:
+            pid = None
+    if not pid:
+        return None
+    try:
+        _uuid.UUID(str(pid))
+        return str(pid)
+    except Exception:
+        return None
+
+
+def _ig_scope(query, pid):
+    """Filtra ig_profiles por marca: project_id = pid, o IS NULL si pid es None."""
+    return query.eq("project_id", pid) if pid else query.is_("project_id", "null")
+
+
+def _get_ig_profile(uid, pid, cols="*"):
+    """Perfil de IG de la MARCA activa (user_id + project_id). None si no hay (o si la
+    columna aún no existe → degradación segura hasta correr la migración)."""
+    try:
+        r = _ig_scope(db.table("ig_profiles").select(cols).eq("user_id", uid), pid).limit(1).execute()
+        return (r.data or [None])[0]
+    except Exception:
+        return None
+
+
 @app.route("/metrics/summary")
 @require_auth
 def metrics_summary():
@@ -5139,11 +5179,8 @@ def metrics_summary():
 
     # IG conectado: el JS hace S.igConnected=(met.connected!==false). Sin este campo
     # quedaba undefined → siempre true → ocultaba la tarjeta "Conecta Instagram".
-    try:
-        ig = db.table("ig_profiles").select("id").eq("user_id", user["id"]).limit(1).execute()
-        connected = bool(ig.data)
-    except Exception:
-        connected = False
+    # connected = la MARCA activa tiene IG vinculado (no la cuenta global).
+    connected = bool(_get_ig_profile(user["id"], project_id, "id"))
 
     return jsonify({
         "total_views": total_views,
@@ -7064,13 +7101,14 @@ def metrics_link_profile():
     if not re.match(r"^[a-zA-Z0-9._]+$", username):
         return jsonify({"error": "Username contiene caracteres inválidos"}), 400
 
-    existing = db.table("ig_profiles").select("id").eq("user_id", user["id"]).execute()
-    if existing.data:
-        return jsonify({"error": "Ya tienes un perfil de Instagram vinculado"}), 409
+    pid = _req_project_id()
+    if _get_ig_profile(user["id"], pid, "id"):
+        return jsonify({"error": "Esta marca ya tiene un perfil de Instagram vinculado"}), 409
 
     row = db.table("ig_profiles").insert({
         "user_id": user["id"],
         "ig_username": username,
+        "project_id": pid,   # la cuenta de IG pertenece a la MARCA activa
     }).execute()
 
     return jsonify({"ok": True, "ig_profile_id": row.data[0]["id"], "ig_username": username})
@@ -7081,8 +7119,8 @@ def metrics_link_profile():
 @limiter.limit("5 per minute")
 def metrics_analyze():
     user = current_user()
-    ig_prof = db.table("ig_profiles").select("*").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_row = _get_ig_profile(user["id"], _req_project_id())
+    if not ig_row:
         return jsonify({"error": "No tienes un perfil de Instagram vinculado"}), 404
 
     profile = get_profile(user["id"])
@@ -7097,8 +7135,8 @@ def metrics_analyze():
     requested = body.get("count")
     if requested and isinstance(requested, int) and 1 <= requested <= max_videos:
         max_videos = requested
-    username = ig_prof.data[0]["ig_username"]
-    ig_profile_id = ig_prof.data[0]["id"]
+    username = ig_row["ig_username"]
+    ig_profile_id = ig_row["id"]
 
     try:
         videos = _scrape_ig_reels([username], limit=max_videos)
@@ -7144,10 +7182,10 @@ def metrics_analyze_one():
     if not reel_url or "instagram.com" not in reel_url:
         return jsonify({"error": "URL de reel inválida"}), 400
 
-    ig_prof = db.table("ig_profiles").select("*").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_row = _get_ig_profile(user["id"], _req_project_id())
+    if not ig_row:
         return jsonify({"error": "No tienes un perfil de Instagram vinculado"}), 404
-    ig_profile_id = ig_prof.data[0]["id"]
+    ig_profile_id = ig_row["id"]
 
     try:
         videos = _scrape_ig_reels([reel_url], limit=1)
@@ -7176,10 +7214,10 @@ def metrics_transcribe_video():
     if not ig_video_id:
         return jsonify({"error": "ig_video_id requerido"}), 400
 
-    ig_prof = db.table("ig_profiles").select("id").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_row = _get_ig_profile(user["id"], _req_project_id(), "id")
+    if not ig_row:
         return jsonify({"error": "No tienes un perfil vinculado"}), 404
-    ig_profile_id = ig_prof.data[0]["id"]
+    ig_profile_id = ig_row["id"]
 
     vid = db.table("ig_videos").select("*").eq("ig_video_id", ig_video_id).eq("ig_profile_id", ig_profile_id).execute()
     if not vid.data:
@@ -7244,11 +7282,10 @@ def metrics_transcribe_video():
 @require_auth
 def metrics_list_videos():
     user = current_user()
-    ig_prof = db.table("ig_profiles").select("*").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_profile = _get_ig_profile(user["id"], _req_project_id())
+    if not ig_profile:
         return jsonify({"ig_profile": None, "videos": []})
 
-    ig_profile = ig_prof.data[0]
     sort_by = request.args.get("sort", "published_at")
     allowed_sorts = {"published_at", "views", "likes", "comments", "shares"}
     if sort_by not in allowed_sorts:
@@ -7282,11 +7319,11 @@ def metrics_list_videos():
 @require_auth
 def metrics_unlink_profile():
     user = current_user()
-    ig_prof = db.table("ig_profiles").select("id").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_row = _get_ig_profile(user["id"], _req_project_id(), "id")
+    if not ig_row:
         return jsonify({"error": "No hay perfil vinculado"}), 404
 
-    ig_profile_id = ig_prof.data[0]["id"]
+    ig_profile_id = ig_row["id"]
     db.table("ig_videos").delete().eq("ig_profile_id", ig_profile_id).execute()
     db.table("ig_profiles").delete().eq("id", ig_profile_id).execute()
 
