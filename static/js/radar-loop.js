@@ -596,8 +596,15 @@
     return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Listo","Ready")+'</div>',
       L("Tu Cerebro ya sabe lo justo para empezar","Your Brain now knows just enough to start"),
       L("Ya leí tu cuenta y a tus 2 competidores. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía). Cada día, con <b>un ejercicio de 1 minuto</b>, subo un poco más — hasta sonar clavado a ti.","I've read your account and your 2 competitors. Your Brain is a <b>context profile</b> (not a full clone of your voice yet). Each day, with a <b>1-minute exercise</b>, it climbs a bit more — until it sounds just like you."),
-      '<div class="onb-brain"><div class="onb-brain-bar"><div class="onb-brain-fill" style="width:'+pct+'%"></div></div>'+
-        '<div class="onb-brain-row"><span class="onb-brain-k">'+IC.brain+' '+L("Cerebro","Brain")+'</span><span class="onb-brain-v">'+pct+'%</span></div></div>'+
+      // v3: anillo del Cerebro al 35% (mismo componente .brain-ring que el Cerebro),
+      // en vez de la barra plana — alinea el cierre al design system v3.
+      '<div class="onb-brain-ring"><div class="brain-ring">'+
+        '<svg width="150" height="150" viewBox="0 0 172 172" class="brain-ring-svg" aria-hidden="true">'+
+          '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
+          '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+Math.round(465*(1-pct/100))+'" class="brain-ring-prog"/>'+
+        '</svg>'+
+        '<div class="brain-ring-c"><span class="onb-ring-pct">'+pct+'%</span><span class="brain-ring-lvl">'+L("CEREBRO","BRAIN")+'</span></div>'+
+      '</div></div>'+
       '<ul class="onb-checklist">'+
         '<li>'+IC.check+' '+L("Panel lleno con reels que petan en tu subnicho","Panel full of reels blowing up in your subniche")+'</li>'+
         '<li>'+IC.check+' '+L("2 competidores en el radar, trayendo sus reels","2 competitors on your radar, bringing their reels")+'</li>'+

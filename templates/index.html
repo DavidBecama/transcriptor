@@ -9912,6 +9912,10 @@
     .rs .onb-brain-row { display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
     .rs .onb-brain-k { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--text-secondary); }
     .rs .onb-brain-v { font-family:var(--font-mono); font-size:15px; font-weight:700; color:var(--brand-500); }
+    /* v3: anillo del Cerebro en el cierre (reusa .brain-ring del Cerebro, tamaño 150). */
+    .rs .onb-brain-ring { display:flex; justify-content:center; margin:6px 0 22px; }
+    .rs .onb-brain-ring .brain-ring { width:150px; height:150px; }
+    .rs .onb-ring-pct { font-family:var(--font-display); font-size:34px; font-weight:600; line-height:1; letter-spacing:-.02em; color:var(--text-primary); }
     .rs[data-theme="light"] .onb-brain-v { color:var(--brand-700); }
     .rs .onb-checklist { list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:9px; }
     .rs .onb-checklist li { display:flex; align-items:flex-start; gap:9px; font-size:14px; color:var(--text-secondary); }
@@ -25207,6 +25211,12 @@ function skipTour() {
   endTour();
 }
 
+// Brief David v3: el house tour se cierra con Esc (además del botón «Saltar» y del
+// clic fuera). Listener único; solo actúa si el tour está activo.
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && tourActive) { e.preventDefault(); skipTour(); }
+});
+
 function endTour() {
   tourActive = false;
   clearHoldWatch();
@@ -26829,6 +26839,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=24"></script>
+<script src="/static/js/radar-loop.js?v=25"></script>
 </body>
 </html>
