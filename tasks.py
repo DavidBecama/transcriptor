@@ -1417,7 +1417,8 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
     GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-    SCRIPT_COST = 18
+    SCRIPT_UNITS = 3                 # econ: 1 guión = 3 créditos (economia-creditos.md)
+    SCRIPT_COST = SCRIPT_UNITS * 18  # 54 cents = 3 créditos
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
     def _fail(error, message):
@@ -1676,8 +1677,13 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             return _fail("llm_error", "No se pudo generar el guion. Inténtalo de nuevo.")
 
         llm_title = ""
-        if isinstance(result, dict) and result.get("title"):
-            llm_title = str(result["title"]).strip()[:80]
+        _alt_hooks = None   # 3 hooks (device distinto): persistimos los 2 alternativos.
+        if isinstance(result, dict):
+            if result.get("title"):
+                llm_title = str(result["title"]).strip()[:80]
+            _ah = result.get("alt_hooks")
+            if isinstance(_ah, list):
+                _alt_hooks = [str(h).strip() for h in _ah if str(h or "").strip()][:4] or None
         if isinstance(result, dict) and "hook" in result:
             flat = (result["hook"] + "\n" +
                     "\n".join(result.get("body", [])) + "\n" +
@@ -1736,6 +1742,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                 "from_competitor_reel_id": reel["id"],
                 "from_competitor_username": ig_username,
                 "assistant_name":         _TASK_LABELS.get(style_label, style_label) if style_label else None,
+                "alt_hooks":              _alt_hooks,   # 2 hooks alternativos (device distinto)
             }).execute()
             if ins.data:
                 script_id = ins.data[0].get("id")
@@ -1749,7 +1756,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         try:
             if is_paid_unlimited:
                 db.table("profiles").update({
-                    "monthly_usage": (profile.get("monthly_usage") or 0) + 1
+                    "monthly_usage": (profile.get("monthly_usage") or 0) + SCRIPT_UNITS
                 }).eq("id", user_id).execute()
             elif _fll and _fll(profile) > 0:
                 # Consumo del free MENSUAL (espejo de app._free_month_consume) con
@@ -1995,7 +2002,8 @@ def adapt_task(text, style, custom_prompt, user_id, charge_mode, cost_cents):
         try:
             fresh = get_profile(user_id)
             if charge_mode == "monthly":
-                db.table("profiles").update({"monthly_usage": (fresh.get("monthly_usage") or 0) + 1}).eq("id", user_id).execute()
+                # econ: guión = 3 créditos (monthly_usage cuenta créditos, no guiones).
+                db.table("profiles").update({"monthly_usage": (fresh.get("monthly_usage") or 0) + 3}).eq("id", user_id).execute()
             elif charge_mode == "credits":
                 db.table("profiles").update({"credits_cents": (fresh.get("credits_cents") or 0) - cost_cents}).eq("id", user_id).execute()
         except Exception as e:
@@ -2009,3 +2017,89 @@ def adapt_task(text, style, custom_prompt, user_id, charge_mode, cost_cents):
         out["credits_cents"] = updated["credits_cents"]
         out["free_used_today"] = updated["free_used_today"]
     return out
+
+
+@celery_app.task(name="tasks.voice_auto_derive")
+def voice_auto_derive_task(uid, email, project_id):
+    """Async «Derivar mi voz de mis reels» (/api/voice/auto-derive). gemini-2.5-pro
+    (modelo de razonamiento) + transcribir reels son lentos (>60s posibles) → Traefik
+    cerraba a 60s. Espejo EXACTO del flujo sync (mismo cobro por transcripción).
+    Devuelve la misma shape que el endpoint sync de antes."""
+    import tempfile
+    from datetime import datetime, timezone
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        from app import (_voice_auto_candidates, get_profile, check_monthly_limit,
+                         download_audio, transcribe_with_groq, derive_voice_profile,
+                         save_voice_profile, get_voice_profile,
+                         COST_CENTS, FREE_DAILY_USER, UNLIMITED_EMAILS, _VOICE_AUTO_SAMPLE,
+                         _voice_reels_used, _voice_mark_reel, credits_available,
+                         _charge_units_locked, VOICE_FREE_REELS, VOICE_REEL_UNITS)
+    except Exception as e:
+        logger.exception("voice_auto_derive_task import failed: %s", e)
+        return {"ok": False, "error": "import", "message": "Servicio no disponible.", "http": 500}
+
+    vids = _voice_auto_candidates(uid)
+    if not vids:
+        return {"ok": False, "error": "no_videos",
+                "message": "No encuentro reels publicados tuyos. Conecta tu Instagram en Métricas.", "http": 404}
+    is_unlimited = (email or "").lower() in UNLIMITED_EMAILS
+    _user = {"id": uid, "email": email}
+    texts, transcribed_now = [], 0
+    for v in vids:
+        txt = (v.get("transcription") or "").strip()
+        if txt:
+            texts.append(txt); continue
+        if not v.get("ig_url"):
+            continue
+        # econ: primeros VOICE_FREE_REELS reels de voz GRATIS (de por vida), luego
+        # VOICE_REEL_UNITS/reel. Sin presupuesto para el siguiente → para.
+        reel_units = 0
+        if not is_unlimited and _voice_reels_used(uid) >= VOICE_FREE_REELS:
+            reel_units = VOICE_REEL_UNITS
+            if credits_available(get_profile(uid)) < reel_units:
+                break
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                audio_path = download_audio(v["ig_url"], tmp, "instagram")
+                txt = transcribe_with_groq(audio_path, None)
+        except Exception as e:
+            logger.warning("voice_auto_derive_task transcribe failed user=%s err=%s", uid, e)
+            continue
+        if not (txt or "").strip():
+            continue
+        try:
+            db.table("ig_videos").update({
+                "transcription": txt,
+                "transcribed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("ig_video_id", v["ig_video_id"]).eq("user_id", uid).execute()
+        except Exception:
+            pass
+        if reel_units and not is_unlimited:
+            _err, _r, _ = _charge_units_locked(uid, reel_units, _user)
+            if _err:
+                break
+        if not is_unlimited:
+            _voice_mark_reel(uid)
+        transcribed_now += 1
+        texts.append(txt)
+
+    if not texts:
+        return {"ok": False, "error": "no_transcripts",
+                "message": "No pude transcribir ninguno de tus reels. Inténtalo de nuevo.", "http": 502}
+    vp = derive_voice_profile(texts[:_VOICE_AUTO_SAMPLE])
+    if not vp:
+        return {"ok": False, "error": "derive_failed",
+                "message": "No pude derivar tu voz con esta muestra. Inténtalo de nuevo.", "http": 502}
+    raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else dict(vp)
+    raw["samples"] = texts[:_VOICE_AUTO_SAMPLE]
+    raw["auto_derived"] = True
+    vp["raw"] = raw
+    save_voice_profile(uid, vp, brand_id=project_id)
+    if project_id and not get_voice_profile(uid):
+        save_voice_profile(uid, vp)
+    return {"ok": True, "confidence": vp.get("confidence"),
+            "source_count": len(texts[:_VOICE_AUTO_SAMPLE]), "transcribed_now": transcribed_now,
+            "tone": vp.get("tone"), "phrases": vp.get("phrases") or [], "evidence": vp.get("evidence") or []}

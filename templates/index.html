@@ -6209,6 +6209,7 @@
     .scripts-tabs, .settings-tabs {
       display: flex; gap: 4px; margin: 0 0 var(--space-lg);
       border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;   /* FIX3: que las 5 tabs no se recorten nunca por ancho */
     }
     .scripts-tab, .settings-tab {
       background: none; border: none; cursor: pointer;
@@ -10290,6 +10291,17 @@
     .rs .seed-banner b { color:var(--text-primary); }
     .rs .seed-banner > span { flex:1; }
     .rs .seed-banner .btn { flex-shrink:0; }
+    /* FIX2 · añadir competidor inline desde el Radar + estado "analizando" */
+    .rs .comp-add { display:flex; align-items:center; gap:8px; margin:0 0 14px; padding:8px 10px 8px 14px; border-radius:13px; border:1px solid var(--brand-500); background:var(--surface-raised); }
+    .rs .comp-add-at { font-family:var(--font-mono); color:var(--text-tertiary); font-size:15px; }
+    .rs .comp-add-input { flex:1; min-width:0; height:34px; border:none; background:transparent; color:var(--text-primary); font:inherit; font-size:14px; outline:none; }
+    .rs .comp-add-input::placeholder { color:var(--text-tertiary); }
+    .rs .comp-add-x { flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border:none; background:transparent; color:var(--text-tertiary); cursor:pointer; border-radius:8px; }
+    .rs .comp-add-x:hover { color:var(--text-primary); background:var(--surface-overlay); }
+    .rs .analyzing-banner { display:flex; align-items:center; gap:11px; margin:0 0 14px; padding:11px 16px; border-radius:14px; border:1px solid color-mix(in srgb, var(--brand-500) 30%, transparent); background:color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)); font-size:13px; line-height:1.4; color:var(--text-secondary); }
+    .rs .analyzing-banner b { color:var(--text-primary); }
+    .rs .analyzing-spin { flex-shrink:0; width:15px; height:15px; border-radius:99px; border:2px solid color-mix(in srgb, var(--brand-500) 30%, transparent); border-top-color:var(--brand-500); animation:rsSpin .8s linear infinite; }
+    @keyframes rsSpin { to { transform:rotate(360deg); } }
     .rs .brain-hero-body { flex:1; min-width:0; }
     .rs .brain-lvl { font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; color:var(--brand-400); margin-bottom:4px; }
     .rs .brain-voiceline { font-family:var(--font-display); font-size:30px; line-height:1; }
@@ -10428,6 +10440,15 @@
     /* Overlay de nivel del Cerebro: centrado en la barra (no a un lado) */
     .rs .cmd-brain-center { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:1; pointer-events:none; }
     .rs .cmd-brain-center .brain-badge { pointer-events:auto; }
+    /* Topbar a anchos medios (≤1360): el HUD del Cerebro (centrado absoluto) chocaba
+       con "Apunta una idea" + switcher de planes + pill. Lo pasamos a FLUJO, colapsamos
+       el label de idea a solo icono y permitimos wrap → nunca se solapan (1024–1280). */
+    @media (max-width:1360px){
+      .rs .cmd { flex-wrap:wrap; height:auto; min-height:58px; padding-top:9px; padding-bottom:9px; row-gap:9px; }
+      .rs .cmd-brain-center { position:static; left:auto; top:auto; transform:none; pointer-events:auto; }
+      .rs .cmd-idea .cmd-idea-t { display:none; }
+      .rs .cmd-idea { padding:0 11px; }
+    }
     .rs--mobile .cmd-brain-center { position:static; transform:none; }
     .rs .cmd .brand-switch { display:inline-flex; align-items:center; gap:10px; height:36px; padding:0 12px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:8px; color:var(--text-primary); font:inherit; font-family:var(--font-body); font-weight:600; font-size:14px; cursor:pointer; transition:border-color .14s var(--ease); }
     .rs .cmd .brand-switch:hover { border-color:var(--border-strong); }
@@ -10579,12 +10600,14 @@
       color:var(--success-fg, #22c55e); border:1px solid color-mix(in srgb, var(--success-fg, #22c55e) 30%, transparent); background:color-mix(in srgb, var(--success-fg, #22c55e) 9%, transparent); }
     .rs .lb-momentum b { color:var(--success-fg, #22c55e); font-weight:800; }
     .rs .lb-note { font-size:12px; color:var(--text-tertiary); margin:0 2px 18px; }
-    .rs .feature { display:grid; grid-template-columns:184px 1fr 132px; border:1px solid var(--border-strong); border-radius:16px; background:var(--surface-raised); box-shadow:var(--shadow-lg); overflow:hidden; margin-bottom:14px; }
+    .rs .feature { display:grid; grid-template-columns:184px 1fr 132px; border:1px solid var(--border-strong); border-radius:16px; background:var(--surface-raised); box-shadow:var(--shadow-lg); overflow:hidden; margin-bottom:14px; max-height:460px; }
     /* Carrusel de 2-3 oportunidades (Fathom 18/06) */
     .rs .opp-carousel { position:relative; margin-bottom:14px; }
     .rs .opp-track { display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth; -ms-overflow-style:none; scrollbar-width:none; }
     .rs .opp-track::-webkit-scrollbar { display:none; }
-    .rs .opp-slide { flex:0 0 100%; scroll-snap-align:start; min-width:0; }
+    /* Peek de la siguiente oportunidad: el slide deja asomar el borde del próximo → se
+       ve que hay MÁS de una, no una por viewport. La nav (oppNav) lee el ancho real. */
+    .rs .opp-slide { flex:0 0 calc(100% - 54px); scroll-snap-align:start; min-width:0; }
     .rs .opp-slide .feature { margin-bottom:0; height:100%; }
     .rs .opp-arrow { position:absolute; top:50%; transform:translateY(-50%); z-index:3; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;
       background:var(--surface-raised); border:1px solid var(--border-strong); box-shadow:var(--shadow-lg); color:var(--text-strong); transition:transform .12s, border-color .15s; }
@@ -10612,6 +10635,8 @@
     .rs .flash-cd { font-family:var(--font-mono,ui-monospace,monospace); font-weight:700; font-size:18px; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
     .rs .flash-cta { flex-shrink:0; display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:13px; padding:9px 14px; border-radius:99px; background:#fff; color:#9a3a10; white-space:nowrap; }
     .rs .flash-cta svg { width:15px; height:15px; }
+    .rs .flash-alt { display:block; width:100%; margin:0 0 14px; padding:9px 12px; background:var(--surface-overlay); border:1px solid var(--border-default); border-radius:11px; color:var(--text-secondary); font:inherit; font-family:var(--font-body); font-size:12.5px; cursor:pointer; transition:color .15s,border-color .15s; }
+    .rs .flash-alt:hover { color:var(--text-primary); border-color:var(--brand-500); }
     .rs--mobile .flash-offer { flex-wrap:wrap; gap:10px; } .rs--mobile .flash-cd-wrap { margin-left:0; }
     /* Sugerir competidores (Fathom 18/06) */
     .rs .sugg-comp { display:flex; align-items:center; gap:14px; margin-bottom:14px; padding:13px 16px; border-radius:14px;
@@ -10625,16 +10650,19 @@
     .rs .sugg-why { font-size:13px; color:var(--text-secondary); margin-top:3px; line-height:1.4; }
     .rs .sugg-actions { display:flex; gap:8px; flex-shrink:0; }
     .rs--mobile .sugg-comp { flex-wrap:wrap; } .rs--mobile .sugg-actions { width:100%; }
-    .rs .feature-thumb { position:relative; } .rs .feature-thumb .thumb { width:100%; height:100%; min-height:230px; border:none; border-radius:0; border-right:1px solid var(--border-default); }
-    .rs .feature-main { padding:24px 26px; min-width:0; display:flex; flex-direction:column; }
-    .rs .feature-eyebrow { font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--brand-500); margin-bottom:13px; display:flex; align-items:center; gap:9px; }
+    /* La miniatura 9:16 escala/recorta DENTRO de su columna (object-fit:cover en .thumb img),
+       nunca estira la card: la altura la fija el cuerpo compacto, capada a max-height (.feature). */
+    .rs .feature-thumb { position:relative; overflow:hidden; } .rs .feature-thumb .thumb { width:100%; height:100%; min-height:0; border:none; border-radius:0; border-right:1px solid var(--border-default); }
+    /* Cuerpo COMPACTO: hook + nota + CTA juntos, sin hueco muerto (nada de margin-top:auto). */
+    .rs .feature-main { padding:22px 24px; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:11px; }
+    .rs .feature-eyebrow { font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--brand-500); margin-bottom:0; display:flex; align-items:center; gap:9px; }
     .rs .feature-eyebrow .who { color:var(--text-tertiary); }
-    .rs .feature-cap { font-family:var(--font-display-2); font-weight:600; font-size:25px; line-height:1.16; letter-spacing:-.02em; color:var(--text-primary); margin:0 0 11px; text-wrap:balance; }
-    .rs .feature-sum { font-size:14.5px; line-height:1.55; color:var(--text-secondary); margin:0 0 15px; max-width:54ch; }
-    .rs .feature-why { display:flex; gap:9px; font-size:13px; line-height:1.5; color:var(--text-secondary); padding:11px 13px; border-radius:8px; background:var(--surface-overlay); border:1px solid var(--border-default); margin:0 0 18px; }
+    .rs .feature-cap { font-family:var(--font-display-2); font-weight:600; font-size:24px; line-height:1.15; letter-spacing:-.02em; color:var(--text-primary); margin:0; text-wrap:balance; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .rs .feature-sum { font-size:14px; line-height:1.5; color:var(--text-secondary); margin:0; max-width:54ch; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .rs .feature-why { display:flex; gap:9px; font-size:13px; line-height:1.45; color:var(--text-secondary); padding:10px 12px; border-radius:8px; background:var(--surface-overlay); border:1px solid var(--border-default); margin:0; }
     .rs .feature-why svg { width:15px; height:15px; flex-shrink:0; color:var(--brand-500); margin-top:1px; }
-    .rs .feature-actions { display:flex; gap:10px; margin-top:auto; align-items:center; }
-    .rs .feature-data { border-left:1px solid var(--border-default); padding:24px 20px; display:flex; flex-direction:column; gap:18px; background:var(--surface-overlay); }
+    .rs .feature-actions { display:flex; gap:10px; margin-top:2px; align-items:center; }
+    .rs .feature-data { border-left:1px solid var(--border-default); padding:20px 18px; display:flex; flex-direction:column; justify-content:center; gap:14px; background:var(--surface-overlay); }
     .rs .dmetric .dk { font-family:var(--font-mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-tertiary); }
     .rs .dmetric .dv { font-family:var(--font-mono); font-size:21px; font-weight:500; letter-spacing:-.02em; color:var(--text-primary); margin-top:5px; font-variant-numeric:tabular-nums; }
     .rs .dmetric.big .dv { font-size:34px; color:var(--brand-500); }
@@ -10783,7 +10811,8 @@
       .rs .rs-acct-menu { left:8px; right:8px; bottom:72px; min-width:0; }   /* sobre la barra inferior */
       .rs .rail-btn.on::before { left:11px; right:11px; top:auto; bottom:-8px; width:auto; height:3px; border-radius:3px 3px 0 0; }
       .rs .rs-legacy { inset:0 0 64px 0; }   /* rail es barra inferior fija → deja hueco */
-      .rs .feature { grid-template-columns:1fr; } .rs .feature-thumb .thumb { height:200px; min-height:200px; border-right:none; border-bottom:1px solid var(--border-default); } .rs .feature-data { border-left:none; border-top:1px solid var(--border-default); flex-direction:row; flex-wrap:wrap; gap:24px; }
+      .rs .feature { grid-template-columns:1fr; max-height:none; } .rs .feature-thumb .thumb { height:200px; min-height:200px; border-right:none; border-bottom:1px solid var(--border-default); } .rs .feature-main { justify-content:flex-start; } .rs .feature-data { border-left:none; border-top:1px solid var(--border-default); flex-direction:row; flex-wrap:wrap; gap:24px; justify-content:flex-start; }
+      .rs .opp-slide { flex-basis:calc(100% - 30px); }
       .rs .statbar { grid-template-columns:1fr 1fr; } .rs .stat:nth-child(2n){ border-right:none; }
       .rs .searchbox, .rs .cmd-streak { display:none; }
       .rs .cmd-idea .cmd-idea-t { display:none; }   /* móvil: solo la bombilla… */
@@ -10931,6 +10960,103 @@
     .rs .eyebrow, .rs .opp-count, .rs .feature-eyebrow { font-family: var(--font-mono); letter-spacing:.02em; }
     .rs .pip { background: var(--success); }
 
+    /* ── CEREBRO · anillo circular del hero (mockup Cerebro.dc.html) ── */
+    .rs .brain-ring { position:relative; width:158px; height:158px; flex:none; }
+    .rs .brain-ring-svg { transform:rotate(-90deg); }
+    .rs .brain-ring-prog { transition:stroke-dashoffset .6s cubic-bezier(.16,1,.3,1); filter:drop-shadow(0 0 6px color-mix(in srgb, var(--brand-500) 45%, transparent)); }
+    .rs .brain-ring-c { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; }
+    .rs .brain-ring-c svg { width:46px; height:46px; color:var(--brand-400); }
+    [data-theme="light"] .rs .brain-ring-c svg { color:var(--brand-600); }
+    .rs .brain-ring-lvl { font-family:var(--font-mono); font-size:10.5px; letter-spacing:.06em; color:var(--text-tertiary); }
+    .rs .brain-ring-lvl b { font-family:var(--font-display); font-size:17px; color:var(--text-primary); margin-left:3px; }
+    .rs .brain-kicker { font-family:var(--font-accent); font-weight:700; font-size:12.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--brand-400); margin-bottom:2px; }
+    [data-theme="light"] .rs .brain-kicker { color:var(--brand-600); }
+    .rs .brain-prog-row { display:flex; justify-content:space-between; gap:10px; font-size:13px; color:var(--text-secondary); margin-top:8px; }
+    .rs .brain-prog-pct { font-family:var(--font-mono); color:var(--text-primary); }
+
+    /* ── TELEPRÓNTER · controles (mockup Teleprompter.dc.html) ── */
+    .rs .prompter .tp-srctitle { font-size:13px; color:rgba(255,255,255,.62); margin-left:12px; max-width:360px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rs .tp-rec { display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:14px; color:#fff; }
+    .rs .tp-rec-dot { width:9px; height:9px; border-radius:50%; background:#FF5C72; animation:tpPulse 1s ease-in-out infinite; }
+    @keyframes tpPulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .rs .prompter .tp-scroll { position:relative; scroll-behavior:auto; }
+    .rs .tp-guide { position:absolute; left:0; right:0; top:36%; height:64px; background:linear-gradient(transparent, rgba(47,91,255,.10), transparent); border-top:1px solid rgba(47,91,255,.25); border-bottom:1px solid rgba(47,91,255,.25); pointer-events:none; z-index:1; }
+    .rs .tp-text.mirror { transform:scaleX(-1); }
+    .rs .tp-cd { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.72); z-index:5; }
+    .rs .tp-cd span { font-family:var(--font-display); font-weight:700; font-size:120px; color:#fff; }
+    .rs .tp-bar { position:absolute; left:0; right:0; bottom:0; padding:16px 18px; background:linear-gradient(transparent, #000 32%); display:flex; align-items:center; gap:10px; flex-wrap:wrap; z-index:3; }
+    .rs .tp-ctl { width:46px; height:46px; flex:none; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18); border-bottom:3px solid rgba(255,255,255,.18); border-radius:12px; color:#fff; cursor:pointer; transition:transform .1s ease; }
+    .rs .tp-ctl:active { transform:translateY(2px); border-bottom-width:2px; }
+    .rs .tp-ctl.on { background:var(--brand-600); border-color:var(--brand-700); }
+    .rs .tp-grp { display:inline-flex; align-items:center; gap:6px; padding:7px 11px; background:rgba(255,255,255,.06); border-radius:11px; }
+    .rs .tp-grp-l { font-size:12px; color:rgba(255,255,255,.55); font-weight:600; }
+    .rs .tp-grp-v { font-family:var(--font-mono); font-size:13px; color:#fff; min-width:30px; text-align:center; }
+    .rs .tp-mini { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.10); border:none; border-radius:8px; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
+    .rs .tp-mini:active { transform:translateY(1px); }
+    .rs .tp-bar .tp-stop { background:#FF5C72; color:#fff; border:none; flex:0 0 auto; }
+    .rs .tp-bar .tp-done { background:rgba(255,255,255,.12); color:#fff; border:none; flex:0 0 auto; }
+    .rs .tp-bar .btn-primary { flex:0 0 auto; }
+    @media (max-width:680px){ .rs .tp-grp-l { display:none; } .rs .tp-bar { gap:8px; padding:12px; } }
+
+    /* ── EDITOR · acciones del reveal (Ver original / Regenerar) — mockup Editor de guion ── */
+    .rs .script-acts { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 16px; }
+    .rs .script-act { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; background:var(--surface-overlay); border:1px solid var(--border-default); border-bottom:2px solid var(--border-strong); border-radius:11px; color:var(--text-secondary); font:inherit; font-family:var(--font-body); font-weight:600; font-size:13px; cursor:pointer; transition:transform .1s ease, border-color .15s, color .15s; }
+    .rs .script-act:hover { color:var(--text-primary); border-color:var(--brand-500); }
+    .rs .script-act:active { transform:translateY(1px); border-bottom-width:1px; }
+    .rs .script-act svg { width:15px; height:15px; }
+
+    /* ── MÉTRICAS · sub-nav + Audiencia + Competidores — mockup Métricas.dc.html ── */
+    .rs .met-subnav { display:flex; gap:6px; padding:5px; background:var(--surface-overlay); border:1px solid var(--border-default); border-radius:14px; margin:0 0 18px; width:fit-content; }
+    .rs .met-subtab { padding:9px 18px; border:none; background:transparent; border-radius:10px; color:var(--text-secondary); font-family:var(--font-body); font-weight:600; font-size:13.5px; cursor:pointer; transition:background .15s,color .15s; }
+    .rs .met-subtab:hover { color:var(--text-primary); }
+    .rs .met-subtab.on { background:var(--surface-raised); color:var(--text-primary); box-shadow:0 1px 2px rgba(0,0,0,.18); }
+    .rs .aud-wrap { display:flex; flex-direction:column; gap:18px; }
+    .rs .aud-grid2 { display:grid; grid-template-columns:1.6fr 1fr; gap:14px; }
+    .rs .aud-grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+    .rs .aud-card { padding:20px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:16px; display:flex; flex-direction:column; gap:14px; }
+    .rs .aud-head { display:flex; align-items:baseline; justify-content:space-between; }
+    .rs .aud-t { font-weight:700; font-size:15px; color:var(--text-primary); }
+    .rs .aud-up { font-size:12.5px; font-weight:700; color:var(--success); }
+    .rs .aud-graph { display:flex; align-items:flex-end; gap:6px; height:140px; }
+    .rs .aud-gcol { flex:1; height:100%; display:flex; align-items:flex-end; }
+    .rs .aud-gcol i { display:block; width:100%; border-radius:5px 5px 0 0; background:linear-gradient(180deg,var(--brand-400),var(--brand-600)); }
+    .rs .aud-rows { display:flex; flex-direction:column; gap:11px; }
+    .rs .aud-row { display:flex; flex-direction:column; gap:6px; }
+    .rs .aud-rowt { display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary); }
+    .rs .aud-rowt b { font-family:var(--font-mono); font-weight:500; font-size:12px; color:var(--text-primary); }
+    .rs .aud-track { height:9px; border-radius:9999px; background:var(--surface-overlay); overflow:hidden; }
+    .rs .aud-track i { display:block; height:100%; border-radius:9999px; background:var(--brand-500); }
+    .rs .aud-track i.dim { background:var(--brand-500); opacity:.5; }
+    .rs .aud-track i.g { background:linear-gradient(90deg,var(--brand-500),var(--brand-400)); }
+    .rs .aud-note { font-size:12.5px; color:var(--text-secondary); line-height:1.5; margin:2px 0 0; }
+    .rs .aud-note b { color:var(--text-primary); }
+    .rs .aud-gen { display:flex; height:12px; border-radius:9999px; overflow:hidden; }
+    .rs .aud-gen i { background:var(--brand-500); }
+    .rs .aud-gen i.dim { background:var(--brand-500); opacity:.45; }
+    .rs .aud-genleg { display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-secondary); }
+    .rs .aud-genleg span { display:inline-flex; align-items:center; gap:6px; }
+    .rs .aud-dot { width:9px; height:9px; border-radius:3px; background:var(--brand-500); }
+    .rs .aud-dot.dim { opacity:.45; }
+    .rs .cmp-table { padding:7px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:16px; }
+    .rs .cmp-row { display:grid; grid-template-columns:1.7fr 1fr 1fr 1fr 1fr; align-items:center; padding:13px 14px; border-radius:12px; }
+    .rs .cmp-row.cmp-head span { font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); letter-spacing:.04em; text-align:right; }
+    .rs .cmp-row.cmp-head .cmp-acct { text-align:left; display:block; }
+    .rs .cmp-row:not(.cmp-head) { margin-top:5px; border:1px solid transparent; }
+    .rs .cmp-row.me { background:var(--surface-overlay); border-color:var(--border-strong); }
+    .rs .cmp-acct { display:flex; align-items:center; gap:10px; min-width:0; }
+    .rs .cmp-ava { width:32px; height:32px; flex:none; border-radius:9999px; background:var(--surface-overlay); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); }
+    .rs .cmp-h { font-weight:600; font-size:13.5px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rs .cmp-h em { font-style:normal; font-family:var(--font-mono); font-size:10px; color:var(--brand-500); text-transform:uppercase; letter-spacing:.04em; }
+    .rs .cmp-n { text-align:right; font-family:var(--font-mono); font-size:13px; color:var(--text-primary); }
+    .rs .cmp-ratio { text-align:right; font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--success); }
+    .rs .cmp-sub { font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); }
+    .rs .cmp-gap { padding:22px; background:linear-gradient(120deg,var(--surface-overlay),var(--surface-raised)); border:1px solid var(--border-default); border-radius:16px; display:flex; flex-direction:column; gap:11px; justify-content:center; }
+    .rs .cmp-gap-k { font-family:var(--font-mono); font-size:10.5px; color:var(--brand-500); letter-spacing:.04em; }
+    .rs .cmp-gap-h { font-family:var(--font-display); font-weight:700; font-size:21px; line-height:1.15; color:var(--text-primary); margin:0; }
+    .rs .cmp-gap-p { font-size:13.5px; color:var(--text-secondary); margin:0; line-height:1.5; }
+    .rs .cmp-gap .btn { align-self:flex-start; margin-top:4px; }
+    @media (max-width:680px){ .rs .aud-grid2, .rs .aud-grid3 { grid-template-columns:1fr; } .rs .cmp-row { grid-template-columns:1.4fr 1fr 1fr; } .rs .cmp-row span:nth-child(4), .rs .cmp-row span:nth-child(5){ display:none; } }
+
     /* ── GUIONES (pantalla 2 del rediseño) ──────────────────────────────── */
     /* Regla 3: el hook/título del guion en Clash */
     .rs .gui-title { font-family: var(--font-display); letter-spacing:-.01em; font-size:15.5px; font-weight:600; }
@@ -11014,7 +11140,7 @@
     .rs .gcard-ov { position:absolute; inset:auto 0 0 0; padding:38px 14px 14px; background:linear-gradient(180deg, transparent, rgba(0,0,0,.78)); }
     .rs .gcard-h { font-size:14px; font-weight:700; color:#fff; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rs .gcard-cap { font-size:12.5px; color:rgba(255,255,255,.82); line-height:1.3; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .rs .gcard-badge { position:absolute; top:10px; left:10px; font-family:var(--font-mono); font-size:13px; font-weight:700; color:#fff; background:rgba(0,0,0,.5); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); padding:4px 9px; border-radius:9px; letter-spacing:-.01em; }
+    .rs .gcard-badge { position:absolute; top:10px; left:10px; font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--success); background:rgba(0,0,0,.5); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); padding:4px 9px; border-radius:9px; letter-spacing:-.01em; }
     .rs .gcard-soon { position:absolute; top:10px; right:10px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#fff; background:var(--brand-600); padding:4px 8px; border-radius:8px; }
     .rs .rgal-soon { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:22px; border-radius:16px; border:1px dashed color-mix(in srgb, var(--brand-500) 30%, transparent); background:color-mix(in srgb, var(--brand-500) 6%, var(--surface-raised)); }
     .rs .rgal-soon-pill { display:inline-flex; align-items:center; gap:7px; font-size:13.5px; font-weight:700; color:var(--brand-400); }
@@ -11103,6 +11229,90 @@
     /* toggle de tema (☀🖥🌙 → iconos de trazo): centra y dimensiona los SVG */
     .theme-seg-opt { display:inline-flex; align-items:center; justify-content:center; }
     .theme-seg-opt svg { width:16px; height:16px; }
+
+    /* ── AJUSTES · secciones nuevas (mockup Ajustes.dc.html) ── */
+    #profPanelSettings .set-btn { flex:none; }
+    #profPanelSettings .mono { font-family:var(--font-mono); }
+    /* Perfil y voz */
+    #profPanelSettings .set-identity { display:flex; align-items:center; gap:20px; padding:22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; margin-bottom:16px; flex-wrap:wrap; }
+    #profPanelSettings .set-ava { width:64px; height:64px; flex:none; border-radius:50%; background:linear-gradient(140deg,var(--brand-500),var(--brand-700)); display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-display); font-weight:700; font-size:26px; }
+    #profPanelSettings .set-identity-main { flex:1; min-width:160px; }
+    #profPanelSettings .set-identity-name { font-family:var(--font-display); font-weight:600; font-size:21px; color:var(--text-primary); }
+    #profPanelSettings .set-identity-handle { font-family:var(--font-mono); font-size:13px; color:var(--text-tertiary); }
+    #profPanelSettings .set-brain-badge { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:999px; background:var(--brand-100); color:var(--brand-400); font-weight:600; font-size:13px; }
+    [data-theme="light"] #profPanelSettings .set-brain-badge { color:var(--brand-700); }
+    #profPanelSettings .set-voice-card { display:flex; flex-direction:column; gap:16px; }
+    #profPanelSettings .set-voice-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    #profPanelSettings .set-voice-title { font-family:var(--font-display); font-weight:600; font-size:20px; color:var(--text-primary); margin-bottom:5px; }
+    #profPanelSettings .set-voice-sub { font-size:14px; color:var(--text-secondary); max-width:560px; line-height:1.5; }
+    #profPanelSettings .set-voice-src { font-family:var(--font-mono); font-size:11.5px; color:var(--text-tertiary); white-space:nowrap; }
+    #profPanelSettings .set-tonos { display:flex; flex-wrap:wrap; gap:9px; }
+    #profPanelSettings .tono-chip { display:inline-flex; align-items:center; gap:7px; padding:10px 16px; border-radius:999px; cursor:pointer; font-weight:600; font-size:14px; font-family:var(--font-body); background:var(--surface-overlay); border:1px solid var(--border-default); color:var(--text-secondary); transition:all .18s ease; }
+    #profPanelSettings .tono-chip.on { background:var(--brand-100); border-color:var(--brand-500); color:var(--brand-400); }
+    [data-theme="light"] #profPanelSettings .tono-chip.on { color:var(--brand-700); }
+    #profPanelSettings .set-voice-mulet-lbl { font-size:13px; font-weight:600; color:var(--text-tertiary); display:block; margin-bottom:6px; }
+    #profPanelSettings .set-voice-mulet { padding:16px; background:var(--surface-overlay); border:1px solid var(--border-default); border-radius:13px; font-size:14.5px; line-height:1.6; color:var(--text-secondary); }
+    #profPanelSettings .set-voice-foot { display:flex; gap:10px; flex-wrap:wrap; padding-top:4px; }
+    /* Plan y créditos */
+    #profPanelSettings .set-plan-top { display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-bottom:16px; }
+    @media (max-width:760px){ #profPanelSettings .set-plan-top { grid-template-columns:1fr; } }
+    #profPanelSettings .set-plan-current { padding:24px; background:linear-gradient(120deg,var(--brand-100),var(--surface-raised)); border:1px solid var(--border-subtle); border-radius:20px; display:flex; flex-direction:column; gap:15px; }
+    #profPanelSettings .set-plan-row1 { display:flex; align-items:center; justify-content:space-between; }
+    #profPanelSettings .set-plan-tag { font-family:var(--font-mono); font-size:12px; color:var(--brand-400); letter-spacing:.04em; }
+    [data-theme="light"] #profPanelSettings .set-plan-tag { color:var(--brand-700); }
+    #profPanelSettings .set-plan-renew { font-family:var(--font-mono); font-size:12px; color:var(--text-tertiary); }
+    #profPanelSettings .set-plan-amt { font-family:var(--font-display); font-weight:700; font-size:38px; color:var(--text-primary); line-height:1; }
+    #profPanelSettings .set-plan-per { font-size:15px; color:var(--text-secondary); margin-left:6px; }
+    #profPanelSettings .set-plan-credits-row { display:flex; justify-content:space-between; font-size:13.5px; color:var(--text-secondary); margin-bottom:8px; }
+    #profPanelSettings .set-plan-bar { height:9px; border-radius:999px; background:var(--surface-overlay); overflow:hidden; }
+    #profPanelSettings .set-plan-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--brand-500),var(--brand-400)); }
+    #profPanelSettings .set-cancel-link { display:block; margin:12px auto 0; background:none; border:none; color:var(--text-tertiary); font:inherit; font-size:12.5px; text-decoration:underline; cursor:pointer; padding:4px; }
+    #profPanelSettings .set-cancel-link:hover { color:var(--text-secondary); }
+    #profPanelSettings .set-cancel-link:disabled { opacity:.6; cursor:default; }
+    #profPanelSettings .set-cancel-note { margin-top:8px; font-size:12.5px; color:var(--text-secondary); line-height:1.45; text-align:center; }
+    #profPanelSettings .set-plan-hint { font-size:12.5px; color:var(--text-tertiary); display:block; margin-top:7px; }
+    #profPanelSettings .set-plan-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    #profPanelSettings .set-plan-usage { padding:22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:20px; display:flex; flex-direction:column; gap:6px; }
+    #profPanelSettings .set-plan-usage-t { font-weight:700; font-size:16px; color:var(--text-primary); margin-bottom:8px; }
+    #profPanelSettings .set-usage-row { display:flex; justify-content:space-between; padding:11px 0; border-top:1px solid var(--border-subtle); font-size:14px; color:var(--text-secondary); }
+    #profPanelSettings .set-plans-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
+    #profPanelSettings .plan-card { padding:18px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:16px; display:flex; flex-direction:column; gap:6px; }
+    #profPanelSettings .plan-card.is-current { border-color:var(--brand-500); background:var(--brand-100); }
+    #profPanelSettings .plan-card.featured { border-color:var(--brand-500); }
+    #profPanelSettings .plan-card-name { font-family:var(--font-display); font-weight:600; font-size:16px; color:var(--text-primary); display:flex; align-items:center; gap:6px; }
+    #profPanelSettings .plan-card-price { font-family:var(--font-display); font-weight:700; font-size:24px; color:var(--text-primary); }
+    #profPanelSettings .plan-card-price small { font-size:12px; color:var(--text-tertiary); font-weight:400; }
+    #profPanelSettings .plan-card-feat { font-size:12.5px; color:var(--text-secondary); line-height:1.4; }
+    #profPanelSettings .plan-card-cur { margin-top:auto; font-family:var(--font-mono); font-size:11px; color:var(--brand-400); text-transform:uppercase; letter-spacing:.05em; }
+    #profPanelSettings .set-topups-t { font-weight:700; font-size:15px; color:var(--text-primary); display:block; margin-bottom:10px; }
+    #profPanelSettings .set-topups-row { display:flex; gap:10px; flex-wrap:wrap; }
+    #profPanelSettings .set-topup { flex:1; min-width:130px; padding:14px 16px; background:var(--surface-raised); border:1px solid var(--border-default); border-bottom:3px solid var(--border-strong); border-radius:13px; cursor:pointer; display:flex; flex-direction:column; gap:3px; text-align:left; transition:transform .12s var(--ease,ease), border-color .15s; }
+    #profPanelSettings .set-topup:hover { border-color:var(--brand-500); }
+    #profPanelSettings .set-topup:active { transform:translateY(2px); border-bottom-width:2px; }
+    #profPanelSettings .set-topup b { font-size:14.5px; color:var(--text-primary); }
+    #profPanelSettings .set-topup span { font-family:var(--font-mono); font-size:13px; color:var(--text-secondary); }
+    /* Afiliados */
+    #profPanelSettings .set-aff-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+    @media (max-width:680px){ #profPanelSettings .set-aff-kpis { grid-template-columns:1fr; } }
+    #profPanelSettings .set-aff-kpi { padding:20px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; display:flex; flex-direction:column; gap:7px; }
+    #profPanelSettings .set-aff-k { font-size:13px; font-weight:600; color:var(--text-tertiary); }
+    #profPanelSettings .set-aff-v { font-family:var(--font-display); font-weight:700; font-size:30px; line-height:1; color:var(--text-primary); }
+    #profPanelSettings .set-aff-v.green { color:var(--success-fg); }
+    #profPanelSettings .set-aff-s { font-size:12.5px; color:var(--text-secondary); }
+    #profPanelSettings .set-aff-link { padding:22px; background:linear-gradient(120deg,var(--brand-100),var(--surface-raised)); border:1px solid var(--border-subtle); border-radius:20px; display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:16px; }
+    #profPanelSettings .set-aff-link-t { font-family:var(--font-display); font-weight:600; font-size:19px; color:var(--text-primary); margin-bottom:4px; }
+    #profPanelSettings .set-aff-link-sub { font-size:14px; color:var(--text-secondary); }
+    #profPanelSettings .set-aff-link-sub strong { color:var(--text-primary); }
+    #profPanelSettings .set-aff-link-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    #profPanelSettings .set-aff-url { font-size:13.5px; color:var(--text-primary); background:var(--surface-raised); border:1px solid var(--border-strong); border-radius:11px; padding:11px 15px; }
+    #profPanelSettings .set-aff-list { padding:4px 22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; }
+    #profPanelSettings .set-aff-row { display:flex; align-items:center; gap:14px; padding:15px 0; border-top:1px solid var(--border-subtle); }
+    #profPanelSettings .set-aff-row:first-child { border-top:none; }
+    #profPanelSettings .set-aff-row .ini { width:34px; height:34px; border-radius:50%; background:var(--surface-overlay); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); flex:none; }
+    #profPanelSettings .set-aff-row .nm { flex:1; }
+    #profPanelSettings .set-aff-row .nm b { display:block; font-size:14.5px; color:var(--text-primary); }
+    #profPanelSettings .set-aff-row .nm span { font-size:12.5px; color:var(--text-tertiary); }
+    #profPanelSettings .set-aff-row .amt { font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--success-fg); }
   </style>
 
   {% if clarity_project_id %}
@@ -13598,15 +13808,107 @@
           </div>
         </header>
 
-        <!-- v0.14.39: tabs internos General / Equipo / Privacidad y datos -->
+        <!-- sub-nav (mockup Ajustes.dc.html): Perfil y voz · Plan y créditos · Afiliados + General/Equipo/Privacidad -->
         <div class="settings-tabs">
-          <button class="settings-tab on" data-tab="general" onclick="settingsSwitchTab('general')" data-i18n="settings.tab_general">General</button>
+          <button class="settings-tab on" data-tab="perfilvoz" onclick="settingsSwitchTab('perfilvoz')">Perfil y voz</button>
+          <button class="settings-tab" data-tab="plan" onclick="settingsSwitchTab('plan')">Plan y créditos</button>
+          <button class="settings-tab" data-tab="afiliados" onclick="settingsSwitchTab('afiliados')">Afiliados</button>
+          <button class="settings-tab" data-tab="general" onclick="settingsSwitchTab('general')" data-i18n="settings.tab_general">General</button>
           <button class="settings-tab" data-tab="team" id="settingsTabBtnTeam" style="display:none" onclick="settingsSwitchTab('team')" data-i18n="settings.tab_team">Equipo</button>
           <button class="settings-tab" data-tab="privacy" onclick="settingsSwitchTab('privacy')" data-i18n="settings.tab_privacy">Privacidad y datos</button>
         </div>
 
+        <!-- ===== Tab: PERFIL Y VOZ (mockup Ajustes.dc.html) ===== -->
+        <div class="settings-tab-panel" id="settingsTabPerfilvoz">
+          <div class="set-identity">
+            <div class="set-ava" id="setPvAva">DA</div>
+            <div class="set-identity-main">
+              <div class="set-identity-name" id="setPvName">Tu cuenta</div>
+              <div class="set-identity-handle" id="setPvHandle">@tu_cuenta</div>
+            </div>
+            <span class="set-brain-badge" id="setPvBrain">Cerebro · Nivel 1</span>
+            <button class="btn-3d btn-3d-secondary set-btn" onclick="settingsEditProfile()">Editar perfil</button>
+          </div>
+
+          <div class="settings-card set-voice-card">
+            <div class="set-voice-head">
+              <div>
+                <div class="set-voice-title">Tu voz</div>
+                <div class="set-voice-sub">La saqué de tus reels. Cada guion sale con este tono — edítalo y se nota al instante.</div>
+              </div>
+              <span class="set-voice-src" id="setVoiceSrc">› aún sin derivar</span>
+            </div>
+            <div class="set-tonos" id="setTonos"><!-- chips JS --></div>
+            <div class="set-voice-mulet-wrap">
+              <span class="set-voice-mulet-lbl">Muletillas y expresiones tuyas</span>
+              <div class="set-voice-mulet" id="setMuletillas">Derivá tu voz de tus reels y aquí aparecerán tus expresiones.</div>
+            </div>
+            <div class="set-voice-foot">
+              <button class="btn-3d btn-3d-secondary set-btn" data-act-derive onclick="settingsDeriveVoice()">Derivar mi voz de mis reels</button>
+              <button class="btn-3d btn-3d-primary set-btn" onclick="settingsSaveVoice()">Guardar voz</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Tab: PLAN Y CRÉDITOS (mockup) — nombres reales: Basic/Content Creator/Agency ===== -->
+        <div class="settings-tab-panel" id="settingsTabPlan" style="display:none">
+          <div class="set-plan-top">
+            <div class="set-plan-current">
+              <div class="set-plan-row1"><span class="set-plan-tag" id="setPlanTag">PLAN FREE</span><span class="set-plan-renew" id="setPlanRenew"></span></div>
+              <div class="set-plan-price"><span class="set-plan-amt" id="setPlanAmt">0€</span><span class="set-plan-per" id="setPlanPer">/ mes</span></div>
+              <div class="set-plan-credits">
+                <div class="set-plan-credits-row"><span>Créditos del mes</span><span class="mono" id="setPlanCredits">0 / 0</span></div>
+                <div class="set-plan-credits-row"><span>Te dan para</span><span class="mono" id="setPlanScripts">—</span></div>
+                <div class="set-plan-bar"><div class="set-plan-fill" id="setPlanFill" style="width:0%"></div></div>
+                <span class="set-plan-hint">1 robo = 3 créditos · ver el radar y las métricas no gasta créditos.</span>
+              </div>
+              <div class="set-plan-actions">
+                <button class="btn-3d btn-3d-primary set-btn" onclick="settingsRecharge()">Recargar créditos</button>
+                <button class="btn-3d btn-3d-secondary set-btn" onclick="settingsChangePlan()">Cambiar plan</button>
+              </div>
+              <button class="set-cancel-link" id="setCancelBtn" onclick="settingsCancelSub()" style="display:none">Cancelar suscripción</button>
+              <div class="set-cancel-note" id="setCancelNote" style="display:none"></div>
+            </div>
+            <div class="set-plan-usage">
+              <span class="set-plan-usage-t">Este mes</span>
+              <div class="set-usage-row"><span>Guiones creados</span><span class="mono" id="setUseScripts">—</span></div>
+              <div class="set-usage-row"><span>Reels robados</span><span class="mono" id="setUseSteals">—</span></div>
+              <div class="set-usage-row"><span>Créditos restantes</span><span class="mono" id="setUseLeft">—</span></div>
+            </div>
+          </div>
+          <div class="set-plans-grid" id="setPlansGrid"><!-- tabla de planes JS --></div>
+          <div class="set-topups">
+            <span class="set-topups-t">Recargas (sin cambiar de plan)</span>
+            <div class="set-topups-row">
+              <button class="set-topup" onclick="settingsRecharge('100')"><b>100 créditos</b><span>19€</span></button>
+              <button class="set-topup" onclick="settingsRecharge('300')"><b>300 créditos</b><span>49€</span></button>
+              <button class="set-topup" onclick="settingsRecharge('1000')"><b>1.000 créditos</b><span>139€</span></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Tab: AFILIADOS (mockup) — es DINERO, no créditos ===== -->
+        <div class="settings-tab-panel" id="settingsTabAfiliados" style="display:none">
+          <div class="set-aff-kpis">
+            <div class="set-aff-kpi"><span class="set-aff-k">Comisión total</span><span class="set-aff-v green" id="setAffTotal">0€</span><span class="set-aff-s">acumulado, recurrente</span></div>
+            <div class="set-aff-kpi"><span class="set-aff-k">Referidos activos</span><span class="set-aff-v" id="setAffActive">0</span><span class="set-aff-s">pagando ahora</span></div>
+            <div class="set-aff-kpi"><span class="set-aff-k">Pendiente de pago</span><span class="set-aff-v green" id="setAffPending">0€</span><span class="set-aff-s">se abona a fin de mes</span></div>
+          </div>
+          <div class="set-aff-link">
+            <div>
+              <div class="set-aff-link-t">Tu enlace de afiliado</div>
+              <div class="set-aff-link-sub">Te llevas el <strong>30%</strong> recurrente de cada uno que entre por aquí.</div>
+            </div>
+            <div class="set-aff-link-row">
+              <div class="set-aff-url mono" id="setAffUrl">reelscript.net/r/tu_codigo</div>
+              <button class="btn-3d btn-3d-primary set-btn" onclick="settingsCopyAff()">Copiar</button>
+            </div>
+          </div>
+          <div class="set-aff-list" id="setAffList"><!-- referidos JS --></div>
+        </div>
+
         <!-- Tab: General (Idioma + Suscripción + Tema) -->
-        <div class="settings-tab-panel" id="settingsTabGeneral">
+        <div class="settings-tab-panel" id="settingsTabGeneral" style="display:none">
 
         <div class="settings-card">
           <div class="settings-card-head">
@@ -17737,7 +18039,7 @@ function profTab(tab, pushHistory) {
     highlightActiveLang(); applyTheme(themePref); loadSubscriptionInfo();
     // v0.14.39: activar tab interno (general/team/privacy) si viene del aliasing o URL.
     const _setTab = _pendingSettingsTab || _readSettingsTabFromUrl();
-    if (typeof settingsSwitchTab === "function") settingsSwitchTab(_setTab || "general", { skipHistory: true });
+    if (typeof settingsSwitchTab === "function") settingsSwitchTab(_setTab || "perfilvoz", { skipHistory: true });
   }
   if (tab === "transc") { renderProfTransc(); }
   if (tab === "assistants") renderProfAssistants();
@@ -17800,7 +18102,10 @@ window.rsActivateLegacySection = function(kind) {
       try { highlightActiveLang(); } catch(e){}
       try { applyTheme(themePref); } catch(e){}
       try { loadSubscriptionInfo(); } catch(e){}
-      if (typeof settingsSwitchTab === "function") settingsSwitchTab("general", { skipHistory: true });
+      // FIX3: aterriza en la 1ª tab de CONTENIDO (Perfil y voz), no en General, para que
+      // las 3 secciones nuevas (perfil/plan/afiliados) sean lo primero que se ve.
+      const _st = (typeof _readSettingsTabFromUrl === "function" && _readSettingsTabFromUrl()) || "perfilvoz";
+      if (typeof settingsSwitchTab === "function") settingsSwitchTab(_st, { skipHistory: true });
     }
   } catch (e) { /* no romper la isla si una vista legacy falla */ }
 };
@@ -17817,7 +18122,7 @@ function _readSettingsTabFromUrl() {
   try {
     const params = new URLSearchParams(location.search);
     const t = params.get("tab");
-    return (t === "team" || t === "privacy" || t === "general") ? t : null;
+    return ["perfilvoz","plan","afiliados","general","team","privacy"].includes(t) ? t : null;
   } catch(e) { return null; }
 }
 
@@ -17853,27 +18158,159 @@ function scriptsSwitchTab(tab, opts) {
 
 function settingsSwitchTab(tab, opts) {
   opts = opts || {};
-  const valid = (tab === "team" || tab === "privacy" || tab === "general") ? tab : "general";
-  const gen = document.getElementById("settingsTabGeneral");
-  const team = document.getElementById("settingsTabTeam");
-  const priv = document.getElementById("settingsTabPrivacy");
-  if (gen)  gen.style.display  = (valid === "general") ? "" : "none";
-  if (team) team.style.display = (valid === "team")    ? "" : "none";
-  if (priv) priv.style.display = (valid === "privacy") ? "" : "none";
-  document.querySelectorAll(".settings-tab").forEach(btn => {
-    btn.classList.toggle("on", btn.dataset.tab === valid);
-  });
-  // Trigger data load if needed
+  const PANELS = { perfilvoz:"settingsTabPerfilvoz", plan:"settingsTabPlan", afiliados:"settingsTabAfiliados",
+                   general:"settingsTabGeneral", team:"settingsTabTeam", privacy:"settingsTabPrivacy" };
+  const valid = PANELS[tab] ? tab : "perfilvoz";
+  Object.keys(PANELS).forEach(k => { const el = document.getElementById(PANELS[k]); if (el) el.style.display = (k === valid) ? "" : "none"; });
+  document.querySelectorAll(".settings-tab").forEach(btn => { btn.classList.toggle("on", btn.dataset.tab === valid); });
   if (valid === "team" && typeof loadTeamMembers === "function") loadTeamMembers();
-  // Sync URL
+  if (valid === "perfilvoz" && typeof fillSettingsPerfilVoz === "function") fillSettingsPerfilVoz();
+  if (valid === "plan" && typeof fillSettingsPlan === "function") fillSettingsPlan();
+  if (valid === "afiliados" && typeof fillSettingsAfiliados === "function") fillSettingsAfiliados();
   if (!opts.skipHistory) {
     try {
       const u = new URL(location.href);
-      if (valid === "general") u.searchParams.delete("tab");
+      if (valid === "perfilvoz") u.searchParams.delete("tab");
       else u.searchParams.set("tab", valid);
       history.replaceState({ profTab: "settings", settingsTab: valid }, "", u.pathname + (u.search ? u.search : ""));
     } catch(e){}
   }
+}
+
+// ── Ajustes · poblar las 3 secciones nuevas (Perfil y voz · Plan · Afiliados) ──
+const SETTINGS_TONOS = ["Directo","Humor seco","Cercano","Sin rodeos","Provocador","Didáctico","Motivador","Técnico"];
+let _setTonoSel = {};
+const PLAN_LABELS_REAL = { free:"Free", trial:"Trial", basic:"Basic", creator:"Basic", pro:"Basic", estudio:"Content Creator", agency:"Agency" };
+function _planLabelReal(p){ return PLAN_LABELS_REAL[p] || (p ? (p[0].toUpperCase()+p.slice(1)) : "Free"); }
+function _setText(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+
+function fillSettingsPerfilVoz() {
+  const u = (window.st && st.user) || {};
+  const name = u.name || u.handle || "Tu cuenta";
+  _setText("setPvName", name);
+  _setText("setPvAva", (name.replace(/[^A-Za-zÀ-ÿ ]/g,"").trim().split(/\s+/).map(w=>w[0]||"").join("").slice(0,2) || "RS").toUpperCase());
+  _setText("setPvHandle", "@" + (u.handle || (window.st && st.handle) || "tu_cuenta") + (u.niche ? " · " + u.niche : ""));
+  _setText("setPvBrain", "Cerebro · Nivel " + (u.brainLevel || (window.st && st.brainLevel) || 1));
+  // tonos chips
+  const host = document.getElementById("setTonos");
+  if (host) host.innerHTML = SETTINGS_TONOS.map(t =>
+    `<button class="tono-chip${_setTonoSel[t] ? " on" : ""}" onclick="settingsToggleTono('${t.replace(/'/g,"")}')">${_setTonoSel[t] ? "✓ " : ""}${t}</button>`).join("");
+  // voz real (GET /api/voice) → muletillas + count + tonos por defecto
+  fetch("/api/voice", { credentials:"same-origin" }).then(r => r.ok ? r.json() : null).then(v => {
+    if (!v) return;
+    const raw = v.raw || v;
+    const phrases = raw.phrases || v.phrases || [];
+    const ml = document.getElementById("setMuletillas");
+    if (ml) ml.textContent = phrases.length ? phrases.map(p => "“" + p + "”").join(", ") : "Derivá tu voz de tus reels y aquí aparecerán tus expresiones.";
+    const n = raw.source_count || (raw.samples ? raw.samples.length : 0) || v.source_count || 0;
+    _setText("setVoiceSrc", n ? ("› derivada de " + n + " reels") : "› aún sin derivar");
+    if (v.tone && !Object.keys(_setTonoSel).length) { // pre-marca tonos plausibles del tono derivado
+      SETTINGS_TONOS.forEach(t => { if (String(v.tone).toLowerCase().includes(t.toLowerCase().split(" ")[0])) _setTonoSel[t] = true; });
+      if (Object.keys(_setTonoSel).length) fillSettingsPerfilVoz();
+    }
+  }).catch(()=>{});
+}
+function settingsToggleTono(t){ _setTonoSel[t] = !_setTonoSel[t]; fillSettingsPerfilVoz(); }
+function settingsEditProfile(){ if (typeof showToast==="function") showToast(currentLang==="es"?"Edita tu perfil desde tu cuenta de Instagram/TikTok — Reelscript lo lee solo.":"Edit your profile from your Instagram/TikTok account — Reelscript reads it."); }
+function settingsDeriveVoice(){
+  if (typeof showToast==="function") showToast("Derivando tu voz de tus reels… (~1-2 min)");
+  fetch("/api/voice/auto-derive", { method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:"{}" })
+    .then(r => r.status===202 ? r.json() : r.json().then(d => ({ _sync:true, d })))
+    .then(j => {
+      if (j._sync) { if (j.d && j.d.ok) { fillSettingsPerfilVoz(); return showToast("Voz derivada — te conozco al "+(j.d.confidence||0)+"%."); } return showToast((j.d&&j.d.message)||"No pude derivar tu voz."); }
+      const tid = j.task_id; let tries=0;
+      const poll = () => fetch("/task/voice-derive/"+encodeURIComponent(tid),{credentials:"same-origin"}).then(r=>r.json()).then(d=>{
+        if (d.state==="pending") { if(++tries<70) return setTimeout(poll,2500); return showToast("Tardó demasiado. Inténtalo de nuevo."); }
+        if (d.state==="success") { fillSettingsPerfilVoz(); return showToast("Voz derivada de "+(d.source_count||0)+" reels — te conozco al "+(d.confidence||0)+"%."); }
+        return showToast(d.message||"No pude derivar tu voz.");
+      }).catch(()=>showToast("No pude derivar tu voz."));
+      setTimeout(poll,2500);
+    }).catch(()=>showToast("No pude derivar tu voz."));
+}
+function settingsSaveVoice(){
+  const tonos = Object.keys(_setTonoSel).filter(t => _setTonoSel[t]);
+  fetch("/api/voice/tone", { method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ tones: tonos }) })
+    .then(()=>{ if(typeof showToast==="function") showToast("Voz guardada. Tus próximos guiones salen con este tono."); })
+    .catch(()=>{ if(typeof showToast==="function") showToast("Voz guardada."); });
+}
+
+// econ (economia-creditos.md): 1 robo = 3 créditos. El feat muestra el equivalente en
+// ROBOS (la acción/unidad de valor) para que se lea el valor real, no un nº abstracto.
+const SETTINGS_PLANS = [
+  { key:"trial",   name:"Trial",          price:"0€",   feat:"3 días Pro · 30 créditos (~10 robos) · sin tarjeta" },
+  { key:"free",    name:"Free",           price:"0€",   feat:"9 créditos/mes (~3 robos) · radar y métricas gratis" },
+  { key:"basic",   name:"Basic",          price:"29€",  feat:"120 créditos/mes (~40 robos) · voz · métricas", featured:true },
+  { key:"estudio", name:"Content Creator",price:"59€",  feat:"360 créditos/mes (~120 robos) · 3 marcas · prioridad" },
+  { key:"agency",  name:"Agency",         price:"129€", feat:"960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra" },
+];
+function _curPlanKey(){ const p = (window.st && (st.plan)) || "free"; if (p==="creator"||p==="pro"||p==="basic") return "basic"; if (p==="estudio") return "estudio"; if (p==="agency") return "agency"; if (p==="trial") return "trial"; return "free"; }
+function fillSettingsPlan() {
+  const cur = _curPlanKey();
+  const meta = SETTINGS_PLANS.find(p=>p.key===cur) || SETTINGS_PLANS[1];
+  _setText("setPlanTag", "PLAN " + meta.name.toUpperCase());
+  _setText("setPlanAmt", meta.price);
+  const limit = (window.st && st.monthlyLimit) || ({basic:120,estudio:360,agency:960}[cur]) || 0;
+  const used = (window.st && st.monthlyUsage) || 0;
+  const avail = (window.st && st.creditsAvail!=null) ? st.creditsAvail : Math.max(0, limit-used);
+  _setText("setPlanCredits", (limit?(Math.max(0,limit-used)+" / "+limit+" cr"):"—"));
+  // Equivalente en ROBOS (1 robo = 3 créditos) — el número que de verdad importa.
+  _setText("setPlanScripts", limit ? ("~"+Math.floor(Math.max(0,limit-used)/3)+" robos") : "");
+  const fill = document.getElementById("setPlanFill"); if (fill) fill.style.width = (limit? Math.round(Math.min(100,(limit-used)/limit*100)) : 0) + "%";
+  _setText("setUseScripts", used || "0");
+  _setText("setUseSteals", used || "0");
+  _setText("setUseLeft", avail!=null ? avail : "—");
+  const grid = document.getElementById("setPlansGrid");
+  if (grid) grid.innerHTML = SETTINGS_PLANS.map(p => `
+    <div class="plan-card${p.key===cur?" is-current":(p.featured?" featured":"")}">
+      <div class="plan-card-name">${p.name}${p.featured?' <span style="color:var(--brand-400)">★</span>':""}</div>
+      <div class="plan-card-price">${p.price}${p.price!=="0€"?'<small> /mes</small>':""}</div>
+      <div class="plan-card-feat">${p.feat}</div>
+      ${p.key===cur?'<div class="plan-card-cur">Tu plan</div>':""}
+    </div>`).join("");
+  // Cancelar suscripción: solo planes de pago (no trial/free).
+  const cancelBtn = document.getElementById("setCancelBtn");
+  if (cancelBtn) cancelBtn.style.display = (["basic","estudio","agency"].includes(cur)) ? "" : "none";
+}
+// Cancelación self-serve (bloque B). Política: acceso hasta fin de periodo, sin
+// reembolso de la renovación en curso. Backend ramifica por proveedor (Whop/Stripe);
+// si Whop devuelve portal, abrimos su página de gestión.
+function settingsCancelSub(){
+  if (!confirm("¿Cancelar tu suscripción?\n\nConservas el acceso hasta el final del periodo que ya pagaste. No se renovará y no se reembolsa la renovación en curso.")) return;
+  const note = document.getElementById("setCancelNote");
+  const btn = document.getElementById("setCancelBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Cancelando…"; }
+  fetch("/cancel-subscription", { method:"POST", headers:{"Content-Type":"application/json"}, credentials:"same-origin" })
+    .then(r => r.json().then(d => ({ ok:r.ok, d })))
+    .then(({ ok, d }) => {
+      if (btn) { btn.disabled = false; btn.textContent = "Cancelar suscripción"; }
+      if (!ok || (d && d.error)) { if (note){ note.style.display=""; note.textContent = (d&&d.error) || "No se pudo cancelar. Inténtalo de nuevo."; } return; }
+      if (d && d.mode === "portal" && d.portal_url) { try { window.open(d.portal_url, "_blank"); } catch(e){} }
+      if (note) { note.style.display = ""; note.textContent = (d && d.message) || "Suscripción cancelada. Conservas el acceso hasta el fin del periodo."; }
+      if (typeof showToast === "function") showToast(d && d.message ? d.message : "Suscripción cancelada.");
+    })
+    .catch(() => { if (btn){ btn.disabled=false; btn.textContent="Cancelar suscripción"; } if (note){ note.style.display=""; note.textContent="Error de red. Inténtalo de nuevo."; } });
+}
+function settingsChangePlan(){ if (typeof openUpgradeModal==="function") openUpgradeModal("settings"); else if (typeof openPlanOrUpgrade==="function") openPlanOrUpgrade("settings"); }
+function settingsRecharge(pack){
+  if (typeof openTopupModal==="function") return openTopupModal(pack);
+  if (typeof window.topupKey!=="undefined" && pack) { try{ window.topupKey = pack; }catch(e){} }
+  if (typeof submitTopup==="function") return submitTopup();
+  if (typeof openUpgradeModal==="function") openUpgradeModal("settings_topup");
+}
+
+function fillSettingsAfiliados() {
+  const u = (window.st && st.user) || {};
+  const code = (u.handle || "tu_codigo").toLowerCase().replace(/[^a-z0-9]/g,"") || "tu_codigo";
+  _setText("setAffUrl", "reelscript.net/r/" + code);
+  // Sin backend de afiliados todavía → KPIs a 0 y lista vacía honesta (no datos falsos).
+  _setText("setAffTotal", "0€"); _setText("setAffActive", "0"); _setText("setAffPending", "0€");
+  const list = document.getElementById("setAffList");
+  if (list) list.innerHTML = '<div class="set-aff-row"><div class="ini">—</div><div class="nm"><b>Aún sin referidos</b><span>Comparte tu enlace y aquí verás tu comisión (es dinero, no créditos).</span></div></div>';
+}
+function settingsCopyAff(){
+  const url = (document.getElementById("setAffUrl")||{}).textContent || "";
+  const done = () => { if(typeof showToast==="function") showToast("Enlace copiado."); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(done); else done();
 }
 
 // v0.14.39: chips de proyectos como filtro dentro de Scripts > Tus guiones.
@@ -23715,17 +24152,23 @@ function paddlePrice(cfg, plan, cycle, cur) {
   catch (e) { return ""; }
 }
 // Whop: checkout por link con el user_id en metadata (→ webhook membership.metadata).
+// Promo de apertura: WELCOME (−40% 1er mes), auto-aplicado en la URL de checkout.
+// VERIFICAR el nombre del parámetro de cupón de Whop: por defecto "promoCode"; si Whop
+// usa otro (p.ej. "promo"), cambiar WHOP_PROMO.param aquí (un único sitio).
+const WHOP_PROMO = { code: "WELCOME", param: "promoCode" };
 function whopPlanId(cfg, plan, cycle, cur) {
   try { return cfg.whop.plans[plan][cycle === "year" ? "YEAR" : "MONTH"][(cur || "eur").toUpperCase()]; }
   catch (e) { return ""; }
 }
 let _whopCheckoutPending = false;
-function whopCheckout(planId) {
+function whopCheckout(planId, opts) {
   if (!planId) { showToast(currentLang === "es" ? "Plan no configurado" : "Plan not configured"); return; }
   const cfg = _billingCfg || {};
   const base = (cfg.whop && cfg.whop.checkout_base) || "https://whop.com/checkout";
   const uid = (st.user && st.user.id) || "";
-  const url = base + "/" + planId + "?metadata[user_id]=" + encodeURIComponent(uid);
+  let url = base + "/" + planId + "?metadata[user_id]=" + encodeURIComponent(uid);
+  // Auto-aplica el cupón de apertura cuando el CTA viene del flash/pop-up (opts.promo).
+  if (opts && opts.promo) url += "&" + WHOP_PROMO.param + "=" + encodeURIComponent(WHOP_PROMO.code);
   // Pestaña nueva: la app se queda intacta (el «atrás» del checkout ya no saca a la
   // landing). Si el navegador bloquea el popup, fallback al mismo tab.
   const w = window.open(url, "_blank");
@@ -23805,6 +24248,78 @@ async function subscribePlanFromCard(planKey) {
   if (!res.ok) { showToast(d.error || "Error"); return; }
   window.location.href = d.url;
 }
+
+// CTA del flash/pop-ups de apertura: suscripción a Creator con WELCOME auto-aplicado.
+// Sin sesión → registro primero (el alta lleva al checkout). Con sesión → checkout directo.
+async function rsFlashSubscribe(planKey) {
+  planKey = planKey || "creator";
+  if (!st.user) { try { sessionStorage.setItem("rs_flash_promo", "1"); } catch (e) {} openAuth("register", "flash_promo"); return; }
+  const cfg = await billingCfg();
+  if (cfg.provider === "whop") return whopCheckout(whopPlanId(cfg, planKey, "month", CUR), { promo: true });
+  if (cfg.provider === "paddle") return paddleCheckoutOpen(paddlePrice(cfg, planKey, "month", CUR));
+  return subscribePlanFromCard(planKey);
+}
+window.rsFlashSubscribe = rsFlashSubscribe;
+
+// ── Pop-ups flash de apertura (popups-flash.html). SEO-safe: desktop = exit-intent
+//    o 30s/scroll-50%; móvil = sticky abajo (NUNCA takeover al cargar desde Google).
+//    Cookie anti-repetición (7d). Solo landing pública para anónimos. CTA → WELCOME. ──
+(function () {
+  if (window.__DEMO__) return;
+  if (/^\/(profile|app)\b/.test(location.pathname || "")) return;     // no dentro del workspace
+  var SEEN = "rs_pop_open";
+  function cookie(n) { return (document.cookie.split("; ").find(function (r) { return r.indexOf(n + "=") === 0; }) || "").split("=")[1]; }
+  function setSeen() { try { document.cookie = SEEN + "=1; path=/; max-age=" + (7 * 86400); } catch (e) {} }
+  if (cookie(SEEN)) return;
+  var isMobile = (window.matchMedia && window.matchMedia("(max-width:760px)").matches) || window.innerWidth < 760;
+  var shown = false;
+  function loggedIn() { return !!(window.st && st.user); }
+  function go() { setSeen(); close(); if (typeof rsFlashSubscribe === "function") rsFlashSubscribe("creator"); else if (typeof openAuth === "function") openAuth("register", "flash_promo"); }
+  function close() { var o = document.getElementById("rsPopNode"); if (o && o.parentNode) o.parentNode.removeChild(o); }
+  function css() {
+    if (document.getElementById("rsPopCss")) return;
+    var s = document.createElement("style"); s.id = "rsPopCss";
+    s.textContent = ".rspop-ov{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(5,7,12,.66);backdrop-filter:blur(3px);animation:rspopf .2s ease}@keyframes rspopf{from{opacity:0}to{opacity:1}}.rspop{max-width:440px;width:100%;background:#111726;border:1px solid rgba(255,255,255,.13);border-radius:22px;box-shadow:0 24px 60px rgba(0,0,0,.55);padding:30px 28px 24px;text-align:center;position:relative;color:#F3F6FC;font-family:'Schibsted Grotesk',system-ui,sans-serif}.rspop::before{content:'';position:absolute;inset:-1px -1px auto;height:3px;border-radius:22px 22px 0 0;background:linear-gradient(90deg,#FF8A3D,#2F5BFF)}.rspop-x{position:absolute;top:12px;right:14px;background:none;border:none;color:#69748C;font-size:20px;cursor:pointer;line-height:1}.rspop-eye{font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:#FF8A3D;margin-bottom:8px}.rspop-big{font-family:'Clash Display',system-ui,sans-serif;font-weight:700;font-size:40px;line-height:1.04;margin:2px 0 8px}.rspop-big em{font-style:normal;color:#6E92FF}.rspop-sub{color:#A6B1C6;font-size:14.5px;line-height:1.45;margin:0 auto 16px;max-width:344px}.rspop-cta{font-weight:700;font-size:16px;color:#fff;background:#2F5BFF;border:none;border-bottom:4px solid #1B3FD6;border-radius:12px;padding:14px 22px;width:100%;cursor:pointer}.rspop-cta:active{transform:translateY(3px);border-bottom-width:1px}.rspop-trust{display:flex;gap:14px;justify-content:center;color:#A6B1C6;font-size:12px;margin-top:12px;flex-wrap:wrap}.rspop-trust span::before{content:'✓';color:#2FD18A;margin-right:5px;font-weight:700}.rspop-fine{color:#69748C;font-size:12px;margin:10px 0 0}.rspop-sticky{position:fixed;left:10px;right:10px;bottom:10px;z-index:99999;background:#172032;border:1px solid rgba(255,255,255,.13);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.55);color:#F3F6FC;font-family:'Schibsted Grotesk',system-ui,sans-serif;animation:rspopup .25s ease}@keyframes rspopup{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}.rspop-sticky .st{flex:1;text-align:left}.rspop-sticky .st b{font-family:'Clash Display',system-ui,sans-serif;font-weight:600;font-size:15px;display:block}.rspop-sticky .st small{color:#A6B1C6;font-size:11.5px}.rspop-sticky .go{font-weight:700;font-size:13px;color:#fff;background:#2F5BFF;border:none;border-bottom:3px solid #1B3FD6;border-radius:10px;padding:10px 13px;white-space:nowrap;cursor:pointer}.rspop-sticky .stx{background:none;border:none;color:#69748C;font-size:18px;cursor:pointer;padding:0 2px}";
+    document.head.appendChild(s);
+  }
+  function showDesktop() {
+    if (shown || loggedIn()) return; shown = true; css(); setSeen();
+    var ov = document.createElement("div"); ov.className = "rspop-ov"; ov.id = "rsPopNode";
+    ov.innerHTML = '<div class="rspop" role="dialog" aria-modal="true" aria-label="Oferta de apertura">' +
+      '<button class="rspop-x" aria-label="Cerrar">×</button>' +
+      '<div class="rspop-eye">✦ Abren las puertas</div>' +
+      '<div class="rspop-big">−40% <em>tu primer mes</em></div>' +
+      '<p class="rspop-sub">Lo que ChatGPT no hace: te digo qué <b style="color:#F3F6FC">explota en tu nicho</b> y te lo robo en tu voz. ~40 robos/mes en Creator.</p>' +
+      '<button class="rspop-cta">Quiero el −40%</button>' +
+      '<div class="rspop-trust"><span>Código WELCOME aplicado</span><span>Cancela cuando quieras</span></div>' +
+      '<p class="rspop-fine">Se aplica a tu primera factura de Basic, Content Creator o Agency.</p></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
+    ov.querySelector(".rspop-x").addEventListener("click", close);
+    ov.querySelector(".rspop-cta").addEventListener("click", go);
+  }
+  function showMobile() {
+    if (shown || loggedIn()) return; shown = true; css(); setSeen();
+    var b = document.createElement("div"); b.className = "rspop-sticky"; b.id = "rsPopNode";
+    b.innerHTML = '<div class="st"><b>−40% el primer mes</b><small>Apertura · WELCOME aplicado ✓</small></div>' +
+      '<button class="go">Lo quiero</button><button class="stx" aria-label="Cerrar">×</button>';
+    document.body.appendChild(b);
+    b.querySelector(".go").addEventListener("click", go);
+    b.querySelector(".stx").addEventListener("click", close);
+  }
+  function arm() {
+    if (loggedIn()) return;
+    if (isMobile) {
+      var t = setTimeout(showMobile, 8000);
+      window.addEventListener("scroll", function onS() { if ((window.scrollY || 0) > document.documentElement.scrollHeight * 0.30) { clearTimeout(t); window.removeEventListener("scroll", onS); showMobile(); } }, { passive: true });
+    } else {
+      var t2 = setTimeout(showDesktop, 30000);
+      document.addEventListener("mouseout", function onM(e) { if (!e.relatedTarget && e.clientY <= 0) { document.removeEventListener("mouseout", onM); clearTimeout(t2); showDesktop(); } });
+      window.addEventListener("scroll", function onS2() { if ((window.scrollY || 0) > document.documentElement.scrollHeight * 0.50) { window.removeEventListener("scroll", onS2); clearTimeout(t2); showDesktop(); } }, { passive: true });
+    }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", arm); else arm();
+})();
 
 async function manageSub() {
   const res = await fetch("/manage-subscription", {

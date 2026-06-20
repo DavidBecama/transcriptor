@@ -99,12 +99,40 @@ def track_event(event, distinct_id, properties=None):
         _t(event, distinct_id, properties or {})
     except Exception:
         pass
+    # econ: el primer muro arranca el flash del Pack 300 (48h). Un solo chokepoint.
+    if event == "paywall_shown" and distinct_id:
+        try:
+            _mark_first_wall(distinct_id)
+        except Exception:
+            pass
 
 FREE_DAILY_ANON  = 5   # transcripciones gratis para anónimos
 FREE_DAILY_USER  = 5   # transcripciones gratis para registrados
 FREE_DAILY_ADAPT = 0   # v0.19: "Hazlo tuyo" (adapt) es de compromiso → cuesta créditos/plan
                        # (política A3: transcribir = gancho gratis; adapt/Hazlo mío = cuesta)
 COST_CENTS       = 18   # $0.18 por uso de pago (~7 usos por $1.29)
+
+# ── Economía de créditos (economia-creditos.md, 2026-06-20) ───────────────────
+# Moneda única = crédito (1 crédito = COST_CENTS de saldo). 1 guión = 3 créditos:
+# el ×3 da granularidad (regenerar y hooks cuestan menos que un guión entero).
+# Los sinks de "mirar" (Radar, métricas, refresh diario) son GRATIS por diseño.
+SCRIPT_UNITS          = 3    # generar guión (Roba la idea / desde idea / desde competidor)
+REGEN_UNITS           = 1    # regenerar guión (re-tira del mismo reel)
+HOOKS_EXTRA_UNITS     = 1    # "3 hooks más" tras agotar el cupo diario gratis
+HOOKS_FREE_PER_DAY    = 2    # hooks-extra gratis por usuario y día
+FILL_WEEK_UNITS       = 12   # "Llena mi semana" (5 guiones de golpe; vs 15 sueltos)
+ADD_COMPETITOR_UNITS  = 2    # añadir competidor NUEVO más allá del cupo del plan
+VOICE_FREE_REELS      = 5    # primeros reels de voz gratis (llegar al aha sin fricción)
+VOICE_REEL_UNITS      = 2    # por reel de voz transcrito tras el cupo gratis
+AGENCY_EXTRA_BRAND_CREDITS = 96   # +96 cr/mes por marca extra de Agencia (+10€/marca)
+
+# Flash por-usuario (economia-creditos.md §4): tras chocar el PRIMER muro, el Pack 300
+# baja a TOPUP_FLASH_EUR € (vs 49 €) durante TOPUP_FLASH_HOURS h. Urgencia + ancla.
+# El price del checkout a 29 € lo crea David en Whop → env WHOP_TOPUP_300_FLASH_*; si no
+# está, la oferta se MUESTRA pero el checkout cae al pack normal (degradado seguro).
+TOPUP_FLASH_PACK      = "300"
+TOPUP_FLASH_EUR       = 29
+TOPUP_FLASH_HOURS     = 48
 
 UNLIMITED_EMAILS = {"davidmiragito@gmail.com"}  # sin límite ni coste
 
@@ -160,11 +188,12 @@ def admin_required(f):
 # (1 «Hazlo mío» · 3 análisis · 1 competidor — nada resetea).
 PLANS = {
     "free": {
-        "credits_month": 0,
+        # econ 2026-06-20 (economia-creditos.md): Free 9 cr/mes ≈ 3 guiones (guión=3cr).
+        "credits_month": 9,
         # reverse-trial: tras los 7 días de Pro, el FREE es MENSUAL (resetea cada mes),
         # ya no una cata de por vida. Contadores: free_lifetime_uses=guiones del mes,
         # free_analysis_uses=análisis del mes (reset por free_month_reset_at).
-        "free_scripts_monthly": 2,     # 2 "Hazlo mío"/mes
+        "free_scripts_monthly": 3,     # 3 "Hazlo mío"/mes (= 9 cr a 3 cr/guion)
         "free_analysis_monthly": 3,    # 3 análisis (transcripciones)/mes
         "monthly_uses": 0,             # → PLAN_LIMITS None (sin límite mensual; usa los free_*_monthly)
         "daily_free": 0,
@@ -178,10 +207,10 @@ PLANS = {
         "support": None,
     },
     "creator": {
-        "credits_month": 100,
+        "credits_month": 120,
         "price_month_eur": 29,
         "price_year_eur": 276,
-        "monthly_uses": 200,           # 200 créditos/mes
+        "monthly_uses": 120,           # econ: 120 cr/mes ≈ 40 guiones (guión=3cr)
         "daily_free": 0,
         "scripts_max": None,           # ilimitado
         "projects_max": None,
@@ -195,10 +224,10 @@ PLANS = {
     # Estudio (nuevo): puente 29→129. "creador pro" para quien factura: 3 marcas
     # y más créditos. Precio anual por defecto (~20% off → 47€/mes).
     "estudio": {
-        "credits_month": 200,
+        "credits_month": 360,
         "price_month_eur": 59,
         "price_year_eur": 564,         # 47€/mes facturado anual (~20% off)
-        "monthly_uses": 400,           # 400 créditos/mes (el doble que Creator)
+        "monthly_uses": 360,           # econ: 360 cr/mes ≈ 120 guiones (~120/marca · 3 marcas)
         "daily_free": 0,
         "scripts_max": None,
         "projects_max": 3,             # 3 marcas
@@ -211,10 +240,10 @@ PLANS = {
         "name": "Estudio",
     },
     "agency": {
-        "credits_month": 500,
+        "credits_month": 960,
         "price_month_eur": 129,
         "price_year_eur": 1290,
-        "monthly_uses": 800,           # pool 800 créditos/mes (cuenta, no por marca)
+        "monthly_uses": 960,           # econ: 960 cr/mes ≈ 320 guiones (~96/marca · 10) · +96 cr/marca extra
         "daily_free": 0,
         "scripts_max": None,
         # base 10 marcas; +10€/marca extra. NOTA: la compra per-marca (Stripe)
@@ -270,7 +299,7 @@ PLAN_LIMITS = {p: v["monthly_uses"] or None for p, v in PLANS.items()}
 # como backstop total del trial (= 5×3). NO toca los planes de pago.
 TRIAL_DAYS = 5
 TRIAL_DAILY_SCRIPTS = 3      # tope de guiones/día durante el trial (reset diario, UTC)
-TRIAL_CREDIT_CAP = 15        # backstop total del trial (= TRIAL_DAYS × TRIAL_DAILY_SCRIPTS)
+TRIAL_CREDIT_CAP = 30        # econ: 30 cr ≈ 10 guiones (guión=3cr) de prueba
 TRIAL_PLAN = "creator"       # tier cuyos límites/feature-set ve el trial (Pro completo)
 RESCRAPE_COST_CREDITS = 10   # coste de forzar el re-scrape del propio perfil (Fathom 18/06)
 
@@ -676,6 +705,80 @@ def release_credit_lock(uid: str, token) -> None:
         pass
 
 
+# ── econ · cupo diario de "3 hooks más" (gratis HOOKS_FREE_PER_DAY/día, luego cobra) ──
+# Contador diario por usuario en Redis (sin tocar schema). Si Redis no está → cobra
+# siempre (degradado seguro). El contador solo avanza tras entregar (mark_used).
+def _hooks_extra_units(uid: str) -> int:
+    """Créditos a cobrar por un 'hooks más' AHORA: 0 mientras queden gratis hoy,
+    si no HOOKS_EXTRA_UNITS."""
+    try:
+        day = datetime.now(timezone.utc).strftime("%Y%m%d")
+        used = int(rds.get(f"hooks:{uid}:{day}") or 0)
+        return 0 if used < HOOKS_FREE_PER_DAY else HOOKS_EXTRA_UNITS
+    except Exception:
+        return HOOKS_EXTRA_UNITS
+
+
+def _hooks_mark_used(uid: str) -> None:
+    """Suma 1 al contador diario de hooks (TTL 48h cubre husos horarios)."""
+    try:
+        day = datetime.now(timezone.utc).strftime("%Y%m%d")
+        key = f"hooks:{uid}:{day}"
+        if rds.incr(key) == 1:
+            rds.expire(key, 172800)
+    except Exception:
+        pass
+
+
+# ── econ · cupo de entrenamiento de voz (VOICE_FREE_REELS gratis de por vida) ──
+# Contador acumulado por usuario en Redis (sin tocar schema). Si Redis no está →
+# trata todos como gratis (degradado seguro: nunca cobra de más por un fallo de infra).
+def _voice_reels_used(uid: str) -> int:
+    try:
+        return int(rds.get(f"voicereels:{uid}") or 0)
+    except Exception:
+        return 0
+
+
+def _voice_mark_reel(uid: str) -> None:
+    try:
+        rds.incr(f"voicereels:{uid}")
+    except Exception:
+        pass
+
+
+# ── econ · flash del 1er muro (Pack 300 → 29 € durante 48 h) ──────────────────
+def _mark_first_wall(uid: str) -> None:
+    """Marca el instante del PRIMER muro del usuario (solo la 1ª vez). Arranca la
+    ventana del flash. Redis con TTL holgado; si no está → no hay flash (degradado)."""
+    try:
+        key = f"firstwall:{uid}"
+        if rds.set(key, datetime.now(timezone.utc).isoformat(), nx=True):
+            rds.expire(key, TOPUP_FLASH_HOURS * 3600 + 86400)
+    except Exception:
+        pass
+
+
+def topup_flash_state(uid: str) -> dict:
+    """Estado del flash para este usuario: {active, pack, eur, regular_eur, expires_at}.
+    Activo si chocó su primer muro hace < TOPUP_FLASH_HOURS."""
+    off = {"active": False, "pack": TOPUP_FLASH_PACK, "eur": TOPUP_FLASH_EUR,
+           "regular_eur": TOPUPS[TOPUP_FLASH_PACK]["eur"]}
+    try:
+        raw = rds.get(f"firstwall:{uid}")
+        if not raw:
+            return off
+        started = _parse_ts(raw.decode() if isinstance(raw, (bytes, bytearray)) else raw)
+        if not started:
+            return off
+        expires = started + timedelta(hours=TOPUP_FLASH_HOURS)
+        if datetime.now(timezone.utc) >= expires:
+            return off
+        return {**off, "active": True, "expires_at": expires.isoformat()}
+    except Exception:
+        return off
+
+
 def paid_features_active(profile: dict, user: dict | None = None) -> bool:
     """Funciones de pago activas. Bloquea 'fantasmas' (plan seteado sin pagar).
     Activo si:
@@ -884,7 +987,7 @@ def check_monthly_limit(profile: dict) -> tuple[bool, str | None]:
     """Comprueba si el usuario con plan de pago ha superado su límite mensual.
     Resetea el contador si toca. Devuelve (ok, error_msg)."""
     plan = profile.get("plan", "free")
-    limit = PLAN_LIMITS.get(plan)
+    limit = plan_credit_limit(profile)   # incl. +96 cr/marca extra (Agencia)
     if limit is None:
         return True, None  # plan free usa otro sistema
 
@@ -909,18 +1012,30 @@ def check_monthly_limit(profile: dict) -> tuple[bool, str | None]:
 
     usage = profile.get("monthly_usage", 0)
     if usage >= limit:
-        return False, f"Has alcanzado el límite de {limit} transcripciones/mes de tu plan. Mejora tu plan para continuar."
+        return False, f"Has alcanzado el límite de {limit} créditos/mes de tu plan. Mejora tu plan o recarga créditos."
     return True, None
 
 
 # TODO(econ): credits_available usa PLAN_LIMITS, derivado del dict PLANS hardcodeado.
 # Lo ideal es que lea de load_plans_config() (tabla `plans` de la DB) para tener una
 # única fuente de verdad y no mantener PLANS sincronizado a mano. No implementar ahora.
+def plan_credit_limit(profile: dict) -> int | None:
+    """Límite mensual de créditos del plan, incluyendo el extra por marcas de Agencia
+    (+AGENCY_EXTRA_BRAND_CREDITS por cada extra_brand_slot). None = sin pool mensual."""
+    plan = profile.get("plan", "free")
+    base = PLAN_LIMITS.get(plan)
+    if not base:
+        return base
+    if plan == "agency":
+        extra = int(profile.get("extra_brand_slots") or 0)
+        return base + extra * AGENCY_EXTRA_BRAND_CREDITS
+    return base
+
+
 def credits_available(profile: dict) -> int:
     """Créditos disponibles = restante de la asignación mensual del plan + topups.
     1 crédito = COST_CENTS de saldo. Es el número que muestra la pill del radar."""
-    plan = profile.get("plan", "free")
-    limit = PLAN_LIMITS.get(plan)
+    limit = plan_credit_limit(profile)
     monthly_rem = max(0, limit - (profile.get("monthly_usage", 0) or 0)) if limit else 0
     topup = (profile.get("credits_cents", 0) or 0) // COST_CENTS
     return monthly_rem + topup
@@ -1296,9 +1411,11 @@ def auth_me():
         "free_daily_limit": FREE_DAILY_USER,
         "plan": plan,
         "monthly_usage": profile.get("monthly_usage", 0),
-        "monthly_limit": PLAN_LIMITS.get(plan),
+        "monthly_limit": plan_credit_limit(profile),   # incl. +96 cr/marca extra (Agencia)
         # v0.19: créditos unificados (mensual restante + topups) para la pill del radar.
         "credits": credits_available(profile),
+        # econ §4: flash del Pack 300 a 29€ (48h tras el 1er muro) — el front lo muestra.
+        "topup_flash": topup_flash_state(user["id"]),
         # reverse-trial: estado del trial (Pro capado sin tarjeta) + free MENSUAL.
         # trial_active = usable (dentro de ventana Y con tope disponible).
         "trial_active": trial_usable(profile),
@@ -2125,6 +2242,23 @@ def _paddle_api(method: str, path: str, body=None):
         return 0, {"error": str(e)}
 
 
+def _whop_api(method: str, path: str, body=None):
+    """Llamada a la API de Whop (server-side, con WHOP_API_KEY). Mismo contrato que
+    _paddle_api: devuelve (status_code, json|{})."""
+    if not WHOP_API_KEY:
+        return 0, {"error": "no_api_key"}
+    try:
+        r = requests.request(
+            method, WHOP_API_BASE + path,
+            headers={"Authorization": "Bearer " + WHOP_API_KEY,
+                     "Content-Type": "application/json"},
+            json=body, timeout=20)
+        return r.status_code, (r.json() if r.content else {})
+    except Exception as e:
+        logger.warning("[whop] api %s %s failed: %s", method, path, e)
+        return 0, {"error": str(e)}
+
+
 def _paddle_verify_signature(raw: bytes, sig_header: str) -> bool:
     """Verifica Paddle-Signature: 'ts=<unix>;h1=<hmac_sha256_hex>'.
     HMAC-SHA256 de f'{ts}:{raw}' con PADDLE_WEBHOOK_SECRET."""
@@ -2209,6 +2343,9 @@ def billing_config():
                     "100": {"EUR": _pp("WHOP_TOPUP_100_EUR"), "USD": _pp("WHOP_TOPUP_100_USD")},
                     "300": {"EUR": _pp("WHOP_TOPUP_300_EUR"), "USD": _pp("WHOP_TOPUP_300_USD")},
                     "1000": {"EUR": _pp("WHOP_TOPUP_1000_EUR"), "USD": _pp("WHOP_TOPUP_1000_USD")},
+                    # econ §4: Pack 300 a 29€ del flash. David crea el plan en Whop y pone
+                    # estas env; vacío → el front usa el "300" normal (degradado seguro).
+                    "300_flash": {"EUR": _pp("WHOP_TOPUP_300_FLASH_EUR"), "USD": _pp("WHOP_TOPUP_300_FLASH_USD")},
                 },
             },
         }
@@ -2454,7 +2591,14 @@ def whop_webhook():
                 track_event("brand_addon_purchased", uid, {"slots": cur + 1, "provider": "whop"})
             elif mapped:
                 plan = mapped["plan"]
-                db.table("profiles").update({"plan": plan}).eq("id", uid).execute()
+                # Guardamos el id de membresía en stripe_subscription_id (columna genérica
+                # de "sub activa"): habilita la cancelación self-serve por API y hace que
+                # paid_features_active reconozca al usuario Whop como pago REAL.
+                _upd = {"plan": plan}
+                _mid = _whop_str_id(_memb.get("id")) or _whop_str_id(data.get("id"))
+                if _mid:
+                    _upd["stripe_subscription_id"] = _mid
+                db.table("profiles").update(_upd).eq("id", uid).execute()
                 grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
                 track_event("subscription_upgraded", uid, {"plan": plan, "plan_id": plan_id, "provider": "whop"})
 
@@ -2633,15 +2777,39 @@ def manage_subscription():
 @app.route("/cancel-subscription", methods=["POST"])
 @require_auth
 def cancel_subscription():
-    if not STRIPE_OK:
-        return jsonify({"error": "Pagos no disponibles"}), 503
-
+    """Cancelación self-serve. Política: acceso hasta el fin del periodo ya pagado,
+    sin reembolso de la renovación en curso. Por proveedor:
+      - Whop  → API cancel-at-period-end con el id de membresía (stripe_subscription_id);
+                si no hay id o la API falla, se devuelve el portal de Whop (self-serve).
+      - Stripe→ Subscription.modify(cancel_at_period_end=True)."""
     user = current_user()
     profile = get_profile(user["id"])
     sub_id = profile.get("stripe_subscription_id")
+    _msg_ok = ("Suscripción cancelada. Conservas el acceso hasta el final del periodo "
+               "que ya pagaste; no se renovará.")
+
+    # ── Whop ──────────────────────────────────────────────────────────────────
+    if _active_provider == "whop":
+        if sub_id:
+            code, _resp = _whop_api("POST", f"/api/v2/memberships/{sub_id}/cancel")
+            if 200 <= code < 300:
+                track_event("subscription_cancel_requested", user["id"], {
+                    "from_plan": profile.get("plan"), "provider": "whop"})
+                return jsonify({"ok": True, "mode": "api", "message": _msg_ok})
+            logger.warning("[whop] cancel API code=%s sub=%s → portal fallback", code, sub_id)
+        # Sin id de membresía o API no disponible → portal de Whop (self-serve real).
+        portal = os.environ.get("WHOP_PORTAL_URL", "https://whop.com/orders")
+        track_event("subscription_cancel_requested", user["id"], {
+            "from_plan": profile.get("plan"), "provider": "whop", "mode": "portal"})
+        return jsonify({"ok": True, "mode": "portal", "portal_url": portal,
+                        "message": "Gestiona la baja en tu portal de Whop. "
+                                   "Conservas el acceso hasta el fin del periodo pagado."})
+
+    # ── Stripe (proveedor por defecto) ─────────────────────────────────────────
+    if not STRIPE_OK:
+        return jsonify({"error": "Pagos no disponibles"}), 503
     if not sub_id:
         return jsonify({"error": "No tienes suscripción activa"}), 400
-
     try:
         stripe_lib.Subscription.modify(sub_id, cancel_at_period_end=True)
         # growth-1: solicitud de baja (a fin de periodo). Distinto de la
@@ -2649,7 +2817,7 @@ def cancel_subscription():
         track_event("subscription_cancel_requested", user["id"], {
             "from_plan": profile.get("plan"),
         })
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "mode": "api", "message": _msg_ok})
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
         return jsonify({"error": "Internal server error. Please try again."}), 500
@@ -2739,9 +2907,12 @@ _JSON_SCRIPT_SCHEMA = (
     '{"title": "título sacado del hook: su dato o ángulo específico en 3-8 palabras '
     '(p.ej. si el hook habla de 10 millones de tokens, el título menciona los tokens; '
     'nada de resúmenes temáticos genéricos; sin comillas, sin emojis)", '
-    '"hook": "las primeras 1-3 líneas que paran el scroll", '
-    '"body": ["línea 1 del desarrollo", "línea 2", "..."], '
-    '"closing": "la línea final que ancla"}. '
+    '"hook": "el MEJOR de 3 hooks — 1 línea del tirón que para el scroll", '
+    '"alt_hooks": ["2º hook con un DEVICE DISTINTO al del hook", "3er hook con OTRO device distinto"], '
+    '"body": ["frase 1 del guión", "frase 2", "..."], '
+    '"closing": "DOS cierres separados por  /  (variante 1 / variante 2; p.ej. un comment-CTA y un cierre suave)"}. '
+    'Reglas de salida: los 3 hooks (hook + los 2 de alt_hooks) usan 3 devices DISTINTOS. '
+    'body = frase a frase (cada elemento del array es UNA frase, se renderiza con ▸). '
     'Sin markdown, sin ```json, sin texto antes ni después. Solo el JSON.'
 )
 
@@ -2754,6 +2925,115 @@ _JSON_HOOKS_SCHEMA = (
     '{"type": "PROMESA", "text": "hook aquí"}]}. '
     'Sin markdown, sin ```json, sin texto antes ni después. Solo el JSON.'
 )
+
+# ── MÉTODO del cerebro (GENERADOR.md + METODO.md, cerebro/cerebro-instrucciones) ──
+# System prompt base que aplica el método de David. Se antepone al registro/tono.
+_METODO_BASE = (
+    "Eres el cerebro de guiones de ReelScript. Escribes guiones de reels que SEGMENTAN en "
+    "el primer segundo, dispersan el valor con loops, suenan al USUARIO (su voz) y NO suenan "
+    "a vendedor ni a IA. Replicas el PORQUÉ de lo que funciona, no plantillas.\n\n"
+    "MÉTODO (obligatorio):\n"
+    "1. Segmenta en la 1ª frase: que un colectivo concreto se sienta identificado YA (nunca genérico). "
+    "Vale 'para mujeres de +40', 'si juegas a Fortnite', 'infoproductor que…'.\n"
+    "2. Abre un loop y NO sueltes el valor entero de golpe; dispérsalo y ciérralo al final.\n"
+    "3. Conecta con 'pero' / 'por lo tanto', NUNCA con 'y además'. Ramifica, no apiles (regla South Park).\n"
+    "4. Rota el DEVICE de apertura entre los 3 hooks: kill-excuse, pregunta, antes-pensaba/hasta-que, "
+    "afirmación seca/contrarian, anécdota, enumeración+loop, promesa, newsjack, reflexivo ('profe curioso'). "
+    "No repitas molde.\n"
+    "5. NO mendigues retención: nada de 'te lo digo al final', 'el último es el mejor', 'aguanta'. "
+    "El loop se abre por curiosidad real.\n"
+    "6. Mete 1 recurso de concreción: un caso/persona, 'imagínate esto', antes/ahora, meme/actualidad.\n"
+    "7. Humaniza con coletillas reales ('si no, luego tenemos un problema', 'y ya está', 'tal cual', "
+    "'sin comerte la cabeza'); tacos suaves SOLO si el estilo del usuario lo pide. NADA de metáforas "
+    "forzadas tipo 'producción ardiendo'.\n"
+    "8. Cuerpo: segmenta → abre loop → valor disperso (pero/por-lo-tanto) → giro/insight (reencuadra: "
+    "el problema no era lo obvio) → sentencia memorable (corta, citable, guardable). Frase por frase.\n"
+    "9. Cierra según el OBJETIVO: Vender → comment-CTA ('comenta X y te paso…'); Crecer/Educar/Entretener "
+    "→ suave o sin CTA. Dosifica el CTA, no en todos.\n"
+    "10. Cero AI slop. Si suena a comunicado o a motivacional, reescríbelo.\n"
+    "Conserva datos, cifras, nombres y el ÁNGULO concreto del material fuente: un guion que valdría para "
+    "cualquier nicho es un guion fallido."
+)
+
+# Few-shot: imitar el PATRÓN (cadencia, loops, pero/por-lo-tanto, coletillas), NO copiar.
+_FEWSHOT_GUIONES = (
+    "\n\n=== EJEMPLOS DE REGISTRO (imita el PATRÓN, NO los copies) ===\n"
+    "[Fitness · device kill-excuse]\n"
+    "Hook: A los 25 estás fofo por una sola razón.\n"
+    "▸ A los 18 te saltabas la cena y ya estabas seco.\n"
+    "▸ Pero a los 25 te cambió la vida entera, no el cuerpo.\n"
+    "▸ De lunes a viernes comes bien y entrenas; pero el sábado te metes 3.000 calorías en birras.\n"
+    "▸ Por lo tanto en dos días borras lo que hiciste en cinco.\n"
+    "▸ Te pesas el lunes, no baja, y le echas la culpa al metabolismo.\n"
+    "▸ No es el metabolismo. Es que tu finde pesa más que tu semana.\n"
+    "Cierre: comenta FINDE y te paso el plan.\n\n"
+    "[Marketing · device reflexivo 'profe curioso']\n"
+    "Hook: Siempre me ha llamado la atención el Instagram de los negocios locales.\n"
+    "▸ Suben cuatro fotos del local y pagan a una agencia para que lo lleve.\n"
+    "▸ Pero, ¿hasta qué punto eso funciona de verdad?\n"
+    "▸ Imagina un reel que llega a 10.000 personas, la mitad de tu zona.\n"
+    "▸ Instagram, por diseño, enseña mucho más los vídeos que las fotos.\n"
+    "▸ Bueno, tampoco es que los posts no sirvan.\n"
+    "▸ Así que igual el error no es hacer posts; es esperar que hagan el trabajo del vídeo.\n"
+    "Cierre: No sé, a mí me cuadra así. ¿Tú cómo lo ves?"
+)
+
+# Semilla por nicho (BANCO-nichos-hooks.md): hooks de referencia (fórmula, no copiar).
+_NICHE_SEED = {
+    "fitness":  ["¿Por qué a los 25 dejas de marcar aunque entrenes más que nunca?",
+                 "El cardio en ayunas a los 25 te quema músculo, no grasa."],
+    "nutri":    ["¿Comes sano y no bajas de peso? El problema no está en el plato.",
+                 "Tu desayuno 'saludable' te tiene con hambre a las 11."],
+    "finanz":   ["¿Cobras 2.000 y no llegas a fin de mes? No gastas de más, gastas mal.",
+                 "Tu dinero parado en el banco pierde valor cada mes."],
+    "marketing":["¿Buen producto y no vendes? El precio no es el problema.",
+                 "Bajar precios para vender más te está haciendo vender menos."],
+    "negocio":  ["¿Buen producto y no vendes? El precio no es el problema.",
+                 "El reel trae a la gente, pero el perfil es el que cierra."],
+    "desarrollo":["¿Empiezas hábitos y los dejas en 2 semanas? No es falta de disciplina.",
+                  "Si necesitas motivación para empezar, ya empezaste mal."],
+    "mentalidad":["Si necesitas motivación para empezar, ya empezaste mal.",
+                  "La motivación no viene antes de la acción, viene después."],
+    "skincare": ["¿7 productos y la piel sigue mal? Sobran 5.",
+                 "Si tu piel tira después de lavarte la cara, lo estás haciendo mal."],
+    "belleza":  ["¿7 productos y la piel sigue mal? Sobran 5.",
+                 "3 errores que te envejecen la piel, y el 3º lo haces cada mañana."],
+}
+
+
+def _match_niche_seed(niche: str):
+    """Devuelve los hooks-semilla del nicho que mejor casa (substring), o None."""
+    n = (niche or "").strip().lower()
+    if not n:
+        return None
+    for key, hooks in _NICHE_SEED.items():
+        if key in n or n in key:
+            return hooks
+    return None
+
+
+def _user_method_context(user_id) -> str:
+    """Bloque de contexto del usuario para el generador: nicho + objetivo + hooks-semilla
+    del nicho (BANCO). El tono/voz se inyecta aparte (voice_prompt_block)."""
+    try:
+        prof = get_profile(user_id)
+    except Exception:
+        return ""
+    niche = (prof.get("niche") or "").strip()
+    goal = (prof.get("goal") or "").strip()
+    subs = prof.get("subniches") or []
+    out = ""
+    if niche or goal:
+        out += "\n\n=== TU CONTEXTO ===\n"
+        if niche:
+            out += "Nicho: " + niche + (("" if not subs else " (sub: " + ", ".join([str(s) for s in subs[:3]]) + ")")) + "\n"
+        if goal:
+            out += "Objetivo: " + goal + " — condiciona el ángulo y el CTA según esto.\n"
+    seed = _match_niche_seed(niche)
+    if seed:
+        out += "Hooks-semilla de tu nicho (referencia de FÓRMULA, NO los copies): " + " · ".join(seed) + "\n"
+    return out
+
 
 STYLE_PROMPTS = {
 
@@ -3081,7 +3361,10 @@ def derive_voice_profile(transcripts):
         return None
     user = "\n\n---\n\n".join("REEL %d:\n%s" % (i + 1, t[:2000]) for i, t in enumerate(texts))
     try:
-        raw = _call_llm(_VOICE_DERIVE_SYS, user, temperature=0.4, max_tokens=900)
+        # gemini-2.5-pro es de razonamiento: sus tokens de "thinking" consumen el
+        # budget ANTES del JSON. Con 900/1800 el JSON salía truncado (finish_reason=
+        # length → no parseable). 4000 deja sitio a razonamiento + el JSON (pequeño).
+        raw = _call_llm(_VOICE_DERIVE_SYS, user, temperature=0.4, max_tokens=4000)
     except Exception as e:
         logger.warning("derive_voice_profile LLM failed: %s", e)
         return None
@@ -3401,11 +3684,17 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
     if style == "custom":
         if not custom_prompt:
             raise ValueError("Escribe tus instrucciones en el campo Custom")
-        system = CUSTOM_BASE + custom_prompt + _JSON_CUSTOM_SUFFIX
+        registro = CUSTOM_BASE + custom_prompt + _JSON_CUSTOM_SUFFIX
     else:
-        system = STYLE_PROMPTS.get(style)
-        if not system:
+        registro = STYLE_PROMPTS.get(style)
+        if not registro:
             raise ValueError("Estilo no válido")
+
+    # GENERADOR (cerebro/cerebro-instrucciones): el MÉTODO va primero como base, con el
+    # contexto del usuario (nicho/objetivo + semilla de nicho) y few-shot; el registro/tono
+    # pedido va después. La voz del usuario se inyecta como CONTEXTO más abajo (ctx).
+    method = _METODO_BASE + (_user_method_context(user_id) if user_id else "") + _FEWSHOT_GUIONES
+    system = method + "\n\n=== REGISTRO / TONO PEDIDO ===\n" + registro
 
     # Moat: CONTEXTO de estilo (no cambia el formato de salida). Se reafirma el JSON al final.
     ctx = ""
@@ -3423,8 +3712,8 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
         ctx += brain_voice_block(user_id)                     # gusto del Brain «Entrenar» (👍/👎 + sugerencias)
     if ctx:
         system = (system + ctx +
-                  "\n\nIMPORTANTE: lo anterior es CONTEXTO de estilo. Responde SOLO con el "
-                  "JSON pedido (hook, body, closing). No copies los ejemplos literalmente.")
+                  "\n\nIMPORTANTE: lo anterior es CONTEXTO (voz, ejemplos, método). Responde SOLO "
+                  "con el JSON pedido. No copies los ejemplos literalmente: imita el PATRÓN.")
 
     raw = _call_llm(system, text)
     return _parse_ai_json(raw, style)
@@ -3608,90 +3897,40 @@ def api_voice_auto_derive():
     body = request.get_json(silent=True) or {}
     project_id = body.get("project_id") or None
 
-    vids = _voice_auto_candidates(uid)
-    if not vids:
-        return jsonify({"error": "no_videos",
-                        "message": "No encuentro reels publicados tuyos. Conecta tu Instagram en Métricas."}), 404
+    # ASYNC: gemini-2.5-pro (razonamiento) + transcribir reels pueden tardar >60s →
+    # Traefik cerraba la conexión a su readTimeout. Encolamos (mismo patrón que /adapt
+    # y generate-script). El flujo completo, el cobro por transcripción y la derivación
+    # los hace el task; el front hace polling a /task/voice-derive/<task_id>.
+    from tasks import voice_auto_derive_task  # noqa: E402
+    ar = voice_auto_derive_task.delay(uid, user.get("email", ""), project_id)
+    return jsonify({"task_id": ar.id, "status": "queued"}), 202
 
-    texts, transcribed_now = [], 0
-    for v in vids:
-        txt = (v.get("transcription") or "").strip()
-        if txt:
-            texts.append(txt)
-            continue
-        if not v.get("ig_url"):
-            continue
-        # Cobro por transcripción — mismo patrón que metrics_transcribe_video
-        # (paid: límite mensual; si no: créditos; si no: cupo free del día).
-        profile = get_profile(uid)
-        is_unlimited = user.get("email", "").lower() in UNLIMITED_EMAILS
-        if not is_unlimited:
-            user_plan = profile.get("plan", "free")
-            if user_plan in ("pro", "creator", "agency"):
-                ok, err_msg = check_monthly_limit(profile)
-                if not ok:
-                    break   # sin presupuesto → deriva con lo que haya
-            elif profile["credits_cents"] >= COST_CENTS:
-                pass
-            elif profile["free_used_today"] < FREE_DAILY_USER:
-                pass
-            else:
-                break
-        try:
-            with tempfile.TemporaryDirectory() as tmp:
-                audio_path = download_audio(v["ig_url"], tmp, "instagram")
-                txt = transcribe_with_groq(audio_path, None)
-        except Exception as e:
-            logger.warning("voice_auto transcribe failed user=%s vid=%s err=%s", uid, v.get("ig_video_id"), e)
-            continue
-        if not (txt or "").strip():
-            continue
-        try:
-            db.table("ig_videos").update({
-                "transcription": txt,
-                "transcribed_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("ig_video_id", v["ig_video_id"]).eq("user_id", uid).execute()
-        except Exception:
-            pass
-        if not is_unlimited:
-            user_plan = profile.get("plan", "free")
-            if user_plan in ("pro", "creator", "agency"):
-                db.table("profiles").update({"monthly_usage": profile.get("monthly_usage", 0) + 1}).eq("id", uid).execute()
-            elif profile["credits_cents"] >= COST_CENTS:
-                db.table("profiles").update({"credits_cents": profile["credits_cents"] - COST_CENTS}).eq("id", uid).execute()
-            else:
-                db.table("profiles").update({"free_used_today": profile["free_used_today"] + 1}).eq("id", uid).execute()
-        transcribed_now += 1
-        texts.append(txt)
 
-    if not texts:
-        return jsonify({"error": "no_transcripts",
-                        "message": "No pude transcribir ninguno de tus reels. Inténtalo de nuevo."}), 502
-
-    vp = derive_voice_profile(texts[:_VOICE_AUTO_SAMPLE])
-    if not vp:
-        return jsonify({"error": "derive_failed",
-                        "message": "No pude derivar tu voz con esta muestra. Inténtalo de nuevo."}), 502
-    raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else dict(vp)
-    raw["samples"] = texts[:_VOICE_AUTO_SAMPLE]
-    raw["auto_derived"] = True
-    vp["raw"] = raw
-
-    save_voice_profile(uid, vp, brand_id=project_id)
-    # La generación (adapt_with_ai) lee la voz de la marca por defecto (brand_id="").
-    # Si esa aún no existe, guárdala también ahí para encender el moat ya.
-    if project_id and not get_voice_profile(uid):
-        save_voice_profile(uid, vp)
-
-    return jsonify({
-        "ok": True,
-        "confidence": vp.get("confidence"),
-        "source_count": len(texts[:_VOICE_AUTO_SAMPLE]),
-        "transcribed_now": transcribed_now,
-        "tone": vp.get("tone"),
-        "phrases": vp.get("phrases") or [],
-        "evidence": vp.get("evidence") or [],
-    })
+@app.route("/task/voice-derive/<task_id>", methods=["GET"])
+@require_auth
+@limiter.limit("60 per minute")
+def task_voice_derive_status(task_id: str):
+    """Polling de voice_auto_derive_task. En éxito devuelve la MISMA shape que el
+    endpoint sync de antes (ok/confidence/source_count/tone/phrases/evidence)."""
+    from tasks import voice_auto_derive_task  # noqa: E402
+    task = voice_auto_derive_task.AsyncResult(task_id)
+    state = task.state
+    if state in ("PENDING", "STARTED", "PROGRESS"):
+        return jsonify({"state": "pending"})
+    if state == "SUCCESS":
+        r = task.result or {}
+        if not isinstance(r, dict):
+            return jsonify({"state": "failed", "error": "bad_result"})
+        if r.get("ok"):
+            out = {k: v for k, v in r.items() if k != "http"}
+            out["state"] = "success"
+            return jsonify(out)
+        return jsonify({"state": "failed", "error": r.get("error"),
+                        "message": r.get("message") or "No pude derivar tu voz. Inténtalo de nuevo."})
+    if state == "FAILURE":
+        return jsonify({"state": "failed", "error": "task_failure",
+                        "message": "Error derivando tu voz. Inténtalo de nuevo."})
+    return jsonify({"state": "pending"})
 
 
 _VOICE_URL_MAX = 6   # máx URLs por entreno (muestra de sobra; controla coste)
@@ -3758,31 +3997,22 @@ def api_voice_from_urls():
         if cached:
             texts.append(cached)
             continue
-        # Cobro por transcripción — mismo patrón que voice/auto-derive y metrics.
-        if not is_unlimited:
-            profile = get_profile(uid)
-            plan = profile.get("plan", "free")
-            if paid_features_active(profile, user):
-                ok, _e = check_monthly_limit(profile)
-                if not ok:
-                    break
-            elif (profile.get("credits_cents") or 0) >= COST_CENTS:
-                pass
-            elif (profile.get("free_used_today") or 0) < FREE_DAILY_USER:
-                pass
-            else:
-                break   # sin presupuesto → deriva con lo que haya
+        # econ: primeros VOICE_FREE_REELS reels de voz GRATIS (de por vida), luego
+        # VOICE_REEL_UNITS/reel. Sin presupuesto para el siguiente → deriva con lo que haya.
+        reel_units = 0
+        if not is_unlimited and _voice_reels_used(uid) >= VOICE_FREE_REELS:
+            reel_units = VOICE_REEL_UNITS
+            if credits_available(get_profile(uid)) < reel_units:
+                break
         txt = _transcribe_reel(uid, url)
         if not (txt or "").strip():
             continue
+        if reel_units and not is_unlimited:
+            _err, _r, _ = _charge_units_locked(uid, reel_units, user)
+            if _err:
+                break
         if not is_unlimited:
-            profile = get_profile(uid)
-            if paid_features_active(profile, user):
-                db.table("profiles").update({"monthly_usage": (profile.get("monthly_usage") or 0) + 1}).eq("id", uid).execute()
-            elif (profile.get("credits_cents") or 0) >= COST_CENTS:
-                db.table("profiles").update({"credits_cents": profile["credits_cents"] - COST_CENTS}).eq("id", uid).execute()
-            else:
-                db.table("profiles").update({"free_used_today": (profile.get("free_used_today") or 0) + 1}).eq("id", uid).execute()
+            _voice_mark_reel(uid)
         charged += 1
         texts.append(txt)
 
@@ -3862,8 +4092,8 @@ def adapt():
                 return jsonify({"error": err_msg}), 429
             cost_cents = 0
             charge_mode = "monthly"
-        elif profile["credits_cents"] >= COST_CENTS:
-            cost_cents = COST_CENTS
+        elif profile["credits_cents"] >= SCRIPT_UNITS * COST_CENTS:
+            cost_cents = SCRIPT_UNITS * COST_CENTS   # econ: 3 créditos por guión
             charge_mode = "credits"
         else:
             # A3: «Hazlo tuyo» es de pago. Free sin créditos → muro de planes.
@@ -4881,6 +5111,46 @@ def api_me_overview():
 
 # ── Metrics ──────────────────────────────────────────────────────────────────
 
+# ── FIX1 · Métricas por MARCA ────────────────────────────────────────────────
+# El IG conectado y sus reels pertenecen a la marca (project), no a la cuenta global.
+# Modelo: ig_profiles.project_id (1 perfil de IG por marca); ig_videos cuelga del
+# ig_profile_id → queda auto-scopeado. project_id NULL = cuenta por defecto (creadores
+# de 1 marca y datos previos a la migración). REQUIERE la columna ig_profiles.project_id
+# (migración Supabase en docs/migration-metrics-por-marca.sql).
+def _req_project_id():
+    """project_id de la request (query ?project_id/?brand o body), validado como UUID.
+    'default' o cualquier no-UUID → None (cuenta por defecto)."""
+    pid = request.args.get("project_id") or request.args.get("brand")
+    if not pid:
+        try:
+            _b = request.get_json(silent=True) or {}
+            pid = _b.get("project_id") or _b.get("brand")
+        except Exception:
+            pid = None
+    if not pid:
+        return None
+    try:
+        _uuid.UUID(str(pid))
+        return str(pid)
+    except Exception:
+        return None
+
+
+def _ig_scope(query, pid):
+    """Filtra ig_profiles por marca: project_id = pid, o IS NULL si pid es None."""
+    return query.eq("project_id", pid) if pid else query.is_("project_id", "null")
+
+
+def _get_ig_profile(uid, pid, cols="*"):
+    """Perfil de IG de la MARCA activa (user_id + project_id). None si no hay (o si la
+    columna aún no existe → degradación segura hasta correr la migración)."""
+    try:
+        r = _ig_scope(db.table("ig_profiles").select(cols).eq("user_id", uid), pid).limit(1).execute()
+        return (r.data or [None])[0]
+    except Exception:
+        return None
+
+
 @app.route("/metrics/summary")
 @require_auth
 def metrics_summary():
@@ -4909,11 +5179,8 @@ def metrics_summary():
 
     # IG conectado: el JS hace S.igConnected=(met.connected!==false). Sin este campo
     # quedaba undefined → siempre true → ocultaba la tarjeta "Conecta Instagram".
-    try:
-        ig = db.table("ig_profiles").select("id").eq("user_id", user["id"]).limit(1).execute()
-        connected = bool(ig.data)
-    except Exception:
-        connected = False
+    # connected = la MARCA activa tiene IG vinculado (no la cuenta global).
+    connected = bool(_get_ig_profile(user["id"], project_id, "id"))
 
     return jsonify({
         "total_views": total_views,
@@ -5250,9 +5517,15 @@ def regenerate_idea(idea_id):
     assistant_id = body.get("assistant_id") or idea.get("assistant_id")
     language = body.get("language", "es")
 
+    # econ: regenerar = REGEN_UNITS (1 cr), más barato que un guión nuevo (3 cr).
+    _err, _refund, _ = _charge_units_locked(user["id"], REGEN_UNITS, user)
+    if _err:
+        return _err
+
     try:
         result = develop_idea(idea["raw_text"], assistant_id, user["id"], language)
     except Exception as e:
+        _refund()
         logger.error(f"Idea regeneration failed: {e}", exc_info=True)
         return jsonify({"error": "Failed to regenerate. Try again."}), 502
 
@@ -5271,6 +5544,73 @@ def regenerate_idea(idea_id):
 # v0.14.30: linkedin queda fuera del set para to-script (no encaja con reel
 # 30-45s). El estilo sigue disponible vía /adapt directo para retrocompat.
 _BUILTIN_SCRIPT_STYLES = {"viral", "divertido", "storytelling", "hooks", "educacional", "informativo"}
+
+
+@app.route("/scripts/<script_id>/regenerate", methods=["POST"])
+@require_auth
+@limiter.limit("10 per minute")
+def regenerate_script(script_id):
+    """econ (gap D1): regenerar un guión YA creado = REGEN_UNITS (1 cr), no un guión
+    nuevo (3). Re-tira del MISMO material: el reel original si lo hay, si no el propio
+    texto. En la voz del usuario. Sync, mismo patrón que /ideas/<id>/regenerate."""
+    user = current_user()
+    uid = user["id"]
+    row = db.table("scripts").select("*").eq("id", script_id).eq("user_id", uid).execute()
+    if not row.data:
+        return jsonify({"error": "Not found"}), 404
+    sc = row.data[0]
+
+    # Material de origen: el reel del que salió (re-tira del mismo reel) o el propio texto.
+    source = ""
+    reel_id = sc.get("from_competitor_reel_id")
+    if reel_id:
+        try:
+            rr = (db.table("creator_reels_global")
+                    .select("caption, transcript").eq("id", reel_id).single().execute())
+            if rr.data:
+                source = ((rr.data.get("transcript") or "") + "\n"
+                          + (rr.data.get("caption") or "")).strip()
+        except Exception:
+            pass
+    if not source:
+        source = (sc.get("script") or "").strip()
+    if not source:
+        return jsonify({"error": "no_source",
+                        "message": "No hay material para regenerar este guion."}), 400
+
+    # econ: cobra 1 crédito ANTES; refunda si el LLM falla.
+    err, refund, _ = _charge_units_locked(uid, REGEN_UNITS, user)
+    if err:
+        return err
+
+    style = str(sc.get("assistant_name") or "viral").lower()
+    style_arg = style if style in _BUILTIN_SCRIPT_STYLES else "viral"
+    try:
+        result = adapt_with_ai(source, style_arg, "", voice=get_voice_profile(uid), user_id=uid)
+    except Exception as e:
+        refund()
+        logger.error("regenerate_script LLM failed script=%s: %s", script_id, e, exc_info=True)
+        return jsonify({"error": "llm_error",
+                        "message": "No se pudo regenerar. Inténtalo de nuevo."}), 502
+    if not (isinstance(result, dict) and result.get("hook")):
+        refund()
+        return jsonify({"error": "llm_error",
+                        "message": "No se pudo regenerar. Inténtalo de nuevo."}), 502
+
+    flat = (result["hook"] + "\n"
+            + "\n".join(result.get("body", [])) + "\n"
+            + result.get("closing", "")).strip()
+    upd = {"script": flat, "updated_at": datetime.now(timezone.utc).isoformat()}
+    if result.get("title"):
+        upd["title"] = str(result["title"]).strip()[:80]
+    try:
+        db.table("scripts").update(upd).eq("id", script_id).eq("user_id", uid).execute()
+    except Exception as e:
+        logger.error("regenerate_script persist failed script=%s: %s", script_id, e)
+
+    return jsonify({"ok": True, "script": flat, "title": upd.get("title", sc.get("title")),
+                    "hook": result["hook"], "body": result.get("body", []),
+                    "closing": result.get("closing", ""), **_credits_display(uid)})
 
 # v0.15.7.b: umbral mínimo de chars en custom_prompt antes de invocar al LLM.
 # Custom prompts demasiado cortos ("instruccion base", 16 chars) provocan que
@@ -5320,13 +5660,13 @@ def idea_to_script(idea_id):
     plan = profile.get("plan", "free")
 
     # v0.14.29: cobro 1 crédito (patrón de /api/ideas/suggest pero con 1 unit).
-    SCRIPT_COST = COST_CENTS              # 18 cents por guion
-    SCRIPT_USAGE_UNITS = 1
-    is_paid_unlimited = plan in ("pro", "creator", "agency")
+    SCRIPT_COST = SCRIPT_UNITS * COST_CENTS   # econ: 3 créditos por guión
+    SCRIPT_USAGE_UNITS = SCRIPT_UNITS
+    is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
     if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SCRIPT_COST:
         return jsonify({
             "error": "no_credits",
-            "message": "Necesitas 1 crédito para generar un guion. Compra créditos o sube de plan.",
+            "message": "Necesitas 3 créditos para generar un guion. Compra créditos o sube de plan.",
         }), 402
 
     # Resolución de asistente: body > idea.assistant_id > profile.default > None
@@ -5509,13 +5849,13 @@ def transcription_to_script(t_id):
     plan = profile.get("plan", "free")
 
     # Cobro 1 crédito (mismo patrón v0.14.29 idea_to_script).
-    SCRIPT_COST = COST_CENTS              # 18 cents por guion
-    SCRIPT_USAGE_UNITS = 1
-    is_paid_unlimited = plan in ("pro", "creator", "agency")
+    SCRIPT_COST = SCRIPT_UNITS * COST_CENTS   # econ: 3 créditos por guión
+    SCRIPT_USAGE_UNITS = SCRIPT_UNITS
+    is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
     if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SCRIPT_COST:
         return jsonify({
             "error": "no_credits",
-            "message": "Necesitas 1 crédito para generar un guion. Compra créditos o sube de plan.",
+            "message": "Necesitas 3 créditos para generar un guion. Compra créditos o sube de plan.",
         }), 402
 
     # Resolución de asistente: body > profile.default > None.
@@ -6761,13 +7101,14 @@ def metrics_link_profile():
     if not re.match(r"^[a-zA-Z0-9._]+$", username):
         return jsonify({"error": "Username contiene caracteres inválidos"}), 400
 
-    existing = db.table("ig_profiles").select("id").eq("user_id", user["id"]).execute()
-    if existing.data:
-        return jsonify({"error": "Ya tienes un perfil de Instagram vinculado"}), 409
+    pid = _req_project_id()
+    if _get_ig_profile(user["id"], pid, "id"):
+        return jsonify({"error": "Esta marca ya tiene un perfil de Instagram vinculado"}), 409
 
     row = db.table("ig_profiles").insert({
         "user_id": user["id"],
         "ig_username": username,
+        "project_id": pid,   # la cuenta de IG pertenece a la MARCA activa
     }).execute()
 
     return jsonify({"ok": True, "ig_profile_id": row.data[0]["id"], "ig_username": username})
@@ -6778,8 +7119,8 @@ def metrics_link_profile():
 @limiter.limit("5 per minute")
 def metrics_analyze():
     user = current_user()
-    ig_prof = db.table("ig_profiles").select("*").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_row = _get_ig_profile(user["id"], _req_project_id())
+    if not ig_row:
         return jsonify({"error": "No tienes un perfil de Instagram vinculado"}), 404
 
     profile = get_profile(user["id"])
@@ -6794,8 +7135,8 @@ def metrics_analyze():
     requested = body.get("count")
     if requested and isinstance(requested, int) and 1 <= requested <= max_videos:
         max_videos = requested
-    username = ig_prof.data[0]["ig_username"]
-    ig_profile_id = ig_prof.data[0]["id"]
+    username = ig_row["ig_username"]
+    ig_profile_id = ig_row["id"]
 
     try:
         videos = _scrape_ig_reels([username], limit=max_videos)
@@ -6841,10 +7182,10 @@ def metrics_analyze_one():
     if not reel_url or "instagram.com" not in reel_url:
         return jsonify({"error": "URL de reel inválida"}), 400
 
-    ig_prof = db.table("ig_profiles").select("*").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_row = _get_ig_profile(user["id"], _req_project_id())
+    if not ig_row:
         return jsonify({"error": "No tienes un perfil de Instagram vinculado"}), 404
-    ig_profile_id = ig_prof.data[0]["id"]
+    ig_profile_id = ig_row["id"]
 
     try:
         videos = _scrape_ig_reels([reel_url], limit=1)
@@ -6873,10 +7214,10 @@ def metrics_transcribe_video():
     if not ig_video_id:
         return jsonify({"error": "ig_video_id requerido"}), 400
 
-    ig_prof = db.table("ig_profiles").select("id").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_row = _get_ig_profile(user["id"], _req_project_id(), "id")
+    if not ig_row:
         return jsonify({"error": "No tienes un perfil vinculado"}), 404
-    ig_profile_id = ig_prof.data[0]["id"]
+    ig_profile_id = ig_row["id"]
 
     vid = db.table("ig_videos").select("*").eq("ig_video_id", ig_video_id).eq("ig_profile_id", ig_profile_id).execute()
     if not vid.data:
@@ -6941,11 +7282,10 @@ def metrics_transcribe_video():
 @require_auth
 def metrics_list_videos():
     user = current_user()
-    ig_prof = db.table("ig_profiles").select("*").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_profile = _get_ig_profile(user["id"], _req_project_id())
+    if not ig_profile:
         return jsonify({"ig_profile": None, "videos": []})
 
-    ig_profile = ig_prof.data[0]
     sort_by = request.args.get("sort", "published_at")
     allowed_sorts = {"published_at", "views", "likes", "comments", "shares"}
     if sort_by not in allowed_sorts:
@@ -6979,11 +7319,11 @@ def metrics_list_videos():
 @require_auth
 def metrics_unlink_profile():
     user = current_user()
-    ig_prof = db.table("ig_profiles").select("id").eq("user_id", user["id"]).execute()
-    if not ig_prof.data:
+    ig_row = _get_ig_profile(user["id"], _req_project_id(), "id")
+    if not ig_row:
         return jsonify({"error": "No hay perfil vinculado"}), 404
 
-    ig_profile_id = ig_prof.data[0]["id"]
+    ig_profile_id = ig_row["id"]
     db.table("ig_videos").delete().eq("ig_profile_id", ig_profile_id).execute()
     db.table("ig_profiles").delete().eq("id", ig_profile_id).execute()
 
@@ -8136,14 +8476,20 @@ def post_tracked_creator():
     extra_slots = get_user_extra_slots(user["id"])
     cap_global = limits["base_slots_global"] + extra_slots
 
+    # econ: más allá del cupo del plan, añadir un competidor NUEVO cuesta
+    # ADD_COMPETITOR_UNITS cr (scrape+transcribe inicial). Cupo blando: el free
+    # sin créditos sigue topando con el muro; con saldo, paga y expande.
+    charge_competitor = False
     if count_active_tracked(user["id"], scope="global") >= cap_global:
-        # growth-1: paywall_shown. El free llega aquí al intentar el 2º competidor
-        # (slot=1). after_first_value=True: ya tiene 1 competidor dándole señales.
-        track_event("paywall_shown", user["id"], {
-            "wall": "tracked_creators", "plan": plan, "limit": cap_global,
-            "after_first_value": cap_global >= 1,
-        })
-        return jsonify({"error": "tc.error.plan_limit_reached", "limit": cap_global}), 403
+        if credits_available(profile) < ADD_COMPETITOR_UNITS:
+            # growth-1: paywall_shown. El free llega aquí al intentar el 2º competidor
+            # (slot=1). after_first_value=True: ya tiene 1 competidor dándole señales.
+            track_event("paywall_shown", user["id"], {
+                "wall": "tracked_creators", "plan": plan, "limit": cap_global,
+                "after_first_value": cap_global >= 1,
+            })
+            return jsonify({"error": "tc.error.plan_limit_reached", "limit": cap_global}), 403
+        charge_competitor = True
 
     if plan == "agency":
         active_in_project = count_active_tracked(user["id"], project_id=project_id, scope="project")
@@ -8182,6 +8528,13 @@ def post_tracked_creator():
     if existing.data:
         return jsonify({"error": "tc.error.already_tracking"}), 409
 
+    # 6.b econ: cobrar el competidor extra (más allá del cupo) ANTES del insert.
+    _comp_refund = lambda: None
+    if charge_competitor:
+        _err, _comp_refund, _ = _charge_units_locked(user["id"], ADD_COMPETITOR_UNITS, user)
+        if _err:
+            return _err
+
     # 7. INSERT tracking
     payload = {
         "user_id": user["id"],
@@ -8193,6 +8546,7 @@ def post_tracked_creator():
         tracking_row = tr.data[0]
     except Exception as e:
         logger.exception("insert user_tracked_creators failed: %s", e)
+        _comp_refund()   # revertir el cargo del competidor si el insert falla
         return jsonify({"error": "tc.error.internal"}), 500
 
     # growth-2: si este es el 1er competidor del usuario (0→1), el onboarding de
@@ -8501,8 +8855,8 @@ def generate_script_from_competitor_reel(reel_id: str):
     # 1-2. Quién puede generar y cómo se paga este guion (sin cobrar todavía).
     #   paid  → cuenta contra su asignación mensual (monthly_usage).
     #   free  → 2 guiones/mes (reverse-trial) → luego topups (credits_cents) → muro.
-    SCRIPT_COST = COST_CENTS  # 18 cents
-    SCRIPT_USAGE_UNITS = 1
+    SCRIPT_COST = SCRIPT_UNITS * COST_CENTS  # econ: 3 créditos por guión
+    SCRIPT_USAGE_UNITS = SCRIPT_UNITS
     is_paid_unlimited = paid_features_active(profile, user)  # plan de pago REAL (no fantasma)
     use_free_lifetime = False
     if not is_paid_unlimited:
@@ -9882,6 +10236,44 @@ def radar_stats():
     })
 
 
+@app.route("/api/radar/refresh", methods=["POST"])
+@require_auth
+@limiter.limit("6 per minute")
+def radar_refresh():
+    """FIX2 · "Actualizar radar" a demanda: re-scrapea los competidores de la MARCA
+    activa que estén stale (>6h), reusando caché (los frescos se saltan; los privados/
+    inexistentes/en-curso también). Async (encola scrape_creator_task) → el front recarga
+    al cabo de unos segundos y entran los reels nuevos. Aísla por project_id."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    project_id = body.get("project_id") or None
+
+    q = (db.table("user_tracked_creators").select("creator_id")
+           .eq("user_id", uid).is_("archived_at", "null"))
+    if project_id:
+        q = q.eq("project_id", project_id)
+    try:
+        rows = q.execute().data or []
+    except Exception as e:
+        logger.warning("radar_refresh: tracked read failed uid=%s: %s", uid, e)
+        rows = []
+    cids = [r.get("creator_id") for r in rows if r.get("creator_id")]
+    if not cids:
+        return jsonify({"ok": True, "queued": 0, "tracked": 0,
+                        "message": "Aún no sigues a ningún competidor."})
+    try:
+        from tasks import _enqueue_if_stale
+        queued, candidates = _enqueue_if_stale(db, cids, stale_hours=6, cap=20)
+    except Exception as e:
+        logger.error("radar_refresh enqueue failed uid=%s: %s", uid, e, exc_info=True)
+        return jsonify({"ok": False, "message": "No pude actualizar el radar. Inténtalo de nuevo."}), 500
+    track_event("radar_refresh", uid, {"queued": queued, "tracked": len(cids), "project_id": project_id})
+    return jsonify({"ok": True, "queued": queued, "tracked": len(cids),
+                    "message": ("Buscando lo nuevo de tus competidores…" if queued
+                                else "Tu radar ya está al día.")})
+
+
 @app.route("/api/radar/fill-week/candidates", methods=["GET"])
 @require_auth
 def radar_fill_week_candidates():
@@ -10652,8 +11044,9 @@ def idea_scripts_generate_batch(idea_id):
     if style_arg == "hooks":
         style_arg = style_label = "viral"
 
-    # Coste del lote: COST.scripts5 = 5 créditos.
-    err, refund, _ = _charge_units_locked(uid, 5, user)
+    # Coste econ: lote de 5 guiones desde una idea = 12 cr en bloque (vs 15 sueltos),
+    # mismo precio que "Llena mi semana".
+    err, refund, _ = _charge_units_locked(uid, FILL_WEEK_UNITS, user)
     if err:
         return err
 
@@ -10782,8 +11175,9 @@ def script_hooks_generate_batch(script_id):
     original_text = script.get("hook") or (lines[0] if lines else "") or full
     user_msg = f"Guión actual:\n{context}\n\nTexto original del que salió:\n{original_text}"
 
-    # Coste del lote: COST.hooks5 = 1 crédito.
-    err, refund, _ = _charge_units_locked(uid, 1, user)
+    # Coste econ: gratis los primeros HOOKS_FREE_PER_DAY/día, luego HOOKS_EXTRA_UNITS.
+    _hk_units = _hooks_extra_units(uid)
+    err, refund, _ = _charge_units_locked(uid, _hk_units, user)
     if err:
         return err
 
@@ -10802,6 +11196,7 @@ def script_hooks_generate_batch(script_id):
         refund()
         return jsonify({"error": "llm_error",
                         "message": "No se pudieron generar hooks. Inténtalo de nuevo."}), 502
+    _hooks_mark_used(uid)   # solo avanza el cupo diario tras entregar
 
     # Persistir en alt_hooks (acumula sobre los existentes).
     existing = script.get("alt_hooks")
@@ -10879,7 +11274,9 @@ def hooks_from_source():
     user_msg = (f"Material fuente ({label}):\n{context}\n\n"
                 f"Texto base del que parte el hook:\n{original_text}")
 
-    err, refund, _ = _charge_units_locked(uid, 1, user)
+    # Coste econ: gratis los primeros HOOKS_FREE_PER_DAY/día, luego HOOKS_EXTRA_UNITS.
+    _hk_units = _hooks_extra_units(uid)
+    err, refund, _ = _charge_units_locked(uid, _hk_units, user)
     if err:
         return err
 
@@ -10898,6 +11295,7 @@ def hooks_from_source():
         refund()
         return jsonify({"error": "llm_error",
                         "message": "No se pudieron generar hooks. Inténtalo de nuevo."}), 502
+    _hooks_mark_used(uid)   # solo avanza el cupo diario tras entregar
 
     try:
         track_event("hooks_from_source", uid, {"source": source, "n": len(new_hooks)})
@@ -10989,8 +11387,10 @@ def reels_steal_batch():
         return jsonify({"error": "no_reels",
                         "message": "No hay reels válidos en tu radar para esta acción."}), 400
 
-    # Cobro: 1 crédito por reel que vamos a intentar.
-    err, refund, state = _charge_units_locked(uid, len(valid), user)
+    # Cobro econ: "Llena mi semana" = 12 cr en bloque (vs 15 sueltos). Para semanas
+    # parciales nunca cobra más que el suelto (3/reel): min(12, n×3).
+    week_units = min(FILL_WEEK_UNITS, len(valid) * SCRIPT_UNITS)
+    err, refund, state = _charge_units_locked(uid, week_units, user)
     if err:
         return err
 

@@ -115,7 +115,14 @@
     serie:["Buscando 3 ángulos que encadenan…","Escribiendo la continuidad…","Dejándolos listos para grabar…"]
   };
   var GEN_TITLE = { script:"Cocinando el guion…", hooks:"Buscando tu hook", carousel:"Montando el carrusel", linkedin:"Pasando a LinkedIn", x:"Tejiendo el hilo", serie:"Creando tu serie" };
-  var COST = { script:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:1, scripts5:5, hooks5:1, explosion:30 };
+  // econ (economia-creditos.md): 1 guión = 3 créditos. hooks "3 más" = 2 gratis/día
+  // luego 1 (ver hooksUnitsToday). "Llena mi semana" 5 guiones = 12. Regenerar = 1.
+  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:1, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30 };
+  var HOOKS_FREE_PER_DAY = 2;   // primeros "3 hooks más" del día gratis (demo + prod)
+  function hooksUnitsToday(){   // demo: 0 mientras queden gratis hoy, luego COST.hooks5
+    if(typeof S.hooksToday!=="number") S.hooksToday=0;
+    return S.hooksToday < HOOKS_FREE_PER_DAY ? 0 : COST.hooks5;
+  }
 
   /* ── estado ──────────────────────────────────────────────────── */
   var S = {
@@ -482,7 +489,7 @@
   function onbSubnicheHTML(){
     var sel=(S.onb.subniches||[]).map(function(t){ return '<span class="onb-tag on" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+' <b>×</b></span>'; }).join("");
     var sugg=onbSubSuggest().slice(0,8).map(function(t){ return '<button class="onb-tag" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+'</button>'; }).join("");
-    return onbCardWrap(onbEyebrow(L("Más concreto","Get specific")),L("Ponle 2-3 subcategorías","Add 2-3 subcategories"),
+    return onbCardWrap(onbEyebrow(L("Más concreto","Get specific")),L("¿Qué tratas dentro de "+(S.onb.niche||"lo tuyo")+"?","What do you cover in "+(S.onb.niche||"your niche")+"?"),
       L("Cuanto más específico, mejor el match: <b>cosmética orgánica</b> es mejor que <b>cosmética</b>. Elige varias o añade las tuyas.","The more specific, the better the match: <b>organic skincare</b> beats <b>skincare</b>. Pick a few or add your own."),
       '<div class="onb-tags" id="rsOnbTags">'+(sel||'<span class="onb-tags-ph">'+L("Tus etiquetas aparecerán aquí…","Your tags will show up here…")+'</span>')+'</div>'+
       '<div class="onb-tagadd"><span class="onb-hash">#</span><input id="rsOnbTagInput" class="onb-text onb-text--tag" type="text" placeholder="'+L("añade una etiqueta y Enter","add a tag and hit Enter")+'" aria-label="'+L("Añadir subnicho","Add subniche")+'"><button class="onb-tagadd-btn" data-act="onb-tag-add">'+IC.plus+'</button></div>'+
@@ -521,7 +528,7 @@
     else if((S.onb.valueReels||[]).length) cta='<span class="onb-hint" style="font-size:13px;opacity:.6;align-self:center">'+L("Toca un reel para robarlo y convertirlo en tu guion","Tap a reel to steal it and turn it into your script")+'</span>';
     else cta='<button class="btn btn-lg btn-primary onb-cta" data-act="onb-value-next">'+IC.arr+' '+L("Seguir","Continue")+'</button>';
     return onbCardWrap('<div class="onb-eyebrow">'+IC.bolt+' '+ESC(subs||L("Tu subnicho","Your subniche"))+'</div>',
-      L("Roba uno y hazlo tuyo","Steal one and make it yours"),
+      L("Esto es lo que explota en lo tuyo","This is what's blowing up in your space"),
       L("Reels reales de creadores como tú que están explotando. Elige el que más te encaje — te lo convierto en guion tuyo al instante.","Real reels from creators like you that are blowing up. Pick the one that fits — I turn it into your script instantly."),
       body+
       '<div class="onb-row">'+onbBackBtn()+cta+'</div>', true);
@@ -571,7 +578,7 @@
     // Cargando → SIN botón de avanzar (solo Atrás): no aparece antes que los resultados.
     var compCta=S.onb.compLoading ? ''
       : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick+" y seguir","Follow "+nPick+" and continue")+'</button>';
-    return onbCardWrap(onbEyebrow(L("Tu radar","Your radar")),L("¿A quién sigues de cerca?","Who do you keep an eye on?"),
+    return onbCardWrap(onbEyebrow(L("Tu radar","Your radar")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
       L("Pre-elegí a 2 de tu subnicho. Seguiré sus reels que petan para que robes el primero en tu voz. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
       body+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+compCta+'</div>');
@@ -580,7 +587,7 @@
   function onbGoalHTML(){
     var cards=ONB_GOALS.map(function(g){ var on=S.onb.goal===g.key; return '<button class="onb-goal'+(on?" on":"")+'" data-act="onb-pick-goal" data-k="'+g.key+'">'+
       '<span class="onb-goal-ic">'+(IC[g.ic]||IC.spark)+'</span><span class="onb-goal-l">'+ESC(L(g.label,g.label_en))+'</span><span class="onb-goal-d">'+ESC(L(g.desc,g.desc_en))+'</span></button>'; }).join("");
-    return onbCardWrap(onbEyebrow(L("El para qué","The why")),L("¿Qué quieres conseguir?","What do you want to achieve?"),
+    return onbCardWrap(onbEyebrow(L("El para qué","The why")),L("¿Qué buscas con esto?","What are you after?"),
       L("Con esto ajusto el tono y la estructura de tus guiones — vender no se escribe como entretener.","With this I tune the tone and structure of your scripts — selling isn't written like entertaining."),
       '<div class="onb-goals">'+cards+'</div>'+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-goal-next"'+(S.onb.goal?'':' disabled')+'>'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
@@ -589,7 +596,7 @@
   function onbCloseHTML(){
     var pct=35;
     return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Listo","Ready")+'</div>',
-      L("Listo. Te conozco al 35%.","Done. I know you at 35%."),
+      L("Tu Cerebro ya sabe lo justo para empezar","Your Brain now knows just enough to start"),
       L("Ya leí tu cuenta y a tus 2 competidores. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía). Cada día, con <b>un ejercicio de 1 minuto</b>, subo un poco más — hasta sonar clavado a ti.","I've read your account and your 2 competitors. Your Brain is a <b>context profile</b> (not a full clone of your voice yet). Each day, with a <b>1-minute exercise</b>, it climbs a bit more — until it sounds just like you."),
       '<div class="onb-brain"><div class="onb-brain-bar"><div class="onb-brain-fill" style="width:'+pct+'%"></div></div>'+
         '<div class="onb-brain-row"><span class="onb-brain-k">'+IC.brain+' '+L("Cerebro","Brain")+'</span><span class="onb-brain-v">'+pct+'%</span></div></div>'+
@@ -885,9 +892,11 @@
   function filtersHTML(){
     var base=[["explosion",IC.spark+' Explotando'],["recent","Recientes"],["fav",IC.starO+' Favoritos']];
     return '<div class="filters">'+base.map(function(f){return '<button class="fchip'+(S.filter===f[0]?" on":"")+'" data-act="filter" data-k="'+f[0]+'">'+f[1]+'</button>';}).join("")+
-      '<button class="fchip ghost" data-act="add-comp" title="Sigue a un creador para ver sus reels en el Radar">'+IC.plus+' Añadir competidor</button>'+
-      '<button class="fchip ghost" data-act="add-reel" title="Pega la URL de un reel para meterlo al ecosistema">'+IC.plus+' Añadir reel</button>'+
-    '</div>';
+      '<button class="fchip ghost'+(S.addCompOpen?" on":"")+'" data-act="add-comp" title="Sigue a un creador para ver sus reels en el Radar">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+      '<button class="fchip ghost" data-act="add-reel" title="Pega la URL de un reel para meterlo al ecosistema">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
+      '<span style="flex:1"></span>'+
+      '<button class="fchip ghost" data-act="refresh-radar" title="'+L("Busca lo nuevo de tus competidores","Check what\'s new from your competitors")+'">'+IC.repeat+' '+L("Actualizar radar","Refresh radar")+'</button>'+
+    '</div>'+addCompInlineHTML()+analyzingBannerHTML();
   }
 
   // SPEC #3: cuando el radar se llena con el SEED del nicho (user sin competidores
@@ -1637,13 +1646,18 @@
   // #2 conversión: guiones restantes HOY (tope diario del trial). null si no es free.
   function freeStealsLeft(){ if(!isFree()) return null; return (S.user.dayLeft!=null ? S.user.dayLeft : 3); }
 
-  /* Flash de 1ª compra (Fathom 18/06, palanca nº1 de conversión): al cruzar el primer
-     muro, -30% el 1er mes de Creator durante 48h, con countdown HONESTO (deadline fijo
-     en localStorage → no se resetea al recargar). En prod: crear producto/precio temporal
-     en la pasarela y validar el % (David). */
-  var FLASH_PCT=30, FLASH_HOURS=48;
+  /* Flash por-usuario (economia-creditos.md §4): al cruzar el PRIMER muro, el Pack de
+     FLASH_PACK_CR créditos baja a €FLASH_PACK_EUR (antes €FLASH_PACK_WAS) durante 48h,
+     con countdown HONESTO (deadline fijo en localStorage → no se resetea al recargar).
+     En prod el price a 29€ lo crea David en Whop (env WHOP_TOPUP_300_FLASH_*). El estado
+     real llega en /auth/me.topup_flash; en demo arranca al cruzar el muro. */
+  var FLASH_HOURS=48, FLASH_PLAN_PCT=40, FLASH_PLAN_EUR=29;
+  var FLASH_PACK_CR=300, FLASH_PACK_EUR=29, FLASH_PACK_WAS=49;
   function flashKey(){ return isDemo()?"rs_flash_demo":"rs_flash_v1"; }
-  function flashDeadline(){ try{ var v=localStorage.getItem(flashKey()); return v?parseInt(v,10):(S._flashDl||0); }catch(e){ return S._flashDl||0; } }
+  function flashDeadline(){
+    var bk=S.user&&S.user.topupFlash; if(bk&&bk.active&&bk.expires_at){ var t=Date.parse(bk.expires_at); if(t>0) return t; }
+    try{ var v=localStorage.getItem(flashKey()); return v?parseInt(v,10):(S._flashDl||0); }catch(e){ return S._flashDl||0; }
+  }
   function startFlash(){ if(flashDeadline()>0) return; var dl=Date.now()+FLASH_HOURS*3600*1000; S._flashDl=dl; try{ localStorage.setItem(flashKey(),String(dl)); }catch(e){} }
   function flashActive(){ if(!isFree() && !isTrial()) return false; var dl=flashDeadline(); return dl>0 && (dl-Date.now())>1000; }
   function flashRemainStr(){
@@ -1651,16 +1665,20 @@
     var h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60, p=function(n){return (n<10?"0":"")+n;};
     return p(h)+":"+p(m)+":"+p(ss);
   }
+  // popups-flash.html · muro in-app: LIDERA con el PLAN (Creator −40%, "lo que ChatGPT
+  // no hace"), WELCOME auto-aplicado; el top-up 300 queda como alternativa secundaria.
   function flashBannerHTML(){
     if(!flashActive()) return '';
-    var price=Math.round(29*(1-FLASH_PCT/100));   // €29 → €20
-    return '<div class="flash-offer" data-act="open-plans" role="button" tabindex="0" aria-label="Oferta: primer mes de Creator con 30% de descuento">'+
-      '<span class="flash-badge">−'+FLASH_PCT+'%</span>'+
-      '<div class="flash-txt"><b>'+L("Tu primer mes de Creator a €"+price,"Your first month of Creator for €"+price)+'</b>'+
-        '<span>'+L("Solo por cruzar el muro hoy","Just for hitting the wall today")+' · <s>€29</s> → <b>€'+price+'</b></span></div>'+
+    var now=Math.round(FLASH_PLAN_EUR*(1-FLASH_PLAN_PCT/100)*100)/100;        // 29 → 17.40
+    var nowTxt=(now%1?String(now.toFixed(2)).replace(".",","):String(now));
+    return '<div class="flash-offer" data-act="flash-cta" role="button" tabindex="0" aria-label="Oferta: Creator a −40% el primer mes">'+
+      '<span class="flash-badge">−'+FLASH_PLAN_PCT+'%</span>'+
+      '<div class="flash-txt"><b>'+L("Sigue con Creator · −40% tu primer mes","Stay on Creator · −40% your first month")+'</b>'+
+        '<span>'+L("Lo que ChatGPT no hace: te digo qué explota y te lo robo en tu voz","What ChatGPT won't: I tell you what's blowing up and steal it in your voice")+' · <s>€'+FLASH_PLAN_EUR+'</s> → <b>€'+nowTxt+'</b> · WELCOME ✓</span></div>'+
       '<div class="flash-cd-wrap"><span class="flash-cd-k">'+L("Termina en","Ends in")+'</span><span class="flash-cd" id="rsFlashCd">'+flashRemainStr()+'</span></div>'+
-      '<span class="flash-cta">'+L("Aprovéchalo","Grab it")+' '+IC.arr+'</span>'+
-    '</div>';
+      '<span class="flash-cta">'+L("Quiero el −40%","Grab −40%")+' '+IC.arr+'</span>'+
+    '</div>'+
+    '<button class="flash-alt" data-act="flash-topup">'+L("¿Solo un empujón? "+FLASH_PACK_CR+" créditos (~100 robos) por €"+FLASH_PACK_EUR,"Just a boost? "+FLASH_PACK_CR+" credits (~100 steals) for €"+FLASH_PACK_EUR)+'</button>';
   }
   // Countdown vivo: actualiza el reloj cada segundo; al expirar, re-render (quita el banner).
   function ensureFlashCountdown(){
@@ -1693,9 +1711,14 @@
     var learned=(m.learned||[]).map(function(l){ return '<div class="learn-item">'+IC.check+'<span>'+ESC(l)+'</span></div>'; }).join("");
     var top=m.top?('<div class="met-top">'+IC.spark+' <b>Top:</b> '+ESC(m.top.title)+' — '+ESC(m.top.views)+' views</div>'):"";
     var hasVideos=metricVideos().length>0;
-    // El panel de datos (stats + chart + grid) es lo premium → borroso en free.
-    var data=hasVideos?(metricStatsHTML()+metricChartHTML()+metricGridHTML()):'<div class="rs-empty">Pulsa “Actualizar reels” para traer tus métricas.</div>';
-    var panel=isFree()?metricsLockHTML(data):data;
+    // Sub-vistas del mockup Métricas.dc.html: Resumen / Audiencia / Competidores.
+    var mv=S.metricView||"resumen";
+    function _mtab(k,es,en){ return '<button class="met-subtab'+(mv===k?" on":"")+'" data-act="metric-view" data-k="'+k+'"'+(mv===k?' aria-current="page"':'')+'>'+L(es,en)+'</button>'; }
+    var subnav='<div class="met-subnav" role="tablist">'+_mtab("resumen","Resumen","Overview")+_mtab("audiencia","Audiencia","Audience")+_mtab("competidores","Competidores","Competitors")+'</div>';
+    // El panel de datos es lo premium → borroso en free (el sub-nav queda FUERA del blur, navegable).
+    var resumen=hasVideos?(metricStatsHTML()+metricChartHTML()+metricGridHTML()):'<div class="rs-empty">Pulsa “Actualizar reels” para traer tus métricas.</div>';
+    var inner=mv==="audiencia"?metricAudienceHTML():(mv==="competidores"?metricCompeteHTML():resumen);
+    var panel=subnav+(isFree()?metricsLockHTML(inner):inner);
     return '<div class="scroll"><div class="canvas">'+
       pheadHTML("Métricas · @"+(b.handle||S.user.handle||""), "Métricas", "Tus reels al detalle — y lo que el sistema aprende de ellos para crear mejor.")+
       '<div class="met-acct"><span class="met-acct-ig">'+IC.ig+' @'+ESC(b.handle||"tu_cuenta")+'</span>'+
@@ -1708,6 +1731,74 @@
       '</div>'+
       top+panel+
     '</div></div>';
+  }
+  /* MÉTRICAS · Audiencia (mockup Métricas.dc.html). En prod los datos vienen de las
+     audience-insights de IG; aquí, deterministas por handle (vía _lbHash) para que el
+     layout viva. GAP: falta el endpoint de audience-insights — el render ya está listo. */
+  function metricAudienceHTML(){
+    var b=brand(), h=(b.handle||S.user.handle||"tu_cuenta");
+    var newF=_lbHash(h+"nf",1200,3600);
+    var trend=[]; for(var i=0;i<14;i++){ trend.push(34+_lbHash(h+"t"+i,0,60)); }
+    var tmax=Math.max.apply(null,trend);
+    var bars=trend.map(function(v){ return '<span class="aud-gcol"><i style="height:'+Math.round(v/tmax*100)+'%"></i></span>'; }).join("");
+    var nonF=58+_lbHash(h+"nf2",0,10), foll=100-nonF;
+    var ed=[["18–24",22],["25–34",41],["35–44",24],["45+",13]], edmax=41;
+    var edHTML=ed.map(function(e){ return '<div class="aud-row"><div class="aud-rowt"><span>'+e[0]+'</span><b>'+e[1]+'%</b></div><div class="aud-track"><i style="width:'+Math.round(e[1]/edmax*100)+'%"></i></div></div>'; }).join("");
+    var men=60+_lbHash(h+"g",0,8), women=100-men;
+    var locs=[["España",38],["México",19],["Argentina",12],["Colombia",9],["EE. UU.",7]], lmax=38;
+    var locHTML=locs.map(function(l){ return '<div class="aud-row"><div class="aud-rowt"><span>'+l[0]+'</span><b>'+l[1]+'%</b></div><div class="aud-track"><i class="g" style="width:'+Math.round(l[1]/lmax*100)+'%"></i></div></div>'; }).join("");
+    return '<div class="aud-wrap">'+
+      '<div class="aud-grid2">'+
+        '<div class="aud-card"><div class="aud-head"><span class="aud-t">'+L("Crecimiento de seguidores","Follower growth")+'</span><span class="aud-up">▲ +'+_fmtK(newF)+'</span></div><div class="aud-graph">'+bars+'</div></div>'+
+        '<div class="aud-card"><span class="aud-t">'+L("Alcance por tipo","Reach by type")+'</span>'+
+          '<div class="aud-rows"><div class="aud-row"><div class="aud-rowt"><span>'+L("No seguidores","Non-followers")+'</span><b>'+nonF+'%</b></div><div class="aud-track"><i style="width:'+nonF+'%"></i></div></div>'+
+          '<div class="aud-row"><div class="aud-rowt"><span>'+L("Seguidores","Followers")+'</span><b>'+foll+'%</b></div><div class="aud-track"><i class="dim" style="width:'+foll+'%"></i></div></div></div>'+
+          '<p class="aud-note">'+L("Llegas más a gente nueva que a tu base. ","You reach more new people than your base. ")+'<b>'+L("Creces, no reciclas.","You\'re growing, not recycling.")+'</b></p></div>'+
+      '</div>'+
+      '<div class="aud-grid3">'+
+        '<div class="aud-card"><span class="aud-t">'+L("Edad","Age")+'</span><div class="aud-rows">'+edHTML+'</div></div>'+
+        '<div class="aud-card"><span class="aud-t">'+L("Género","Gender")+'</span><div class="aud-gen"><i style="width:'+men+'%"></i><i class="dim" style="width:'+women+'%"></i></div>'+
+          '<div class="aud-genleg"><span><span class="aud-dot"></span>'+L("Hombres","Men")+' '+men+'%</span><span><span class="aud-dot dim"></span>'+L("Mujeres","Women")+' '+women+'%</span></div>'+
+          '<p class="aud-note">'+L("Sobre todo ","Mostly ")+'<b>'+L("hombres de 25–34","men 25–34")+'</b>. '+L("Háblales a ellos.","Speak to them.")+'</p></div>'+
+        '<div class="aud-card"><span class="aud-t">'+L("Top ubicaciones","Top locations")+'</span><div class="aud-rows">'+locHTML+'</div></div>'+
+      '</div>'+
+    '</div>';
+  }
+  /* MÉTRICAS · Competidores (mockup Métricas.dc.html): tabla tú-vs-rivales + cuota de
+     atención + "hueco detectado" ("@x publica 6×/sem, tú 5"). Reusa leaderboardRows()
+     para que los rivales sean los mismos del resto de la isla. */
+  function metricCompeteHTML(){
+    var rows=leaderboardRows();
+    var me=rows.filter(function(r){return r.you;})[0]||{handle:(brand().handle||"tu_cuenta"),followers:42000};
+    var head='<div class="cmp-row cmp-head"><span class="cmp-acct">'+L("cuenta","account")+'</span><span>'+L("seguidores","followers")+'</span><span>'+L("repros medias","avg views")+'</span><span>'+L("interacción","engagement")+'</span><span>'+L("explota","explodes")+'</span></div>';
+    var body=rows.slice(0,6).map(function(r){
+      var you=!!r.you;
+      var views=_lbHash(r.handle+"v",18,260)/10;
+      var eng=(_lbHash(r.handle+"e",18,72)/10).toFixed(1);
+      var ratio=(_lbHash(r.handle+"r",11,34)/10).toFixed(1);
+      return '<div class="cmp-row'+(you?' me':'')+'">'+
+        '<span class="cmp-acct"><span class="cmp-ava">'+ESC(initialsOf(r.handle))+'</span><span class="cmp-h">@'+ESC(r.handle)+(you?' <em>'+L("tú","you")+'</em>':'')+'</span></span>'+
+        '<span class="cmp-n">'+_fmtK(r.followers)+'</span>'+
+        '<span class="cmp-n">'+views.toFixed(1)+'K</span>'+
+        '<span class="cmp-n">'+eng+'%</span>'+
+        '<span class="cmp-ratio">'+ratio+'×</span></div>';
+    }).join("");
+    var others=rows.filter(function(r){return !r.you;});
+    var rival=others[0]||{handle:"tu_rival"};
+    var rivalCad=4+_lbHash((rival.handle||"r")+"c",0,4), myCad=Math.max(2,rivalCad-1);
+    var share=[["@"+(rival.handle||"rival"),34,'var(--text-primary)'],[L("Tú","You")+" @"+(me.handle||"tu_cuenta"),21,'var(--brand-500)'],["@"+((others[1]||{}).handle||"otro"),18,'var(--text-secondary)'],[L("El resto","The rest"),27,'var(--text-tertiary)']];
+    var smax=34;
+    var shareHTML=share.map(function(s){ return '<div class="aud-row"><div class="aud-rowt"><span style="color:'+s[2]+'">'+ESC(s[0])+'</span><b>'+s[1]+'%</b></div><div class="aud-track"><i style="width:'+Math.round(s[1]/smax*100)+'%;background:'+s[2]+'"></i></div></div>'; }).join("");
+    return '<div class="aud-wrap">'+
+      '<div class="cmp-table">'+head+body+'</div>'+
+      '<div class="aud-grid2">'+
+        '<div class="aud-card"><div class="aud-head"><span class="aud-t">'+L("Cuota de atención del nicho","Niche share of voice")+'</span><span class="cmp-sub">'+L("repros · 30 días","views · 30d")+'</span></div><div class="aud-rows">'+shareHTML+'</div></div>'+
+        '<div class="cmp-gap"><span class="cmp-gap-k">'+L("› hueco detectado","› gap found")+'</span>'+
+          '<h3 class="cmp-gap-h">@'+ESC(rival.handle||"rival")+' '+L("publica","posts")+' '+rivalCad+'×/'+L("sem","wk")+'. '+L("Tú","You")+', '+myCad+'. '+L("Pero tu interacción por reel es mayor.","But your engagement per reel is higher.")+'</h3>'+
+          '<p class="cmp-gap-p">'+L("Mismo esfuerzo, más retorno: te falta volumen, no calidad. Roba un tema más esta semana.","Same effort, more return: you lack volume, not quality. Steal one more topic this week.")+'</p>'+
+          '<button class="btn btn-sm btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Ver sus reels en el Radar","See their reels in the Radar")+'</button></div>'+
+      '</div>'+
+    '</div>';
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -2076,6 +2167,81 @@
       if(r.ok && r.d && Array.isArray(r.d.tracked)){ S.tracked=r.d.tracked; if(S.tab==="brain"||S.tab==="dashboard") render(); brainLevelPulse(); }
     });
   }
+
+  /* ── FIX2 · Radar "del tirón": añadir competidor DESDE el Radar (inline, sin la
+     chrome legacy) → auto-análisis async (scrape+transcribe) con estado "analizando
+     tu nicho…" no bloqueante; cuando el scrape termina, sus reels entran en el radar.
+     Más el botón "Actualizar radar" (refresca a demanda, reusa caché). ── */
+  function addCompInlineHTML(){
+    if(!S.addCompOpen) return '';
+    return '<div class="comp-add"><span class="comp-add-at">@</span>'+
+      '<input id="rsCompAddInput" class="comp-add-input" type="text" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="'+L("usuario de Instagram y Enter","Instagram handle, then Enter")+'" aria-label="'+L("Añadir competidor","Add competitor")+'">'+
+      '<button class="btn btn-sm btn-primary" data-act="comp-add-submit">'+IC.bolt+' '+L("Analizar","Analyze")+'</button>'+
+      '<button class="comp-add-x" data-act="add-comp" aria-label="'+L("Cerrar","Close")+'">'+IC.x+'</button>'+
+    '</div>';
+  }
+  function analyzingBannerHTML(){
+    var hs=Object.keys(S.analyzing||{}); if(!hs.length) return '';
+    return '<div class="analyzing-banner"><span class="analyzing-spin"></span>'+
+      '<span class="analyzing-txt"><b>'+L("Analizando tu nicho","Analyzing your niche")+'</b> — '+hs.map(function(h){return '@'+ESC(h);}).join(", ")+
+      '. '+L("Sus reels entrarán en el radar en cuanto termine.","Their reels hit the radar as soon as it's done.")+'</span></div>';
+  }
+  function toggleAddComp(){ S.addCompOpen=!S.addCompOpen; render(); if(S.addCompOpen){ setTimeout(function(){ var i=document.getElementById("rsCompAddInput"); if(i) i.focus(); },30); } }
+  function submitAddComp(){ var i=document.getElementById("rsCompAddInput"); addCompetitorFromRadar(i?i.value:""); }
+  function addCompetitorFromRadar(handle){
+    handle=(handle||"").trim().replace(/^@+/,"").toLowerCase();
+    if(!/^[a-zA-Z0-9._]{1,30}$/.test(handle)){ return showError(L("Pon un @usuario de Instagram válido.","Enter a valid Instagram @handle.")); }
+    S.addCompOpen=false;
+    if(isDemo()){   // demo: simula el auto-análisis no bloqueante
+      S.analyzing=S.analyzing||{}; S.analyzing[handle]=true; render();
+      showToast(L("Analizando a @"+handle+"…","Analyzing @"+handle+"…"));
+      setTimeout(function(){ if(S.analyzing) delete S.analyzing[handle]; if(typeof applyDemoBrand==="function") applyDemoBrand(); render(); showToast(L("@"+handle+" ya está en tu radar.","@"+handle+" is now in your radar.")); },2600);
+      return;
+    }
+    var body={ ig_username:handle, source:"radar" };
+    var _pid=_pidOf(S.brandId); if(isAgency()&&_pid) body.project_id=_pid;
+    showToast(L("Añadiendo a @"+handle+"…","Adding @"+handle+"…"));
+    apiPost("/api/tracked-creators", body).then(function(r){
+      if(!r.ok){
+        if(r.status===402||(r.d&&r.d.error==="no_credits")) return showPaywall("no_credits");
+        if(r.d&&r.d.error==="tc.error.already_tracking"){ return showToast(L("Ya seguías a @"+handle+".","Already following @"+handle+".")); }
+        if(r.d&&r.d.error==="tc.error.plan_limit_reached"){ return showPaywall("tracked_creators"); }
+        return showError((r.d&&r.d.message)||L("No pude añadir a @"+handle+".","Couldn't add @"+handle+"."));
+      }
+      S.analyzing=S.analyzing||{}; S.analyzing[handle]=true;
+      loadTracked(); render();
+      showToast(L("Analizando a @"+handle+" — sus reels entrarán en el radar en un momento.","Analyzing @"+handle+" — its reels will hit your radar shortly."));
+      pollAnalyzing(handle,0);
+    });
+  }
+  function pollAnalyzing(handle,tries){
+    if(tries>20){ if(S.analyzing) delete S.analyzing[handle]; render(); return; }
+    setTimeout(function(){
+      var _pid=_pidOf(S.brandId);
+      apiGet("/api/tracked-creators"+(_pid?("?project_id="+encodeURIComponent(_pid)):"")).then(function(r){
+        var done=false;
+        if(r.ok&&r.d&&Array.isArray(r.d.tracked)){
+          S.tracked=r.d.tracked;
+          var c=r.d.tracked.filter(function(t){ return ((t.creator&&t.creator.ig_username)||t.ig_username)===handle; })[0];
+          var st=c&&c.creator&&c.creator.scrape_status;
+          if(st==="ok"||st==="failed"||st==="private"||st==="not_found") done=true;
+        }
+        if(done){ if(S.analyzing) delete S.analyzing[handle]; loadBrandData(); }
+        else { pollAnalyzing(handle,tries+1); }   // el spinner es CSS → sin re-render por tick
+      });
+    }, 3000);
+  }
+  function refreshRadar(){
+    if(isDemo()){ if(typeof applyDemoBrand==="function") applyDemoBrand(); render(); return showToast(L("Radar actualizado.","Radar refreshed.")); }
+    showToast(L("Actualizando el radar…","Refreshing the radar…"));
+    var _pid=_pidOf(S.brandId);
+    apiPost("/api/radar/refresh", _pid?{project_id:_pid}:{}).then(function(r){
+      if(!r.ok){ return showError((r.d&&r.d.message)||L("No pude actualizar el radar.","Couldn't refresh the radar.")); }
+      var n=(r.d&&r.d.queued)||0;
+      showToast((r.d&&r.d.message)||L("Radar al día.","Radar up to date."));
+      setTimeout(loadBrandData, n?4500:300);   // da tiempo al scrape; reusa caché si nada stale
+    });
+  }
   /* ── Cerebro 3D (WebGL, lazy) ──────────────────────────────────────────────
      Three.js (vendado) + brain3d.js se cargan SOLO al abrir Cerebro. Si no es
      elegible (reduced-motion, sin WebGL, headless del harness, o fallo de carga)
@@ -2402,14 +2568,23 @@
     }
 
     return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Cerebro · @"+(b.handle||S.user.handle||""), "El cerebro de "+b.name, "Todo lo que el sistema sabe de esta marca, y cómo crece. Cuanto más creas y publicas, más tuyo suena todo.")+
-      // hero de nivel + voz
+      pheadHTML("Cerebro · @"+(b.handle||S.user.handle||""), "Tu Cerebro", "Aprende tu voz reel a reel. Cuanto más creas, más clava tu tono — y antes escribe solo.")+
+      // hero: ANILLO circular (brainProgress%) + nivel + voz (mockup Cerebro.dc.html).
+      // El 3D se conserva oculto (la lógica de ensureBrain3D sigue, sin saturar el render).
       '<div class="brain-hero">'+
-        '<div id="rsBrainStage" class="brain3d-stage"><div class="brain-orb brain3d-fallback">'+IC.brain+'</div></div>'+
+        '<div class="brain-ring">'+
+          '<svg width="158" height="158" viewBox="0 0 172 172" class="brain-ring-svg" aria-hidden="true">'+
+            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
+            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+Math.round(465*(1-brainProgress()/100))+'" class="brain-ring-prog"/>'+
+          '</svg>'+
+          '<div class="brain-ring-c">'+IC.brain+'<span class="brain-ring-lvl">NIVEL <b>'+lv.level+'</b></span></div>'+
+        '</div>'+
+        '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
         '<div class="brain-hero-body">'+
-          '<div class="brain-lvl">Nivel '+lv.level+' · '+ESC(ecoLevelName(lv.level))+(lv.level>=4?' <span class="brain-pro" title="Eres Pro Reelscript — acceso a grupos solo-pros">'+IC.star+' Pro</span>':'')+'</div>'+
+          '<div class="brain-kicker">'+ESC(ecoLevelName(lv.level))+(lv.level>=4?' · '+IC.star+' Pro':'')+'</div>'+
           '<div class="brain-voiceline">Te conozco al <b>'+brainProgress()+'%</b></div>'+
-          '<div class="eco-bar" style="margin:10px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,brainProgress())+'%"></div></div>'+
+          (lv.next?'<div class="brain-prog-row"><span>Progreso al Nivel '+lv.next+'</span><span class="brain-prog-pct">'+brainProgress()+'%</span></div>':'')+
+          '<div class="eco-bar" style="margin:6px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,brainProgress())+'%"></div></div>'+
           // B2: umbrales VISIBLES del siguiente nivel (checklist ✓/○) + UNA acción primaria
           // (la primera carencia). B4: el beneficio es real — voz y ganadores entran en el prompt.
           (lv.next
@@ -2596,6 +2771,8 @@
     var r=S.reel,s=r.script||{hook:"",beats:[],close:""};
     var beats=(s.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
     return '<div class="script-wrap fade-in"><div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div><div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
+      '<div class="script-acts"><button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>'+
+        '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
       '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+conveyorHTML()+'</div>';
   }
   function formatResultHTML(kind){
@@ -2667,14 +2844,48 @@
   }
   function submitSheet(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSubmit); }
   function submitSheetSecondary(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSecondary); }
+  var _tpPlay='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
+  var _tpPause='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>';
+  function _tpMMSS(ms){ var t=Math.floor(ms/1000),m=Math.floor(t/60),x=t%60; return (m<10?'0':'')+m+':'+(x<10?'0':'')+x; }
   function teleprompterHTML(){
     var r=S.reel||{creator:{handle:""},script:{hook:"",beats:[],close:""}};
     var s=r.script||{hook:"",beats:[],close:""};
+    if(!S.tp) S.tp={ playing:false, speed:3, fontPx:34, mirror:false, recording:false, ms:0, countdown:0 };
+    var tp=S.tp;
     var body='<p class="hook">'+ESC(s.hook)+'</p>'+(s.beats||[]).map(function(b){return '<p>'+ESC(b)+'</p>';}).join("")+(s.close?'<p>'+ESC(s.close)+'</p>':"");
-    var src=(r.creator&&r.creator.handle)?'@'+ESC(r.creator.handle)+' · en tu voz':'en tu voz';
-    return '<div class="overlay prompter" role="dialog" aria-modal="true" aria-label="Teleprompter"><div class="obar"><button class="back" data-act="tp-back" aria-label="Volver">'+IC.back+'</button><span class="otitle">Teleprompter</span><span style="flex:1"></span><span style="font-size:12px;color:rgba(255,255,255,.5)">'+src+'</span></div>'+
-      '<div class="tp-scroll"><div class="tp-text">'+body+'</div></div>'+
-      '<div class="tp-foot"><button class="btn btn-lg" style="background:rgba(255,255,255,.12);color:#fff;border:none;flex:0 0 auto" data-act="tp-back">Aún no</button><button class="btn btn-lg btn-primary" data-act="recorded">'+IC.check+' Ya lo grabé</button></div></div>';
+    var rec = tp.recording ? '<span class="tp-rec"><span class="tp-rec-dot"></span>REC <b id="rsTpTimer">'+_tpMMSS(tp.ms)+'</b></span>' : '';
+    var cd = tp.countdown>0 ? '<div class="tp-cd"><span>'+tp.countdown+'</span></div>' : '';
+    return '<div class="overlay prompter" role="dialog" aria-modal="true" aria-label="Teleprompter">'+
+      '<div class="obar"><button class="back" data-act="tp-back" aria-label="Volver">'+IC.back+'</button>'+
+        '<span class="otitle">Teleprónter</span>'+
+        '<span class="tp-srctitle">'+ESC(s.hook||((r.creator&&r.creator.handle)?'@'+r.creator.handle:'tu guion'))+'</span>'+
+        '<span style="flex:1"></span>'+rec+'</div>'+
+      '<div class="tp-scroll" id="rsTpScroll"><div class="tp-guide"></div><div class="tp-text'+(tp.mirror?' mirror':'')+'" id="rsTpText" style="font-size:'+tp.fontPx+'px">'+body+'</div></div>'+
+      cd+
+      '<div class="tp-bar">'+
+        '<button class="tp-ctl'+(tp.playing?' on':'')+'" data-act="tp-play" aria-label="'+(tp.playing?'Pausa':'Play')+'">'+(tp.playing?_tpPause:_tpPlay)+'</button>'+
+        '<button class="tp-ctl" data-act="tp-restart" aria-label="Reiniciar">'+IC.repeat+'</button>'+
+        '<div class="tp-grp"><span class="tp-grp-l">Velocidad</span><button class="tp-mini" data-act="tp-speed" data-k="down" aria-label="Menos velocidad">−</button><span class="tp-grp-v">×'+tp.speed+'</span><button class="tp-mini" data-act="tp-speed" data-k="up" aria-label="Más velocidad">+</button></div>'+
+        '<div class="tp-grp"><span class="tp-grp-l">Texto</span><button class="tp-mini" data-act="tp-font" data-k="down" aria-label="Texto más pequeño">A−</button><button class="tp-mini" data-act="tp-font" data-k="up" aria-label="Texto más grande">A+</button></div>'+
+        '<button class="tp-ctl'+(tp.mirror?' on':'')+'" data-act="tp-mirror" aria-label="Espejo">'+IC.repeat+'</button>'+
+        '<span style="flex:1"></span>'+
+        '<button class="btn btn-lg '+(tp.recording?'tp-stop':'btn-primary')+'" data-act="tp-record">'+(tp.recording?'Detener':IC.mic+' Grabar')+'</button>'+
+        '<button class="btn btn-lg tp-done" data-act="recorded">'+IC.check+' Ya lo grabé</button>'+
+      '</div></div>';
+  }
+  // Auto-scroll + timer del teleprónter (manipulan el DOM directo → no re-render por tick).
+  function tpScrollStart(){ clearInterval(S.tpScrollTimer); S.tpScrollTimer=setInterval(function(){ var el=document.getElementById("rsTpScroll"); if(!el){ clearInterval(S.tpScrollTimer); return; } el.scrollTop += (S.tp?S.tp.speed:3); if(el.scrollTop+el.clientHeight>=el.scrollHeight-2 && S.tp){ S.tp.playing=false; clearInterval(S.tpScrollTimer); render(); } },32); }
+  function tpScrollStop(){ clearInterval(S.tpScrollTimer); }
+  function tpTimerStart(){ clearInterval(S.tpTimer); S.tpTimer=setInterval(function(){ if(!S.tp||!S.tp.recording){ clearInterval(S.tpTimer); return; } S.tp.ms+=250; var t=document.getElementById("rsTpTimer"); if(t) t.textContent=_tpMMSS(S.tp.ms); },250); }
+  function tpRecordCountdown(){
+    if(!S.tp) return; S.tp.countdown=3; render();
+    clearInterval(S.tpCdTimer);
+    S.tpCdTimer=setInterval(function(){
+      if(!S.tp){ clearInterval(S.tpCdTimer); return; }
+      S.tp.countdown-=1;
+      if(S.tp.countdown<=0){ clearInterval(S.tpCdTimer); S.tp.countdown=0; S.tp.recording=true; S.tp.ms=0; S.tp.playing=true; render(); tpTimerStart(); }
+      else render();
+    },1000);
   }
   function fillReels(){ return S.reels.slice().sort(function(a,b){return (b.explosion||0)-(a.explosion||0);}).slice(0,5); }
   function fillWeekHTML(reels,phase){
@@ -2747,11 +2958,18 @@
     else if(S.view==="fillweek") html+='<div class="overlay" role="dialog" aria-modal="true" aria-label="Llena mi semana"><div class="obar"><button class="back" data-act="close-feed" aria-label="Cerrar">'+IC.x+'</button><span class="otitle">Llena mi semana</span></div><div class="oscroll" id="rsFillHost">'+fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase)+'</div></div>';
     if(S.communityInfo) html+=communityInfoModalHTML();   // mini-modal «Más información» Comunidad
     if(S.sheet) html+=sheetHTML();   // T2: el sheet de entrada va SOBRE cualquier overlay
+    // Teleprónter: preservar la posición de scroll a través del re-render (los toggles
+    // de play/velocidad/texto re-pintan; sin esto el scroll saltaría a 0).
+    var _tpScroll=null; if(S.view==="prompter"){ var _tpe=document.getElementById("rsTpScroll"); if(_tpe) _tpScroll=_tpe.scrollTop; }
     view.innerHTML=html;
+    if(_tpScroll!=null){ var _tpe2=document.getElementById("rsTpScroll"); if(_tpe2) _tpe2.scrollTop=_tpScroll; }
     // T4: el error persistente sobrevive a los re-render mutando el nodo estable.
     var errN=document.getElementById("rsErr"),errM=document.getElementById("rsErrMsg");
     if(errN&&errM){ if(S.errMsg){ errM.textContent=S.errMsg; errN.classList.add("show"); } else { errN.classList.remove("show"); } }
     if(S.view==="gen") startGenSteps();
+    // Teleprónter: gestiona auto-scroll/timer según estado (sin re-render por tick).
+    if(S.view==="prompter"){ if(S.tp&&S.tp.playing) tpScrollStart(); else tpScrollStop(); if(S.tp&&S.tp.recording) tpTimerStart(); }
+    else { tpScrollStop(); clearInterval(S.tpTimer); clearInterval(S.tpCdTimer); if(S.tp){ S.tp.playing=false; S.tp.recording=false; } }
     // Cerebro 3D: monta/re-ancla al entrar en la pestaña Cerebro, pausa al salir.
     if(S.tab==="brain"){ ensureBrain3D(); ensureBrainTrain(); } else pauseBrain3D();
     ensureFlashCountdown();   // tic-tac del reloj de la oferta flash si está visible
@@ -3143,6 +3361,30 @@
       else { refreshCredits().then(function(){ flashSpark(0); }); }
     });
   }
+  /* Editor · "Regenerar guion" = re-tira del mismo material por COST.regen (1 cr),
+     más barato que un guión nuevo (3 cr). Demo: descuenta local y refresca. Prod:
+     endpoint dedicado /scripts/<id>/regenerate (gap D1 cerrado) — cobra 1, no 3. */
+  function regenInEditor(id){
+    var g = guionById(id) || (S.activeGuionId && guionById(S.activeGuionId));
+    if(isDemo()){
+      if(!isTrial()){
+        if((S.user.credits||0) < COST.regen){ return showPaywall("no_credits"); }
+        spend(COST.regen);
+      }
+      if(g){ var ns=makeScript(g.title||g.hook||""); g.hook=ns.hook; g.title=ns.hook; g.beats=ns.beats; g.close=ns.close; }
+      render(); flashSpark(-COST.regen); showToast("Guion regenerado (−"+COST.regen+" créd.).");
+      return;
+    }
+    var sid = g && g._sid;
+    if(!sid){ return showToast(L("Este guion aún no está guardado.","This script isn't saved yet.")); }
+    showToast(L("Regenerando…","Regenerating…"));
+    apiPost("/scripts/"+encodeURIComponent(sid)+"/regenerate", {}).then(function(r){
+      if(!r.ok || !r.d || !r.d.script){ return showPaywallOrError(r); }
+      if(g){ g.hook=r.d.hook||g.hook; g.title=r.d.title||g.title; g.beats=Array.isArray(r.d.body)?r.d.body:g.beats; g.close=r.d.closing||g.close; }
+      applyCredits(r.d, COST.regen); render(); showToast(L("Guion regenerado.","Script regenerated."));
+    });
+    return;
+  }
   /* Loop continuity (Fathom): al robar/descartar, el reel sale del radar y entra el
      siguiente con más explosión (sorted[0] promueve el próximo). En demo, si el feed
      se vacía, re-siembra (sensación de "siempre hay señales nuevas"). */
@@ -3295,7 +3537,7 @@
   function startFillWeek(){
     var reels=fillReels();
     S._fillGuionIds=[]; S._fillResult=null; S._fillErr=null; S.view="fillweek"; S._fillPhase=0; render();
-    if(isDemo()){ spend(reels.length); bumpEco(reels.length,reels.length); flashSpark(-reels.length); runFillPhase(); return; }
+    if(isDemo()){ var fw=Math.min(COST.fillweek, reels.length*COST.script); spend(fw); bumpEco(reels.length,reels.length); flashSpark(-fw); runFillPhase(); return; }
     // Prod: dispara el lote real (/reels/steal-batch). La animación corre en
     // paralelo; al completar la fase, aterrizamos los guiones REALES del backend.
     apiPost("/reels/steal-batch",{count:Math.max(1,reels.length)||5}).then(function(r){
@@ -3500,7 +3742,7 @@
   }
   function gen5hooks(scriptId, btn){
     var sc=findScript(scriptId); if(!sc) return;
-    if(isDemo()){ spend(COST.hooks5); sc.hooks=pick(BANK_HOOKS,5,(sc.hook||"").length+ Object.keys(S.ideas).length); render(); flashSpark(-COST.hooks5); return; }
+    if(isDemo()){ var hu=hooksUnitsToday(); spend(hu); S.hooksToday=(S.hooksToday||0)+1; sc.hooks=pick(BANK_HOOKS,5,(sc.hook||"").length+ Object.keys(S.ideas).length); render(); flashSpark(-hu); if(!hu) showToast("Hooks gratis hoy ("+(HOOKS_FREE_PER_DAY-S.hooksToday)+" más)."); return; }
     if(!sc._sid){ return showToast("Este guion aún no está persistido."); }
     var restore=_btnLoading(btn);
     showToast("Generando 5 hooks…");
@@ -3517,9 +3759,10 @@
      endpoint unificado /api/hooks/from-source. assign(hooks) pega el resultado. */
   function _genHooks(payload, assign, btn){
     if(isDemo()){
-      spend(COST.hooks5);
+      var hu=hooksUnitsToday(); spend(hu); S.hooksToday=(S.hooksToday||0)+1;
       var seed=((payload.text||payload.reel_id||"")+"" ).length + Object.keys(S.ideas).length;
-      assign(pick(BANK_HOOKS,5,seed)); render(); flashSpark(-COST.hooks5); return;
+      assign(pick(BANK_HOOKS,5,seed)); render(); flashSpark(-hu);
+      if(!hu) showToast("Hooks gratis hoy ("+(HOOKS_FREE_PER_DAY-S.hooksToday)+" más)."); return;
     }
     var restore=_btnLoading(btn);
     showToast(L("Generando 5 hooks…","Generating 5 hooks…"));
@@ -3750,16 +3993,31 @@
         ? d.need_transcribe+" de ellos necesita"+(d.need_transcribe===1?"":"n")+" transcripción ("+d.need_transcribe+" uso"+(d.need_transcribe===1?"":"s")+"/crédito"+(d.need_transcribe===1?"":"s")+")."
         : "Todos ya están transcritos — derivar es gratis.";
       var go=function(){
-        showToast("Derivando tu voz de tus reels… (~1 min si hay que transcribir)");
+        showToast("Derivando tu voz de tus reels… (~1-2 min si hay que transcribir)");
+        var done=function(d){
+          return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
+            S.voice=v; render();
+            showToast("Voz derivada de "+(d.source_count||0)+" reels — te conozco al "+(d.confidence||v.confidence||0)+"%.");
+            setTimeout(brainLevelPulse,1600);
+          });
+        };
+        // /api/voice/auto-derive es async (202 + task_id): gemini-2.5-pro razona y
+        // transcribir reels tarda → Traefik cortaba a 60s. Polling a /task/voice-derive.
         apiPost("/api/voice/auto-derive",{project_id:_pidOf(S.brandId)}).then(function(r){
-          if(r.ok && r.d && r.d.ok){
-            return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
-              S.voice=v; render();
-              showToast("Voz derivada de "+(r.d.source_count||0)+" reels — te conozco al "+(r.d.confidence||v.confidence||0)+"%.");
-              setTimeout(brainLevelPulse,1600);
+          if(!r.ok || !r.d){ return showError("No pude derivar tu voz. Inténtalo de nuevo."); }
+          if(r.d.ok){ return done(r.d); }   // respuesta sync legacy, por si acaso
+          if(!r.d.task_id){ return showError(r.d.message||r.d.error||"No pude derivar tu voz. Inténtalo de nuevo."); }
+          var tid=r.d.task_id, tries=0;
+          var poll=function(){
+            apiGet("/task/voice-derive/"+encodeURIComponent(tid)).then(function(p){
+              var d=(p&&p.d)||{};
+              if(!p.ok){ if(++tries<60) return setTimeout(poll,2500); return showError("No pude derivar tu voz. Inténtalo de nuevo."); }
+              if(d.state==="pending"){ if(++tries<70) return setTimeout(poll,2500); return showError("Tardó demasiado. Inténtalo de nuevo."); }
+              if(d.state==="success"){ return done(d); }
+              return showError(d.message||d.error||"No pude derivar tu voz. Inténtalo de nuevo.");
             });
-          }
-          showError((r.d&&r.d.message)||(r.d&&r.d.error)||"No pude derivar tu voz. Inténtalo de nuevo.");
+          };
+          setTimeout(poll,2500);
         });
       };
       if(typeof window.confirmModal==="function"){
@@ -3835,7 +4093,7 @@
   // (POST /metrics/analyze-one) y refrescamos las métricas del guion.
   function linkReelPublished(g, url){
     showToast("Analizando tu reel… esto entrena tu Cerebro.");
-    fetch("/metrics/analyze-one",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:url})})
+    fetch("/metrics/analyze-one",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(_pidOf(S.brandId)?{url:url,project_id:_pidOf(S.brandId)}:{url:url})})
       .then(function(r){ return r.json().catch(function(){return{};}); })
       .then(function(d){
         if(d&&d.ok){
@@ -3862,7 +4120,7 @@
   }
   function igConnectWith(u){
     showToast("Conectando @"+u+"…");
-    fetch("/metrics/ig-profile",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u})})
+    fetch("/metrics/ig-profile",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(_pidOf(S.brandId)?{username:u,project_id:_pidOf(S.brandId)}:{username:u})})
       .then(function(r){ return r.json().catch(function(){return{};}); })
       .then(function(d){
         if(d&&d.ok){
@@ -3876,7 +4134,7 @@
   }
   function refreshReels(){
     showToast("Actualizando tus reels…");
-    return fetch("/metrics/analyze",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({})})
+    return fetch("/metrics/analyze",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(_pidOf(S.brandId)?{project_id:_pidOf(S.brandId)}:{})})
       .then(function(r){ return r.json().catch(function(){return{};}); })
       .then(function(d){
         if(d&&d.ok){
@@ -3974,6 +4232,7 @@
       if(e.target.id==="rsOnbNiche"){ e.preventDefault(); return onbNicheNext(); }
       if(e.target.id==="rsOnbTagInput"){ e.preventDefault(); return onbTagAdd(); }
       if(e.target.id==="rsOnbCompInput"){ e.preventDefault(); return onbCompAdd(); }
+      if(e.target.id==="rsCompAddInput"){ e.preventDefault(); return submitAddComp(); }   // FIX2: Enter añade competidor desde el Radar
       if(e.target.id==="rsIdeaSeed2"){ e.preventDefault(); return addSeedIdea(); }
       // A: la card del reel es role=button — Enter abre el detalle (a11y teclado).
       if(e.target.getAttribute && e.target.getAttribute("data-act")==="reel-detail"){ e.preventDefault(); return openReelDetail(e.target.getAttribute("data-id")); }
@@ -4061,6 +4320,8 @@
       return showToast("Generando el informe del mes…");
     }
     if(act==="steal") return steal(id);
+    if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
+    if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.ig_url||_ro.url||_ro.permalink; if(_u){ try{ window.open(_u,"_blank"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
     if(act==="reel-dismiss") return reelDismiss(id);
     if(act==="undo-dismiss") return undoDismiss();
     if(act==="reel-detail") return openReelDetail(id);
@@ -4147,8 +4408,14 @@
     }
     // Reusa el modal legacy global (index.html); al añadir, submitAddCompetitor
     // recarga el Radar vía window.RS_reloadRadar (puente en loadBrandData).
-    if(act==="add-comp"){ if(typeof window.openAddCompetitorModal==="function") window.openAddCompetitorModal(); return; }
+    if(act==="add-comp") return toggleAddComp();          // FIX2: añadir competidor inline desde el Radar
+    if(act==="comp-add-submit") return submitAddComp();
+    if(act==="refresh-radar") return refreshRadar();
     if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){} } return; }
+    // Flash del muro: CTA principal = Creator −40% con WELCOME auto-aplicado (rsFlashSubscribe
+    // del chrome); secundario = top-up 300. En demo no hay checkout → abre el modal de planes.
+    if(act==="flash-cta"){ if(!isDemo() && typeof window.rsFlashSubscribe==="function"){ try{ window.rsFlashSubscribe("creator"); return; }catch(e){} } if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("flash_creator"); }catch(e){} } return; }
+    if(act==="flash-topup"){ if(typeof window.openTopupModal==="function"){ try{ window.openTopupModal("300"); return; }catch(e){} } if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("flash_topup"); }catch(e){} } return; }
     // B2: CTA «Entrenar mi voz» — lleva al Cerebro y deja el cursor en el textarea
     // de captura (la acción de verdad), no en la pestaña a secas.
     if(act==="voice-focus"){
@@ -4220,10 +4487,18 @@
     if(act==="back-script"){ S.view="script"; return render(); }
     if(act==="close-feed") return closeOverlay();
     if(act==="tp-back") return tpBack();
+    if(act && act.indexOf("tp-")===0 && !S.tp) S.tp={ playing:false, speed:3, fontPx:34, mirror:false, recording:false, ms:0, countdown:0 };
+    if(act==="tp-play"){ S.tp.playing=!S.tp.playing; return render(); }
+    if(act==="tp-restart"){ var _e=document.getElementById("rsTpScroll"); if(_e) _e.scrollTop=0; return; }
+    if(act==="tp-speed"){ S.tp.speed=Math.max(1,Math.min(6,S.tp.speed+(k==="up"?1:-1))); return render(); }
+    if(act==="tp-font"){ S.tp.fontPx=Math.max(22,Math.min(56,S.tp.fontPx+(k==="up"?4:-4))); return render(); }
+    if(act==="tp-mirror"){ S.tp.mirror=!S.tp.mirror; return render(); }
+    if(act==="tp-record"){ if(S.tp.recording){ S.tp.recording=false; S.tp.playing=false; clearInterval(S.tpTimer); return render(); } tpRecordCountdown(); return; }
     if(act==="ig-connect"){ if(!isDemo()) return igConnectProfile(); S.igConnected=true; bumpEco(0,0); render(); return showToast("Instagram conectado. El sistema empezará a aprender de lo que publicas."); }
     if(act==="ig-disconnect"){ S.igConnected=false; render(); return showToast("Instagram desvinculado."); }
     if(act==="metric-sort"){ S.metricSort=k; return render(); }
     if(act==="metric-chart"){ S.metricChart=k; return render(); }
+    if(act==="metric-view"){ S.metricView=k||"resumen"; return render(); }
     if(act==="metric-refresh"){ if(!isDemo()) return refreshReels(); render(); return showToast("Métricas actualizadas."); }
     if(act==="fw-guiones"){ S.view="feed"; S._fillPhase=null; S.tab="guiones"; S.guiFilter="all"; return render(); }
     if(act==="fw-record"){ var fid=S._fillGuionIds&&S._fillGuionIds[0]; var g0=fid?guionById(fid):null; if(g0){ S.activeGuionId=g0.id; S.reel={creator:{handle:(g0.from||"").replace("@","")},script:{hook:g0.hook,beats:g0.beats,close:g0.close}}; S.view="prompter"; render(); } return; }
@@ -4401,6 +4676,7 @@
       var me=res[0]||{}, bd=res[1]||{};
       if(me.user){ S.user.name=me.user.name||(me.user.email||"").split("@")[0]||""; S.user.handle=me.user.handle||(me.user.email||"").split("@")[0]||""; S.user.email=me.user.email||""; }
       if(me.credits!=null) S.user.credits=me.credits; else if(me.credits_cents!=null) S.user.credits=Math.round(me.credits_cents/18);
+      if(me.topup_flash) S.user.topupFlash=me.topup_flash;   // econ §4: flash Pack 300 @ 29€
       if(me.streak!=null) S.user.streak=me.streak;
       // Plan crudo de /auth/me (puede ser "free") + guiones gratis del mes restantes.
       S.user.plan=(me.plan||(me.user&&me.user.plan))||"";
@@ -4439,7 +4715,10 @@
       _routeFromPath();   // la isla muestra la sección de /profile/<x> en el rail
       // Demo deep-link: ?plan= ?t=<tab> ?b=<brandId> para previsualizar cualquier vista.
       if(isDemo()){ try{ var qs=new URLSearchParams(location.search);
-        var qp=qs.get("plan"); if(qp==="creador"){ S.plan="creador"; S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab="dashboard"; } else if(qp==="agencia"){ S.plan="agencia"; S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="portfolio"; }
+        // econ demo: el saldo del contador refleja los grants del plan (Creator 120 ·
+        // Agency 960). Sin ?plan → un saldo medio para ver el contador en acción.
+        if(!S.user.credits) S.user.credits=120;
+        var qp=qs.get("plan"); if(qp==="creador"){ S.plan="creador"; S.user.credits=120; S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab="dashboard"; } else if(qp==="agencia"){ S.plan="agencia"; S.user.credits=960; S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="portfolio"; }
         var qb=qs.get("b"); if(qb && S.brands.some(function(x){return x.id===qb;})){ S.brandId=qb; S.tab="dashboard"; }
         var qt=qs.get("t"); if(qt==="perf"){ S.tab="guiones"; S.view="perf"; S.perfGuion="gd1"; } else if(qt){ S.tab=qt; }
         // ?onb=1 → fuerza el onboarding v2 en demo (sin tocar el flujo normal/harness)
