@@ -10199,6 +10199,44 @@ def radar_stats():
     })
 
 
+@app.route("/api/radar/refresh", methods=["POST"])
+@require_auth
+@limiter.limit("6 per minute")
+def radar_refresh():
+    """FIX2 · "Actualizar radar" a demanda: re-scrapea los competidores de la MARCA
+    activa que estén stale (>6h), reusando caché (los frescos se saltan; los privados/
+    inexistentes/en-curso también). Async (encola scrape_creator_task) → el front recarga
+    al cabo de unos segundos y entran los reels nuevos. Aísla por project_id."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    project_id = body.get("project_id") or None
+
+    q = (db.table("user_tracked_creators").select("creator_id")
+           .eq("user_id", uid).is_("archived_at", "null"))
+    if project_id:
+        q = q.eq("project_id", project_id)
+    try:
+        rows = q.execute().data or []
+    except Exception as e:
+        logger.warning("radar_refresh: tracked read failed uid=%s: %s", uid, e)
+        rows = []
+    cids = [r.get("creator_id") for r in rows if r.get("creator_id")]
+    if not cids:
+        return jsonify({"ok": True, "queued": 0, "tracked": 0,
+                        "message": "Aún no sigues a ningún competidor."})
+    try:
+        from tasks import _enqueue_if_stale
+        queued, candidates = _enqueue_if_stale(db, cids, stale_hours=6, cap=20)
+    except Exception as e:
+        logger.error("radar_refresh enqueue failed uid=%s: %s", uid, e, exc_info=True)
+        return jsonify({"ok": False, "message": "No pude actualizar el radar. Inténtalo de nuevo."}), 500
+    track_event("radar_refresh", uid, {"queued": queued, "tracked": len(cids), "project_id": project_id})
+    return jsonify({"ok": True, "queued": queued, "tracked": len(cids),
+                    "message": ("Buscando lo nuevo de tus competidores…" if queued
+                                else "Tu radar ya está al día.")})
+
+
 @app.route("/api/radar/fill-week/candidates", methods=["GET"])
 @require_auth
 def radar_fill_week_candidates():

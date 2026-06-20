@@ -892,9 +892,11 @@
   function filtersHTML(){
     var base=[["explosion",IC.spark+' Explotando'],["recent","Recientes"],["fav",IC.starO+' Favoritos']];
     return '<div class="filters">'+base.map(function(f){return '<button class="fchip'+(S.filter===f[0]?" on":"")+'" data-act="filter" data-k="'+f[0]+'">'+f[1]+'</button>';}).join("")+
-      '<button class="fchip ghost" data-act="add-comp" title="Sigue a un creador para ver sus reels en el Radar">'+IC.plus+' Añadir competidor</button>'+
-      '<button class="fchip ghost" data-act="add-reel" title="Pega la URL de un reel para meterlo al ecosistema">'+IC.plus+' Añadir reel</button>'+
-    '</div>';
+      '<button class="fchip ghost'+(S.addCompOpen?" on":"")+'" data-act="add-comp" title="Sigue a un creador para ver sus reels en el Radar">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+      '<button class="fchip ghost" data-act="add-reel" title="Pega la URL de un reel para meterlo al ecosistema">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
+      '<span style="flex:1"></span>'+
+      '<button class="fchip ghost" data-act="refresh-radar" title="'+L("Busca lo nuevo de tus competidores","Check what\'s new from your competitors")+'">'+IC.repeat+' '+L("Actualizar radar","Refresh radar")+'</button>'+
+    '</div>'+addCompInlineHTML()+analyzingBannerHTML();
   }
 
   // SPEC #3: cuando el radar se llena con el SEED del nicho (user sin competidores
@@ -2163,6 +2165,81 @@
     var _pid=_pidOf(S.brandId);
     apiGet("/api/tracked-creators"+(_pid?("?project_id="+encodeURIComponent(_pid)):"")).then(function(r){
       if(r.ok && r.d && Array.isArray(r.d.tracked)){ S.tracked=r.d.tracked; if(S.tab==="brain"||S.tab==="dashboard") render(); brainLevelPulse(); }
+    });
+  }
+
+  /* ── FIX2 · Radar "del tirón": añadir competidor DESDE el Radar (inline, sin la
+     chrome legacy) → auto-análisis async (scrape+transcribe) con estado "analizando
+     tu nicho…" no bloqueante; cuando el scrape termina, sus reels entran en el radar.
+     Más el botón "Actualizar radar" (refresca a demanda, reusa caché). ── */
+  function addCompInlineHTML(){
+    if(!S.addCompOpen) return '';
+    return '<div class="comp-add"><span class="comp-add-at">@</span>'+
+      '<input id="rsCompAddInput" class="comp-add-input" type="text" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="'+L("usuario de Instagram y Enter","Instagram handle, then Enter")+'" aria-label="'+L("Añadir competidor","Add competitor")+'">'+
+      '<button class="btn btn-sm btn-primary" data-act="comp-add-submit">'+IC.bolt+' '+L("Analizar","Analyze")+'</button>'+
+      '<button class="comp-add-x" data-act="add-comp" aria-label="'+L("Cerrar","Close")+'">'+IC.x+'</button>'+
+    '</div>';
+  }
+  function analyzingBannerHTML(){
+    var hs=Object.keys(S.analyzing||{}); if(!hs.length) return '';
+    return '<div class="analyzing-banner"><span class="analyzing-spin"></span>'+
+      '<span class="analyzing-txt"><b>'+L("Analizando tu nicho","Analyzing your niche")+'</b> — '+hs.map(function(h){return '@'+ESC(h);}).join(", ")+
+      '. '+L("Sus reels entrarán en el radar en cuanto termine.","Their reels hit the radar as soon as it's done.")+'</span></div>';
+  }
+  function toggleAddComp(){ S.addCompOpen=!S.addCompOpen; render(); if(S.addCompOpen){ setTimeout(function(){ var i=document.getElementById("rsCompAddInput"); if(i) i.focus(); },30); } }
+  function submitAddComp(){ var i=document.getElementById("rsCompAddInput"); addCompetitorFromRadar(i?i.value:""); }
+  function addCompetitorFromRadar(handle){
+    handle=(handle||"").trim().replace(/^@+/,"").toLowerCase();
+    if(!/^[a-zA-Z0-9._]{1,30}$/.test(handle)){ return showError(L("Pon un @usuario de Instagram válido.","Enter a valid Instagram @handle.")); }
+    S.addCompOpen=false;
+    if(isDemo()){   // demo: simula el auto-análisis no bloqueante
+      S.analyzing=S.analyzing||{}; S.analyzing[handle]=true; render();
+      showToast(L("Analizando a @"+handle+"…","Analyzing @"+handle+"…"));
+      setTimeout(function(){ if(S.analyzing) delete S.analyzing[handle]; if(typeof applyDemoBrand==="function") applyDemoBrand(); render(); showToast(L("@"+handle+" ya está en tu radar.","@"+handle+" is now in your radar.")); },2600);
+      return;
+    }
+    var body={ ig_username:handle, source:"radar" };
+    var _pid=_pidOf(S.brandId); if(isAgency()&&_pid) body.project_id=_pid;
+    showToast(L("Añadiendo a @"+handle+"…","Adding @"+handle+"…"));
+    apiPost("/api/tracked-creators", body).then(function(r){
+      if(!r.ok){
+        if(r.status===402||(r.d&&r.d.error==="no_credits")) return showPaywall("no_credits");
+        if(r.d&&r.d.error==="tc.error.already_tracking"){ return showToast(L("Ya seguías a @"+handle+".","Already following @"+handle+".")); }
+        if(r.d&&r.d.error==="tc.error.plan_limit_reached"){ return showPaywall("tracked_creators"); }
+        return showError((r.d&&r.d.message)||L("No pude añadir a @"+handle+".","Couldn't add @"+handle+"."));
+      }
+      S.analyzing=S.analyzing||{}; S.analyzing[handle]=true;
+      loadTracked(); render();
+      showToast(L("Analizando a @"+handle+" — sus reels entrarán en el radar en un momento.","Analyzing @"+handle+" — its reels will hit your radar shortly."));
+      pollAnalyzing(handle,0);
+    });
+  }
+  function pollAnalyzing(handle,tries){
+    if(tries>20){ if(S.analyzing) delete S.analyzing[handle]; render(); return; }
+    setTimeout(function(){
+      var _pid=_pidOf(S.brandId);
+      apiGet("/api/tracked-creators"+(_pid?("?project_id="+encodeURIComponent(_pid)):"")).then(function(r){
+        var done=false;
+        if(r.ok&&r.d&&Array.isArray(r.d.tracked)){
+          S.tracked=r.d.tracked;
+          var c=r.d.tracked.filter(function(t){ return ((t.creator&&t.creator.ig_username)||t.ig_username)===handle; })[0];
+          var st=c&&c.creator&&c.creator.scrape_status;
+          if(st==="ok"||st==="failed"||st==="private"||st==="not_found") done=true;
+        }
+        if(done){ if(S.analyzing) delete S.analyzing[handle]; loadBrandData(); }
+        else { pollAnalyzing(handle,tries+1); }   // el spinner es CSS → sin re-render por tick
+      });
+    }, 3000);
+  }
+  function refreshRadar(){
+    if(isDemo()){ if(typeof applyDemoBrand==="function") applyDemoBrand(); render(); return showToast(L("Radar actualizado.","Radar refreshed.")); }
+    showToast(L("Actualizando el radar…","Refreshing the radar…"));
+    var _pid=_pidOf(S.brandId);
+    apiPost("/api/radar/refresh", _pid?{project_id:_pid}:{}).then(function(r){
+      if(!r.ok){ return showError((r.d&&r.d.message)||L("No pude actualizar el radar.","Couldn't refresh the radar.")); }
+      var n=(r.d&&r.d.queued)||0;
+      showToast((r.d&&r.d.message)||L("Radar al día.","Radar up to date."));
+      setTimeout(loadBrandData, n?4500:300);   // da tiempo al scrape; reusa caché si nada stale
     });
   }
   /* ── Cerebro 3D (WebGL, lazy) ──────────────────────────────────────────────
@@ -4155,6 +4232,7 @@
       if(e.target.id==="rsOnbNiche"){ e.preventDefault(); return onbNicheNext(); }
       if(e.target.id==="rsOnbTagInput"){ e.preventDefault(); return onbTagAdd(); }
       if(e.target.id==="rsOnbCompInput"){ e.preventDefault(); return onbCompAdd(); }
+      if(e.target.id==="rsCompAddInput"){ e.preventDefault(); return submitAddComp(); }   // FIX2: Enter añade competidor desde el Radar
       if(e.target.id==="rsIdeaSeed2"){ e.preventDefault(); return addSeedIdea(); }
       // A: la card del reel es role=button — Enter abre el detalle (a11y teclado).
       if(e.target.getAttribute && e.target.getAttribute("data-act")==="reel-detail"){ e.preventDefault(); return openReelDetail(e.target.getAttribute("data-id")); }
@@ -4330,7 +4408,9 @@
     }
     // Reusa el modal legacy global (index.html); al añadir, submitAddCompetitor
     // recarga el Radar vía window.RS_reloadRadar (puente en loadBrandData).
-    if(act==="add-comp"){ if(typeof window.openAddCompetitorModal==="function") window.openAddCompetitorModal(); return; }
+    if(act==="add-comp") return toggleAddComp();          // FIX2: añadir competidor inline desde el Radar
+    if(act==="comp-add-submit") return submitAddComp();
+    if(act==="refresh-radar") return refreshRadar();
     if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){} } return; }
     // Flash del muro: CTA principal = Creator −40% con WELCOME auto-aplicado (rsFlashSubscribe
     // del chrome); secundario = top-up 300. En demo no hay checkout → abre el modal de planes.

@@ -10291,6 +10291,17 @@
     .rs .seed-banner b { color:var(--text-primary); }
     .rs .seed-banner > span { flex:1; }
     .rs .seed-banner .btn { flex-shrink:0; }
+    /* FIX2 · añadir competidor inline desde el Radar + estado "analizando" */
+    .rs .comp-add { display:flex; align-items:center; gap:8px; margin:0 0 14px; padding:8px 10px 8px 14px; border-radius:13px; border:1px solid var(--brand-500); background:var(--surface-raised); }
+    .rs .comp-add-at { font-family:var(--font-mono); color:var(--text-tertiary); font-size:15px; }
+    .rs .comp-add-input { flex:1; min-width:0; height:34px; border:none; background:transparent; color:var(--text-primary); font:inherit; font-size:14px; outline:none; }
+    .rs .comp-add-input::placeholder { color:var(--text-tertiary); }
+    .rs .comp-add-x { flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border:none; background:transparent; color:var(--text-tertiary); cursor:pointer; border-radius:8px; }
+    .rs .comp-add-x:hover { color:var(--text-primary); background:var(--surface-overlay); }
+    .rs .analyzing-banner { display:flex; align-items:center; gap:11px; margin:0 0 14px; padding:11px 16px; border-radius:14px; border:1px solid color-mix(in srgb, var(--brand-500) 30%, transparent); background:color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)); font-size:13px; line-height:1.4; color:var(--text-secondary); }
+    .rs .analyzing-banner b { color:var(--text-primary); }
+    .rs .analyzing-spin { flex-shrink:0; width:15px; height:15px; border-radius:99px; border:2px solid color-mix(in srgb, var(--brand-500) 30%, transparent); border-top-color:var(--brand-500); animation:rsSpin .8s linear infinite; }
+    @keyframes rsSpin { to { transform:rotate(360deg); } }
     .rs .brain-hero-body { flex:1; min-width:0; }
     .rs .brain-lvl { font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; color:var(--brand-400); margin-bottom:4px; }
     .rs .brain-voiceline { font-family:var(--font-display); font-size:30px; line-height:1; }
