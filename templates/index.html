@@ -9803,6 +9803,43 @@
     /* v3 (mockup David): mono azul, minúscula con «› », sin MAYÚS. */
     .rs .onb-eyebrow { display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; color:var(--brand-500); margin-bottom:14px; }
     .rs .onb-eyebrow svg { width:14px; height:14px; }
+    /* ════ RADAR HERO v3 (mockup David «RADAR exploración») ════ */
+    .rs .rdr-hero { display:flex; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:24px; overflow:hidden; margin-bottom:26px; }
+    .rs .rdr-hero-l { flex:1; min-width:0; padding:34px 36px; display:flex; flex-direction:column; gap:18px; }
+    .rs .rdr-eyebrow { display:inline-flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; color:var(--text-tertiary); }
+    .rs .rdr-eye-dot { width:8px; height:8px; border-radius:9999px; background:var(--success-fg); box-shadow:0 0 8px var(--success-fg); flex:none; }
+    .rs .rdr-title { font-family:var(--font-display); font-weight:700; font-size:46px; line-height:1; letter-spacing:-.02em; color:var(--text-primary); margin:0; }
+    .rs .rdr-sub { font-size:18px; line-height:1.5; color:var(--text-secondary); margin:0; max-width:520px; }
+    .rs .rdr-sub b { color:var(--text-primary); font-weight:600; }
+    .rs .rdr-stats { display:flex; align-items:flex-end; gap:32px; margin-top:8px; flex-wrap:wrap; }
+    .rs .rdr-stat { display:flex; flex-direction:column; gap:5px; }
+    .rs .rdr-stat-v { font-family:var(--font-display); font-weight:800; font-size:34px; line-height:1; font-variant-numeric:tabular-nums; }
+    .rs .rdr-stat-l { font-size:13.5px; color:var(--text-secondary); display:inline-flex; align-items:center; gap:7px; }
+    .rs .rdr-livedot { width:6px; height:6px; border-radius:50%; background:var(--success-fg); box-shadow:0 0 7px var(--success-fg); animation:esPulse 1.3s ease-in-out infinite; flex:none; }
+    .rs .rdr-hero-r { width:330px; flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:28px 24px; background:radial-gradient(circle at 50% 42%, var(--surface-overlay), var(--surface-raised)); border-left:1px solid var(--border-default); }
+    .rs .rdr-scope { position:relative; width:228px; height:228px; }
+    .rs .rdr-face { position:absolute; inset:0; border-radius:50%; overflow:hidden; background:radial-gradient(circle at 50% 50%, var(--surface-raised), var(--surface-overlay)); border:1px solid var(--border-strong); }
+    .rs .rdr-ring { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); border-radius:50%; border:1px solid var(--border-default); }
+    .rs .rdr-ring.r1 { width:74%; height:74%; } .rs .rdr-ring.r2 { width:48%; height:48%; } .rs .rdr-ring.r3 { width:22%; height:22%; border-color:var(--border-strong); }
+    .rs .rdr-axis { position:absolute; background:var(--border-default); }
+    .rs .rdr-axis.x { top:50%; left:0; width:100%; height:1px; } .rs .rdr-axis.y { left:50%; top:0; height:100%; width:1px; }
+    .rs .rdr-sweep { position:absolute; inset:0; border-radius:50%; background:conic-gradient(from 0deg, transparent 0deg 280deg, color-mix(in srgb,var(--brand-500) 14%, transparent) 340deg, color-mix(in srgb,var(--brand-500) 55%, transparent) 360deg); animation:esSpin 4s linear infinite; }
+    .rs .rdr-blip { position:absolute; border-radius:50%; transform:translate(-50%,-50%); }
+    .rs .rdr-blip.g { width:10px; height:10px; background:var(--success-fg); box-shadow:0 0 10px var(--success-fg); animation:esBlip 2.4s ease-in-out infinite; }
+    .rs .rdr-blip.o { width:8px; height:8px; background:#FF8A3D; box-shadow:0 0 8px #FF8A3D; animation:esBlip 2.8s ease-in-out .6s infinite; }
+    .rs .rdr-blip.b { width:7px; height:7px; background:var(--brand-500); box-shadow:0 0 8px var(--brand-500); animation:esBlip 3.1s ease-in-out .3s infinite; }
+    .rs .rdr-blip.n { width:6px; height:6px; background:var(--text-tertiary); animation:esBlip 2.6s ease-in-out 1s infinite; }
+    .rs .rdr-ping { position:absolute; width:10px; height:10px; border-radius:50%; border:2px solid var(--success-fg); transform:translate(-50%,-50%); animation:esPing 2.4s ease-out infinite; }
+    .rs .rdr-core { position:absolute; top:50%; left:50%; width:8px; height:8px; border-radius:50%; background:var(--brand-500); transform:translate(-50%,-50%); box-shadow:0 0 0 4px color-mix(in srgb,var(--brand-500) 16%, transparent); }
+    .rs .rdr-cap { display:inline-flex; align-items:center; gap:9px; padding:8px 15px; border-radius:9999px; background:var(--surface-raised); border:1px solid var(--border-default); }
+    .rs .rdr-cap-dot { width:7px; height:7px; border-radius:50%; background:var(--brand-500); animation:esPulse 1.4s ease-in-out infinite; flex:none; }
+    .rs .rdr-cap-t { font-family:var(--font-mono); font-size:12px; letter-spacing:.03em; color:var(--text-secondary); }
+    @keyframes esSpin { to { transform:rotate(360deg); } }
+    @keyframes esBlip { 0%,100%{ opacity:.35; transform:translate(-50%,-50%) scale(.8); } 50%{ opacity:1; transform:translate(-50%,-50%) scale(1.2); } }
+    @keyframes esPing { 0%{ opacity:.7; transform:translate(-50%,-50%) scale(.6); } 100%{ opacity:0; transform:translate(-50%,-50%) scale(2.4); } }
+    @keyframes esPulse { 0%,100%{ opacity:.35; } 50%{ opacity:1; } }
+    @media (prefers-reduced-motion: reduce){ .rs .rdr-sweep, .rs .rdr-blip, .rs .rdr-ping, .rs .rdr-cap-dot, .rs .rdr-livedot { animation:none; } }
+    @media (max-width:860px){ .rs .rdr-hero { flex-direction:column; } .rs .rdr-hero-r { width:100%; border-left:none; border-top:1px solid var(--border-default); } .rs .rdr-title { font-size:34px; } }
     .rs .onb-h { font-family:var(--font-display); font-size:30px; line-height:1.05; letter-spacing:-.02em; margin:0 0 8px; color:var(--text-primary); }
     .rs--mobile .onb-h { font-size:25px; }
     .rs .onb-sub { font-size:14.5px; color:var(--text-secondary); margin:0 0 22px; line-height:1.5; }
@@ -26844,6 +26881,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=27"></script>
+<script src="/static/js/radar-loop.js?v=32"></script>
 </body>
 </html>

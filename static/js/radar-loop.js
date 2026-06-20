@@ -1241,6 +1241,49 @@
       '<div class="act-prog-steps">'+chips+'</div>'+
     '</div>';
   }
+  /* RADAR HERO v3 (mockup David «RADAR exploración»): eyebrow mono + título Clash
+     46px + sub + stats en línea + SCOPE animado (barrido cónico + blips). Sustituye
+     al phead + statbar viejos. Tokens del island (azul=brand-500, verde=success-fg). */
+  function radarScopeHTML(){
+    return '<div class="rdr-scope"><div class="rdr-face">'+
+      '<span class="rdr-ring r1"></span><span class="rdr-ring r2"></span><span class="rdr-ring r3"></span>'+
+      '<span class="rdr-axis x"></span><span class="rdr-axis y"></span>'+
+      '<span class="rdr-sweep"></span>'+
+      '<span class="rdr-blip g" style="top:32%;left:62%"></span><span class="rdr-ping" style="top:32%;left:62%"></span>'+
+      '<span class="rdr-blip o" style="top:60%;left:38%"></span>'+
+      '<span class="rdr-blip b" style="top:44%;left:28%"></span>'+
+      '<span class="rdr-blip n" style="top:70%;left:64%"></span>'+
+      '<span class="rdr-core"></span>'+
+    '</div></div>';
+  }
+  function radarHeroHTML(){
+    var st=S.stats||{}; var n=st.competitors||0;
+    var line = st.exploded_week>0
+      ? L("Mientras no mirabas, <b>"+st.exploded_week+" reel"+(st.exploded_week>1?"es":"")+" explotaron</b> en tu nicho. Esto es lo que merece tu próximo guion.","While you looked away, <b>"+st.exploded_week+" reel"+(st.exploded_week>1?"s":"")+" blew up</b> in your niche. This is what deserves your next script.")
+      : L("Tus <b>"+n+" rivales</b> publicaron "+(st.reels_week||0)+" reels esta semana. Esto es lo que merece tu próximo guion.","Your <b>"+n+" rivals</b> posted "+(st.reels_week||0)+" reels this week. This is what deserves your next script.");
+    var stats=[
+      {v:st.exploded_week||0, l:L("explotando ahora","exploding now"), c:"var(--success-fg)", live:true},
+      {v:n, l:L("rivales en el radar","rivals on radar"), c:"var(--text-primary)", live:false},
+      {v:st.reels_week||0, l:L("reels · 7 días","reels · 7 days"), c:"var(--brand-500)", live:false}
+    ];
+    var statsH=stats.map(function(s){
+      return '<div class="rdr-stat"><span class="rdr-stat-v" style="color:'+s.c+'">'+_fmtK(s.v)+'</span>'+
+        '<span class="rdr-stat-l">'+(s.live?'<span class="rdr-livedot"></span>':'')+ESC(s.l)+'</span></div>';
+    }).join("");
+    var cap = n>0 ? L("vigilando "+n+" cuenta"+(n===1?"":"s")+" · en vivo","watching "+n+" account"+(n===1?"":"s")+" · live")
+                  : L("añade competidores para escanear","add competitors to scan");
+    return '<div class="rdr-hero">'+
+      '<div class="rdr-hero-l">'+
+        '<div class="rdr-eyebrow"><span class="rdr-eye-dot"></span>Radar · '+L("escaneando","scanning")+' '+n+' '+L("competidor"+(n===1?"":"es"),"competitor"+(n===1?"":"s"))+'</div>'+
+        '<h1 class="rdr-title">'+L("Señales de hoy","Today's signals")+'</h1>'+
+        '<p class="rdr-sub">'+line+'</p>'+
+        '<div class="rdr-stats">'+statsH+'</div>'+
+      '</div>'+
+      '<div class="rdr-hero-r">'+radarScopeHTML()+
+        '<div class="rdr-cap"><span class="rdr-cap-dot"></span><span class="rdr-cap-t">'+ESC(cap)+'</span></div>'+
+      '</div>'+
+    '</div>';
+  }
   function dashboardHTML(){
     var st=S.stats||{competitors:0,reels_week:0,exploded_week:0,stolen_today:0}; var b=brand();
     var sorted=feedReels();
@@ -1285,14 +1328,15 @@
       : '';
 
     return '<div class="scroll"><div class="canvas">'+
-      head+
+      radarHeroHTML()+            // v3 (mockup David): hero con scope animado + stats (sustituye phead+statbar)
       (isAgency()?brandTabsHTML():"")+
+      // v3 (mockup David): la OPORTUNIDAD va justo tras el hero (acción «Roba la idea»
+      // arriba, sobre el fold). Los banners promo bajan debajo.
+      opportunityCarouselHTML(heroN)+
       flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro
-      statbarHTML()+
       trackedManageHTML()+
       activationProgressHTML()+   // endowed progress: «1/4 · Roba tu primera idea»
       seedBannerHTML()+           // SPEC #3: aviso «esto petó en tu nicho» con seed
-      opportunityCarouselHTML(heroN)+
       suggestedCompHTML()+      // sugerir competidores proactivamente (Fathom 18/06)
       voiceOnboardCardHTML()+   // B6+T1: banner de voz BAJO la oportunidad — no empuja el hero bajo el fold
       nextSeriesHTML("dash")+   // B1+T1: "tu próxima serie" con CTA secundario en el Dashboard
