@@ -1693,9 +1693,14 @@
     var learned=(m.learned||[]).map(function(l){ return '<div class="learn-item">'+IC.check+'<span>'+ESC(l)+'</span></div>'; }).join("");
     var top=m.top?('<div class="met-top">'+IC.spark+' <b>Top:</b> '+ESC(m.top.title)+' — '+ESC(m.top.views)+' views</div>'):"";
     var hasVideos=metricVideos().length>0;
-    // El panel de datos (stats + chart + grid) es lo premium → borroso en free.
-    var data=hasVideos?(metricStatsHTML()+metricChartHTML()+metricGridHTML()):'<div class="rs-empty">Pulsa “Actualizar reels” para traer tus métricas.</div>';
-    var panel=isFree()?metricsLockHTML(data):data;
+    // Sub-vistas del mockup Métricas.dc.html: Resumen / Audiencia / Competidores.
+    var mv=S.metricView||"resumen";
+    function _mtab(k,es,en){ return '<button class="met-subtab'+(mv===k?" on":"")+'" data-act="metric-view" data-k="'+k+'"'+(mv===k?' aria-current="page"':'')+'>'+L(es,en)+'</button>'; }
+    var subnav='<div class="met-subnav" role="tablist">'+_mtab("resumen","Resumen","Overview")+_mtab("audiencia","Audiencia","Audience")+_mtab("competidores","Competidores","Competitors")+'</div>';
+    // El panel de datos es lo premium → borroso en free (el sub-nav queda FUERA del blur, navegable).
+    var resumen=hasVideos?(metricStatsHTML()+metricChartHTML()+metricGridHTML()):'<div class="rs-empty">Pulsa “Actualizar reels” para traer tus métricas.</div>';
+    var inner=mv==="audiencia"?metricAudienceHTML():(mv==="competidores"?metricCompeteHTML():resumen);
+    var panel=subnav+(isFree()?metricsLockHTML(inner):inner);
     return '<div class="scroll"><div class="canvas">'+
       pheadHTML("Métricas · @"+(b.handle||S.user.handle||""), "Métricas", "Tus reels al detalle — y lo que el sistema aprende de ellos para crear mejor.")+
       '<div class="met-acct"><span class="met-acct-ig">'+IC.ig+' @'+ESC(b.handle||"tu_cuenta")+'</span>'+
@@ -1708,6 +1713,74 @@
       '</div>'+
       top+panel+
     '</div></div>';
+  }
+  /* MÉTRICAS · Audiencia (mockup Métricas.dc.html). En prod los datos vienen de las
+     audience-insights de IG; aquí, deterministas por handle (vía _lbHash) para que el
+     layout viva. GAP: falta el endpoint de audience-insights — el render ya está listo. */
+  function metricAudienceHTML(){
+    var b=brand(), h=(b.handle||S.user.handle||"tu_cuenta");
+    var newF=_lbHash(h+"nf",1200,3600);
+    var trend=[]; for(var i=0;i<14;i++){ trend.push(34+_lbHash(h+"t"+i,0,60)); }
+    var tmax=Math.max.apply(null,trend);
+    var bars=trend.map(function(v){ return '<span class="aud-gcol"><i style="height:'+Math.round(v/tmax*100)+'%"></i></span>'; }).join("");
+    var nonF=58+_lbHash(h+"nf2",0,10), foll=100-nonF;
+    var ed=[["18–24",22],["25–34",41],["35–44",24],["45+",13]], edmax=41;
+    var edHTML=ed.map(function(e){ return '<div class="aud-row"><div class="aud-rowt"><span>'+e[0]+'</span><b>'+e[1]+'%</b></div><div class="aud-track"><i style="width:'+Math.round(e[1]/edmax*100)+'%"></i></div></div>'; }).join("");
+    var men=60+_lbHash(h+"g",0,8), women=100-men;
+    var locs=[["España",38],["México",19],["Argentina",12],["Colombia",9],["EE. UU.",7]], lmax=38;
+    var locHTML=locs.map(function(l){ return '<div class="aud-row"><div class="aud-rowt"><span>'+l[0]+'</span><b>'+l[1]+'%</b></div><div class="aud-track"><i class="g" style="width:'+Math.round(l[1]/lmax*100)+'%"></i></div></div>'; }).join("");
+    return '<div class="aud-wrap">'+
+      '<div class="aud-grid2">'+
+        '<div class="aud-card"><div class="aud-head"><span class="aud-t">'+L("Crecimiento de seguidores","Follower growth")+'</span><span class="aud-up">▲ +'+_fmtK(newF)+'</span></div><div class="aud-graph">'+bars+'</div></div>'+
+        '<div class="aud-card"><span class="aud-t">'+L("Alcance por tipo","Reach by type")+'</span>'+
+          '<div class="aud-rows"><div class="aud-row"><div class="aud-rowt"><span>'+L("No seguidores","Non-followers")+'</span><b>'+nonF+'%</b></div><div class="aud-track"><i style="width:'+nonF+'%"></i></div></div>'+
+          '<div class="aud-row"><div class="aud-rowt"><span>'+L("Seguidores","Followers")+'</span><b>'+foll+'%</b></div><div class="aud-track"><i class="dim" style="width:'+foll+'%"></i></div></div></div>'+
+          '<p class="aud-note">'+L("Llegas más a gente nueva que a tu base. ","You reach more new people than your base. ")+'<b>'+L("Creces, no reciclas.","You\'re growing, not recycling.")+'</b></p></div>'+
+      '</div>'+
+      '<div class="aud-grid3">'+
+        '<div class="aud-card"><span class="aud-t">'+L("Edad","Age")+'</span><div class="aud-rows">'+edHTML+'</div></div>'+
+        '<div class="aud-card"><span class="aud-t">'+L("Género","Gender")+'</span><div class="aud-gen"><i style="width:'+men+'%"></i><i class="dim" style="width:'+women+'%"></i></div>'+
+          '<div class="aud-genleg"><span><span class="aud-dot"></span>'+L("Hombres","Men")+' '+men+'%</span><span><span class="aud-dot dim"></span>'+L("Mujeres","Women")+' '+women+'%</span></div>'+
+          '<p class="aud-note">'+L("Sobre todo ","Mostly ")+'<b>'+L("hombres de 25–34","men 25–34")+'</b>. '+L("Háblales a ellos.","Speak to them.")+'</p></div>'+
+        '<div class="aud-card"><span class="aud-t">'+L("Top ubicaciones","Top locations")+'</span><div class="aud-rows">'+locHTML+'</div></div>'+
+      '</div>'+
+    '</div>';
+  }
+  /* MÉTRICAS · Competidores (mockup Métricas.dc.html): tabla tú-vs-rivales + cuota de
+     atención + "hueco detectado" ("@x publica 6×/sem, tú 5"). Reusa leaderboardRows()
+     para que los rivales sean los mismos del resto de la isla. */
+  function metricCompeteHTML(){
+    var rows=leaderboardRows();
+    var me=rows.filter(function(r){return r.you;})[0]||{handle:(brand().handle||"tu_cuenta"),followers:42000};
+    var head='<div class="cmp-row cmp-head"><span class="cmp-acct">'+L("cuenta","account")+'</span><span>'+L("seguidores","followers")+'</span><span>'+L("repros medias","avg views")+'</span><span>'+L("interacción","engagement")+'</span><span>'+L("explota","explodes")+'</span></div>';
+    var body=rows.slice(0,6).map(function(r){
+      var you=!!r.you;
+      var views=_lbHash(r.handle+"v",18,260)/10;
+      var eng=(_lbHash(r.handle+"e",18,72)/10).toFixed(1);
+      var ratio=(_lbHash(r.handle+"r",11,34)/10).toFixed(1);
+      return '<div class="cmp-row'+(you?' me':'')+'">'+
+        '<span class="cmp-acct"><span class="cmp-ava">'+ESC(initialsOf(r.handle))+'</span><span class="cmp-h">@'+ESC(r.handle)+(you?' <em>'+L("tú","you")+'</em>':'')+'</span></span>'+
+        '<span class="cmp-n">'+_fmtK(r.followers)+'</span>'+
+        '<span class="cmp-n">'+views.toFixed(1)+'K</span>'+
+        '<span class="cmp-n">'+eng+'%</span>'+
+        '<span class="cmp-ratio">'+ratio+'×</span></div>';
+    }).join("");
+    var others=rows.filter(function(r){return !r.you;});
+    var rival=others[0]||{handle:"tu_rival"};
+    var rivalCad=4+_lbHash((rival.handle||"r")+"c",0,4), myCad=Math.max(2,rivalCad-1);
+    var share=[["@"+(rival.handle||"rival"),34,'var(--text-primary)'],[L("Tú","You")+" @"+(me.handle||"tu_cuenta"),21,'var(--brand-500)'],["@"+((others[1]||{}).handle||"otro"),18,'var(--text-secondary)'],[L("El resto","The rest"),27,'var(--text-tertiary)']];
+    var smax=34;
+    var shareHTML=share.map(function(s){ return '<div class="aud-row"><div class="aud-rowt"><span style="color:'+s[2]+'">'+ESC(s[0])+'</span><b>'+s[1]+'%</b></div><div class="aud-track"><i style="width:'+Math.round(s[1]/smax*100)+'%;background:'+s[2]+'"></i></div></div>'; }).join("");
+    return '<div class="aud-wrap">'+
+      '<div class="cmp-table">'+head+body+'</div>'+
+      '<div class="aud-grid2">'+
+        '<div class="aud-card"><div class="aud-head"><span class="aud-t">'+L("Cuota de atención del nicho","Niche share of voice")+'</span><span class="cmp-sub">'+L("repros · 30 días","views · 30d")+'</span></div><div class="aud-rows">'+shareHTML+'</div></div>'+
+        '<div class="cmp-gap"><span class="cmp-gap-k">'+L("› hueco detectado","› gap found")+'</span>'+
+          '<h3 class="cmp-gap-h">@'+ESC(rival.handle||"rival")+' '+L("publica","posts")+' '+rivalCad+'×/'+L("sem","wk")+'. '+L("Tú","You")+', '+myCad+'. '+L("Pero tu interacción por reel es mayor.","But your engagement per reel is higher.")+'</h3>'+
+          '<p class="cmp-gap-p">'+L("Mismo esfuerzo, más retorno: te falta volumen, no calidad. Roba un tema más esta semana.","Same effort, more return: you lack volume, not quality. Steal one more topic this week.")+'</p>'+
+          '<button class="btn btn-sm btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Ver sus reels en el Radar","See their reels in the Radar")+'</button></div>'+
+      '</div>'+
+    '</div>';
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -4300,6 +4373,7 @@
     if(act==="ig-disconnect"){ S.igConnected=false; render(); return showToast("Instagram desvinculado."); }
     if(act==="metric-sort"){ S.metricSort=k; return render(); }
     if(act==="metric-chart"){ S.metricChart=k; return render(); }
+    if(act==="metric-view"){ S.metricView=k||"resumen"; return render(); }
     if(act==="metric-refresh"){ if(!isDemo()) return refreshReels(); render(); return showToast("Métricas actualizadas."); }
     if(act==="fw-guiones"){ S.view="feed"; S._fillPhase=null; S.tab="guiones"; S.guiFilter="all"; return render(); }
     if(act==="fw-record"){ var fid=S._fillGuionIds&&S._fillGuionIds[0]; var g0=fid?guionById(fid):null; if(g0){ S.activeGuionId=g0.id; S.reel={creator:{handle:(g0.from||"").replace("@","")},script:{hook:g0.hook,beats:g0.beats,close:g0.close}}; S.view="prompter"; render(); } return; }

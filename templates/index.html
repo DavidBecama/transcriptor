@@ -10976,6 +10976,58 @@
     .rs .script-act:active { transform:translateY(1px); border-bottom-width:1px; }
     .rs .script-act svg { width:15px; height:15px; }
 
+    /* ── MÉTRICAS · sub-nav + Audiencia + Competidores — mockup Métricas.dc.html ── */
+    .rs .met-subnav { display:flex; gap:6px; padding:5px; background:var(--surface-overlay); border:1px solid var(--border-default); border-radius:14px; margin:0 0 18px; width:fit-content; }
+    .rs .met-subtab { padding:9px 18px; border:none; background:transparent; border-radius:10px; color:var(--text-secondary); font-family:var(--font-body); font-weight:600; font-size:13.5px; cursor:pointer; transition:background .15s,color .15s; }
+    .rs .met-subtab:hover { color:var(--text-primary); }
+    .rs .met-subtab.on { background:var(--surface-raised); color:var(--text-primary); box-shadow:0 1px 2px rgba(0,0,0,.18); }
+    .rs .aud-wrap { display:flex; flex-direction:column; gap:18px; }
+    .rs .aud-grid2 { display:grid; grid-template-columns:1.6fr 1fr; gap:14px; }
+    .rs .aud-grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+    .rs .aud-card { padding:20px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:16px; display:flex; flex-direction:column; gap:14px; }
+    .rs .aud-head { display:flex; align-items:baseline; justify-content:space-between; }
+    .rs .aud-t { font-weight:700; font-size:15px; color:var(--text-primary); }
+    .rs .aud-up { font-size:12.5px; font-weight:700; color:var(--brand-500); }
+    .rs .aud-graph { display:flex; align-items:flex-end; gap:6px; height:140px; }
+    .rs .aud-gcol { flex:1; height:100%; display:flex; align-items:flex-end; }
+    .rs .aud-gcol i { display:block; width:100%; border-radius:5px 5px 0 0; background:linear-gradient(180deg,var(--brand-400),var(--brand-600)); }
+    .rs .aud-rows { display:flex; flex-direction:column; gap:11px; }
+    .rs .aud-row { display:flex; flex-direction:column; gap:6px; }
+    .rs .aud-rowt { display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary); }
+    .rs .aud-rowt b { font-family:var(--font-mono); font-weight:500; font-size:12px; color:var(--text-primary); }
+    .rs .aud-track { height:9px; border-radius:9999px; background:var(--surface-overlay); overflow:hidden; }
+    .rs .aud-track i { display:block; height:100%; border-radius:9999px; background:var(--brand-500); }
+    .rs .aud-track i.dim { background:var(--brand-500); opacity:.5; }
+    .rs .aud-track i.g { background:linear-gradient(90deg,var(--brand-500),var(--brand-400)); }
+    .rs .aud-note { font-size:12.5px; color:var(--text-secondary); line-height:1.5; margin:2px 0 0; }
+    .rs .aud-note b { color:var(--text-primary); }
+    .rs .aud-gen { display:flex; height:12px; border-radius:9999px; overflow:hidden; }
+    .rs .aud-gen i { background:var(--brand-500); }
+    .rs .aud-gen i.dim { background:var(--brand-500); opacity:.45; }
+    .rs .aud-genleg { display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-secondary); }
+    .rs .aud-genleg span { display:inline-flex; align-items:center; gap:6px; }
+    .rs .aud-dot { width:9px; height:9px; border-radius:3px; background:var(--brand-500); }
+    .rs .aud-dot.dim { opacity:.45; }
+    .rs .cmp-table { padding:7px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:16px; }
+    .rs .cmp-row { display:grid; grid-template-columns:1.7fr 1fr 1fr 1fr 1fr; align-items:center; padding:13px 14px; border-radius:12px; }
+    .rs .cmp-row.cmp-head span { font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); letter-spacing:.04em; text-align:right; }
+    .rs .cmp-row.cmp-head .cmp-acct { text-align:left; display:block; }
+    .rs .cmp-row:not(.cmp-head) { margin-top:5px; border:1px solid transparent; }
+    .rs .cmp-row.me { background:var(--surface-overlay); border-color:var(--border-strong); }
+    .rs .cmp-acct { display:flex; align-items:center; gap:10px; min-width:0; }
+    .rs .cmp-ava { width:32px; height:32px; flex:none; border-radius:9999px; background:var(--surface-overlay); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); }
+    .rs .cmp-h { font-weight:600; font-size:13.5px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rs .cmp-h em { font-style:normal; font-family:var(--font-mono); font-size:10px; color:var(--brand-500); text-transform:uppercase; letter-spacing:.04em; }
+    .rs .cmp-n { text-align:right; font-family:var(--font-mono); font-size:13px; color:var(--text-primary); }
+    .rs .cmp-ratio { text-align:right; font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--brand-500); }
+    .rs .cmp-sub { font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); }
+    .rs .cmp-gap { padding:22px; background:linear-gradient(120deg,var(--surface-overlay),var(--surface-raised)); border:1px solid var(--border-default); border-radius:16px; display:flex; flex-direction:column; gap:11px; justify-content:center; }
+    .rs .cmp-gap-k { font-family:var(--font-mono); font-size:10.5px; color:var(--brand-500); letter-spacing:.04em; }
+    .rs .cmp-gap-h { font-family:var(--font-display); font-weight:700; font-size:21px; line-height:1.15; color:var(--text-primary); margin:0; }
+    .rs .cmp-gap-p { font-size:13.5px; color:var(--text-secondary); margin:0; line-height:1.5; }
+    .rs .cmp-gap .btn { align-self:flex-start; margin-top:4px; }
+    @media (max-width:680px){ .rs .aud-grid2, .rs .aud-grid3 { grid-template-columns:1fr; } .rs .cmp-row { grid-template-columns:1.4fr 1fr 1fr; } .rs .cmp-row span:nth-child(4), .rs .cmp-row span:nth-child(5){ display:none; } }
+
     /* ── GUIONES (pantalla 2 del rediseño) ──────────────────────────────── */
     /* Regla 3: el hook/título del guion en Clash */
     .rs .gui-title { font-family: var(--font-display); letter-spacing:-.01em; font-size:15.5px; font-weight:600; }
