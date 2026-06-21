@@ -510,6 +510,11 @@ for _cur, _pid in WHOP_PLAN_ADDON_BRAND.items():
     if _pid:
         WHOP_PLAN_TO_PLAN[_pid] = {"plan": "brand_addon", "interval": "month"}
 
+# Allowlist de plan_ids válidos para crear un checkout-session (suscripción + addon +
+# topups, incl. el flash). El endpoint /whop/checkout-session solo acepta estos.
+WHOP_FLASH_TOPUP_IDS = {_pp(f"WHOP_TOPUP_300_FLASH_{_c}") for _c in ("EUR", "USD")} - {""}
+WHOP_ALL_PLAN_IDS = set(WHOP_PLAN_TO_PLAN.keys()) | set(WHOP_TOPUP_PLANS.keys()) | WHOP_FLASH_TOPUP_IDS
+
 db: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
@@ -2607,6 +2612,61 @@ def _whop_event_seen(key: str) -> bool:
         return False
 
 
+def _whop_event_email(data: dict, memb: dict):
+    """Email del comprador a partir del evento. Whop a veces lo trae inline
+    (membership.email) y a veces solo el id → lo resolvemos por API (el Bot API key
+    SÍ lee /memberships/<id>.email y /payments/<id>). Para el fallback de abono."""
+    em = (memb.get("email") if isinstance(memb, dict) else None) or data.get("email") or data.get("user_email")
+    if em:
+        return em
+    mid = _whop_str_id(data.get("membership")) or _whop_str_id(memb.get("id") if isinstance(memb, dict) else None)
+    if mid:
+        code, d = _whop_api("GET", f"/api/v2/memberships/{mid}")
+        if code == 200 and isinstance(d, dict) and d.get("email"):
+            return d.get("email")
+    pid = data.get("id")
+    if isinstance(pid, str) and pid.startswith("pay_"):
+        code, d = _whop_api("GET", f"/api/v2/payments/{pid}")
+        if code == 200 and isinstance(d, dict):
+            mid2 = _whop_str_id(d.get("membership"))
+            if mid2:
+                code2, d2 = _whop_api("GET", f"/api/v2/memberships/{mid2}")
+                if code2 == 200 and isinstance(d2, dict) and d2.get("email"):
+                    return d2.get("email")
+    return None
+
+
+_WHOP_EMAIL_UID_CACHE: dict = {}
+def _whop_uid_by_email(email):
+    """email → uid de Supabase (auth.users). Solo en el fallback (metadata ausente),
+    así que el escaneo paginado es aceptable. Cachea solo aciertos (un alta posterior
+    no queda envenenada por un None)."""
+    if not email:
+        return None
+    key = str(email).strip().lower()
+    if not key:
+        return None
+    if key in _WHOP_EMAIL_UID_CACHE:
+        return _WHOP_EMAIL_UID_CACHE[key]
+    uid = None
+    try:
+        for pg in range(1, 11):
+            users = db.auth.admin.list_users(page=pg, per_page=200)
+            if not users:
+                break
+            for u in users:
+                if (getattr(u, "email", "") or "").lower() == key:
+                    uid = getattr(u, "id", None)
+                    break
+            if uid or len(users) < 200:
+                break
+    except Exception:
+        logger.warning("[whop] lookup email→uid falló", exc_info=True)
+    if uid:
+        _WHOP_EMAIL_UID_CACHE[key] = uid
+    return uid
+
+
 @app.route("/webhooks/whop", methods=["POST"])
 @limiter.exempt
 def whop_webhook():
@@ -2638,6 +2698,14 @@ def whop_webhook():
     if not (isinstance(md, dict) and md.get("user_id")):
         md = _memb.get("metadata") if isinstance(_memb.get("metadata"), dict) else (md if isinstance(md, dict) else {})
     uid = md.get("user_id") if isinstance(md, dict) else None
+    # FALLBACK (metadata vacía): Whop NO captura metadata vía el query-param del link
+    # de checkout (whop.com/checkout/<plan>?metadata[user_id]=…) — solo si el checkout
+    # se crea como SESSION por API (ver /whop/checkout-session). Hasta que todo migre,
+    # resolvemos al comprador por su EMAIL → perfil Supabase. metadata = primario.
+    if not uid:
+        uid = _whop_uid_by_email(_whop_event_email(data, _memb))
+        if uid:
+            logger.info("[whop] %s sin metadata.user_id → resuelto por email (uid=%s)", action, uid)
     # id de idempotencia: cabecera de entrega si la hay, si no action+id(+status)
     deliv = request.headers.get("X-Whop-Webhook-Id") or request.headers.get("Whop-Webhook-Id")
     ev_key = deliv or f"{action}:{data.get('id')}:{data.get('status','')}"
@@ -2721,6 +2789,32 @@ def whop_webhook():
         return "", 200
 
     return "", 200
+
+
+@app.route("/whop/checkout-session", methods=["POST"])
+@require_auth
+@limiter.limit("12 per minute")
+def whop_create_checkout_session():
+    """Crea un checkout-session de Whop con metadata.user_id atada SERVER-SIDE y devuelve
+    su purchase_url. Es la forma fiable de pasar el user_id: el link pelado
+    (whop.com/checkout/<plan>?metadata[user_id]=…) NO lo captura — Whop solo persiste la
+    metadata si el checkout nace como session por API. Así el webhook payment_succeeded/
+    membership_activated trae el user_id y abona a la cuenta correcta (no por email)."""
+    if payment_provider() != "whop":
+        return jsonify({"error": "whop no activo"}), 400
+    user = current_user()
+    body = request.get_json(silent=True) or {}
+    plan_id = (body.get("plan_id") or "").strip()
+    if plan_id not in WHOP_ALL_PLAN_IDS:
+        logger.warning("[whop] checkout-session plan desconocido: %s", plan_id[:40])
+        return jsonify({"error": "plan no válido"}), 400
+    payload = {"plan_id": plan_id, "metadata": {"user_id": user["id"]}}
+    code, data = _whop_api("POST", "/api/v2/checkout_sessions", payload)
+    url = (data or {}).get("purchase_url") if isinstance(data, dict) else None
+    if code not in (200, 201) or not url:
+        logger.warning("[whop] checkout-session fallo code=%s data=%s", code, str(data)[:200])
+        return jsonify({"error": "no se pudo crear el checkout"}), 502
+    return jsonify({"url": url, "session_id": (data or {}).get("id")})
 
 
 @app.route("/create-subscription-checkout", methods=["POST"])
