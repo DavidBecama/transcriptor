@@ -12017,6 +12017,11 @@
       --brand-400:#4A74FF; --brand-500:#2348E6; --brand-600:#2348E6; --brand-700:#1A37B8; --brand-800:#142B8F; --brand-900:#0F2070;
       --success:#0E8A5A; --success-bg:rgba(14,138,90,.10); --success-fg:#0A6B45; --success-border:rgba(14,138,90,.28);
     }
+    /* La página Configuración (panel legacy reparentado en la isla) ocupaba TODO el
+       ancho del host → se veía estirada. La capamos y centramos como la isla
+       (.canvas, max-width 1180px) para igualar el ancho de la pestaña Ajustes. */
+    #profPanelSettings { max-width:1180px; margin:0 auto; padding-left:26px; padding-right:26px; box-sizing:border-box; }
+    @media (max-width:760px){ #profPanelSettings { padding-left:16px; padding-right:16px; } }
     /* Titular en Clash; eyebrow en mono (telemetría); tab activo azul v3 */
     #profPanelSettings .heading-1 { font-family: var(--font-display); letter-spacing:-.02em; }
     #profPanelSettings .panel-header .eyebrow { font-family: var(--font-mono); }
