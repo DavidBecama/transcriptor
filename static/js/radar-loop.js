@@ -1716,13 +1716,6 @@
     var header='<header class="guic-head"><div class="guic-head-l">'+
       '<h1 class="h-title guic-h1">'+L("Tus guiones","Your scripts")+'</h1>'+
       '<p class="h-sub guic-sub">'+sub+'</p></div>'+tabs+'</header>';
-    // B3: agencia/estudio → segunda fila de filtros de aprobación.
-    if(isMultiBrand()){
-      var cPend=all.filter(function(g){return g.approval!=="approved";}).length, cAppr=all.filter(function(g){return g.approval==="approved";}).length;
-      header+='<div class="filters" style="margin-top:-10px">'+[["all","Todas",cAll],["pending","Pendientes",cPend],["approved","Aprobadas",cAppr]].map(function(f){
-        return '<button class="fchip'+(appr===f[0]?" on":"")+'" data-act="gui-approval-filter" data-k="'+f[0]+'">'+f[1]+' '+f[2]+'</button>';
-      }).join("")+'</div>';
-    }
     var grid=items.length===0
       ? (cAll===0
           ? '<div class="guic-empty"><span class="guic-empty-h">'+L("Aún nada aquí.","Nothing here yet.")+'</span><span class="guic-empty-s">'+L("Roba tu primera señal en el Radar y vuelve.","Steal your first signal in the Radar and come back.")+'</span><button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Ir al Radar","Go to Radar")+'</button></div>'
