@@ -1896,34 +1896,56 @@
       '<div class="aj-card aj-prefs">'+prefs+'</div>'+
     '</div>';
   }
+  // Naming Whop (lo que cobra): Basic/Content Creator/Agency. `whop` = key del plan en
+  // /api/billing/config (basic→creator). trial/free no se compran (alta o cancelación).
+  var AJ_TIERS=[
+    {k:"trial",   whop:null,      name:"Trial",           price:"0€",   cap:30,  feat:L("3 días Pro · 30 créditos (~10 robos) · sin tarjeta","3-day Pro · 30 credits (~10 steals) · no card")},
+    {k:"free",    whop:null,      name:"Free",            price:"0€",   cap:9,   feat:L("9 créditos/mes (~3 robos) · radar y métricas gratis","9 credits/mo (~3 steals) · radar & metrics free")},
+    {k:"basic",   whop:"creator", name:"Basic",           price:"29€",  cap:120, feat:L("120 créditos/mes (~40 robos) · voz · métricas","120 credits/mo (~40 steals) · voice · metrics"), featured:true},
+    {k:"estudio", whop:"estudio", name:"Content Creator", price:"59€",  cap:360, feat:L("360 créditos/mes (~120 robos) · 3 marcas · prioridad","360 credits/mo (~120 steals) · 3 brands · priority")},
+    {k:"agency",  whop:"agency",  name:"Agency",          price:"129€", cap:960, feat:L("960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra","960 credits/mo (~320 steals) · 10 brands · +96 cr/extra")}
+  ];
+  function _ajPrice(k){ return ({trial:0,free:0,basic:29,estudio:59,agency:129})[k]||0; }
+  function _ajCurTier(){ var p=(S.user.plan||"free"); if(p==="creator"||p==="pro"||p==="basic")return"basic"; if(p==="estudio")return"estudio"; if(p==="agency")return"agency"; if(p==="trial")return"trial"; return"free"; }
+  function _ajTier(k){ for(var i=0;i<AJ_TIERS.length;i++){ if(AJ_TIERS[i].k===k) return AJ_TIERS[i]; } return AJ_TIERS[1]; }
   function ajPlanHTML(){
-    var plan=(S.user.plan||"free"); var planName=plan==="free"?"Free":(plan==="agencia"?"Agencia":(plan==="creador"?"Creador":"Pro"));
-    var cr=S.user.credits||0; var capMonth=30; var pct=Math.max(2,Math.min(100,Math.round(cr/capMonth*100)));
+    var cur=_ajCurTier(); var curMeta=_ajTier(cur);
+    var cr=S.user.credits||0; var cap=curMeta.cap||0; var pct=cap?Math.max(2,Math.min(100,Math.round(cr/cap*100))):0;
     var nGuiones=S.guiones.filter(function(g){return g.status!=="discarded";}).length;
     var usage=[
       [L("Guiones generados","Scripts generated"), String(nGuiones)],
       [L("Reels analizados","Reels analyzed"), String(hasRealVoice()?(S.voice.source_count||0):(brand().reelsAnalyzed||0)).replace(/\B(?=(\d{3})+(?!\d))/g," ")],
       [L("«Llena mi semana»","«Fill my week»"), "2"]
     ].map(function(u){ return '<div class="aj-usage-row"><span>'+u[0]+'</span><span class="aj-usage-v">'+ESC(u[1])+'</span></div>'; }).join("");
-    var invoices=[["14 jun 2026","19,00€"],["14 may 2026","19,00€"],["14 abr 2026","19,00€"]].map(function(iv,i){
-      return '<div class="aj-inv'+(i>0?" bt":"")+'"><div class="aj-inv-l">'+IC.doc+' <span>'+iv[0]+'</span></div>'+
-        '<span class="aj-inv-amt">'+iv[1]+'</span><span class="aj-inv-paid">'+IC.check+' '+L("Pagada","Paid")+'</span>'+
-        '<button class="aj-inv-dl" data-act="aj-invoice">'+L("Descargar","Download")+'</button></div>';
+    // Tarjetas de plan CLICABLES: subida → checkout Whop; bajada → plan más barato /
+    // Free = cancelar (acceso hasta fin de periodo). El plan actual = «Tu plan», inerte.
+    var tiers=AJ_TIERS.filter(function(t){ return t.k!=="trial" || cur==="trial"; });
+    var grid=tiers.map(function(t){
+      var isCur=t.k===cur, up=_ajPrice(t.k)>_ajPrice(cur);
+      var cta = isCur
+        ? '<span class="aj-tier-cur">'+IC.check+' '+L("Tu plan","Your plan")+'</span>'
+        : '<span class="aj-tier-cta '+(up?"up":"down")+'">'+(t.k==="free"?L("Bajar a Free","Switch to Free"):(up?L("Mejorar","Upgrade"):L("Bajar","Downgrade")))+' '+IC.arr+'</span>';
+      return '<button class="aj-tier'+(isCur?" is-current":(t.featured?" featured":""))+'"'+
+        (isCur?' disabled aria-disabled="true"':' data-act="plan-pick" data-k="'+t.k+'"')+'>'+
+        '<span class="aj-tier-name">'+ESC(t.name)+(t.featured&&!isCur?' <i class="aj-tier-star">'+IC.spark+'</i>':'')+'</span>'+
+        '<span class="aj-tier-price">'+ESC(t.price)+(t.price!=="0€"?'<small> /'+L("mes","mo")+'</small>':'')+'</span>'+
+        '<span class="aj-tier-feat">'+ESC(t.feat)+'</span>'+cta+'</button>';
     }).join("");
     return '<div class="aj-stack">'+
       '<div class="aj-plan-grid">'+
         '<div class="aj-card aj-plancard">'+
-          '<div class="aj-plan-top"><span class="aj-plan-badge">'+IC.spark+' '+L("PLAN ","PLAN ")+ESC(planName.toUpperCase())+'</span><span class="aj-plan-renew">'+L("renueva 14 jul","renews Jul 14")+'</span></div>'+
-          '<div class="aj-plan-price"><span class="aj-plan-n">19€</span><span class="aj-plan-per">/ '+L("mes","mo")+'</span></div>'+
-          '<div class="aj-plan-cred"><div class="aj-plan-cred-row"><span>'+L("Créditos del mes","Credits this month")+'</span><span class="aj-mono">'+cr+' / '+capMonth+'</span></div>'+
+          '<div class="aj-plan-top"><span class="aj-plan-badge">'+IC.spark+' '+L("PLAN ","PLAN ")+ESC(curMeta.name.toUpperCase())+'</span></div>'+
+          '<div class="aj-plan-price"><span class="aj-plan-n">'+ESC(curMeta.price)+'</span>'+(curMeta.price!=="0€"?'<span class="aj-plan-per">/ '+L("mes","mo")+'</span>':'')+'</div>'+
+          '<div class="aj-plan-cred"><div class="aj-plan-cred-row"><span>'+L("Créditos del mes","Credits this month")+'</span><span class="aj-mono">'+cr+' / '+cap+'</span></div>'+
             '<div class="aj-cred-bar"><div class="aj-cred-fill" style="width:'+pct+'%"></div></div>'+
             '<span class="aj-cred-note">'+L("1 robo = 3 créditos · ver el radar y las métricas no gasta créditos.","1 steal = 3 credits · viewing the radar and metrics is free.")+'</span></div>'+
-          '<div class="aj-plan-cta"><button class="btn btn-md btn-primary" data-act="recharge">'+L("Recargar créditos","Top up credits")+'</button>'+
-            '<button class="btn btn-md btn-secondary" data-act="change-plan">'+L("Cambiar plan","Change plan")+'</button></div>'+
+          '<div class="aj-plan-cta"><button class="btn btn-lg btn-primary" data-act="recharge">'+IC.bolt+' '+L("Recargar créditos","Top up credits")+'</button></div>'+
         '</div>'+
         '<div class="aj-card aj-usage"><span class="aj-card-t">'+L("Este mes","This month")+'</span>'+usage+'</div>'+
       '</div>'+
-      '<div class="aj-card aj-invoices">'+invoices+'</div>'+
+      '<div class="aj-card aj-tiers-card"><div class="aj-tiers-head"><span class="aj-card-t">'+L("Cambiar de plan","Change plan")+'</span>'+
+        '<span class="aj-tiers-sub">'+L("Sube o baja cuando quieras. Las bajadas se aplican al final de tu periodo.","Move up or down anytime. Downgrades apply at the end of your period.")+'</span></div>'+
+        '<div class="aj-tiers">'+grid+'</div></div>'+
     '</div>';
   }
   function ajAfiliadosHTML(){
@@ -5354,6 +5376,23 @@
     // C1: Ajustes → Plan. "Cambiar plan" abre el modal de PLANES (checkout Whop), "Recargar
     // créditos" abre el modal de TOPUPS (openTopup, no openTopupModal que no existe).
     if(act==="change-plan"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("settings_plan"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
+    // Tarjeta de plan clicada: subir = checkout Whop del plan; Free = cancelar (acceso
+    // hasta fin de periodo, reusa /cancel-subscription vía settingsCancelSub); bajar a un
+    // plan de pago más barato = checkout del más barato (Whop hace el cambio).
+    if(act==="plan-pick"){
+      var pk=k||btn.getAttribute("data-k"); var cur=_ajCurTier();
+      if(!pk||pk===cur) return;
+      if(isDemo()){ showToast(L("En la app real esto abre el checkout de "+_ajTier(pk).name+".","In the real app this opens the "+_ajTier(pk).name+" checkout.")); return; }
+      if(pk==="free"||pk==="trial"){
+        if(typeof window.settingsCancelSub==="function"){ try{ window.settingsCancelSub(); return; }catch(e){} }
+        if(typeof window.openUpgradeModal==="function"){ window.openUpgradeModal("settings_plan"); }
+        return;
+      }
+      var whopKey=_ajTier(pk).whop;
+      if(whopKey && typeof window.subscribePlanFromCard==="function"){ try{ window.subscribePlanFromCard(whopKey); return; }catch(e){} }
+      if(typeof window.openUpgradeModal==="function"){ window.openUpgradeModal("settings_plan"); }
+      return;
+    }
     if(act==="recharge"){ if(typeof window.openTopup==="function"){ try{ window.openTopup(); }catch(e){ showError(L("No pude abrir la recarga. Recarga la página.","Couldn't open top-up. Reload the page.")); } } else if(typeof window.openUpgradeModal==="function"){ window.openUpgradeModal("settings_topup"); } return; }
     // Flash del muro: CTA principal = Creator −40% con WELCOME auto-aplicado (rsFlashSubscribe
     // del chrome); secundario = top-up 300. En demo no hay checkout → abre el modal de planes.
