@@ -10490,6 +10490,15 @@
     .rs .aj-mulet-k { font-size:13px; font-weight:600; color:var(--text-tertiary); }
     .rs .aj-mulet { padding:16px; background:var(--surface-overlay); border:1px solid var(--border-default); border-radius:13px; font-size:15px; line-height:1.6; color:var(--text-secondary); }
     .rs .aj-voice-foot { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-top:4px; flex-wrap:wrap; }
+    /* móvil: tarjeta de identidad — el badge «Cerebro · Nivel» solapaba el nombre en
+       pantallas estrechas → fuera en móvil; la fila puede envolver. */
+    .rs--mobile .aj-identity { flex-wrap:wrap; row-gap:14px; }
+    .rs--mobile .aj-identity .aj-lvl { display:none; }
+    .rs--mobile .aj-identity .btn { flex:1 1 100%; justify-content:center; }   /* botón a su propia fila → el nombre no se corta */
+    /* móvil: bloque «Tu voz» — la cabecera apilaba mal (la descripción quedaba apretada
+       en media columna por la «derivada de N reels» a la derecha). Apilar. */
+    .rs--mobile .aj-voice-head { flex-direction:column; gap:6px; }
+    .rs--mobile .aj-derived { margin-top:0; }
     .rs .aj-slider-row { display:flex; align-items:center; gap:12px; font-size:14.5px; color:var(--text-primary); }
     .rs .aj-slider { position:relative; width:200px; height:8px; border-radius:99px; background:var(--surface-overlay); }
     .rs .aj-slider-fill { position:absolute; left:0; top:0; height:100%; border-radius:99px; background:linear-gradient(90deg, var(--brand-500,#2F5BFF), var(--brand-300,#6E92FF)); }
@@ -19109,7 +19118,7 @@ function fillSettingsPlan() {
   // El "Trial" es un estado transitorio (3 días Pro), no un plan elegible → fuera de la
   // rejilla. El tag del plan actual (fillSettingsPlan) sí lo conserva para no romper a
   // quien esté en trial.
-  if (grid) grid.innerHTML = SETTINGS_PLANS.filter(p => p.key !== "trial").map(p => `
+  if (grid) grid.innerHTML = SETTINGS_PLANS.filter(p => p.key !== "trial" || cur === "trial").map(p => `
     <div class="plan-card${p.key===cur?" is-current":(p.featured?" featured":"")}">
       <div class="plan-card-name">${p.name}${p.featured?' <span style="color:var(--brand-400)">★</span>':""}</div>
       <div class="plan-card-price">${p.price}${p.price!=="0€"?'<small> /mes</small>':""}</div>
