@@ -27158,7 +27158,7 @@ async function removeCompetitor(trackingId, username) {
     <div class="adm-header">
       <div>
         <h1>Admin Panel</h1>
-        <div class="adm-sub">Planes, topups, usuarios, ajustes y métricas — ReelScript</div>
+        <div class="adm-sub">Métricas, usuarios y feedback — ReelScript</div>
       </div>
       <div class="adm-header-actions">
         <button class="adm-btn adm-btn-secondary" onclick="window.__adminRefresh && window.__adminRefresh()">Actualizar</button>
@@ -27168,18 +27168,13 @@ async function removeCompetitor(trackingId, username) {
 
     <div class="adm-tabs" id="admTabs">
       <button class="adm-tab on"  data-panel="metrics"  onclick="window.__adminTab('metrics', this)">Métricas</button>
-      <button class="adm-tab"     data-panel="plans"    onclick="window.__adminTab('plans', this)">Planes</button>
-      <button class="adm-tab"     data-panel="topups"   onclick="window.__adminTab('topups', this)">Topups</button>
       <button class="adm-tab"     data-panel="users"    onclick="window.__adminTab('users', this)">Usuarios</button>
       <button class="adm-tab"     data-panel="feedback" onclick="window.__adminTab('feedback', this)">Feedback</button>
-      <button class="adm-tab"     data-panel="settings" onclick="window.__adminTab('settings', this)">Ajustes</button>
     </div>
 
     <div id="adm-metrics" class="adm-panel on">
       <div class="adm-loading"><span class="adm-spinner"></span><div style="margin-top:14px">Cargando métricas…</div></div>
     </div>
-    <div id="adm-plans" class="adm-panel"></div>
-    <div id="adm-topups" class="adm-panel"></div>
     <div id="adm-users" class="adm-panel">
       <div class="adm-field" style="max-width:420px">
         <input type="text" class="adm-input" id="admUserSearch" placeholder="Buscar por email o ID…" autocomplete="off">
@@ -27187,7 +27182,6 @@ async function removeCompetitor(trackingId, username) {
       <div id="adm-users-content"></div>
     </div>
     <div id="adm-feedback" class="adm-panel"></div>
-    <div id="adm-settings" class="adm-panel"></div>
   </div>
   <div class="adm-toast" id="admToast"></div>
 
@@ -27228,10 +27222,6 @@ async function removeCompetitor(trackingId, username) {
     }
     return data;
   }
-  function sourceTag(src){
-    var label = src === "db" ? "Base de datos" : "Configuración (env)";
-    return '<div class="adm-source">Fuente activa: <span class="adm-src-tag">' + esc(label) + '</span></div>';
-  }
 
   // ── Navegación de pestañas ──────────────────────────────────────────
   function switchTab(name, btn){
@@ -27251,11 +27241,8 @@ async function removeCompetitor(trackingId, username) {
   function load(name, force){
     if (loaded[name] && !force) { return; }
     if (name === "metrics") { loadMetrics(); }
-    else if (name === "plans") { loadPlans(); }
-    else if (name === "topups") { loadTopups(); }
     else if (name === "users") { loadUsers(); }
     else if (name === "feedback") { loadFeedback(); }
-    else if (name === "settings") { loadSettings(); }
   }
 
   // ── MÉTRICAS (reusa el endpoint admin existente /admin/metrics) ──────
@@ -27295,139 +27282,6 @@ async function removeCompetitor(trackingId, username) {
     } catch(e) {
       el.innerHTML = '<div class="adm-msg error">No se pudieron cargar las métricas: ' + esc(e.message) + '</div>';
     }
-  }
-
-  // ── PLANES ───────────────────────────────────────────────────────────
-  async function loadPlans(){
-    var el = $("adm-plans"); if (!el) { return; }
-    el.innerHTML = '<div class="adm-loading"><span class="adm-spinner"></span></div>';
-    try {
-      var data = await api("/plans");
-      var plans = data.plans || [];
-      var html = sourceTag(data.source);
-      if (!plans.length) { html += '<div class="adm-msg info">No hay planes configurados.</div>'; }
-      html += '<div class="adm-grid">';
-      plans.forEach(function(p){
-        var key = esc(p.key);
-        html +=
-          '<div class="adm-card">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-              '<div class="adm-label" style="margin:0">Plan · ' + key + '</div>' +
-              '<span class="adm-pill' + (p.active ? "" : " muted") + '">' + (p.active ? "activo" : "inactivo") + '</span>' +
-            '</div>' +
-            '<form data-key="' + key + '" onsubmit="return window.__adminSavePlan(event)">' +
-              field("Nombre", "name", p.name, "text", true) +
-              field("Precio mes (¢)", "price_month_cents", p.price_month_cents, "number") +
-              field("Precio año (¢)", "price_year_cents", p.price_year_cents, "number") +
-              field("Créditos mensuales", "monthly_credits", p.monthly_credits != null ? p.monthly_credits : 0, "number") +
-              field("Stripe Price ID (mes)", "stripe_price_month", p.stripe_price_month, "text") +
-              field("Stripe Price ID (año)", "stripe_price_year", p.stripe_price_year, "text") +
-              field("Orden", "sort_order", p.sort_order != null ? p.sort_order : 0, "number") +
-              '<div class="adm-field"><label class="adm-check"><input type="checkbox" name="active"' + (p.active ? " checked" : "") + '> Activo</label></div>' +
-              '<button type="submit" class="adm-btn" style="width:100%">Guardar plan</button>' +
-            '</form>' +
-          '</div>';
-      });
-      html += '</div>';
-      el.innerHTML = html;
-      loaded.plans = true;
-    } catch(e) {
-      el.innerHTML = '<div class="adm-msg error">Error al cargar planes: ' + esc(e.message) + '</div>';
-    }
-  }
-  function field(label, name, value, type, required){
-    var v = value == null ? "" : value;
-    return '<div class="adm-field"><label class="adm-label">' + esc(label) + '</label>' +
-           '<input class="adm-input" name="' + esc(name) + '" type="' + (type || "text") + '"' +
-           (required ? " required" : "") + ' value="' + esc(v) + '"></div>';
-  }
-  async function savePlan(evt){
-    evt.preventDefault();
-    var form = evt.target;
-    var key = form.getAttribute("data-key");
-    var fd = new FormData(form);
-    function numOrNull(n){ var x = fd.get(n); return (x === "" || x == null) ? null : parseInt(x, 10); }
-    var body = {
-      name: fd.get("name"),
-      price_month_cents: numOrNull("price_month_cents"),
-      price_year_cents: numOrNull("price_year_cents"),
-      monthly_credits: parseInt(fd.get("monthly_credits"), 10) || 0,
-      stripe_price_month: fd.get("stripe_price_month") || null,
-      stripe_price_year: fd.get("stripe_price_year") || null,
-      sort_order: parseInt(fd.get("sort_order"), 10) || 0,
-      active: !!fd.get("active")
-    };
-    var btn = form.querySelector("button[type=submit]");
-    if (btn) { btn.disabled = true; }
-    try {
-      var res = await api("/plans/" + encodeURIComponent(key), {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
-      });
-      if (res && res.ok !== false) { toast("Plan «" + key + "» guardado", "ok"); load("plans", true); }
-      else { toast("Error: " + ((res && res.error) || "desconocido"), "error"); }
-    } catch(e) { toast("Error al guardar: " + e.message, "error"); }
-    finally { if (btn) { btn.disabled = false; } }
-    return false;
-  }
-
-  // ── TOPUPS ─────────────────────────────────────────────────────────
-  async function loadTopups(){
-    var el = $("adm-topups"); if (!el) { return; }
-    el.innerHTML = '<div class="adm-loading"><span class="adm-spinner"></span></div>';
-    try {
-      var data = await api("/topups");
-      var topups = data.topups || [];
-      var html = sourceTag(data.source);
-      if (!topups.length) { html += '<div class="adm-msg info">No hay topups configurados.</div>'; }
-      html += '<div class="adm-grid">';
-      topups.forEach(function(t){
-        var key = esc(t.key);
-        html +=
-          '<div class="adm-card">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-              '<div class="adm-label" style="margin:0">Topup · ' + key + '</div>' +
-              '<span class="adm-pill' + (t.active ? "" : " muted") + '">' + (t.active ? "activo" : "inactivo") + '</span>' +
-            '</div>' +
-            '<form data-key="' + key + '" onsubmit="return window.__adminSaveTopup(event)">' +
-              field("Créditos", "credits", t.credits != null ? t.credits : 0, "number", true) +
-              field("Precio (¢)", "price_cents", t.price_cents != null ? t.price_cents : 0, "number") +
-              field("Stripe Price ID", "stripe_price_id", t.stripe_price_id, "text") +
-              field("Orden", "sort_order", t.sort_order != null ? t.sort_order : 0, "number") +
-              '<div class="adm-field"><label class="adm-check"><input type="checkbox" name="active"' + (t.active ? " checked" : "") + '> Activo</label></div>' +
-              '<button type="submit" class="adm-btn" style="width:100%">Guardar topup</button>' +
-            '</form>' +
-          '</div>';
-      });
-      html += '</div>';
-      el.innerHTML = html;
-      loaded.topups = true;
-    } catch(e) {
-      el.innerHTML = '<div class="adm-msg error">Error al cargar topups: ' + esc(e.message) + '</div>';
-    }
-  }
-  async function saveTopup(evt){
-    evt.preventDefault();
-    var form = evt.target;
-    var key = form.getAttribute("data-key");
-    var fd = new FormData(form);
-    var body = {
-      credits: parseInt(fd.get("credits"), 10) || 0,
-      price_cents: parseInt(fd.get("price_cents"), 10) || 0,
-      stripe_price_id: fd.get("stripe_price_id") || null,
-      sort_order: parseInt(fd.get("sort_order"), 10) || 0,
-      active: !!fd.get("active")
-    };
-    var btn = form.querySelector("button[type=submit]");
-    if (btn) { btn.disabled = true; }
-    try {
-      var res = await api("/topups/" + encodeURIComponent(key), {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
-      });
-      if (res && res.ok !== false) { toast("Topup «" + key + "» guardado", "ok"); load("topups", true); }
-      else { toast("Error: " + ((res && res.error) || "desconocido"), "error"); }
-    } catch(e) { toast("Error al guardar: " + e.message, "error"); }
-    finally { if (btn) { btn.disabled = false; } }
-    return false;
   }
 
   // ── USUARIOS ─────────────────────────────────────────────────────────
@@ -27493,45 +27347,6 @@ async function removeCompetitor(trackingId, username) {
       else { toast("Error: " + ((res && res.error) || "desconocido"), "error"); }
     } catch(e) { toast("Error: " + e.message, "error"); }
     finally { btn.disabled = false; }
-  }
-
-  // ── AJUSTES ───────────────────────────────────────────────────────────
-  async function loadSettings(){
-    var el = $("adm-settings"); if (!el) { return; }
-    el.innerHTML = '<div class="adm-loading"><span class="adm-spinner"></span></div>';
-    try {
-      var data = await api("/settings");
-      var cost = (data && data.cost_cents != null) ? data.cost_cents : 18;
-      var src = data && data.cost_cents_source ? data.cost_cents_source : null;
-      var html = '<div class="adm-card" style="max-width:480px">';
-      if (src) { html += sourceTag(src); }
-      html +=
-        '<form onsubmit="return window.__adminSaveSettings(event)">' +
-          field("COST_CENTS · coste de 1 crédito en ¢", "cost_cents", cost, "number", true) +
-          '<button type="submit" class="adm-btn">Guardar ajustes</button>' +
-        '</form>' +
-      '</div>';
-      el.innerHTML = html;
-      loaded.settings = true;
-    } catch(e) {
-      el.innerHTML = '<div class="adm-msg error">Error al cargar ajustes: ' + esc(e.message) + '</div>';
-    }
-  }
-  async function saveSettings(evt){
-    evt.preventDefault();
-    var fd = new FormData(evt.target);
-    var body = { cost_cents: parseInt(fd.get("cost_cents"), 10) || 18 };
-    var btn = evt.target.querySelector("button[type=submit]");
-    if (btn) { btn.disabled = true; }
-    try {
-      var res = await api("/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
-      });
-      if (res && res.ok !== false) { toast("Ajustes guardados", "ok"); load("settings", true); }
-      else { toast("Error: " + ((res && res.error) || "desconocido"), "error"); }
-    } catch(e) { toast("Error al guardar: " + e.message, "error"); }
-    finally { if (btn) { btn.disabled = false; } }
-    return false;
   }
 
   // ── FEEDBACK (cola de reportes + recompensa en créditos) ──────────────
@@ -27738,10 +27553,7 @@ async function removeCompetitor(trackingId, username) {
   window.__adminOpen = open;
   window.__adminClose = close;
   window.__adminRefresh = refresh;
-  window.__adminSavePlan = savePlan;
-  window.__adminSaveTopup = saveTopup;
   window.__adminEditUser = editUser;
-  window.__adminSaveSettings = saveSettings;
   window.__adminFbFilter = fbFilter;
   window.__adminFbResolve = resolveFeedback;
   window.__adminFbView = viewFeedback;
