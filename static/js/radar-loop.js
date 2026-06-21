@@ -2128,14 +2128,21 @@
     '</div></div>';
   }
   function metResumenHTML(){
+    // DATOS REALES: KPIs/interacción/top reels se derivan de tus vídeos publicados
+    // (metricVideos ← /api/metrics). Lo que el dato no contiene (tendencia 14d, hooks,
+    // temas, heatmap) queda como muestra del diseño — fable lo enchufa al backend.
+    var V=metricVideos(); var hasV=V.length>0;
+    var _sum=function(f){ return V.reduce(function(a,v){ return a+(Number(v[f])||0); },0); };
+    var sv=_sum("views"), sl=_sum("likes"), sc=_sum("comments"), ss=_sum("shares");
+    var sInter=sl+sc+ss;
     var kpis=[
-      ["Reproducciones","1,02 M","+52%",[12,18,15,22,26,24,31,29,36,40,38,46,52,58]],
+      ["Reproducciones", hasV?fmtKM(sv):"1,02 M","+52%",[12,18,15,22,26,24,31,29,36,40,38,46,52,58]],
       ["Alcance","214 K","+38%",[20,22,21,26,25,30,28,33,31,36,40,38,44,48]],
-      ["Interacciones","48 K","+29%",[10,14,13,16,18,17,20,22,21,25,27,26,30,33]],
+      ["Interacciones", hasV?fmtKM(sInter):"48 K","+29%",[10,14,13,16,18,17,20,22,21,25,27,26,30,33]],
       ["Visitas al perfil","37 K","+19%",[8,9,11,10,13,12,15,14,16,18,17,20,22,24]],
-      ["Me gusta","31 K","+24%",[14,16,15,18,20,19,22,24,23,27,29,28,31,34]],
-      ["Comentarios","4,7 K","+61%",[6,7,9,8,11,13,12,16,18,17,22,26,30,34]],
-      ["Guardados","9,1 K","+44%",[9,10,12,11,14,16,15,19,18,22,24,28,30,34]],
+      ["Me gusta", hasV?fmtKM(sl):"31 K","+24%",[14,16,15,18,20,19,22,24,23,27,29,28,31,34]],
+      ["Comentarios", hasV?fmtKM(sc):"4,7 K","+61%",[6,7,9,8,11,13,12,16,18,17,22,26,30,34]],
+      ["Compartidos", hasV?fmtKM(ss):"6,3 K","+44%",[9,10,12,11,14,16,15,19,18,22,24,28,30,34]],
       ["Nuevos seguidores","+2 480","+18%",[18,16,19,17,20,22,21,24,23,26,28,27,30,33]]
     ];
     var kpiH=kpis.map(function(k){
@@ -2147,7 +2154,10 @@
     var trend=[42,55,48,61,58,73,67,71,64,82,78,88,79,92]; var th=_mBars(trend);
     var tlabels=["","","","","5","","","","","10","","","","14"];
     var trendBars=trend.map(function(v,i){ return '<div class="mt-tb"><div class="mt-tb-col"><div class="mt-tb-fill" style="height:'+th[i]+'"></div></div><span class="mt-tb-l">'+tlabels[i]+'</span></div>'; }).join("");
-    var eng=[["Me gusta","31 K",31],["Guardados","9,1 K",9.1],["Compartidos","6,3 K",6.3],["Comentarios","4,7 K",4.7]]; var emax=31;
+    var eng = hasV
+      ? [["Me gusta",fmtKM(sl),sl],["Compartidos",fmtKM(ss),ss],["Comentarios",fmtKM(sc),sc]]
+      : [["Me gusta","31 K",31],["Guardados","9,1 K",9.1],["Compartidos","6,3 K",6.3],["Comentarios","4,7 K",4.7]];
+    var emax=Math.max.apply(null,eng.map(function(r){return r[2];}).concat([1]));
     var engH=eng.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+r[0]+'</span><span class="mt-mono">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+Math.round(r[2]/emax*100)+'%"></i></div></div>'; }).join("");
     var hooks=[["“Comenta X y te mando…”","82%"],["“Acaba de pasar…”","74%"],["“Nadie te cuenta que…”","61%"],["“3 cosas que…”","44%"]];
     var hooksH=hooks.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+ESC(r[0])+'</span><span class="mt-mono">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+r[1]+'"></i></div></div>'; }).join("");
@@ -2164,7 +2174,11 @@
       var peak=(ri===pr&&ci===pc); return '<div class="mt-hm-cell'+(peak?" peak":"")+'" style="background:rgba(110,146,255,'+(0.08+v*0.78).toFixed(2)+')">'+(peak?"★":"")+'</div>';
     }).join("")+'</div>'; }).join("");
     var rowLabH='<div class="mt-hm-rowl">'+rowL.map(function(rl){ return '<span>'+rl+'</span>'; }).join("")+'</div>';
-    var top=[["1","1:09","Comenta “Secretario” y te mando el manual desde 0","182 K","14 K","12×"],["2","0:45","Claude no basta para montar un SaaS que escale","94 K","7,1 K","11×"],["3","0:29","Anthropic ha soltado Fable 5 y cambia el juego","71 K","5,3 K","7.6×"],["4","1:27","Comenta “Claude” y te paso el setup completo","48 K","3,8 K","5.4×"]];
+    var top = hasV
+      ? V.slice().sort(function(a,b){ return (b.views||0)-(a.views||0); }).slice(0,4).map(function(v,i){
+          return [String(i+1), v.dur||"", v.cap||v.from_guion||"", fmtKM(v.views||0), fmtKM((v.likes||0)+(v.comments||0)), (v.vsMedian!=null?v.vsMedian+"×":"–")];
+        })
+      : [["1","1:09","Comenta “Secretario” y te mando el manual desde 0","182 K","14 K","12×"],["2","0:45","Claude no basta para montar un SaaS que escale","94 K","7,1 K","11×"],["3","0:29","Anthropic ha soltado Fable 5 y cambia el juego","71 K","5,3 K","7.6×"],["4","1:27","Comenta “Claude” y te paso el setup completo","48 K","3,8 K","5.4×"]];
     var topH=top.map(function(r){ return '<div class="mt-top-row"><span class="mt-top-rank">'+r[0]+'</span>'+
       '<div class="mt-top-thumb"><span class="mt-top-dur">'+r[1]+'</span></div>'+
       '<div class="mt-top-title">'+ESC(r[2])+'</div>'+

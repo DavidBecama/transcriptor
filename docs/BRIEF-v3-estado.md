@@ -1,39 +1,58 @@
-# Brief · Alineado v3 (rediseño 7 páginas) — estado
+# Handoff v3 — para el Claude de fable
 
-**Rama:** `onboarding-v3-align` (clon limpio desde prod `v0.22.1`/`aa100ce`).
-**Merge:** `--no-ff` → `prod` ya hecho **en local** (commit `23b5c6d`). **Sin push** — pendiente de coordinar contigo.
-**Gates (verde):** harness **30/30** (`node scripts/verify-island.mjs`) · `node --check` · `py_compile`.
-**Probar:** `DEMO_MODE=1 PORT=5059 python app.py` → `http://localhost:5059/es/` (Ctrl+Shift+R). Toggle de plan DEMO arriba para Free/Pro.
+Estado del rediseño **design system v3** (mockups de David). Pensado para que otra instancia de Claude continúe sin contexto previo.
 
 ---
 
-## ✅ HECHO — las 7 páginas a tu mockup
+## 0. Setup rápido
 
-| Página | Qué lleva |
-|---|---|
-| **RADAR** | hero + radar-scope animado, oportunidad (thumb limpio + insight 12×), competidores + galería, Cerebro/progreso, "Llena mi semana", "Más señales · N", barra superior limpia |
-| **Guiones** | cabecera + tabs (Todos/Por grabar/Grabados), "Sin desarrollar" (cards dashed), rejilla de cards con badge de estado (Por grabar / Cocinando / Grabado), "Explosión creativa" |
-| **Cerebro** | header + anillo de progreso con nodos animados, "Lo que ya sé de ti", "Niveles del Cerebro" (Aprendiz→Viral), "Misiones para subir al Nivel N" |
-| **Editor de guion** | 2 columnas: documento editable (hook H1 + barra IA + bloques Gancho/Desarrollo/CTA) y rail (reel fuente, transcripción, variantes de gancho, Regenerar) |
-| **Teleprónter** | barra ‹Editor + pill REC + timer, banda de lectura + marcador + fades, kickers, controles (velocidad/texto/espejo), Grabar/Detener |
-| **Ajustes** | página nueva: Perfil y voz · Plan y créditos · Afiliados |
-| **Métricas** | clon de las 3 vistas (Resumen / Audiencia / Competidores) + paywall Pro borroso |
+- **Repo / rama:** `DavidBecama/transcriptor`, rama **`onboarding-v3-align`** (brancheada de prod `v0.22.1`/`aa100ce`). `origin/prod` está **intacto** a propósito — no se mergea hasta validar.
+- **Clon local de trabajo:** `C:\dev\transcriptor-v3`.
+- **Arrancar demo (Windows):**
+  `DEMO_MODE=1 PORT=5059 FLASK_DEBUG=0 /c/dev/transcriptor/.venv/Scripts/python.exe app.py`
+  La isla vive en **http://localhost:5059/es/** (la home redirige a `/es/`). Tras editar, **reinicia el server** (Flask cachea el template) y recarga con **Ctrl+Shift+R** (la caché del navegador es la causa #1 de "no veo cambios"). El server es **flaky** (se cae solo) → si HTTP 000, relánzalo.
+- **Cache-bust de la isla:** `templates/index.html` referencia `static/js/radar-loop.js?v=N`. **Sube N** en cada cambio de JS (vamos por **v=65**).
 
-**Criterio:** la espina de cada mockup arriba; las features reales que el mockup no muestra quedan **conservadas debajo** (no se ha borrado funcionalidad). Tokens v3 (azul marca · verde multiplicadores · naranja chispazo), Clash/Schibsted/Syne/Geist, botones 3D, cero emojis. Cerebro al **35%** en onboarding (no 50), según tu brief.
+## 1. Gates (obligatorio antes de pushear)
+- **Harness:** `node scripts/verify-island.mjs <URL>` → debe dar **30/30**. El script tiene hardcodeado el Chrome de macOS; en Windows usa una copia parcheada:
+  `sed 's#/Applications/Google Chrome.app/Contents/MacOS/Google Chrome#C:/Program Files/Google/Chrome/Application/chrome.exe#' scripts/verify-island.mjs > /tmp/vi.mjs && node /tmp/vi.mjs http://localhost:5059`
+- `node --check static/js/radar-loop.js`
+- `python -m py_compile app.py`
+- Al editar la UI v3 hubo que actualizar selectores del harness (lo hecho, intención intacta): detector de montaje `.phead`→`.cmd`; Guiones `.ideas-zone`→`.guiu`, `.gui-card`→`.guic`, `.gui-pill`→`.guic-badge`; T1 cuenta solo el primario VISIBLE (carrusel); test de tabs de marca → ahora valida `.brand-switch`.
 
----
+## 2. Arquitectura (lo mínimo para no romper nada)
+- **La isla** = `static/js/radar-loop.js` (vanilla JS, estado `S`, `render()` reconstruye `#radarRoot`). El **CSS v3 es inline** en `templates/index.html` (scope `.rs`).
+- **Tabs:** `S.tab` ∈ dashboard·guiones·metrics·leaderboard·brain·**settings**(nuevo, Ajustes)·team. **Vistas overlay:** `S.view` ∈ feed·gen·**script**(reveal «aha» tras robar, `.script-hook`)·**editor**(editor v3 de guion, abierto con «Abrir guion»)·result·prompter·fillweek.
+- **Móvil:** clase `.rs--mobile` en `#radarRoot` si `max-width:720px`. Hay reglas `.rs--mobile`/`@media` por componente.
+- **Scroll preservado** entre repintados (no salta arriba al pulsar): en `render()`, clave `tab|view|creatorFilter`.
+- **Tour (tutorial):** TODO en `index.html` (`TOUR_STEPS`, `startTour`, `renderTourStep`…). Lanzar solo el tour: **`?tour=1`** o `startTour()` en consola.
+- **Tokens v3** (`.rs`): `--brand-500:#2F5BFF` (azul=marca/acción), `--success-fg`/verde (multiplicadores), `#FF8A3D` (naranja=chispazo, hardcoded). Fonts: Clash (display) · Schibsted (body) · Syne (accent/"aha") · Geist Mono (telemetría). Reglas: cero emojis (iconos Lucide 2px), CTA de robar = **«Roba la idea»** (decisión usuario, NO «Hazlo mío»), targets ≥44px, un primario por pantalla.
 
-## ⏭️ QUEDA
+## 3. HECHO (todo en la rama, gates 30/30)
 
-1. **RADAR — pulido visual.** La estructura está clavada al Layout A, pero falta repaso fino contra el mockup (espaciados/proporciones, miniaturas de la galería/oportunidad, y los **chips por-competidor** que filtran la galería, que están en el mockup y aún no se filtran de verdad).
-2. **CEREBRO — quitar lo que sobra.** Bajo la espina del mockup quedaron bloques de la versión anterior que **no están en tu diseño** (entrenar/votar hooks, Tinder de guiones, re-analizar perfil, analizar reel suelto, selector de tono, captura de voz, "de qué me alimento", asistentes, "lo que funciona", "de quién aprendo"). Hay que **decidir qué se mantiene y limpiar el resto** para que la página quede como el mockup.
-3. **MÉTRICAS — coordinar.** El clon es **demo-data** y **pisa el `metricsHTML` con datos reales de Instagram** (lo de fable/Alberto): su función queda definida pero sin uso. Decidir entre los dos qué va a release — el look del mockup o la lógica real (o el marco visual del mockup envolviendo los datos reales).
-4. **TUTORIAL (house tour) — ajustar a la nueva Radar.** El tour navega/ilumina elementos por selector; con el rediseño del Radar (hero, oportunidad, galería, barra superior) muchos targets cambiaron → revisar los pasos y el spotlight para que apunten a los elementos nuevos.
-5. **Versión MÓVIL — arreglar.** Repaso responsive de las 7 páginas: hay reglas `.rs--mobile` puestas por bloque, pero falta probar de verdad en móvil (rejillas a 1 columna, rails laterales, tablas de Métricas/Competidores, editor/teleprónter, targets ≥44px).
-6. **RANKING — falta visual.** La pestaña Ranking (leaderboard) **no se ha alineado a v3** (no entraba en las 7 páginas del mockup) → queda con el look anterior; pendiente de rediseño visual.
-7. **Quitar la página «Analizar»** (panel legacy `transc`, icono micro del rail) y **reubicar la función de analizar un reel concreto** (pegar URL → transcribir/analizar sin añadirlo como competidor). Decidir dónde vive ahora (¿en «Añadir reel» del Radar? ¿en el editor? ¿en una acción suelta?).
-8. **Push / release a prod.** El merge está hecho en local; falta subirlo y meterlo en tu release.
+**7 páginas a mockup David:** RADAR (Layout A), Guiones, Cerebro, Editor de guion, Teleprónter, Ajustes, Métricas. Patrón: espina del mockup arriba + features reales conservadas/demotadas.
 
----
+**Afinado RADAR:** oportunidad (eyebrow/labels en frase, sin botón X, card más alta + más aire, estrella «Guardar» 3D, 3 CTA del carrusel en azul); **«Competidores en el radar»** = chips compactos por competidor que filtran la galería + desplegable «+N» con buscador (escala a 20+, `gal-menu`); fuera la fila de tabs de marca (el cambio de marca vive en `.brand-switch` de la barra); quitados de la espina: «Tus competidores», activación, «Enséñame tu voz», «Tu próxima serie», «Más señales». Quedan: añadir competidor/reel, «Te lo sugiero», «Creaciones de la comunidad».
 
-*Notas técnicas del rediseño:* desaparece el header universal `.phead` (cada página tiene el suyo); el editor v3 vive en `view==="editor"` y el reveal "aha" post-robo sigue en `view==="script"`; el harness se actualizó (`.phead`→`.cmd`, selectores de Guiones renombrados) manteniendo la intención de cada test.
+**CEREBRO:** solo la espina (header + anillo + «Lo que ya sé de ti» + niveles + misiones); anillo con cerebro centrado y «NIVEL» debajo más grande; nivel Estratega ya no dice «ilimitados» (el tope real es por plan, `TRACKED_CREATORS_LIMITS` en app.py: free/pro 1, creator 5, estudio 15, agency 20 +10/marca).
+
+**ONBOARDING:** tag seleccionado legible (azul sólido + texto blanco), CTA «Sigamos», **sin «Saltar configuración»** (obligatorio), paso 5 sin flash del botón + «Seguir a N», paso 4 al mismo ancho que el resto.
+
+**TUTORIAL:** adaptado a la nueva Radar; **Ranking antes de Métricas**; NO se cierra con Esc ni clic fuera (solo sus botones); el botón resaltado solo es clicable en pasos `hold`; tras robar explica el guión creado (paso `noFrame`, sin encuadre, texto a un lado) + pasos «Grábalo ahora» y «Roba la siguiente señal»; «Atrás» salta pasos efímeros (`ephemeral`); scroll instantáneo (sin recolocar el foco); re-consulta el target cada frame (Cerebro re-renderiza). Orden: Radar→Oportunidad→Competidores→Roba la idea→Guión creado→Grábalo ahora→Roba la siguiente señal→Guiones→Cerebro→Ranking→Métricas.
+
+**MÓVIL:** auditado a 390px (headless) → ninguna de las 7 páginas desborda; oportunidad colapsa a 1 col; carruseles/galerías/chips scrollean en horizontal a propósito; tabla de competidores de Métricas scrollable en móvil.
+
+**MÉTRICAS (marco David + datos reales, parcial):** la vista **Resumen** deriva de tus vídeos reales (`metricVideos()` ← `/api/metrics`): **KPIs** (Reproducciones, Interacciones, Me gusta, Comentarios, Compartidos), **Desglose de interacción** y **Top reels**. Fallback a la muestra del diseño si no hay vídeos.
+
+## 4. QUEDA — para fable
+
+1. **MÉTRICAS — completar con backend real (tu lane).** En `metResumenHTML`/`metAudienciaHTML`/`metCompetidoresHTML` (radar-loop.js) siguen como **muestra del diseño**: la **tendencia 14 días**, **ganchos que funcionan**, **temas que explotan**, **heatmap de horas**, toda la vista **Audiencia** (crecimiento, alcance por tipo, edad/género/ubicaciones) y **Competidores** (tabla, cuota de atención). El dato actual de `S.metrics.videos` no las contiene → hay que traerlas de `/api/metrics*` (IG insights). El marco visual `.mt-*` ya está; solo enchufar datos. ⚠️ La función antigua de métricas reales quedó **definida sin uso** — revisa si reaprovechas su lógica.
+2. **RANKING (leaderboard) — falta visual v3.** No entraba en los 7 mockups; sigue con el look anterior (`leaderboardPageHTML`). Rediseñar al sistema v3.
+3. **Quitar la página «Analizar»** (panel legacy `transc`, icono micro del rail en `railHTML`) y **reubicar la función de analizar un reel concreto** (pegar URL → transcribir/analizar sin añadirlo como competidor). Decidir dónde vive (¿«Añadir reel» del Radar? ¿editor? ¿acción suelta?).
+4. **Chips por-competidor / galería:** funcionan; revisar con datos reales (en prod los competidores salen de `/api/tracked-creators/reels`).
+5. **Merge `--no-ff` a `prod` + release** (lo coordina David). Hay un merge local de prueba (`23b5c6d`) en el clon, NO pusheado.
+
+## 5. Notas de coordinación
+- **Lane de fable:** Métricas (datos reales IG) y todo lo de backend. El frontend v3 (`ed-*`, `guic-*`, `ce-*`, `mt-*`, `aj-*`, `tp-*`, `rgal-*`, `rdr-*`) es CSS nuevo aislado.
+- **NO** pushear skills privados (`C:\dev\_skills-privado\`). **NO** `git add -A` — añadir archivos concretos.
+- Real-mode escribe en la Supabase de **prod** → solo cuentas test, limpiar.
