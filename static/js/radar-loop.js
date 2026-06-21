@@ -2744,6 +2744,140 @@
       '<div class="bt-prog">'+(gt.i+1)+' / '+gt.cards.length+'</div>'+
     '</div></div>';
   }
+  /* ── v3 (mockup David · Cerebro): espina limpia ───────────────────────
+     header (eyebrow glow + «Tu Cerebro» + sub), hero con anillo de progreso +
+     nodos cerebro animados + columna de stats, rejilla «Lo que ya sé de ti» |
+     «Niveles del Cerebro», y «Misiones para subir al Nivel N». Las features
+     densas (entrenar, tinder, asistentes, voz, métricas) van DEBAJO, intactas. */
+  function brainHeaderV3HTML(){
+    return '<header class="ce-head">'+
+      '<div class="ce-eyebrow"><span class="ce-eye-dot"></span>'+L("tu copiloto, entrenándose con cada guion","your copilot, training with every script")+'</div>'+
+      '<h1 class="ce-h1">'+L("Tu Cerebro","Your Brain")+'</h1>'+
+      '<p class="ce-sub">'+L("Aprende tu voz reel a reel. Cuanto más creas, más clava tu tono — y antes escribe solo.","It learns your voice reel by reel. The more you create, the better it nails your tone — and the sooner it writes on its own.")+'</p>'+
+    '</header>';
+  }
+  // Nodos del cerebro (SVG) — réplica del mockup: glifo + sinapsis animadas.
+  var _ceBrainSVG='<svg width="118" height="118" viewBox="0 0 120 120" fill="none" class="ce-brain-svg">'+
+    '<g class="ce-breathe">'+
+    '<path d="M60 22 C45 20 35 30 35 42 C25 45 25 60 33 64 C29 75 39 88 53 85 C57 93 70 93 75 85 C89 88 99 75 91 64 C99 59 97 44 86 43 C86 31 76 20 60 22 Z" fill="var(--brand-500)" opacity="0.07"/>'+
+    '<path d="M60 22 C45 20 35 30 35 42 C25 45 25 60 33 64 C29 75 39 88 53 85 C57 93 70 93 75 85 C89 88 99 75 91 64 C99 59 97 44 86 43 C86 31 76 20 60 22 Z" stroke="var(--brand-300,#6E92FF)" stroke-width="1" opacity="0.35"/>'+
+    '<circle class="ceN" cx="60" cy="58" r="5.5" fill="var(--brand-500)"/>'+
+    '<circle class="ceN" cx="56" cy="40" r="3.6" fill="var(--brand-300,#6E92FF)" style="animation-delay:.2s"/>'+
+    '<circle class="ceN" cx="40" cy="54" r="3.6" fill="var(--brand-300,#6E92FF)" style="animation-delay:.5s"/>'+
+    '<circle class="ceN" cx="76" cy="56" r="3.6" fill="var(--brand-300,#6E92FF)" style="animation-delay:.35s"/>'+
+    '<circle class="ceN" cx="58" cy="76" r="3.6" fill="var(--brand-300,#6E92FF)" style="animation-delay:.7s"/>'+
+    '<circle class="ceN" cx="44" cy="34" r="2.8" fill="var(--brand-300,#6E92FF)" style="animation-delay:.9s"/>'+
+    '<circle class="ceN" cx="72" cy="36" r="2.8" fill="var(--brand-300,#6E92FF)" style="animation-delay:1.1s"/>'+
+    '<circle class="ceN" cx="46" cy="72" r="2.8" fill="var(--brand-300,#6E92FF)" style="animation-delay:.6s"/>'+
+    '<circle class="ceN" cx="74" cy="74" r="2.8" fill="var(--brand-300,#6E92FF)" style="animation-delay:1.3s"/>'+
+    '</g></svg>';
+  function brainHeroV3HTML(lv, voicePct){
+    var b=brand();
+    var pct=brainProgress();
+    var leveled=pct>=100 || !lv.next;
+    var off=Math.round(465*(1-pct/100));
+    var kicker=leveled?L("Manifestando viralidad","Manifesting virality"):L("Vas afinando","Dialing it in");
+    var title=leveled
+      ? L("¡Tu Cerebro está a punto de subir de nivel!","Your Brain is about to level up!")
+      : L("Te falta poco para que escriba como tú sin pensar","Almost there — soon it writes like you without thinking");
+    var reels=hasRealVoice()?(S.voice.source_count||0):(b.reelsAnalyzed||0);
+    var reelsTxt=String(reels).replace(/\B(?=(\d{3})+(?!\d))/g," ");
+    var nGuiones=S.guiones.filter(function(g){return g.status!=="discarded";}).length;
+    var stats=[
+      [L("Reels analizados","Reels analyzed"), reelsTxt, "var(--text-primary)"],
+      [L("Guiones creados","Scripts created"), String(nGuiones), "var(--text-primary)"],
+      [L("Tu voz, clavada","Your voice, nailed"), voicePct+"%", "var(--success-fg,#3FE0A0)"],
+      [L("Racha","Streak"), (S.user.streak||0)+" "+L("días","days"), "var(--brand-500,#2F5BFF)"]
+    ];
+    var statsH=stats.map(function(s){ return '<div class="ce-stat"><span class="ce-stat-l">'+ESC(s[0])+'</span><span class="ce-stat-v" style="color:'+s[2]+'">'+ESC(s[1])+'</span></div>'; }).join("");
+    return '<div class="ce-hero-row">'+
+      '<div class="ce-hero">'+
+        '<div class="ce-ring">'+
+          '<svg width="172" height="172" viewBox="0 0 172 172" class="ce-ring-svg" aria-hidden="true">'+
+            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
+            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+off+'" class="ce-ring-prog"/>'+
+          '</svg>'+
+          '<div class="ce-ring-c">'+_ceBrainSVG+'<span class="ce-ring-lvl">'+L("NIVEL","LEVEL")+' <b>'+lv.level+'</b></span></div>'+
+          '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
+        '</div>'+
+        '<div class="ce-hero-body">'+
+          '<div class="ce-kicker">'+ESC(kicker)+'</div>'+
+          '<div class="ce-hero-title">'+ESC(title)+'</div>'+
+          (lv.next?'<div class="ce-prog-row"><span>'+L("Progreso al Nivel "+lv.next,"Progress to Level "+lv.next)+'</span><span class="ce-prog-pct">'+pct+'%</span></div>':'')+
+          '<div class="ce-prog-bar"><div class="ce-prog-fill eco-fill" style="width:'+Math.max(4,pct)+'%"></div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="ce-stats">'+statsH+'</div>'+
+    '</div>';
+  }
+  function brainKnowHTML(v){
+    var reels=hasRealVoice()?(S.voice.source_count||0):(brand().reelsAnalyzed||47);
+    var tonos=(v.tono||"").split(/[,·]/).map(function(x){return x.trim();}).filter(Boolean);
+    if(!tonos.length) tonos=["Directo","Cercano"];
+    var pills=tonos.map(function(t){ return '<span class="ce-tono">'+ESC(t)+'</span>'; }).join("");
+    var frases=(v.frases&&v.frases.length)?v.frases.map(function(f){return '“'+ESC(f)+'”';}).join(", ")+"." : "—";
+    var gancho=(v.frases&&v.frases[0])?('“'+ESC(v.frases[0]).slice(0,16)+'…”'):'“Comenta X…”';
+    return '<div class="ce-card ce-know">'+
+      '<div class="ce-card-head"><span class="ce-card-t">'+L("Lo que ya sé de ti","What I already know about you")+'</span><span class="ce-card-meta">'+L("› de "+reels+" reels","› from "+reels+" reels")+'</span></div>'+
+      '<div class="ce-know-block"><span class="ce-know-k">'+L("Tu tono","Your tone")+'</span><div class="ce-tonos">'+pills+'</div></div>'+
+      '<div class="ce-know-block"><span class="ce-know-k">'+L("Tus muletillas","Your catchphrases")+'</span><p class="ce-mulet">'+frases+'</p></div>'+
+      '<div class="ce-know-foot">'+
+        '<div><div class="ce-foot-k">'+L("duración ideal","ideal length")+'</div><div class="ce-foot-v">'+ESC(v.duracion||"30–45 s")+'</div></div>'+
+        '<div><div class="ce-foot-k">'+L("gancho top","top hook")+'</div><div class="ce-foot-v">'+gancho+'</div></div>'+
+      '</div>'+
+    '</div>';
+  }
+  // Roadmap de niveles (nombres/desbloqueos de David); el nivel actual viene de brainLevel().
+  function brainLevelsHTML(lv){
+    var data=[
+      [1,L("Aprendiz","Apprentice"),L("Detección básica de señales","Basic signal detection")],
+      [2,L("Imitador","Imitator"),L("Tu voz aprendida · guiones con tu tono","Your voice learned · scripts in your tone")],
+      [3,L("Ladrón","Thief"),L("«Llena mi semana» · 5 guiones de golpe","«Fill my week» · 5 scripts at once")],
+      [4,L("Estratega","Strategist"),L("Competidores ilimitados · métricas Pro","Unlimited competitors · Pro metrics")],
+      [5,L("Viral","Viral"),L("Autopiloto · el Cerebro escribe solo","Autopilot · the Brain writes by itself")]
+    ];
+    var cur=lv.level||1;
+    var rows=data.map(function(d){
+      var n=d[0], isCur=n===cur, isPast=n<cur, isNext=n===cur+1;
+      var cls=isCur?" cur":(isPast?" past":"");
+      var tag=isPast?IC.check:(isCur?L("Aquí estás","You are here"):(isNext?L("Siguiente","Next"):""));
+      return '<div class="ce-lvl'+cls+'">'+
+        '<div class="ce-lvl-n">'+(isPast?IC.check:n)+'</div>'+
+        '<div class="ce-lvl-body"><div class="ce-lvl-name">'+ESC(d[1])+'</div><div class="ce-lvl-unlock">'+ESC(d[2])+'</div></div>'+
+        (tag?'<span class="ce-lvl-tag">'+tag+'</span>':'')+
+      '</div>';
+    }).join("");
+    return '<div class="ce-card ce-levels"><span class="ce-card-t">'+L("Niveles del Cerebro","Brain levels")+'</span><div class="ce-lvl-list">'+rows+'</div></div>';
+  }
+  function brainMissionsHTML(lv){
+    var s=brainSignals();
+    var nRec=S.guiones.filter(function(g){return g.status==="recorded";}).length;
+    var nx=lv.next||lv.level;
+    var data=[
+      [(s.guiones>=3), L("Crea 3 guiones con tu voz","Create 3 scripts in your voice"), L("+ afina tu tono","+ tunes your tone"), IC.edit, "tab","dashboard"],
+      [(nRec>=2), L("Graba 2 reels en teleprónter","Record 2 reels on teleprompter"), L("+ aprende tu ritmo","+ learns your pace"), IC.mic, "tab","guiones"],
+      [(s.comps>=1), L("Añade 1 competidor más","Add 1 more competitor"), L("+ amplía el radar","+ widens the radar"), IC.eye, "add-comp",""],
+      [(s.guiones>=1), L("Roba y remezcla 1 viral","Steal & remix 1 viral"), L("+ desbloquea estilos","+ unlocks styles"), IC.repeat, "tab","dashboard"]
+    ];
+    var done=data.filter(function(m){return m[0];}).length;
+    var cards=data.map(function(m){
+      var dn=m[0];
+      var btn=dn
+        ? '<button class="btn btn-sm btn-secondary ce-mission-done" disabled>'+IC.check+' '+L("Hecho","Done")+'</button>'
+        : '<button class="btn btn-sm btn-primary" data-act="'+m[4]+'"'+(m[5]?' data-k="'+m[5]+'"':'')+'>'+L("Empezar","Start")+'</button>';
+      return '<div class="ce-mission'+(dn?' done':'')+'">'+
+        '<div class="ce-mission-ic">'+m[3]+'</div>'+
+        '<div class="ce-mission-body"><div class="ce-mission-l">'+ESC(m[1])+'</div><div class="ce-mission-r">'+ESC(m[2])+'</div></div>'+
+        btn+
+      '</div>';
+    }).join("");
+    return '<div class="ce-card ce-missions">'+
+      '<div class="ce-missions-head"><div><span class="ce-card-t">'+L("Misiones para subir al Nivel "+nx,"Missions to reach Level "+nx)+'</span>'+
+        '<div class="ce-missions-sub">'+L("Cada misión entrena tu Cerebro y llena el anillo.","Each mission trains your Brain and fills the ring.")+'</div></div>'+
+        '<span class="ce-missions-count">'+done+' / '+data.length+' '+L("completadas","completed")+'</span></div>'+
+      '<div class="ce-missions-grid">'+cards+'</div>'+
+    '</div>';
+  }
   function brainHTML(){
     var b=brand();
     var v=brainVoice(b);
@@ -2792,41 +2926,14 @@
         : '<div class="rs-empty" style="padding:20px">Aún no sigues a nadie. Añade competidores en el Dashboard.</div>';
     }
 
-    return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Cerebro · @"+(b.handle||S.user.handle||""), "Tu Cerebro", "Aprende tu voz reel a reel. Cuanto más creas, más clava tu tono — y antes escribe solo.")+
-      // hero: ANILLO circular (brainProgress%) + nivel + voz (mockup Cerebro.dc.html).
-      // El 3D se conserva oculto (la lógica de ensureBrain3D sigue, sin saturar el render).
-      '<div class="brain-hero">'+
-        '<div class="brain-ring">'+
-          '<svg width="158" height="158" viewBox="0 0 172 172" class="brain-ring-svg" aria-hidden="true">'+
-            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
-            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+Math.round(465*(1-brainProgress()/100))+'" class="brain-ring-prog"/>'+
-          '</svg>'+
-          '<div class="brain-ring-c">'+IC.brain+'<span class="brain-ring-lvl">NIVEL <b>'+lv.level+'</b></span></div>'+
-        '</div>'+
-        '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
-        '<div class="brain-hero-body">'+
-          '<div class="brain-kicker">'+ESC(ecoLevelName(lv.level))+(lv.level>=4?' · '+IC.star+' Pro':'')+'</div>'+
-          '<div class="brain-voiceline">Te conozco al <b>'+brainProgress()+'%</b></div>'+
-          (lv.next?'<div class="brain-prog-row"><span>Progreso al Nivel '+lv.next+'</span><span class="brain-prog-pct">'+brainProgress()+'%</span></div>':'')+
-          '<div class="eco-bar" style="margin:6px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,brainProgress())+'%"></div></div>'+
-          // B2: umbrales VISIBLES del siguiente nivel (checklist ✓/○) + UNA acción primaria
-          // (la primera carencia). B4: el beneficio es real — voz y ganadores entran en el prompt.
-          (lv.next
-            ? '<div class="brain-next">'+(lv.missing.length===1?'Te falta <b>1 paso</b>':'Te faltan <b>'+lv.missing.length+' pasos</b>')+' para el <b>Nivel '+lv.next+' · '+ESC(ecoLevelName(lv.next))+'</b>.</div>'+
-              '<div class="brain-reqs">'+lv.reqs.map(function(r){
-                return '<span class="brain-req'+(r.ok?' ok':'')+'">'+(r.ok?IC.check:'<span class="brain-req-o">○</span>')+' '+ESC(r.label)+'</span>';
-              }).join('')+'</div>'+
-              (lv.nextAction
-                ? '<button class="btn btn-md btn-primary" style="margin-top:12px" data-act="'+ESC(lv.nextAction.cta.act)+'"'+(lv.nextAction.cta.k?' data-k="'+ESC(lv.nextAction.cta.k)+'"':'')+'>'+ESC(lv.nextAction.cta.t)+'</button>'
-                : '')+
-              // Fathom 18/06: el nivel sube SOLO con el auto-scrape (2×/sem); el botón
-              // de arriba solo lo adelanta. Se enseña cuando el salto depende de publicar.
-              (lv.next>=4 ? '<div class="brain-autonote">'+IC.spark+' Analizo tu perfil <b>2×/semana</b> sin que hagas nada — cuando publicas, tu nivel sube en el siguiente análisis. ¿Con prisa? Fuérzalo arriba.</div>' : '')
-            : '<div class="brain-next">Nivel máximo: creo con tu voz, tus rivales y tus datos. Guiones casi sin retoques.</div>')+
-          '<div class="brain-why">A más nivel, menos retoques: tu voz y tus reels ganadores entran en el prompt de cada «Roba la idea».</div>'+
-        '</div>'+
-      '</div>'+
+    return '<div class="scroll"><div class="canvas ce-canvas">'+
+      // ── espina limpia (mockup David) ──
+      brainHeaderV3HTML()+
+      brainHeroV3HTML(lv, voicePct)+
+      '<div class="ce-grid">'+brainKnowHTML(v)+brainLevelsHTML(lv)+'</div>'+
+      brainMissionsHTML(lv)+
+      // ── features avanzadas (intactas, debajo de la espina) ──
+      (lv.next&&lv.next>=4 ? '<div class="brain-autonote">'+IC.spark+' Analizo tu perfil <b>2×/semana</b> sin que hagas nada — cuando publicas, tu nivel sube en el siguiente análisis. ¿Con prisa? Fuérzalo abajo.</div>' : '')+
       // Entrenar (inversión): valora hooks → afina tu gusto + alimenta el cerebro 3D.
       brainTrainHTML()+
       // Tinder de TUS guiones (Fathom 18/06, David): swipe sobre lo que ya creaste →
