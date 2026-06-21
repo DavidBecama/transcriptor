@@ -19106,7 +19106,10 @@ function fillSettingsPlan() {
   _setText("setUseSteals", used || "0");
   _setText("setUseLeft", avail!=null ? avail : "—");
   const grid = document.getElementById("setPlansGrid");
-  if (grid) grid.innerHTML = SETTINGS_PLANS.map(p => `
+  // El "Trial" es un estado transitorio (3 días Pro), no un plan elegible → fuera de la
+  // rejilla. El tag del plan actual (fillSettingsPlan) sí lo conserva para no romper a
+  // quien esté en trial.
+  if (grid) grid.innerHTML = SETTINGS_PLANS.filter(p => p.key !== "trial").map(p => `
     <div class="plan-card${p.key===cur?" is-current":(p.featured?" featured":"")}">
       <div class="plan-card-name">${p.name}${p.featured?' <span style="color:var(--brand-400)">★</span>':""}</div>
       <div class="plan-card-price">${p.price}${p.price!=="0€"?'<small> /mes</small>':""}</div>
