@@ -360,7 +360,9 @@
     ]
   }
   </script>
-  <link rel="icon" type="image/png" href="/static/img/branding/apple-touch-icon.png">
+  <link rel="icon" href="/static/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/img/branding/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/img/branding/favicon-16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/img/branding/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3203,6 +3205,7 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 1.4rem; margin-bottom: 8px;
     }
+    .price-icon svg { width: 22px; height: 22px; color: var(--brand-500, #2F5BFF); }
     .price-title { font-family: var(--font-display); font-size: 1.2rem; font-weight: 400; margin-bottom: 2px; }
     .price-desc  { font-size: .82rem; color: var(--text2); line-height: 1.6; font-weight: 300; }
     .price-features {
@@ -11063,7 +11066,8 @@
     .rs.app { display:grid; grid-template-columns:64px 1fr; overflow:hidden; position:relative; }
     /* ── RAIL lateral ── */
     .rs .rail { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 0; background:var(--surface-base); border-right:1px solid var(--border-subtle); z-index:8; height:100%; }
-    .rs .rail-logo { width:32px; height:32px; margin-bottom:10px; border-radius:8px; display:block; }
+    .rs .rail-logo { width:32px; height:32px; margin-bottom:10px; display:block; background:url("/static/img/branding/isotipo-white-128.png") center/contain no-repeat; }
+    .rs[data-theme="light"] .rail-logo { background-image:url("/static/img/branding/isotipo-color-128.png"); }
     .rs .rail-btn { position:relative; width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--text-tertiary); cursor:pointer; transition:color .14s var(--ease), background .14s var(--ease); }
     .rs .rail-btn:hover { color:var(--text-secondary); background:var(--surface-raised); }
     .rs .rail-btn.on { color:var(--text-primary); background:var(--surface-overlay); }
@@ -24790,11 +24794,17 @@ async function logout() {
 
 // ── Topup ──────────────────────────────────────────────────────────────────
 function openTopup() {
-  if (!st.user) { openAuth("register"); return; }
-  document.getElementById("topupErr").classList.remove("on");
+  // En demo (sin login) mostramos la recarga igual (los packs son client-side).
+  if (!st.user && !window.__DEMO__) { openAuth("register"); return; }
+  const _e = document.getElementById("topupErr"); if (_e) _e.classList.remove("on");
   openModal("topupOverlay");
   loadTopupPacks();   // pinta los packs dinámicos (con caché en sesión)
 }
+// La isla (radar-loop.js) llama a estos por window.* → los exponemos explícitamente
+// (las function declarations ya están en el scope global; el alias es a prueba de bundlers).
+window.openTopupModal = openTopup;
+window.openTopup = openTopup;
+window.openUpgradeModal = openUpgradeModal;
 function pickTopup(el) {
   document.querySelectorAll(".topup-opt").forEach(o => o.classList.remove("on"));
   el.classList.add("on"); topupAmt = el.dataset.amt;
@@ -25246,7 +25256,7 @@ const PLAN_META = {
     stripeKeys: { month: "price_1TPz2tCWQn5Tis1W5CdUwBmN", year: "price_1TPz2tCWQn5Tis1W1HNRJlL9" },
   },
   creator: {
-    icon: "🚀", label: "Creador",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>', label: "Basic",
     price:    { monthEur: 2900, monthUsd: 3200, yearEur: 2300, yearUsd: 2500, billedEur: 27600, billedUsd: 30000 },
     ideal:    { es: "Para creadores activos que viven del contenido.", en: "For active creators living off their content." },
     features: { es: ["200 créditos/mes","1 marca","Cerebro: aprende tu voz","Ideas, hooks y formatos","Métricas de Instagram","Teleprompter + grabación","Soporte por email"],
@@ -25254,7 +25264,7 @@ const PLAN_META = {
     stripeKeys: { month: "", year: "" },
   },
   estudio: {
-    icon: "🎬", label: "Estudio",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>', label: "Content Creator",
     price:    { monthEur: 5900, monthUsd: 6500, yearEur: 4700, yearUsd: 5200, billedEur: 56400, billedUsd: 62400 },
     ideal:    { es: "Para el creador que ya factura y lleva varias marcas.", en: "For the creator who already bills and runs a few brands." },
     features: { es: ["400 créditos/mes (el doble)","3 marcas con cerebro propio","Todo lo de Creador + prioridad","El puente entre creador y agencia"],
@@ -25264,7 +25274,7 @@ const PLAN_META = {
     featured: true,
   },
   agency: {
-    icon: "🏢", label: "Agencia",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>', label: "Agency",
     price:    { monthEur: 12900, monthUsd: 13900, yearEur: 10750, yearUsd: 11600, billedEur: 129000, billedUsd: 139000 },
     ideal:    { es: "Para agencias que gestionan varias marcas.", en: "For agencies managing multiple brands." },
     features: { es: ["800 créditos/mes (pool)","10 marcas con cerebro propio","Asientos de equipo ilimitados","Informe white-label en PDF por marca","Marca extra €10/mes","Portfolio multi-marca"],
@@ -27626,6 +27636,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=73"></script>
+<script src="/static/js/radar-loop.js?v=75"></script>
 </body>
 </html>

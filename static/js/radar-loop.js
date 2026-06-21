@@ -291,7 +291,7 @@
     // las marcas se cambian con el switcher de la command bar, no con una pantalla aparte.
     var navTabs = [["dashboard",IC.grid,"Radar"],["guiones",IC.doc,"Guiones"],["metrics",IC.chart,"Métricas"],["leaderboard",_tro,"Ranking"],["brain",IC.brain,"Cerebro"]];
     return '<nav class="rail">'+
-      '<img class="rail-logo" src="/static/img/branding/isotipo-128.png" srcset="/static/img/branding/isotipo-128.png 1x, /static/img/branding/isotipo-256.png 2x" alt="Reelscript">'+
+      '<span class="rail-logo" role="img" aria-label="Reelscript"></span>'+   // logo R (theme-aware vía CSS: blanca en oscuro, azul en claro)
       navTabs.map(function(t){return '<button class="rail-btn'+(S.tab===t[0]&&!S.legacy?" on":"")+'" data-act="tab" data-k="'+t[0]+'" data-tour="tab-'+t[0]+'">'+t[1]+'<span class="tip">'+t[2]+'</span></button>';}).join("")+
       // «Analizar» (transcribir un reel suelto) ya NO vive en el rail: se reubicó al
       // Radar como acción «Analizar un reel» (junto a «Añadir reel»).
@@ -1914,9 +1914,9 @@
           '<div class="aj-plan-price"><span class="aj-plan-n">19€</span><span class="aj-plan-per">/ '+L("mes","mo")+'</span></div>'+
           '<div class="aj-plan-cred"><div class="aj-plan-cred-row"><span>'+L("Créditos del mes","Credits this month")+'</span><span class="aj-mono">'+cr+' / '+capMonth+'</span></div>'+
             '<div class="aj-cred-bar"><div class="aj-cred-fill" style="width:'+pct+'%"></div></div>'+
-            '<span class="aj-cred-note">'+L("1 crédito = 1 guion completo con tu voz.","1 credit = 1 full script in your voice.")+'</span></div>'+
-          '<div class="aj-plan-cta"><button class="btn btn-md btn-primary" data-act="open-plans">'+L("Recargar créditos","Top up credits")+'</button>'+
-            '<button class="btn btn-md btn-secondary" data-act="open-plans">'+L("Cambiar plan","Change plan")+'</button></div>'+
+            '<span class="aj-cred-note">'+L("1 robo = 3 créditos · ver el radar y las métricas no gasta créditos.","1 steal = 3 credits · viewing the radar and metrics is free.")+'</span></div>'+
+          '<div class="aj-plan-cta"><button class="btn btn-md btn-primary" data-act="recharge">'+L("Recargar créditos","Top up credits")+'</button>'+
+            '<button class="btn btn-md btn-secondary" data-act="change-plan">'+L("Cambiar plan","Change plan")+'</button></div>'+
         '</div>'+
         '<div class="aj-card aj-usage"><span class="aj-card-t">'+L("Este mes","This month")+'</span>'+usage+'</div>'+
       '</div>'+
@@ -5302,11 +5302,15 @@
     if(act==="add-comp") return toggleAddComp();          // FIX2: añadir competidor inline desde el Radar
     if(act==="comp-add-submit") return submitAddComp();
     if(act==="refresh-radar") return refreshRadar();
-    if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){} } return; }
+    if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
+    // C1: Ajustes → Plan. "Cambiar plan" abre el modal de PLANES (checkout Whop), "Recargar
+    // créditos" abre el modal de TOPUPS (openTopup, no openTopupModal que no existe).
+    if(act==="change-plan"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("settings_plan"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
+    if(act==="recharge"){ if(typeof window.openTopup==="function"){ try{ window.openTopup(); }catch(e){ showError(L("No pude abrir la recarga. Recarga la página.","Couldn't open top-up. Reload the page.")); } } else if(typeof window.openUpgradeModal==="function"){ window.openUpgradeModal("settings_topup"); } return; }
     // Flash del muro: CTA principal = Creator −40% con WELCOME auto-aplicado (rsFlashSubscribe
     // del chrome); secundario = top-up 300. En demo no hay checkout → abre el modal de planes.
     if(act==="flash-cta"){ if(!isDemo() && typeof window.rsFlashSubscribe==="function"){ try{ window.rsFlashSubscribe("creator"); return; }catch(e){} } if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("flash_creator"); }catch(e){} } return; }
-    if(act==="flash-topup"){ if(typeof window.openTopupModal==="function"){ try{ window.openTopupModal("300"); return; }catch(e){} } if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("flash_topup"); }catch(e){} } return; }
+    if(act==="flash-topup"){ if(typeof window.openTopup==="function"){ try{ window.openTopup(); return; }catch(e){} } if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("flash_topup"); }catch(e){} } return; }
     // B2: CTA «Entrenar mi voz» — lleva al Cerebro y deja el cursor en el textarea
     // de captura (la acción de verdad), no en la pestaña a secas.
     if(act==="voice-focus"){
