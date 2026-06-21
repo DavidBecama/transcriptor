@@ -3288,31 +3288,56 @@
   function submitSheetSecondary(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSecondary); }
   var _tpPlay='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
   var _tpPause='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>';
+  var _icMirror='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7 4 12l4 5"/><path d="m16 7 4 5-4 5"/></svg>';
   function _tpMMSS(ms){ var t=Math.floor(ms/1000),m=Math.floor(t/60),x=t%60; return (m<10?'0':'')+m+':'+(x<10?'0':'')+x; }
   function teleprompterHTML(){
     var r=S.reel||{creator:{handle:""},script:{hook:"",beats:[],close:""}};
     var s=r.script||{hook:"",beats:[],close:""};
     if(!S.tp) S.tp={ playing:false, speed:3, fontPx:34, mirror:false, recording:false, ms:0, countdown:0 };
     var tp=S.tp;
-    var body='<p class="hook">'+ESC(s.hook)+'</p>'+(s.beats||[]).map(function(b){return '<p>'+ESC(b)+'</p>';}).join("")+(s.close?'<p>'+ESC(s.close)+'</p>':"");
-    var rec = tp.recording ? '<span class="tp-rec"><span class="tp-rec-dot"></span>REC <b id="rsTpTimer">'+_tpMMSS(tp.ms)+'</b></span>' : '';
+    // v3 (mockup David): bloques con kicker (Gancho · 0–3 s / Desarrollo / CTA · cierre)
+    // en mono azul + cuerpo Clash. Desarrollo conserva los beats como párrafos.
+    var devBeats=(s.beats||[]).map(function(b){return '<p class="tp-p">'+ESC(b)+'</p>';}).join("");
+    var blocks='';
+    if(s.hook) blocks+='<div class="tp-block"><span class="tp-block-k">'+L("Gancho · 0–3 s","Hook · 0–3 s")+'</span><p class="tp-p">'+ESC(s.hook)+'</p></div>';
+    if(devBeats) blocks+='<div class="tp-block"><span class="tp-block-k">'+L("Desarrollo","Body")+'</span>'+devBeats+'</div>';
+    if(s.close) blocks+='<div class="tp-block"><span class="tp-block-k">'+L("CTA · cierre","CTA · close")+'</span><p class="tp-p">'+ESC(s.close)+'</p></div>';
+    var title=s.hook||((r.creator&&r.creator.handle)?'@'+r.creator.handle:L("tu guion","your script"));
     var cd = tp.countdown>0 ? '<div class="tp-cd"><span>'+tp.countdown+'</span></div>' : '';
     return '<div class="overlay prompter" role="dialog" aria-modal="true" aria-label="Teleprompter">'+
-      '<div class="obar"><button class="back" data-act="tp-back" aria-label="Volver">'+IC.back+'</button>'+
-        '<span class="otitle">Teleprónter</span>'+
-        '<span class="tp-srctitle">'+ESC(s.hook||((r.creator&&r.creator.handle)?'@'+r.creator.handle:'tu guion'))+'</span>'+
-        '<span style="flex:1"></span>'+rec+'</div>'+
-      '<div class="tp-scroll" id="rsTpScroll"><div class="tp-guide"></div><div class="tp-text'+(tp.mirror?' mirror':'')+'" id="rsTpText" style="font-size:'+tp.fontPx+'px">'+body+'</div></div>'+
-      cd+
-      '<div class="tp-bar">'+
-        '<button class="tp-ctl'+(tp.playing?' on':'')+'" data-act="tp-play" aria-label="'+(tp.playing?'Pausa':'Play')+'">'+(tp.playing?_tpPause:_tpPlay)+'</button>'+
-        '<button class="tp-ctl" data-act="tp-restart" aria-label="Reiniciar">'+IC.repeat+'</button>'+
-        '<div class="tp-grp"><span class="tp-grp-l">Velocidad</span><button class="tp-mini" data-act="tp-speed" data-k="down" aria-label="Menos velocidad">−</button><span class="tp-grp-v">×'+tp.speed+'</span><button class="tp-mini" data-act="tp-speed" data-k="up" aria-label="Más velocidad">+</button></div>'+
-        '<div class="tp-grp"><span class="tp-grp-l">Texto</span><button class="tp-mini" data-act="tp-font" data-k="down" aria-label="Texto más pequeño">A−</button><button class="tp-mini" data-act="tp-font" data-k="up" aria-label="Texto más grande">A+</button></div>'+
-        '<button class="tp-ctl'+(tp.mirror?' on':'')+'" data-act="tp-mirror" aria-label="Espejo">'+IC.repeat+'</button>'+
-        '<span style="flex:1"></span>'+
-        '<button class="btn btn-lg '+(tp.recording?'tp-stop':'btn-primary')+'" data-act="tp-record">'+(tp.recording?'Detener':IC.mic+' Grabar')+'</button>'+
-        '<button class="btn btn-lg tp-done" data-act="recorded">'+IC.check+' Ya lo grabé</button>'+
+      // top bar
+      '<div class="tp-top">'+
+        '<div class="tp-top-l">'+
+          '<button class="tp-editback" data-act="tp-back">'+IC.back+' '+L("Editor","Editor")+'</button>'+
+          '<span class="tp-title">'+ESC(title)+'</span>'+
+        '</div>'+
+        '<div class="tp-top-r">'+
+          '<span class="tp-pill'+(tp.recording?' rec':'')+'"><span class="tp-pill-dot"></span>'+(tp.recording?'REC':L("en pausa","paused"))+'</span>'+
+          '<span class="tp-timer" id="rsTpTimer">'+_tpMMSS(tp.ms)+'</span>'+
+        '</div>'+
+      '</div>'+
+      // stage
+      '<div class="tp-stage">'+
+        '<div class="tp-band"></div><div class="tp-marker">'+_tpPlay+'</div>'+
+        '<div class="tp-fade top"></div><div class="tp-fade bot"></div>'+
+        '<div class="tp-scroll" id="rsTpScroll"><div class="tp-text'+(tp.mirror?' mirror':'')+'" id="rsTpText" style="font-size:'+tp.fontPx+'px">'+blocks+'</div></div>'+
+        cd+
+      '</div>'+
+      // controls
+      '<div class="tp-controls">'+
+        '<div class="tp-c-l">'+
+          '<button class="tp-ctl'+(tp.playing?' on':'')+'" data-act="tp-play" aria-label="'+(tp.playing?'Pausa':'Play')+'">'+(tp.playing?_tpPause:_tpPlay)+'</button>'+
+          '<button class="tp-ctl" data-act="tp-restart" aria-label="Reiniciar">'+IC.repeat+'</button>'+
+        '</div>'+
+        '<div class="tp-c-mid">'+
+          '<div class="tp-grp"><span class="tp-grp-l">'+L("Velocidad","Speed")+'</span><button class="tp-mini" data-act="tp-speed" data-k="down" aria-label="Menos velocidad">−</button><span class="tp-grp-v">×'+tp.speed+'</span><button class="tp-mini" data-act="tp-speed" data-k="up" aria-label="Más velocidad">+</button></div>'+
+          '<div class="tp-grp"><span class="tp-grp-l">'+L("Texto","Text")+'</span><button class="tp-mini" data-act="tp-font" data-k="down" aria-label="Texto más pequeño">A</button><span class="tp-grp-v">'+tp.fontPx+'</span><button class="tp-mini tp-mini-lg" data-act="tp-font" data-k="up" aria-label="Texto más grande">A</button></div>'+
+          '<button class="tp-mirror'+(tp.mirror?' on':'')+'" data-act="tp-mirror" aria-label="Espejo">'+_icMirror+' '+L("Espejo","Mirror")+'</button>'+
+        '</div>'+
+        '<div class="tp-c-r">'+
+          '<button class="tp-recbtn'+(tp.recording?' on':'')+'" data-act="tp-record">'+(tp.recording?'<span class="tp-recbtn-sq"></span>'+L("Detener","Stop"):'<span class="tp-recbtn-ci"></span>'+L("Grabar","Record"))+'</button>'+
+          '<button class="btn btn-md tp-done" data-act="recorded">'+IC.check+' '+L("Ya lo grabé","Done recording")+'</button>'+
+        '</div>'+
       '</div></div>';
   }
   // Auto-scroll + timer del teleprónter (manipulan el DOM directo → no re-render por tick).
