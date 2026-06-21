@@ -9720,7 +9720,7 @@
     /* overlays — B2: NO cubren el rail (inset left:64px, como #rs-legacy) → la barra
        lateral sigue clicable con un overlay abierto (gen/guion) dentro de un proyecto;
        al pulsar el rail, switchTab cierra el overlay. */
-    .rs .overlay { position:absolute; inset:0 0 0 64px; z-index:30; background:var(--surface-base); display:flex; flex-direction:column; animation: rsSheetUp .42s var(--ease-out); }
+    .rs .overlay { position:absolute; inset:0 0 0 64px; z-index:30; background:var(--surface-base); display:flex; flex-direction:column; align-items:stretch; animation: rsSheetUp .42s var(--ease-out); }
     @keyframes rsSheetUp { from{ transform:translateY(24px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
     .rs .overlay .obar { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border-subtle); flex-shrink:0; }
     .rs .overlay .obar .back { width:38px; height:38px; border-radius:99px; border:1px solid var(--border-default); background:transparent; color:var(--text-primary); display:flex; align-items:center; justify-content:center; cursor:pointer; }
@@ -9736,7 +9736,11 @@
     .rs .analyze-tx { max-height:46vh; overflow-y:auto; white-space:pre-wrap; line-height:1.55;
       font-size:14px; color:var(--text-secondary); background:var(--surface-overlay);
       border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px; }
-    .rs--mobile .sheet-body { padding:20px 16px; }
+    .rs--mobile .sheet-body { padding:20px 16px; max-width:100%; }
+    /* móvil: los botones de acción (nowrap) forzaban el ancho del sheet > viewport y lo
+       descuadraban (anclado a la derecha, cortado por la izquierda). Que envuelvan. */
+    .rs--mobile .sheet-actions { flex-wrap:wrap; }
+    .rs .overlay .oscroll { overflow-x:hidden; }
     /* generating */
     .rs .gen { height:100%; min-height:460px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:40px; text-align:center; }
     .rs .gen .orb { width:74px; height:74px; border-radius:99px; background:conic-gradient(from 0deg, var(--brand-500), #6f93ff, var(--brand-400), var(--brand-500)); animation: rsSpin 1.1s linear infinite; position:relative; }
@@ -10446,7 +10450,11 @@
     .rs .ed-var-t { flex:1; line-height:1.4; }
     .rs .ed-rail-cta { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
     .rs .ed-rail-cta .btn { width:100%; justify-content:center; }
-    .rs--mobile .ed-body { flex-direction:column; } .rs--mobile .ed-doc { border-right:none; border-bottom:1px solid var(--border-default); } .rs--mobile .ed-rail { width:100%; }
+    /* móvil: el editor scrollea como un bloque (antes .ed-body era overflow:hidden y el
+       rail/variantes de abajo quedaba cortado sin poder hacer scroll). */
+    .rs--mobile .ed-body { flex-direction:column; overflow-y:auto; }
+    .rs--mobile .ed-doc { border-right:none; border-bottom:1px solid var(--border-default); overflow:visible; flex:none; }
+    .rs--mobile .ed-rail { width:100%; flex:none; }
     /* ── v3 mockup David · Ajustes ─────────────────────────────────────── */
     .rs .aj-canvas { display:flex; flex-direction:column; gap:26px; }
     .rs .aj-head { display:flex; flex-direction:column; gap:18px; }
