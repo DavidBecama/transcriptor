@@ -467,8 +467,18 @@ for _cur, _pid in PADDLE_PRICE_ADDON_BRAND.items():
 # Mismo modelo de planes/créditos que Paddle/Stripe; solo cambia la fuente del
 # evento. Catálogo creado en la cuenta aprobada; los plan IDs se leen por la API
 # (no se hardcodean) y viven en .env como WHOP_PLAN_*/WHOP_TOPUP_*.
-WHOP_API_KEY = os.environ.get("WHOP_API_KEY", "")
-WHOP_WEBHOOK_SECRET = os.environ.get("WHOP_WEBHOOK_SECRET", "")  # se rellena al crear el webhook
+def _clean_secret(name: str) -> str:
+    """Lee un secreto de env y limpia errores de pegado típicos: espacios, comillas
+    y los <ÁNGULOS> del placeholder. Un secreto envuelto en <…> (p.ej. copiar literal
+    «<ws_…>» del ejemplo) rompía la verificación de firma del webhook → 100% de pagos
+    rechazados en silencio. Esto lo neutraliza."""
+    v = (os.environ.get(name, "") or "").strip()
+    if len(v) >= 2 and v[0] in "<\"'" and v[-1] in ">\"'":
+        v = v[1:-1].strip()
+    return v
+
+WHOP_API_KEY = _clean_secret("WHOP_API_KEY")
+WHOP_WEBHOOK_SECRET = _clean_secret("WHOP_WEBHOOK_SECRET")  # se rellena al crear el webhook
 WHOP_API_BASE = "https://api.whop.com"
 WHOP_CHECKOUT_BASE = "https://whop.com/checkout"  # checkout link por plan_id
 
