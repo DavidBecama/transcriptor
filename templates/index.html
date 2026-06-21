@@ -9671,7 +9671,11 @@
     .rs .rcb .rcb-seg { width:48px; height:6px; border-radius:999px; background:var(--surface-sunken); }
     .rs .rcb .rcb-seg.on { background:linear-gradient(90deg, var(--brand-500,#2F5BFF), var(--success-fg,#3FE0A0)); }
     .rs .rcb > .btn { flex:none; }
-    .rs--mobile .rcb { flex-wrap:wrap; }
+    /* móvil: el bloque «Tu cerebro · nivel» apila — el texto deja de apretarse y el
+       botón «Crear guion» pasa a ancho completo abajo. */
+    .rs--mobile .rcb { flex-wrap:wrap; row-gap:14px; }
+    .rs--mobile .rcb .rcb-body { flex:1 1 calc(100% - 72px); }
+    .rs--mobile .rcb > .btn { flex:1 1 100%; justify-content:center; }
     .rs--mobile .whale { flex-direction:column; align-items:flex-start; }
     /* v3 mockup David — «Más señales · N» */
     .rs .signals { margin:22px 0 8px; }
@@ -9684,6 +9688,10 @@
     /* filters */
     .rs .filters { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
     .rs .radar-addbar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+    /* móvil: rejilla 2×2 limpia (el spacer flex:1 empujaba «Actualizar radar» a la derecha) */
+    .rs--mobile .radar-addbar { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .rs--mobile .radar-addbar > span { display:none; }
+    .rs--mobile .radar-addbar .fchip { width:100%; justify-content:center; }
     .rs .fchip { display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 14px; border-radius:99px; border:1px solid var(--border-default); background:transparent; font-size:13px; font-weight:600; color:var(--text-secondary); cursor:pointer; transition: all .15s var(--ease); }
     .rs .fchip:hover { color:var(--text-primary); border-color:var(--border-strong); }
     .rs .fchip.on { background:var(--surface-overlay); color:var(--text-primary); border-color:var(--border-strong); box-shadow:inset 2px 0 0 var(--brand-500); }
@@ -11355,6 +11363,7 @@
     .rs .sugg-why { font-size:13px; color:var(--text-secondary); margin-top:3px; line-height:1.4; }
     .rs .sugg-actions { display:flex; gap:8px; flex-shrink:0; }
     .rs--mobile .sugg-comp { flex-wrap:wrap; } .rs--mobile .sugg-actions { width:100%; }
+    .rs--mobile .sugg-actions .btn-primary { flex:1; justify-content:center; }   /* «Añadir» prominente, «Ahora no» compacto */
     /* La miniatura 9:16 escala/recorta DENTRO de su columna (object-fit:cover en .thumb img),
        nunca estira la card: la altura la fija el cuerpo compacto, capada a max-height (.feature). */
     .rs .feature-thumb { position:relative; overflow:hidden; } .rs .feature-thumb .thumb { width:100%; height:100%; min-height:0; border:none; border-radius:0; border-right:1px solid var(--border-default); background:linear-gradient(160deg, var(--surface-sunken), var(--surface-raised)); }
@@ -11843,6 +11852,11 @@
     .rs .rgal { margin:8px 0 26px; display:flex; flex-direction:column; gap:16px; }
     /* v3 mockup David — «Competidores en el radar» (chips) + línea de galería + empty */
     .rs .rgal-comps-head { display:flex; align-items:center; gap:14px; flex-wrap:nowrap; }
+    /* móvil: la tira de chips por-competidor desbordaba/se cortaba → dejamos solo el
+       desplegable «+N» (selector) + «Añadir». La cabecera puede envolver. */
+    .rs--mobile .rgal-comps-head { flex-wrap:wrap; gap:10px; }
+    .rs--mobile .rgal-comps-head .rgal-comps { display:none; }   /* +especificidad: gana al base .rs .rgal-comps */
+    .rs--mobile .rgal-comps-head .rgal-add { margin-left:auto; }
     .rs .rgal-comps-t { font-size:13px; font-weight:600; color:var(--text-tertiary); flex:none; white-space:nowrap; }
     /* tira de chips con scroll horizontal (caben 20+ competidores sin romper la fila) */
     .rs .rgal-comps { flex:1; min-width:0; display:flex; align-items:center; gap:9px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; padding-bottom:2px; }
@@ -11943,6 +11957,10 @@
     .rs .rgal-soon-pill { display:inline-flex; align-items:center; gap:7px; font-size:13.5px; font-weight:700; color:var(--brand-400); }
     .rs .rgal-soon-pill svg { width:16px; height:16px; }
     .rs .rgal-soon .rgal-more { margin-left:auto; }
+    /* móvil: los 3 textos (Próximamente · Más información · Avísame) se apilan
+       alineados a la izquierda en vez de quedar descuadrados a la derecha. */
+    .rs--mobile .rgal-soon { flex-direction:column; align-items:flex-start; gap:10px; }
+    .rs--mobile .rgal-soon .rgal-more { margin-left:0; }
     [data-theme="light"] .rs .rgal-soon-pill, .rs[data-theme="light"] .rgal-soon-pill { color:var(--brand-600); }
     [data-theme="light"] .rs .rgal-more:hover, .rs[data-theme="light"] .rgal-more:hover { color:var(--brand-600); }
     @media (max-width:720px){ .rs .gcard { flex-basis:168px; } }
