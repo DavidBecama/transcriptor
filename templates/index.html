@@ -10538,6 +10538,21 @@
     .rs .mt-charts.locked { filter:blur(9px); pointer-events:none; }
     .rs .mt-stack { display:flex; flex-direction:column; gap:20px; }
     .rs .mt-card { padding:22px 24px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:18px; display:flex; flex-direction:column; gap:16px; }
+    /* Métricas · estados honestos (datos reales o "próximamente", nunca inventados) */
+    .rs .mt-pronto { display:flex; flex-direction:column; align-items:flex-start; gap:9px; padding:18px 4px 6px; }
+    .rs .mt-pronto-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:99px; background:var(--surface-overlay); border:1px solid var(--border-default); font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; color:var(--text-tertiary); text-transform:uppercase; }
+    .rs .mt-pronto-pill svg { width:13px; height:13px; color:var(--brand-500); }
+    .rs .mt-pronto-p { margin:0; font-size:13.5px; line-height:1.5; color:var(--text-secondary); max-width:46ch; }
+    .rs .mt-empty { display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px; padding:28px 18px; }
+    .rs .mt-empty-ic { width:52px; height:52px; border-radius:15px; background:var(--surface-overlay); display:flex; align-items:center; justify-content:center; color:var(--brand-500); }
+    .rs .mt-empty-ic svg { width:26px; height:26px; }
+    .rs .mt-empty-h { margin:0; font-family:var(--font-display); font-weight:700; font-size:21px; color:var(--text-primary); }
+    .rs .mt-empty-p { margin:0; font-size:14px; line-height:1.5; color:var(--text-secondary); max-width:48ch; }
+    .rs .mt-aud-hero { display:flex; align-items:flex-start; gap:14px; padding:20px 22px; border-radius:16px; background:color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)); border:1px solid color-mix(in srgb, var(--brand-500) 26%, transparent); }
+    .rs .mt-aud-hero-ic { flex:none; width:40px; height:40px; border-radius:11px; background:var(--surface-raised); display:flex; align-items:center; justify-content:center; color:var(--brand-500); }
+    .rs .mt-aud-hero-ic svg { width:20px; height:20px; }
+    .rs .mt-aud-hero-h { margin:0 0 4px; font-family:var(--font-display); font-weight:700; font-size:17px; color:var(--text-primary); }
+    .rs .mt-aud-hero-p { margin:0; font-size:13.5px; line-height:1.5; color:var(--text-secondary); }
     .rs .mt-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
     .rs .mt-card-tt { display:flex; align-items:baseline; gap:12px; }
     .rs .mt-card-t { font-weight:700; font-size:16px; color:var(--text-primary); }
@@ -27612,6 +27627,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=72"></script>
+<script src="/static/js/radar-loop.js?v=73"></script>
 </body>
 </html>

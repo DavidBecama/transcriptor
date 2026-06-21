@@ -2140,129 +2140,113 @@
         '<button class="btn btn-md btn-secondary" data-act="ig-connect">'+L("Conectar Instagram","Connect Instagram")+'</button></div>'+
     '</div></div>';
   }
+  // Marco visual del mockup con estado honesto "próximamente" (sin inventar datos).
+  function _metPronto(es,en){
+    return '<div class="mt-pronto"><span class="mt-pronto-pill">'+IC.spark+' '+L("Próximamente","Coming soon")+'</span>'+
+      '<p class="mt-pronto-p">'+L(es,en)+'</p></div>';
+  }
+  function _durSec(d){ var p=String(d||"").split(":"); return p.length===2 ? ((+p[0])*60+(+p[1])||0) : (+p[0]||0); }
   function metResumenHTML(){
-    // DATOS REALES: KPIs/interacción/top reels se derivan de tus vídeos publicados
-    // (metricVideos ← /api/metrics). Lo que el dato no contiene (tendencia 14d, hooks,
-    // temas, heatmap) queda como muestra del diseño — fable lo enchufa al backend.
+    // DATOS REALES de tus vídeos publicados (metricVideos ← /metrics/videos). Lo que el
+    // dato NO contiene (tendencia por fecha, audiencia IG, temas) → "próximamente" honesto,
+    // nunca datos inventados (directiva David: no subir demo-data a prod).
     var V=metricVideos(); var hasV=V.length>0;
+    if(!hasV){
+      return '<div class="mt-stack"><div class="mt-card">'+
+        '<div class="mt-empty"><div class="mt-empty-ic">'+IC.chart+'</div>'+
+        '<h3 class="mt-empty-h">'+L("Aún no he leído tus reels","I haven't read your reels yet")+'</h3>'+
+        '<p class="mt-empty-p">'+L("Conecta tu Instagram (abajo) o pulsa «Actualizar reels» y aquí verás tus números REALES: reproducciones, interacción y tus reels que más rinden.","Connect Instagram (below) or hit «Refresh reels» and you'll see your REAL numbers here.")+'</p>'+
+        '<button class="btn btn-md btn-primary" data-act="metric-refresh">'+IC.repeat+' '+L("Actualizar reels","Refresh reels")+'</button></div></div></div>';
+    }
     var _sum=function(f){ return V.reduce(function(a,v){ return a+(Number(v[f])||0); },0); };
-    var sv=_sum("views"), sl=_sum("likes"), sc=_sum("comments"), ss=_sum("shares");
-    var sInter=sl+sc+ss;
-    var kpis=[
-      ["Reproducciones", hasV?fmtKM(sv):"1,02 M","+52%",[12,18,15,22,26,24,31,29,36,40,38,46,52,58]],
-      ["Alcance","214 K","+38%",[20,22,21,26,25,30,28,33,31,36,40,38,44,48]],
-      ["Interacciones", hasV?fmtKM(sInter):"48 K","+29%",[10,14,13,16,18,17,20,22,21,25,27,26,30,33]],
-      ["Visitas al perfil","37 K","+19%",[8,9,11,10,13,12,15,14,16,18,17,20,22,24]],
-      ["Me gusta", hasV?fmtKM(sl):"31 K","+24%",[14,16,15,18,20,19,22,24,23,27,29,28,31,34]],
-      ["Comentarios", hasV?fmtKM(sc):"4,7 K","+61%",[6,7,9,8,11,13,12,16,18,17,22,26,30,34]],
-      ["Compartidos", hasV?fmtKM(ss):"6,3 K","+44%",[9,10,12,11,14,16,15,19,18,22,24,28,30,34]],
-      ["Nuevos seguidores","+2 480","+18%",[18,16,19,17,20,22,21,24,23,26,28,27,30,33]]
-    ];
+    var sv=_sum("views"), sl=_sum("likes"), sc=_sum("comments"), ss=_sum("shares"); var sInter=sl+sc+ss;
+    // KPIs REALES (sin sparkline/delta inventados — solo lo que sabemos de verdad).
+    var kpis=[["Reproducciones",fmtKM(sv)],["Interacciones",fmtKM(sInter)],["Me gusta",fmtKM(sl)],
+              ["Comentarios",fmtKM(sc)],["Compartidos",fmtKM(ss)],["Reels analizados",String(V.length)]];
     var kpiH=kpis.map(function(k){
       return '<div class="mt-kpi"><span class="mt-kpi-l">'+ESC(k[0])+'</span>'+
-        '<div class="mt-kpi-row"><span class="mt-kpi-v">'+ESC(k[1])+'</span>'+
-          '<svg class="mt-kpi-spark" width="58" height="22" viewBox="0 0 60 22" preserveAspectRatio="none"><polyline points="'+_mSpark(k[3])+'" fill="none" stroke="var(--brand-300,#6E92FF)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
-        '<span class="mt-kpi-d">▲ '+ESC(k[2])+'</span></div>';
+        '<div class="mt-kpi-row"><span class="mt-kpi-v">'+ESC(k[1])+'</span></div></div>';
     }).join("");
-    var trend=[42,55,48,61,58,73,67,71,64,82,78,88,79,92]; var th=_mBars(trend);
-    var tlabels=["","","","","5","","","","","10","","","","14"];
-    var trendBars=trend.map(function(v,i){ return '<div class="mt-tb"><div class="mt-tb-col"><div class="mt-tb-fill" style="height:'+th[i]+'"></div></div><span class="mt-tb-l">'+tlabels[i]+'</span></div>'; }).join("");
-    var eng = hasV
-      ? [["Me gusta",fmtKM(sl),sl],["Compartidos",fmtKM(ss),ss],["Comentarios",fmtKM(sc),sc]]
-      : [["Me gusta","31 K",31],["Guardados","9,1 K",9.1],["Compartidos","6,3 K",6.3],["Comentarios","4,7 K",4.7]];
-    var emax=Math.max.apply(null,eng.map(function(r){return r[2];}).concat([1]));
-    var engH=eng.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+r[0]+'</span><span class="mt-mono">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+Math.round(r[2]/emax*100)+'%"></i></div></div>'; }).join("");
-    var hooks=[["“Comenta X y te mando…”","82%"],["“Acaba de pasar…”","74%"],["“Nadie te cuenta que…”","61%"],["“3 cosas que…”","44%"]];
-    var hooksH=hooks.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+ESC(r[0])+'</span><span class="mt-mono">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+r[1]+'"></i></div></div>'; }).join("");
-    var temas=[["Agentes / automatización","9.4×","92%"],["Montar un SaaS","6.1×","70%"],["Herramientas IA gratis","4.3×","52%"],["Mentalidad / dinero","2.2×","30%"]];
-    var temasH=temas.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+ESC(r[0])+'</span><span class="mt-mult">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+r[2]+'"></i></div></div>'; }).join("");
-    var dur=[["0–15s","21 K","34%",0],["15–30s","58 K","68%",0],["30–45s","92 K","100%",1],["45–60s","71 K","80%",0],["1–2m","33 K","44%",0],["2m+","12 K","20%",0]];
-    var durH=dur.map(function(d){ return '<div class="mt-dur"><span class="mt-dur-v">'+d[1]+'</span><div class="mt-dur-bar'+(d[3]?" top":"")+'" style="height:'+d[2]+'"></div><span class="mt-dur-l">'+d[0]+'</span></div>'; }).join("");
-    // heatmap 6×7
-    var hm=[[.1,.15,.2,.15,.25,.1,.08],[.3,.35,.4,.38,.5,.2,.15],[.5,.55,.6,.58,.65,.35,.3],[.7,.75,.85,.8,.95,.55,.5],[.6,.7,.78,.82,1,.7,.65],[.4,.5,.55,.6,.7,.85,.8]];
-    var cols=["L","M","X","J","V","S","D"], rowL=["6–9h","9–12h","12–15h","15–18h","18–21h","21–24h"];
-    var peakV=0,pr=0,pc=0; hm.forEach(function(r,ri){ r.forEach(function(v,ci){ if(v>peakV){peakV=v;pr=ri;pc=ci;} }); });
-    var colsH='<div class="mt-hm-cols">'+cols.map(function(c){ return '<span>'+c+'</span>'; }).join("")+'</div>';
-    var rowsH=hm.map(function(r,ri){ return '<div class="mt-hm-row">'+r.map(function(v,ci){
-      var peak=(ri===pr&&ci===pc); return '<div class="mt-hm-cell'+(peak?" peak":"")+'" style="background:rgba(110,146,255,'+(0.08+v*0.78).toFixed(2)+')">'+(peak?"★":"")+'</div>';
-    }).join("")+'</div>'; }).join("");
-    var rowLabH='<div class="mt-hm-rowl">'+rowL.map(function(rl){ return '<span>'+rl+'</span>'; }).join("")+'</div>';
-    var top = hasV
-      ? V.slice().sort(function(a,b){ return (b.views||0)-(a.views||0); }).slice(0,4).map(function(v,i){
-          return [String(i+1), v.dur||"", v.cap||v.from_guion||"", fmtKM(v.views||0), fmtKM((v.likes||0)+(v.comments||0)), (v.vsMedian!=null?v.vsMedian+"×":"–")];
-        })
-      : [["1","1:09","Comenta “Secretario” y te mando el manual desde 0","182 K","14 K","12×"],["2","0:45","Claude no basta para montar un SaaS que escale","94 K","7,1 K","11×"],["3","0:29","Anthropic ha soltado Fable 5 y cambia el juego","71 K","5,3 K","7.6×"],["4","1:27","Comenta “Claude” y te paso el setup completo","48 K","3,8 K","5.4×"]];
-    var topH=top.map(function(r){ return '<div class="mt-top-row"><span class="mt-top-rank">'+r[0]+'</span>'+
-      '<div class="mt-top-thumb"><span class="mt-top-dur">'+r[1]+'</span></div>'+
-      '<div class="mt-top-title">'+ESC(r[2])+'</div>'+
-      '<div class="mt-top-stat"><div class="mt-mono">'+r[3]+'</div><div class="mt-top-k">repros</div></div>'+
-      '<div class="mt-top-stat"><div class="mt-mono">'+r[4]+'</div><div class="mt-top-k">interac.</div></div>'+
-      '<div class="mt-top-stat mt-top-mult"><div class="mt-mult">'+r[5]+'</div><div class="mt-top-k">explota</div></div></div>'; }).join("");
+    // Desglose de interacción REAL.
+    var eng=[["Me gusta",sl],["Compartidos",ss],["Comentarios",sc]];
+    var emax=Math.max.apply(null,eng.map(function(r){return r[1];}).concat([1]));
+    var engH=eng.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+r[0]+'</span><span class="mt-mono">'+fmtKM(r[1])+'</span></div><div class="mt-br-track"><i style="width:'+Math.round(r[1]/emax*100)+'%"></i></div></div>'; }).join("");
+    // Duración óptima REAL: agrupa tus vídeos por franja de duración y promedia repros.
+    var buckets=[["0–15s",0,15],["15–30s",15,30],["30–45s",30,45],["45–60s",45,60],["1–2m",60,120],["2m+",120,99999]];
+    var bAgg=buckets.map(function(b){ var vs=V.filter(function(v){ var s=_durSec(v.dur); return s>=b[1]&&s<b[2]; }); var avg=vs.length?Math.round(vs.reduce(function(a,v){return a+(v.views||0);},0)/vs.length):0; return {l:b[0],avg:avg,n:vs.length}; });
+    var bmax=Math.max.apply(null,bAgg.map(function(b){return b.avg;}).concat([1]));
+    var durH=bAgg.map(function(b){ var top=(b.avg===bmax&&b.avg>0); return '<div class="mt-dur"><span class="mt-dur-v">'+(b.n?fmtKM(b.avg):"–")+'</span><div class="mt-dur-bar'+(top?" top":"")+'" style="height:'+(bmax?Math.max(4,Math.round(b.avg/bmax*100)):4)+'%"></div><span class="mt-dur-l">'+b.l+'</span></div>'; }).join("");
+    // Top reels REALES.
+    var top=V.slice().sort(function(a,b){ return (b.views||0)-(a.views||0); }).slice(0,4);
+    var topH=top.map(function(v,i){ return '<div class="mt-top-row"><span class="mt-top-rank">'+(i+1)+'</span>'+
+      '<div class="mt-top-thumb">'+(v.dur?'<span class="mt-top-dur">'+ESC(v.dur)+'</span>':'')+'</div>'+
+      '<div class="mt-top-title">'+ESC(v.cap||v.from_guion||L("(sin título)","(untitled)"))+'</div>'+
+      '<div class="mt-top-stat"><div class="mt-mono">'+fmtKM(v.views||0)+'</div><div class="mt-top-k">repros</div></div>'+
+      '<div class="mt-top-stat"><div class="mt-mono">'+fmtKM((v.likes||0)+(v.comments||0))+'</div><div class="mt-top-k">interac.</div></div>'+
+      '<div class="mt-top-stat mt-top-mult"><div class="mt-mult">'+(v.vsMedian!=null?ESC(v.vsMedian)+"×":"–")+'</div><div class="mt-top-k">explota</div></div></div>'; }).join("");
     return '<div class="mt-stack">'+
       '<div class="mt-kpis">'+kpiH+'</div>'+
-      '<div class="mt-card"><div class="mt-card-head"><div class="mt-card-tt"><span class="mt-card-t">'+L("Reproducciones","Plays")+'</span><span class="mt-card-meta">'+L("últimos 14 días · 1,02 M","last 14 days · 1.02 M")+'</span></div></div>'+
-        '<div class="mt-trend">'+trendBars+'</div></div>'+
+      // tendencia por fecha: el dato de /metrics/videos no trae fecha → próximamente honesto
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Reproducciones · 14 días","Plays · 14 days")+'</span></div>'+_metPronto("La tendencia por día necesita la fecha de cada reel (insights de Instagram). En cuanto conecte ese dato, aquí verás la curva real.","Daily trend needs each reel's date (Instagram insights). Once connected, you'll see the real curve.")+'</div>'+
       '<div class="mt-grid2">'+
-        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Desglose de interacción","Interaction breakdown")+'</span><span class="mt-card-meta">48 K total</span></div><div class="mt-bars">'+engH+'</div></div>'+
-        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Ganchos que funcionan","Hooks that work")+'</span><span class="mt-card-meta">'+L("retención media","avg retention")+'</span></div><div class="mt-bars">'+hooksH+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Desglose de interacción","Interaction breakdown")+'</span><span class="mt-card-meta">'+fmtKM(sInter)+' total</span></div><div class="mt-bars">'+engH+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Duración óptima","Optimal length")+'</span><span class="mt-card-meta">'+L("repros medias · tus reels","avg plays · your reels")+'</span></div><div class="mt-durs">'+durH+'</div></div>'+
       '</div>'+
       '<div class="mt-grid2">'+
-        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Temas que explotan","Topics that explode")+'</span><span class="mt-card-meta">'+L("escala log","log scale")+'</span></div><div class="mt-bars">'+temasH+'</div></div>'+
-        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Duración óptima","Optimal length")+'</span><span class="mt-card-meta">'+L("repros medias","avg plays")+'</span></div><div class="mt-durs">'+durH+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Ganchos que funcionan","Hooks that work")+'</span></div>'+_metPronto("Analizo qué tipo de hook retiene mejor cuando tenga el watch-time de cada reel (insights de Instagram).","I'll analyze which hook retains best once I have each reel's watch-time (Instagram insights).")+'</div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos para publicar","Best times to post")+'</span></div>'+_metPronto("El mapa de horas necesita la fecha/hora de publicación de cada reel. Llega con los insights de Instagram.","The hours heatmap needs each reel's publish time. Coming with Instagram insights.")+'</div>'+
       '</div>'+
-      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos para publicar","Best times to post")+'</span><span class="mt-card-meta">'+L("interacción por franja","engagement by slot")+'</span></div>'+
-        '<div class="mt-hm">'+rowLabH+'<div class="mt-hm-grid">'+colsH+rowsH+'</div></div></div>'+
-      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels que más rinden","Your top-performing reels")+'</span><span class="mt-card-meta">30 '+L("días","days")+'</span></div>'+topH+'</div>'+
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels que más rinden","Your top-performing reels")+'</span><span class="mt-card-meta">'+V.length+' '+L("reels","reels")+'</span></div>'+topH+'</div>'+
     '</div>';
   }
   function metAudienciaHTML(){
-    var fol=[6,9,7,12,10,15,13,18,16,22,20,26,24,30]; var fh=_mBars(fol);
-    var folBars=fol.map(function(v,i){ return '<div class="mt-fb"><div class="mt-fb-fill" style="height:'+fh[i]+'"></div></div>'; }).join("");
-    var ed=[["18–24","28%","67%"],["25–34","42%","100%"],["35–44","19%","45%"],["45+","11%","26%"]];
-    var edH=ed.map(function(e){ return '<div class="mt-br"><div class="mt-br-top"><span>'+e[0]+'</span><span class="mt-mono">'+e[1]+'</span></div><div class="mt-br-track"><i style="width:'+e[2]+'"></i></div></div>'; }).join("");
-    var ub=[["España","54%","100%"],["México","14%","26%"],["Argentina","9%","17%"],["Colombia","7%","13%"],["Otros","16%","30%"]];
-    var ubH=ub.map(function(u){ return '<div class="mt-br"><div class="mt-br-top"><span>'+u[0]+'</span><span class="mt-mono">'+u[1]+'</span></div><div class="mt-br-track"><i style="width:'+u[2]+'"></i></div></div>'; }).join("");
+    // Sin endpoint de audience-insights de IG → marco listo + "próximamente" honesto.
+    // NO inventamos edad/género/ubicaciones (directiva David).
+    var card=function(t){ return '<div class="mt-card"><span class="mt-card-t">'+t+'</span>'+_metPronto("Necesita los insights de audiencia de Instagram (Graph API). El marco está listo; en cuanto conectemos esa cuenta, estos datos serán reales.","Needs Instagram audience insights (Graph API). The frame is ready; once connected these will be real.")+'</div>'; };
     return '<div class="mt-stack">'+
-      '<div class="mt-grid-audtop">'+
-        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Crecimiento de seguidores","Follower growth")+'</span><span class="mt-up">▲ +2 480</span></div><div class="mt-fgrowth">'+folBars+'</div></div>'+
-        '<div class="mt-card"><span class="mt-card-t">'+L("Alcance por tipo","Reach by type")+'</span>'+
-          '<div class="mt-br"><div class="mt-br-top"><span>'+L("No seguidores","Non-followers")+'</span><span class="mt-mono">62%</span></div><div class="mt-br-track"><i style="width:62%"></i></div></div>'+
-          '<div class="mt-br"><div class="mt-br-top"><span>'+L("Seguidores","Followers")+'</span><span class="mt-mono">38%</span></div><div class="mt-br-track"><i class="alt" style="width:38%"></i></div></div>'+
-          '<div class="mt-note">'+L("Llegas más a gente nueva que a tu propia base. <b>Bien:</b> estás creciendo, no reciclando.","You reach more new people than your own base. <b>Good:</b> you're growing, not recycling.")+'</div></div>'+
+      '<div class="mt-aud-hero">'+
+        '<div class="mt-aud-hero-ic">'+IC.spark+'</div>'+
+        '<div><h3 class="mt-aud-hero-h">'+L("Audiencia — en camino","Audience — on the way")+'</h3>'+
+        '<p class="mt-aud-hero-p">'+L("Crecimiento de seguidores, alcance por tipo, edad, género y ubicaciones salen de los insights de audiencia de Instagram. Aún no están conectados, así que no te enseño números inventados.","Follower growth, reach by type, age, gender and locations come from Instagram audience insights. Not connected yet, so I won't show you made-up numbers.")+'</p></div>'+
       '</div>'+
-      '<div class="mt-grid3">'+
-        '<div class="mt-card"><span class="mt-card-t">'+L("Edad","Age")+'</span><div class="mt-bars">'+edH+'</div></div>'+
-        '<div class="mt-card"><span class="mt-card-t">'+L("Género","Gender")+'</span>'+
-          '<div class="mt-gender"><div style="width:63%"></div><div class="alt" style="width:37%"></div></div>'+
-          '<div class="mt-gender-leg"><span><i></i>'+L("Hombres 63%","Men 63%")+'</span><span><i class="alt"></i>'+L("Mujeres 37%","Women 37%")+'</span></div>'+
-          '<div class="mt-note">'+L("Tu audiencia es mayoritariamente <b>hombres de 25–34</b>. Habla para ellos.","Your audience is mostly <b>men 25–34</b>. Talk to them.")+'</div></div>'+
-        '<div class="mt-card"><span class="mt-card-t">'+L("Top ubicaciones","Top locations")+'</span><div class="mt-bars">'+ubH+'</div></div>'+
-      '</div>'+
+      '<div class="mt-grid-audtop">'+card(L("Crecimiento de seguidores","Follower growth"))+card(L("Alcance por tipo","Reach by type"))+'</div>'+
+      '<div class="mt-grid3">'+card(L("Edad","Age"))+card(L("Género","Gender"))+card(L("Top ubicaciones","Top locations"))+'</div>'+
     '</div>';
   }
   function metCompetidoresHTML(){
-    var cols=[L("seguidores","followers"),L("repros medias","avg plays"),L("interacción","engagement"),L("explota","explodes")];
-    var comp=[
-      ["DA","@davidmiragito10","tú",1,"18,4 K","42 K","7,2%","1 de 4"],
-      ["NI","@nicoazero","líder del nicho",0,"112 K","88 K","9,1%","1 de 3"],
-      ["LA","@laura_kpi","al alza",0,"34 K","27 K","5,8%","1 de 5"],
-      ["VI","@victor_abarca","irregular",0,"9,7 K","12 K","4,3%","1 de 7"]
-    ];
-    var head='<div class="mt-comp-head"><span>cuenta</span>'+cols.map(function(c){ return '<span>'+ESC(c)+'</span>'; }).join("")+'</div>';
-    var rows=comp.map(function(r){ var me=r[3];
-      return '<div class="mt-comp-row'+(me?" me":"")+'">'+
-        '<div class="mt-comp-acct"><span class="mt-comp-av">'+r[0]+'</span><div><div class="mt-comp-n">'+ESC(r[1])+'</div><div class="mt-comp-tag'+(me?" me":"")+'">'+ESC(r[2])+'</div></div></div>'+
-        '<span class="mt-comp-c">'+r[4]+'</span><span class="mt-comp-c">'+r[5]+'</span><span class="mt-comp-c">'+r[6]+'</span><span class="mt-comp-c mt-mult">'+r[7]+'</span></div>';
-    }).join("");
-    var sv=[["@nicoazero","2,4 M","100%",0],["@laura_kpi","1,1 M","46%",0],["Tú · @davidmiragito10","1,02 M","42%",1],["@victor_abarca","0,4 M","17%",0]];
-    var svH=sv.map(function(s){ return '<div class="mt-br"><div class="mt-br-top"><span'+(s[3]?' style="color:var(--brand-500,#2F5BFF)"':'')+'>'+ESC(s[0])+'</span><span class="mt-mono">'+s[1]+'</span></div><div class="mt-br-track"><i'+(s[3]?'':' class="dim"')+' style="width:'+s[2]+'"></i></div></div>'; }).join("");
-    return '<div class="mt-stack">'+
-      '<div class="mt-card mt-comp"><div class="mt-comp-table">'+head+rows+'</div></div>'+
+    // Tabla derivada de tus competidores REALES (S.tracked + sus reels en el radar).
+    // La "cuota de atención del nicho" necesita repros agregadas → próximamente honesto.
+    var b=brand();
+    var t=Array.isArray(S.tracked)?S.tracked:[];
+    var cols=[L("repros medias","avg plays"),L("interacción","engagement"),L("reels","reels")];
+    // Agrega por competidor desde S.reels (lo que hay en el radar).
+    function _agg(handle){ var rs=(S.reels||[]).filter(function(r){ return r.creator&&r.creator.handle===handle; });
+      if(!rs.length) return null;
+      var av=Math.round(rs.reduce(function(a,r){return a+(r.views||0);},0)/rs.length);
+      var en=rs.reduce(function(a,r){return a+(r.engagement||0);},0)/rs.length;
+      return {avg:av, eng:en, n:rs.length}; }
+    var meAgg=null; var mv=metricVideos(); if(mv.length){ meAgg={avg:Math.round(mv.reduce(function(a,v){return a+(v.views||0);},0)/mv.length), n:mv.length}; }
+    var rowsArr=[];
+    if(meAgg) rowsArr.push({ini:initialsOf(b.handle||"tu"),h:"@"+(b.handle||S.user.handle||"tu_cuenta"),tag:L("tú","you"),me:1,avg:meAgg.avg,eng:null,n:meAgg.n});
+    t.forEach(function(tt){ var h=(tt.creator&&tt.creator.ig_username)||tt.ig_username||""; if(!h) return; var a=_agg(h);
+      rowsArr.push({ini:initialsOf(h),h:"@"+h,tag:(a?(a.n+" "+L("reels","reels")):L("analizando…","analyzing…")),me:0,avg:a?a.avg:null,eng:a?a.eng:null,n:a?a.n:0}); });
+    var head='<div class="mt-comp-head"><span>'+L("cuenta","account")+'</span>'+cols.map(function(c){ return '<span>'+ESC(c)+'</span>'; }).join("")+'</div>';
+    var rows=rowsArr.length ? rowsArr.map(function(r){
+      return '<div class="mt-comp-row'+(r.me?" me":"")+'">'+
+        '<div class="mt-comp-acct"><span class="mt-comp-av">'+ESC(r.ini)+'</span><div><div class="mt-comp-n">'+ESC(r.h)+'</div><div class="mt-comp-tag'+(r.me?" me":"")+'">'+ESC(r.tag)+'</div></div></div>'+
+        '<span class="mt-comp-c">'+(r.avg!=null?fmtKM(r.avg):"–")+'</span>'+
+        '<span class="mt-comp-c">'+(r.eng!=null?(r.eng.toFixed(1)+"%"):"–")+'</span>'+
+        '<span class="mt-comp-c mt-mono">'+(r.n||0)+'</span></div>';
+    }).join("") : '';
+    var table = rowsArr.length
+      ? '<div class="mt-card mt-comp"><div class="mt-comp-table">'+head+rows+'</div></div>'
+      : '<div class="mt-card"><span class="mt-card-t">'+L("Tus competidores","Your competitors")+'</span>'+_metPronto("Sigue a algún competidor desde el Radar y aquí verás cómo vas contra ellos (repros medias, interacción).","Follow a competitor from the Radar and you'll see how you stack up here.")+'</div>';
+    return '<div class="mt-stack">'+table+
       '<div class="mt-grid2">'+
-        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Cuota de atención del nicho","Niche share of voice")+'</span><span class="mt-card-meta">'+L("repros · 30 días","plays · 30 days")+'</span></div><div class="mt-bars">'+svH+'</div></div>'+
-        '<div class="mt-card mt-opp"><span class="mt-opp-eye">'+L("› hueco detectado","› gap detected")+'</span>'+
-          '<h3 class="mt-opp-h">'+L("@nicoazero publica 6×/semana. Tú, 5. Pero tu interacción por reel es mayor.","@nicoazero posts 6×/week. You, 5. But your engagement per reel is higher.")+'</h3>'+
-          '<p class="mt-opp-p">'+L("Mismo esfuerzo, más retorno: te falta volumen, no calidad. Roba un tema más esta semana.","Same effort, more return: you need volume, not quality. Steal one more topic this week.")+'</p>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Cuota de atención del nicho","Niche share of voice")+'</span></div>'+_metPronto("La cuota de atención compara las repros totales del nicho — necesita el histórico agregado de cada competidor. En cuanto lo tenga, aquí va tu % real.","Share of voice compares total niche plays — needs each competitor's aggregated history. Real % coming once available.")+'</div>'+
+        '<div class="mt-card mt-opp"><span class="mt-opp-eye">'+L("› cómo usarlo","› how to use it")+'</span>'+
+          '<h3 class="mt-opp-h">'+L("Roba lo que les explota a ellos.","Steal what's exploding for them.")+'</h3>'+
+          '<p class="mt-opp-p">'+L("Sus reels que más rinden ya están en tu Radar, listos para robar en tu voz.","Their top reels are already in your Radar, ready to steal in your voice.")+'</p>'+
           '<button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Ver sus reels en el Radar","See their reels in the Radar")+'</button></div>'+
       '</div>'+
     '</div>';
