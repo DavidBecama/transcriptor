@@ -2457,7 +2457,7 @@
     if(vp && vp.has_profile){
       return {
         tono: vp.tone||"",
-        frases: (vp.phrases||[]).map(function(p){ return '"'+p+'"'; }),
+        frases: (vp.phrases||[]).map(function(p){ return String(p).replace(/^[\s"'“”]+|[\s"'“”]+$/g,''); }),
         estructura: vp.structure||"",
         duracion: vp.avg_duration ? ("~"+vp.avg_duration+"s objetivo") : "",
         evita: vp.avoid||""
@@ -2470,7 +2470,7 @@
     }
     return {
       tono:"Directo y sin postureo. Cuentas las cosas como a un colega en un audio de WhatsApp.",
-      frases:['"te lo cuento porque a mí…"','"paso uno… paso dos…"','"guárdate esto"','"y no, no es lo que crees"'],
+      frases:['te lo cuento porque a mí…','paso uno… paso dos…','guárdate esto','y no, no es lo que crees'],
       estructura:"Hook directo (sin 'hola') → 3 pasos concretos → CTA de guardar/comentar.",
       duracion:"30–45s es tu punto dulce: ahí retienes el doble.",
       evita:"Nada de 'en el panorama actual', 'es fundamental', ni motivacional vacío."
@@ -3213,12 +3213,16 @@
     var tonos=(v.tono||"").split(/[,·]/).map(function(x){return x.trim();}).filter(Boolean);
     if(!tonos.length) tonos=["Directo","Cercano"];
     var pills=tonos.map(function(t){ return '<span class="ce-tono">'+ESC(t)+'</span>'; }).join("");
-    var frases=(v.frases&&v.frases.length)?v.frases.map(function(f){return '“'+ESC(f)+'”';}).join(", ")+"." : "—";
-    var gancho=(v.frases&&v.frases[0])?('“'+ESC(v.frases[0]).slice(0,16)+'…”'):'“Comenta X…”';
+    // Muletillas como chips (no un run de comas con comillas dobles → mucho más legible).
+    var frases=(v.frases&&v.frases.length)
+      ? v.frases.map(function(f){ return '<span class="ce-mulet-chip">'+ESC(f)+'</span>'; }).join("")
+      : '<span class="ce-mulet-empty">—</span>';
+    var _g0=(v.frases&&v.frases[0])?ESC(v.frases[0]):"";
+    var gancho=_g0 ? ('“'+(_g0.length>22?_g0.slice(0,22).replace(/\s+\S*$/,'')+'…':_g0)+'”') : '“Comenta X…”';
     return '<div class="ce-card ce-know">'+
       '<div class="ce-card-head"><span class="ce-card-t">'+L("Lo que ya sé de ti","What I already know about you")+'</span><span class="ce-card-meta">'+L("› de "+reels+" reels","› from "+reels+" reels")+'</span></div>'+
       '<div class="ce-know-block"><span class="ce-know-k">'+L("Tu tono","Your tone")+'</span><div class="ce-tonos">'+pills+'</div></div>'+
-      '<div class="ce-know-block"><span class="ce-know-k">'+L("Tus muletillas","Your catchphrases")+'</span><p class="ce-mulet">'+frases+'</p></div>'+
+      '<div class="ce-know-block"><span class="ce-know-k">'+L("Tus muletillas","Your catchphrases")+'</span><div class="ce-mulet">'+frases+'</div></div>'+
       '<div class="ce-know-foot">'+
         '<div><div class="ce-foot-k">'+L("duración ideal","ideal length")+'</div><div class="ce-foot-v">'+ESC(v.duracion||"30–45 s")+'</div></div>'+
         '<div><div class="ce-foot-k">'+L("gancho top","top hook")+'</div><div class="ce-foot-v">'+gancho+'</div></div>'+

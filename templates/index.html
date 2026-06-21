@@ -10356,7 +10356,10 @@
     .rs .ce-know-k { font-size:13px; font-weight:600; color:var(--text-tertiary); }
     .rs .ce-tonos { display:flex; flex-wrap:wrap; gap:8px; }
     .rs .ce-tono { padding:8px 13px; border-radius:99px; background:var(--brand-50, rgba(47,91,255,.16)); color:var(--brand-500,#2F5BFF); font-weight:600; font-size:13px; }
-    .rs .ce-mulet { font-size:14.5px; line-height:1.6; color:var(--text-secondary); margin:0; }
+    /* Muletillas como chips (antes era un run de texto con comas y comillas dobles) */
+    .rs .ce-mulet { display:flex; flex-wrap:wrap; gap:8px; margin:0; }
+    .rs .ce-mulet-chip { display:inline-flex; align-items:center; padding:7px 13px; border-radius:99px; background:var(--surface-overlay); border:1px solid var(--border-default); color:var(--text-secondary); font-size:13.5px; line-height:1.3; }
+    .rs .ce-mulet-empty { color:var(--text-tertiary); }
     .rs .ce-know-foot { display:flex; gap:18px; padding-top:14px; border-top:1px solid var(--border-subtle); }
     .rs .ce-foot-k { font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); margin-bottom:3px; }
     .rs .ce-foot-v { font-family:var(--font-display); font-weight:700; font-size:18px; color:var(--text-primary); }
@@ -27761,6 +27764,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=80"></script>
+<script src="/static/js/radar-loop.js?v=81"></script>
 </body>
 </html>
