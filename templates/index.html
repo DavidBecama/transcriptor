@@ -25987,11 +25987,10 @@ function skipTour() {
   endTour();
 }
 
-// El house tour NO se cierra con Esc (decisión usuario): solo con los botones del
-// propio tutorial (Saltar / Listo). Mientras está activo, Esc se traga para que no
-// cierre overlays de debajo por accidente.
+// House tour: Esc SALTA el tutorial (igual que el botón «Saltar»/X) — decisión David.
+// Se captura en fase de captura para que no caiga a overlays de debajo.
 document.addEventListener("keydown", function (e) {
-  if (e.key === "Escape" && tourActive) { e.preventDefault(); e.stopPropagation(); }
+  if (e.key === "Escape" && tourActive) { e.preventDefault(); e.stopPropagation(); skipTour(); }
 }, true);
 
 function endTour() {
