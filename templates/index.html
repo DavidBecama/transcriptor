@@ -4100,6 +4100,26 @@
     #adminPage .adm-table tbody tr:hover td { background: rgba(255,255,255,.02); }
     #adminPage .adm-table-wrap { overflow-x: auto; border-radius: var(--radius-lg); }
 
+    /* Feedback: filtro + texto truncado + modal de detalle */
+    #adminPage .adm-fb-filter { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; }
+    #adminPage .adm-fb-txt { max-width: 360px; color: var(--text-secondary);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #adminPage .adm-fb-modal {
+      position: fixed; inset: 0; z-index: 70; display: none;
+      align-items: center; justify-content: center; padding: 24px;
+      background: rgba(0,0,0,.72); backdrop-filter: blur(2px);
+    }
+    #adminPage .adm-fb-modal.on { display: flex; }
+    #adminPage .adm-fb-modal-card {
+      background: var(--surface-raised); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg); max-width: 560px; width: 100%;
+      max-height: 86vh; overflow-y: auto; padding: 24px;
+    }
+    #adminPage .adm-fb-modal-card img {
+      max-width: 100%; margin-top: 14px; border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle); display: block;
+    }
+
     #adminPage .adm-pill {
       display: inline-block; padding: 2px 9px; border-radius: var(--radius-full);
       font-size: 11px; font-weight: 600; font-family: var(--font-body);
@@ -27151,6 +27171,7 @@ async function removeCompetitor(trackingId, username) {
       <button class="adm-tab"     data-panel="plans"    onclick="window.__adminTab('plans', this)">Planes</button>
       <button class="adm-tab"     data-panel="topups"   onclick="window.__adminTab('topups', this)">Topups</button>
       <button class="adm-tab"     data-panel="users"    onclick="window.__adminTab('users', this)">Usuarios</button>
+      <button class="adm-tab"     data-panel="feedback" onclick="window.__adminTab('feedback', this)">Feedback</button>
       <button class="adm-tab"     data-panel="settings" onclick="window.__adminTab('settings', this)">Ajustes</button>
     </div>
 
@@ -27165,9 +27186,15 @@ async function removeCompetitor(trackingId, username) {
       </div>
       <div id="adm-users-content"></div>
     </div>
+    <div id="adm-feedback" class="adm-panel"></div>
     <div id="adm-settings" class="adm-panel"></div>
   </div>
   <div class="adm-toast" id="admToast"></div>
+
+  <!-- Detalle de un feedback (texto completo + captura) -->
+  <div class="adm-fb-modal" id="admFbModal" onclick="if(event.target===this)window.__adminFbClose()">
+    <div class="adm-fb-modal-card" id="admFbModalBody"></div>
+  </div>
 </div>
 
 <script>
@@ -27227,6 +27254,7 @@ async function removeCompetitor(trackingId, username) {
     else if (name === "plans") { loadPlans(); }
     else if (name === "topups") { loadTopups(); }
     else if (name === "users") { loadUsers(); }
+    else if (name === "feedback") { loadFeedback(); }
     else if (name === "settings") { loadSettings(); }
   }
 
@@ -27506,6 +27534,180 @@ async function removeCompetitor(trackingId, username) {
     return false;
   }
 
+  // ── FEEDBACK (cola de reportes + recompensa en créditos) ──────────────
+  // Recompensa por defecto al aprobar (override en el prompt). El backend valida.
+  var FB_DEFAULT = { bug: 25, idea: 10 };
+  // Captura de muestra (solo demo) — SVG inline, no pesa.
+  var DEMO_FB_IMG = "data:image/svg+xml;utf8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">' +
+    '<rect width="640" height="360" fill="#11131a"/>' +
+    '<rect x="24" y="24" width="592" height="56" rx="10" fill="#1c2030"/>' +
+    '<rect x="40" y="44" width="220" height="16" rx="6" fill="#2F5BFF"/>' +
+    '<rect x="24" y="104" width="380" height="14" rx="6" fill="#2a2f40"/>' +
+    '<rect x="24" y="134" width="300" height="14" rx="6" fill="#2a2f40"/>' +
+    '<rect x="24" y="200" width="180" height="44" rx="10" fill="#2F5BFF"/>' +
+    '<text x="320" y="320" fill="#6b7280" font-family="sans-serif" font-size="15" text-anchor="middle">captura de ejemplo (demo)</text>' +
+    '</svg>');
+  var FB_DEMO = [
+    { id:"demo-1", type:"bug", page:"dashboard", plan:"creator", status:"new", credits_awarded:0,
+      created_at:"2026-06-21T09:12:00Z", user_id:"a1b2c3d4-0000-0000-0000-000000000001", _img:true,
+      text:"Al robar una idea desde el Radar en el móvil, el botón «Roba la idea» se queda cargando y nunca abre el guión. En escritorio sí funciona." },
+    { id:"demo-2", type:"idea", page:"prompter", plan:"agency", status:"new", credits_awarded:0,
+      created_at:"2026-06-20T18:40:00Z", user_id:"a1b2c3d4-0000-0000-0000-000000000002", _img:false,
+      text:"Estaría genial poder programar la publicación del reel directamente desde el teleprónter, sin salir de la app." },
+    { id:"demo-3", type:"bug", page:"settings", plan:"pro", status:"confirmed", credits_awarded:25,
+      created_at:"2026-06-19T11:05:00Z", user_id:"a1b2c3d4-0000-0000-0000-000000000003", _img:false,
+      text:"Los créditos de la pill del Radar no se actualizan tras comprar un topup hasta que recargo la página." }
+  ];
+
+  function fbStatusPill(s){
+    var map = { "new":"Nuevo", "confirmed":"Confirmado", "implemented":"Implementado", "rejected":"Rechazado" };
+    var muted = s !== "new" ? " muted" : "";
+    return '<span class="adm-pill' + muted + '">' + esc(map[s] || s) + '</span>';
+  }
+  function fbTypePill(t){
+    return '<span class="adm-pill' + (t === "bug" ? "" : " muted") + '">' + (t === "bug" ? "Bug" : "Idea") + '</span>';
+  }
+  function fbDate(s){
+    if (!s) { return "—"; }
+    try { return new Date(s).toLocaleDateString(); } catch(e) { return esc(s); }
+  }
+  function fbFilterBar(status){
+    var opts = [["new","Nuevos"],["confirmed","Confirmados"],["implemented","Implementados"],["rejected","Rechazados"],["all","Todos"]];
+    var sel = opts.map(function(o){
+      return '<option value="' + o[0] + '"' + (o[0] === status ? " selected" : "") + '>' + o[1] + '</option>';
+    }).join("");
+    return '<div class="adm-fb-filter">' +
+             '<span class="adm-label" style="margin:0">Estado</span>' +
+             '<select class="adm-input" style="width:auto" onchange="window.__adminFbFilter(this.value)">' + sel + '</select>' +
+           '</div>';
+  }
+
+  async function loadFeedback(){
+    var el = $("adm-feedback"); if (!el) { return; }
+    var status = window.__fbStatus || "new";
+    var bar = fbFilterBar(status);
+    el.innerHTML = bar + '<div class="adm-loading"><span class="adm-spinner"></span></div>';
+    var rows;
+    try {
+      if (window.__DEMO__) {
+        rows = FB_DEMO.filter(function(r){ return status === "all" || r.status === status; });
+      } else {
+        var data = await api("/feedback?status=" + encodeURIComponent(status) + "&limit=100");
+        rows = data.feedback || [];
+      }
+    } catch(e) {
+      el.innerHTML = bar + '<div class="adm-msg error">Error al cargar feedback: ' + esc(e.message) + '</div>';
+      return;
+    }
+    window.__fbRows = rows;
+    var html = bar + '<div class="adm-table-wrap"><table class="adm-table"><thead><tr>' +
+      '<th>Fecha</th><th>Tipo</th><th>Reporte</th><th>Página</th><th>Estado</th><th>Créditos</th><th>Acciones</th>' +
+      '</tr></thead><tbody>';
+    if (!rows.length) {
+      html += '<tr><td colspan="7" style="color:var(--text-tertiary)">Sin feedback en este estado.</td></tr>';
+    } else {
+      rows.forEach(function(r){
+        var id = esc(r.id || "");
+        var full = r.text || "";
+        var txt = esc(full.slice(0, 120)) + (full.length > 120 ? "…" : "");
+        var acts = '<button class="adm-btn adm-btn-secondary" data-fb="' + id + '" onclick="window.__adminFbView(this)">Ver</button>';
+        if (r.status === "new") {
+          var lbl = r.type === "bug" ? ("Confirmar +" + FB_DEFAULT.bug) : ("Implementar +" + FB_DEFAULT.idea);
+          acts += ' <button class="adm-btn" data-fb="' + id + '" data-type="' + esc(r.type || "bug") + '" data-act="approve" onclick="window.__adminFbResolve(this)">' + lbl + '</button>';
+          acts += ' <button class="adm-btn adm-btn-secondary" data-fb="' + id + '" data-act="reject" onclick="window.__adminFbResolve(this)">Rechazar</button>';
+        }
+        html +=
+          '<tr>' +
+            '<td>' + fbDate(r.created_at) + '</td>' +
+            '<td>' + fbTypePill(r.type) + '</td>' +
+            '<td class="adm-fb-txt" title="' + esc(full) + '">' + txt + '</td>' +
+            '<td>' + esc(r.page || "—") + '</td>' +
+            '<td>' + fbStatusPill(r.status) + '</td>' +
+            '<td>' + (r.credits_awarded ? ("+" + esc(r.credits_awarded)) : '<span style="color:var(--text-tertiary)">—</span>') + '</td>' +
+            '<td style="white-space:nowrap">' + acts + '</td>' +
+          '</tr>';
+      });
+    }
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+    loaded.feedback = true;
+  }
+
+  function fbFilter(v){ window.__fbStatus = v; loaded.feedback = false; loadFeedback(); }
+
+  async function resolveFeedback(btn){
+    var id = btn.getAttribute("data-fb");
+    if (!id) { return; }
+    var approve = btn.getAttribute("data-act") === "approve";
+    var type = btn.getAttribute("data-type") || "bug";
+    var status, credits = 0;
+    if (approve) {
+      var def = FB_DEFAULT[type] != null ? FB_DEFAULT[type] : 25;
+      var ans = prompt("Créditos a abonar al usuario (1 crédito ≈ 0,18 €):", String(def));
+      if (ans === null) { return; }
+      credits = parseInt(ans, 10);
+      if (isNaN(credits) || credits < 0) { toast("Cantidad no válida", "error"); return; }
+      status = type === "idea" ? "implemented" : "confirmed";
+    } else {
+      if (!confirm("¿Rechazar este reporte? No se abonan créditos.")) { return; }
+      status = "rejected";
+    }
+    if (window.__DEMO__) {
+      FB_DEMO.forEach(function(r){ if (r.id === id) { r.status = status; r.credits_awarded = approve ? credits : 0; } });
+      toast(approve ? ("Aprobado · +" + credits + " créditos (demo)") : "Rechazado (demo)", approve ? "ok" : "info");
+      loaded.feedback = false; loadFeedback();
+      return;
+    }
+    btn.disabled = true;
+    try {
+      var body = { status: status };
+      if (approve) { body.credits = credits; }
+      var res = await api("/feedback/" + encodeURIComponent(id) + "/resolve", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+      });
+      if (res && res.ok !== false) {
+        var g = res.credits_granted != null ? res.credits_granted : credits;
+        toast(approve ? ("Aprobado · +" + g + " créditos") : "Rechazado", approve ? "ok" : "info");
+        loaded.feedback = false; loadFeedback();
+      } else { toast("Error: " + ((res && res.error) || "desconocido"), "error"); }
+    } catch(e) { toast("Error: " + e.message, "error"); }
+    finally { btn.disabled = false; }
+  }
+
+  async function viewFeedback(btn){
+    var id = btn.getAttribute("data-fb");
+    var modal = $("admFbModal"), box = $("admFbModalBody");
+    if (!modal || !box || !id) { return; }
+    box.innerHTML = '<div class="adm-loading"><span class="adm-spinner"></span></div>';
+    modal.classList.add("on");
+    var fb;
+    try {
+      if (window.__DEMO__) {
+        fb = (window.__fbRows || FB_DEMO).filter(function(r){ return r.id === id; })[0];
+        if (fb && fb._img) { fb = Object.assign({}, fb, { image_b64: DEMO_FB_IMG }); }
+      } else {
+        var data = await api("/feedback/" + encodeURIComponent(id));
+        fb = data.feedback;
+      }
+    } catch(e) { box.innerHTML = '<div class="adm-msg error">Error: ' + esc(e.message) + '</div>'; return; }
+    if (!fb) { box.innerHTML = '<div class="adm-msg error">No encontrado</div>'; return; }
+    var h =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+        '<div>' + fbTypePill(fb.type) + ' ' + fbStatusPill(fb.status) + '</div>' +
+        '<button class="adm-btn adm-btn-secondary" onclick="window.__adminFbClose()">Cerrar</button>' +
+      '</div>' +
+      '<div style="color:var(--text-tertiary);font-size:var(--text-xs);margin-bottom:14px">' +
+        fbDate(fb.created_at) + ' · ' + esc(fb.page || "—") + ' · plan ' + esc(fb.plan || "—") +
+        ' · user ' + esc((fb.user_id || "").slice(0, 8)) + '…</div>' +
+      '<div style="white-space:pre-wrap;color:var(--text-secondary);line-height:1.55">' + esc(fb.text || "") + '</div>';
+    if (fb.image_b64) { h += '<img src="' + fb.image_b64 + '" alt="captura">'; }
+    else { h += '<div style="margin-top:12px;color:var(--text-tertiary);font-size:var(--text-xs)">(sin captura adjunta)</div>'; }
+    if (fb.credits_awarded) { h += '<div style="margin-top:14px"><span class="adm-pill">+' + esc(fb.credits_awarded) + ' créditos abonados</span></div>'; }
+    box.innerHTML = h;
+  }
+  function closeFbModal(){ var m = $("admFbModal"); if (m) { m.classList.remove("on"); } }
+
   // ── Apertura / cierre del overlay ─────────────────────────────────────
   function open(){
     var page = $("adminPage");
@@ -27540,6 +27742,10 @@ async function removeCompetitor(trackingId, username) {
   window.__adminSaveTopup = saveTopup;
   window.__adminEditUser = editUser;
   window.__adminSaveSettings = saveSettings;
+  window.__adminFbFilter = fbFilter;
+  window.__adminFbResolve = resolveFeedback;
+  window.__adminFbView = viewFeedback;
+  window.__adminFbClose = closeFbModal;
 
   // ── Boot ──────────────────────────────────────────────────────────────
   function boot(){
@@ -27565,6 +27771,13 @@ async function removeCompetitor(trackingId, username) {
                || /(^|\/)admin$/.test(location.pathname.replace(/\/+$/, ""))
                || location.hash === "#admin";
     if (atAdmin) { open(); }
+
+    // Demo: no hay login (/auth/me no marca admin) → mostramos el chip igualmente
+    // para poder ver/probar el panel localmente. En prod manda /auth/me.
+    if (window.__DEMO__) {
+      var demoChip = $("adminEntry");
+      if (demoChip) { demoChip.classList.add("on"); }
+    }
 
     // Chip flotante para admins: comprobamos is_admin vía /auth/me (no toca
     // el estado `st` del workspace). Tolerante a fallos: si no es admin, nada.

@@ -10583,6 +10583,109 @@ def api_admin_update_user(user_id: str):
         return jsonify({"error": str(e)}), 500
 
 
+# ── Feedback: revisión + recompensa en créditos ─────────────────────────────
+# Recompensa por defecto al APROBAR (el admin puede sobreescribir con body.credits):
+#   bug confirmado = 25 cr · idea implementada = 10 cr. 1 crédito = COST_CENTS de saldo.
+FEEDBACK_REWARD = {"bug": 25, "idea": 10}
+_FEEDBACK_LIST_COLS = ("id,user_id,type,text,page,plan,status,credits_awarded,"
+                       "admin_note,resolved_at,created_at")
+
+
+@app.route("/admin/api/feedback", methods=["GET"])
+@admin_required
+def api_admin_feedback_list():
+    """Cola de feedback. ?status=new|confirmed|implemented|rejected|all (def: new).
+    No devuelve image_b64 (pesa); usar el detalle para verla."""
+    status = (request.args.get("status", "new") or "new").strip().lower()
+    try:
+        limit = min(max(1, int(request.args.get("limit", 50))), 200)
+    except (TypeError, ValueError):
+        limit = 50
+    try:
+        q = (db.table("feedback").select(_FEEDBACK_LIST_COLS)
+               .order("created_at", desc=True).limit(limit))
+        if status != "all":
+            q = q.eq("status", status)
+        rows = q.execute().data or []
+        return jsonify({"feedback": rows, "count": len(rows)})
+    except Exception as e:
+        logger.error(f"api_admin_feedback_list: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/admin/api/feedback/<fid>", methods=["GET"])
+@admin_required
+def api_admin_feedback_detail(fid: str):
+    """Detalle completo de un feedback (incluye image_b64 para revisarlo)."""
+    try:
+        row = (db.table("feedback").select("*").eq("id", fid).single().execute())
+        return jsonify({"feedback": row.data})
+    except Exception as e:
+        logger.error(f"api_admin_feedback_detail({fid}): {e}")
+        return jsonify({"error": "not_found"}), 404
+
+
+@app.route("/admin/api/feedback/<fid>/resolve", methods=["POST"])
+@admin_required
+def api_admin_feedback_resolve(fid: str):
+    """Resuelve un feedback. body.status ∈ confirmed|implemented|rejected.
+    Al aprobar (confirmed/implemented) abona créditos al autor sumando a
+    profiles.credits_cents (default por tipo; override con body.credits).
+    IDEMPOTENTE: si ya se abonó (credits_awarded>0) no vuelve a pagar."""
+    admin = current_user()
+    body = request.get_json(silent=True) or {}
+    new_status = str(body.get("status") or "").strip().lower()
+    if new_status not in ("confirmed", "implemented", "rejected"):
+        return jsonify({"ok": False, "error": "bad_status"}), 400
+    note = (str(body.get("note") or "").strip()[:1000]) or None
+    try:
+        fb = (db.table("feedback")
+                .select("id,user_id,type,status,credits_awarded")
+                .eq("id", fid).single().execute()).data
+        if not fb:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+
+        # Cuántos créditos abonar (solo si se aprueba). Override explícito o default por tipo.
+        award = 0
+        if new_status in ("confirmed", "implemented"):
+            if body.get("credits") is not None:
+                try:
+                    award = max(0, int(body["credits"]))
+                except (TypeError, ValueError):
+                    award = 0
+            else:
+                award = FEEDBACK_REWARD.get(fb.get("type") or "bug", 0)
+
+        # Abona una sola vez (idempotencia: no si ya hay créditos abonados).
+        granted = 0
+        if award and (fb.get("credits_awarded") or 0) == 0:
+            prof = (db.table("profiles").select("credits_cents")
+                      .eq("id", fb["user_id"]).single().execute())
+            current = (prof.data or {}).get("credits_cents", 0) or 0
+            db.table("profiles").update(
+                {"credits_cents": current + award * COST_CENTS}
+            ).eq("id", fb["user_id"]).execute()
+            granted = award
+
+        db.table("feedback").update({
+            "status": new_status,
+            "credits_awarded": (fb.get("credits_awarded") or 0) + granted,
+            "admin_note": note,
+            "resolved_by": admin["id"],
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", fid).execute()
+
+        try:
+            track_event("feedback_resolved", admin["id"],
+                        {"feedback_id": fid, "status": new_status, "credits": granted})
+        except Exception:
+            pass
+        return jsonify({"ok": True, "status": new_status, "credits_granted": granted})
+    except Exception as e:
+        logger.error(f"api_admin_feedback_resolve({fid}): {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/admin/api/settings", methods=["GET"])
 @admin_required
 def api_admin_settings():

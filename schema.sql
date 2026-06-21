@@ -402,3 +402,26 @@ CREATE POLICY "Users see own scripts" ON public.saved_scripts
 -- voice_profiles: el usuario ve/gestiona solo su propia voz
 CREATE POLICY "own voice" ON public.voice_profiles
   FOR ALL USING (auth.uid() = user_id);
+
+-- ════════════════════════════════════════════════════════════
+--  feedback — reportes de bug/idea (menú de cuenta). Insert vía POST /api/feedback;
+--  revisión + recompensa en créditos vía /admin/api/feedback. service_role only.
+-- ════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.feedback (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  type            text NOT NULL DEFAULT 'bug',
+  text            text NOT NULL,
+  page            text,
+  plan            text,
+  image_b64       text,
+  status          text NOT NULL DEFAULT 'new',
+  credits_awarded integer NOT NULL DEFAULT 0,
+  admin_note      text,
+  resolved_by     uuid REFERENCES auth.users(id),
+  resolved_at     timestamptz,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS feedback_status_idx ON public.feedback (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS feedback_user_idx   ON public.feedback (user_id, created_at DESC);
+ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;  -- service_role only (sin policy)
