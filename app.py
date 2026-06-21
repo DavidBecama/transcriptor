@@ -467,8 +467,18 @@ for _cur, _pid in PADDLE_PRICE_ADDON_BRAND.items():
 # Mismo modelo de planes/créditos que Paddle/Stripe; solo cambia la fuente del
 # evento. Catálogo creado en la cuenta aprobada; los plan IDs se leen por la API
 # (no se hardcodean) y viven en .env como WHOP_PLAN_*/WHOP_TOPUP_*.
-WHOP_API_KEY = os.environ.get("WHOP_API_KEY", "")
-WHOP_WEBHOOK_SECRET = os.environ.get("WHOP_WEBHOOK_SECRET", "")  # se rellena al crear el webhook
+def _clean_secret(name: str) -> str:
+    """Lee un secreto de env y limpia errores de pegado típicos: espacios, comillas
+    y los <ÁNGULOS> del placeholder. Un secreto envuelto en <…> (p.ej. copiar literal
+    «<ws_…>» del ejemplo) rompía la verificación de firma del webhook → 100% de pagos
+    rechazados en silencio. Esto lo neutraliza."""
+    v = (os.environ.get(name, "") or "").strip()
+    if len(v) >= 2 and v[0] in "<\"'" and v[-1] in ">\"'":
+        v = v[1:-1].strip()
+    return v
+
+WHOP_API_KEY = _clean_secret("WHOP_API_KEY")
+WHOP_WEBHOOK_SECRET = _clean_secret("WHOP_WEBHOOK_SECRET")  # se rellena al crear el webhook
 WHOP_API_BASE = "https://api.whop.com"
 WHOP_CHECKOUT_BASE = "https://whop.com/checkout"  # checkout link por plan_id
 
@@ -3670,12 +3680,15 @@ def attribute_and_learn(user_id, videos, max_transcribe=_REEL_TRANSCRIBE_PER_RUN
     return {"attributed": attributed, "transcribed": transcribed, "insights": insights}
 
 
-def next_series_suggestion(user_id):
-    """Para Radar/email diario: tu guión que mejor rinde → 'haz el siguiente de esa serie'."""
+def next_series_suggestion(user_id, project_id=None):
+    """Para Radar/email diario: tu guión que mejor rinde → 'haz el siguiente de esa serie'.
+    Scopeado a la marca activa (project_id) si se pasa — sin cruce entre marcas."""
     try:
-        r = (db.table("scripts").select("id, title, views_count")
-               .eq("user_id", user_id).not_.is_("views_count", "null")
-               .order("views_count", desc=True).limit(1).execute())
+        q = (db.table("scripts").select("id, title, views_count")
+               .eq("user_id", user_id).not_.is_("views_count", "null"))
+        if project_id:
+            q = q.eq("project_id", project_id)
+        r = q.order("views_count", desc=True).limit(1).execute()
     except Exception:
         return None
     if not r.data:
@@ -5273,11 +5286,12 @@ def api_metrics_insights():
     """Lo que el sistema aprendió de TU cuenta (Métricas/Cerebro) + el siguiente de la
     serie que rinde (Radar/email diario). Persistido en el VoiceProfile."""
     user = current_user()
-    vp = get_voice_profile(user["id"])
+    pid = _req_project_id()   # insights de la MARCA activa (sin cruce entre marcas)
+    vp = get_voice_profile(user["id"], pid)
     raw = (vp.get("raw") if vp and isinstance(vp.get("raw"), dict) else {}) or {}
     return jsonify({
         "what_works": raw.get("what_works") or [],
-        "next": next_series_suggestion(user["id"]),
+        "next": next_series_suggestion(user["id"], pid),
     })
 
 
@@ -8787,12 +8801,16 @@ def leaderboard():
     cacheado (hoy NULL); el front no lo muestra si falta."""
     user = current_user()
     uid = user["id"]
+    pid = _req_project_id()   # marca activa: el ranking es SOLO de sus competidores + su IG
 
-    # 1. Mis competidores trackeados.
+    # 1. Mis competidores trackeados (de ESTA marca; sin pid = cuenta por defecto).
     try:
-        tc = (db.table("user_tracked_creators")
-                .select("creator:creators_global(id, ig_username, followers_count_cached)")
-                .eq("user_id", uid).is_("archived_at", "null").limit(60).execute())
+        tcq = (db.table("user_tracked_creators")
+                .select("project_id, creator:creators_global(id, ig_username, followers_count_cached)")
+                .eq("user_id", uid).is_("archived_at", "null").limit(60))
+        if pid:
+            tcq = tcq.eq("project_id", pid)
+        tc = tcq.execute()
     except Exception:
         logger.exception("leaderboard: tracked read failed uid=%s", uid)
         tc = type("X", (), {"data": []})()
@@ -8835,12 +8853,12 @@ def leaderboard():
     me = {"handle": "", "you": True, "followers": None,
           "avg_views": 0, "best_views": 0, "reels": 0, "growth": 0, "has_data": False}
     try:
-        prof_r = db.table("ig_profiles").select("ig_username").eq("user_id", uid).limit(1).execute()
-        if prof_r.data:
-            me["handle"] = (prof_r.data[0].get("ig_username") or "").lstrip("@")
+        ig_row = _get_ig_profile(uid, pid, "id, ig_username")
+        if ig_row:
+            me["handle"] = (ig_row.get("ig_username") or "").lstrip("@")
             mv = (db.table("ig_videos")
                     .select("views, published_at")
-                    .eq("user_id", uid).order("published_at", desc=True)
+                    .eq("ig_profile_id", ig_row["id"]).order("published_at", desc=True)
                     .limit(30).execute())
             myviews = [int(v.get("views") or 0) for v in (mv.data or [])]
             st = _views_stats(myviews)
