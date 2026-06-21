@@ -1816,9 +1816,11 @@
     if(S.setTab) return;
     S.setTab="perfil";
     var v=brainVoice(brand()); var sel={};
-    var base=(v.tono||"Directo, Cercano").split(/[,·]/).map(function(x){return x.trim();}).filter(Boolean);
-    AJ_TONES.forEach(function(t){ sel[t]=base.some(function(b){return b.toLowerCase()===t.toLowerCase();}); });
-    if(!base.length){ sel["Directo"]=true; sel["Cercano"]=true; }
+    var baseTxt=(v.tono||"Directo, Cercano").toLowerCase();
+    // preselecciona un tono si su nombre aparece en la voz detectada (p.ej. «Directo
+    // y sin postureo» → marca «Directo»). Match por contención, no igualdad exacta.
+    AJ_TONES.forEach(function(t){ sel[t]=baseTxt.indexOf(t.toLowerCase())>=0; });
+    if(!Object.keys(sel).some(function(k){return sel[k];})){ sel["Directo"]=true; sel["Cercano"]=true; }
     S.setTones=sel;
     S.setPrefs={notif:true, semanal:true, beta:false};
   }
@@ -1846,7 +1848,7 @@
     var v=brainVoice(brand());
     var reels=hasRealVoice()?(S.voice.source_count||0):(brand().reelsAnalyzed||47);
     var tonos=AJ_TONES.map(function(t){ var on=!!S.setTones[t];
-      return '<button class="aj-tono'+(on?" on":"")+'" data-act="set-tone" data-k="'+ESC(t)+'">'+(on?IC.check+' ':'')+ESC(t)+'</button>';
+      return '<button class="aj-tono'+(on?" on":"")+'" data-act="aj-tone" data-k="'+ESC(t)+'">'+(on?IC.check+' ':'')+ESC(t)+'</button>';
     }).join("");
     var frases=(v.frases&&v.frases.length)?v.frases.map(function(f){return '“'+ESC(f)+'”';}).join(", ") : "“que no te engañen”, “comenta X y te lo paso”";
     var prefs=[
@@ -1892,7 +1894,7 @@
     var invoices=[["14 jun 2026","19,00€"],["14 may 2026","19,00€"],["14 abr 2026","19,00€"]].map(function(iv,i){
       return '<div class="aj-inv'+(i>0?" bt":"")+'"><div class="aj-inv-l">'+IC.doc+' <span>'+iv[0]+'</span></div>'+
         '<span class="aj-inv-amt">'+iv[1]+'</span><span class="aj-inv-paid">'+IC.check+' '+L("Pagada","Paid")+'</span>'+
-        '<button class="aj-inv-dl" data-act="noop">'+L("Descargar","Download")+'</button></div>';
+        '<button class="aj-inv-dl" data-act="aj-invoice">'+L("Descargar","Download")+'</button></div>';
     }).join("");
     return '<div class="aj-stack">'+
       '<div class="aj-plan-grid">'+
@@ -5295,10 +5297,11 @@
     if(act==="ed-close"){ S.view="feed"; S.tab="guiones"; S.activeGuionId=null; return render(); }   // v3 editor → vuelve a Guiones
     // v3 Ajustes (página isla)
     if(act==="set-tab"){ S.setTab=k; return render(); }
-    if(act==="set-tone"){ ajustesInit(); S.setTones[k]=!S.setTones[k]; return render(); }
+    if(act==="aj-tone"){ ajustesInit(); S.setTones[k]=!S.setTones[k]; return render(); }   // Ajustes (set-tone colisionaba con el selector de tono del Cerebro)
     if(act==="set-pref"){ ajustesInit(); S.setPrefs[k]=!S.setPrefs[k]; return render(); }
     if(act==="ajustes-edit"){ return openLegacy("settings"); }   // perfil/cuenta real → ajustes legacy
     if(act==="ajustes-save-voice"){ showToast(L("Voz guardada — tus próximos guiones salen con este tono.","Voice saved — your next scripts come out in this tone.")); return; }
+    if(act==="aj-invoice"){ showToast(L("Descarga de facturas disponible en producción.","Invoice download available in production.")); return; }
     if(act==="noop"){ return; }
     if(act==="ed-usehook"){ var eg=guionById(id); var ei=parseInt(btn.getAttribute("data-i"),10); if(eg&&eg.hooks&&eg.hooks[ei]!=null){ var prev=eg.hook; eg.hook=eg.hooks[ei]; eg.hooks[ei]=prev; if(eg.title===prev) eg.title=eg.hook; } return render(); }   // v3: elegir variante de gancho
     if(act==="gui-duplicate"){ var gd=guionById(id); if(gd){ var nid=addGuion({title:gd.title,hook:gd.hook,beats:(gd.beats||[]).slice(),close:gd.close,hooks:(gd.hooks||[]).slice(),from:gd.from,type:gd.type}); var ng=guionById(nid); if(ng){ ng.mult=gd.mult||gd.fromMult; } render(); showToast(L("Guion duplicado — listo para retocar.","Script duplicated — ready to tweak.")); } return; }
