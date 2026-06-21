@@ -1041,6 +1041,15 @@ def credits_available(profile: dict) -> int:
     return monthly_rem + topup
 
 
+def _plan_mrr_cents(plan: str) -> int:
+    """MRR mensual del plan en céntimos. Lo adjuntamos a subscription_upgraded para
+    que el panel (becama-panel) pueda sumar el MRR de expansión por upgrade."""
+    try:
+        return int((PLANS.get(plan, {}).get("price_month_eur") or 0) * 100)
+    except Exception:
+        return 0
+
+
 # ── Free MENSUAL (reverse-trial) ─────────────────────────────────────────────
 # Tras el trial, el free resetea cada mes. Reusamos free_lifetime_uses (guiones)
 # y free_analysis_uses (análisis) como contadores del mes en curso; el boundary
@@ -1195,7 +1204,8 @@ def _on_signup_complete(user_id, lang):
             updates["lang"] = lang or "es"
         # reverse-trial: 7 días de Pro al registrarse (solo si no se fijó ya —
         # idempotente, no se extiende en re-llamadas).
-        if not existing.get("trial_ends_at"):
+        started_trial = not existing.get("trial_ends_at")
+        if started_trial:
             updates["trial_ends_at"] = (
                 datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)
             ).isoformat()
@@ -1211,6 +1221,9 @@ def _on_signup_complete(user_id, lang):
             logger.warning("send_email_now dispatch failed user=%s err=%s", user_id, e)
         # 4) growth-1: evento de funnel «registro» (server-side, fiable)
         track_event("user_registered", user_id, {"lang": lang or "es"})
+        # panel: inicio del reverse-trial (solo la 1ª vez que se fija el trial).
+        if started_trial:
+            track_event("trial_started", user_id, {"plan": "pro", "trial_days": TRIAL_DAYS})
     except Exception as e:
         # NUNCA romper el signup por errores en el flujo de email.
         logger.warning("_on_signup_complete failed user=%s err=%s", user_id, e)
@@ -2093,6 +2106,7 @@ def stripe_webhook():
             # growth-1: evento de funnel «upgrade» (conversión free→pago).
             track_event("subscription_upgraded", user_id, {
                 "plan": plan, "price_id": price_id,
+                "amount_cents": _plan_mrr_cents(plan),
             })
         else:
             # ── Recarga de créditos (topup) ──────────────────────────
@@ -2452,7 +2466,7 @@ def paddle_webhook():
                     logger.warning("[paddle] cols paddle_* ausentes (¿migración?), set solo plan", exc_info=True)
                     db.table("profiles").update(upd).eq("id", uid).execute()
                 grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
-                track_event("subscription_upgraded", uid, {"plan": plan, "price_id": price_id, "provider": "paddle"})
+                track_event("subscription_upgraded", uid, {"plan": plan, "price_id": price_id, "provider": "paddle", "amount_cents": _plan_mrr_cents(plan)})
             elif status in ("paused", "canceled"):
                 db.table("profiles").update({"plan": "free"}).eq("id", uid).execute()
 
@@ -2643,7 +2657,7 @@ def whop_webhook():
                     _upd["stripe_subscription_id"] = _mid
                 db.table("profiles").update(_upd).eq("id", uid).execute()
                 grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
-                track_event("subscription_upgraded", uid, {"plan": plan, "plan_id": plan_id, "provider": "whop"})
+                track_event("subscription_upgraded", uid, {"plan": plan, "plan_id": plan_id, "provider": "whop", "amount_cents": _plan_mrr_cents(plan)})
 
         elif action == "membership_deactivated":   # baja / fin de acceso → free
             if mapped and mapped["plan"] == "brand_addon":
@@ -8595,11 +8609,18 @@ def post_tracked_creator():
     # activación quedó completado (handle → competencia en el radar). Señal de
     # funnel server-side fiable; `source` distingue el onboarding del alta suelta.
     try:
-        if count_active_tracked(user["id"], scope="global") == 1:
+        _total_tracked = count_active_tracked(user["id"], scope="global")
+        if _total_tracked == 1:
             track_event("onboarding_completed", user["id"], {
                 "source": (body.get("source") or "manual"),
                 "first_creator": ig_username,
             })
+        # panel: cada alta de competidor (no solo la 1ª) → tile «competidores añadidos».
+        track_event("competitor_added", user["id"], {
+            "source": (body.get("source") or "manual"),
+            "creator": ig_username,
+            "total": _total_tracked,
+        })
     except Exception:
         pass
 

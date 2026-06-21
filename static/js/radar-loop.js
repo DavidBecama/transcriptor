@@ -444,6 +444,15 @@
       if(window.posthog && window.posthog.capture) window.posthog.capture(evt, p);
     }catch(e){}
   }
+  /* Captura genérica de producto (fuera del onboarding) para el panel becama.
+     No-op si posthog no está cargado; adjunta plan+demo de base. */
+  function rsTrack(evt, props){
+    try{
+      var p={ plan:(S.realPlan||(S.user&&S.user.plan)||null), demo:isDemo() };
+      if(props) for(var k in props) p[k]=props[k];
+      if(window.posthog && window.posthog.capture) window.posthog.capture(evt, p);
+    }catch(e){}
+  }
   function onbView(){ if(!S.onb._viewed) S.onb._viewed={}; if(!S.onb._viewed[S.onb.step]){ S.onb._viewed[S.onb.step]=1; onbTrack("onb_step_viewed"); } }
   function onbGoto(step){ S.onb.step=step; S.onb.error=null; render(); }
   function onbNext(){ var i=onbIdx(); onbTrack("onb_step_completed"); if(i<ONB_STEPS.length-1) onbGoto(ONB_STEPS[i+1]); }
@@ -3843,6 +3852,7 @@
      ════════════════════════════════════════════════════════════════ */
   function switchTab(t){
     if(S.legacy) _exitLegacy();   // salir de Analizar/Configuración al cambiar de tab
+    if(t==="metrics" && S.tab!=="metrics") rsTrack("metrics_viewed", {});   // panel: vista de Métricas
     S.tab=t; S.brandMenu=false; S.view="feed";
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: estados de la feed no sobreviven al cambio de tab
     // Vistas de marca (no macro/equipo) refrescan stats+feed de la marca activa.
@@ -4351,6 +4361,7 @@
   // Prod: persiste el estado de grabación del guion (PATCH /scripts/<id>). La isla
   // usa draft|recorded|discarded; el backend pending|recorded|discarded (draft→pending).
   function persistRecStatus(g){
+    if(g && g.status==="recorded") rsTrack("script_recorded", {script_id:(g&&g._sid)||null});   // panel: guion grabado
     if(isDemo() || !g || !g._sid) return;
     var rs=(g.status==="recorded")?"recorded":(g.status==="discarded"?"discarded":"pending");
     apiPatch("/scripts/"+encodeURIComponent(g._sid), {recording_status:rs});
@@ -5181,6 +5192,7 @@
         oppAvg=_lbHash(opp+"avg",40000,160000); mine=_lbHash((S.user.handle||"me")+"best",50000,190000);
       }
       S.versus={ opp:opp, youHandle:(brand().handle||S.user.handle||"tu_cuenta"), oppAvg:oppAvg, mine:mine };
+      rsTrack("versus_started", {opp:opp, mine:mine, opp_avg:oppAvg, beating:(mine>=oppAvg)});   // panel
       showToast(L("Objetivo fijado: supera la media de @"+opp+".","Goal set: beat @"+opp+"'s average."));
       return render();
     }
@@ -5193,7 +5205,7 @@
       showToast(L("¡Hecho! Te avisaremos en cuanto la comunidad esté lista.","Done! We'll let you know when the community is ready."));
       return render();
     }
-    if(act==="community-info"){ S.communityInfo=true; return render(); }   // abre mini-modal Comunidad
+    if(act==="community-info"){ rsTrack("community_info_opened", {from:"radar"}); S.communityInfo=true; return render(); }   // abre mini-modal Comunidad
     if(act==="ci-close"){ S.communityInfo=false; return render(); }
     if(act==="ci-stop") return;   // clic DENTRO del modal no lo cierra
     if(act==="rgal-scroll"){
