@@ -1787,6 +1787,49 @@ def delete_transcription(tid: int):
     return jsonify({"ok": True})
 
 
+# ── Feedback (menú de cuenta): reportar bug / pedir mejora ────────────────────
+# Recompensa: si el bug es real, se abonan créditos al confirmarlo (flujo manual
+# por ahora; ver TODO). La imagen viaja como dataURL base64 (igual que thumbnail_b64).
+@app.route("/api/feedback", methods=["POST"])
+@require_auth
+def submit_feedback():
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    ftype = str(body.get("type") or "bug")[:20]
+    text = str(body.get("text") or "").strip()[:4000]
+    page = str(body.get("page") or "")[:60]
+    plan = str(body.get("plan") or "")[:30]
+    image_b64 = body.get("image_b64") or None
+    if not text:
+        return jsonify({"ok": False, "error": "empty"}), 400
+    # Cap de imagen (~3.5 MB de base64); si se pasa, se descarta para no reventar la fila.
+    if image_b64 and (not isinstance(image_b64, str) or len(image_b64) > 3_600_000):
+        image_b64 = None
+    # 1) PostHog — siempre (el feedback queda consultable aunque la tabla no exista aún).
+    try:
+        track_event("feedback_submitted", uid, {
+            "type": ftype, "page": page, "plan": plan,
+            "length": len(text), "has_image": bool(image_b64),
+        })
+    except Exception:
+        pass
+    # 2) Persistencia best-effort en la tabla `feedback` (si existe). TODO(fable):
+    #    crear tabla `feedback` (user_id, type, text, page, plan, image_b64, status,
+    #    created_at) + flujo de revisión y abono de créditos al confirmar el bug.
+    try:
+        db.table("feedback").insert({
+            "user_id": uid, "type": ftype, "text": text,
+            "page": page, "plan": plan, "image_b64": image_b64, "status": "new",
+        }).execute()
+    except Exception as e:  # tabla ausente u otro fallo de persistencia → no rompe el envío
+        try:
+            app.logger.warning("feedback insert skipped: %s", e)
+        except Exception:
+            pass
+    return jsonify({"ok": True})
+
+
 # ── v0.14.7: refresh métricas Apify ──────────────────────────────────────────
 
 _metrics_refresh_cooldown: dict = {}  # (uid, tid) -> ts (last refresh)

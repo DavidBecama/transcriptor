@@ -3565,7 +3565,7 @@
      créditos si el bug es real. En prod → POST /api/feedback (fable lo cablea);
      en demo solo confirma con toast. Reusa el promptSheet (textarea + tipo). */
   function openFeedback(){
-    S.acctMenu=false;
+    S.acctMenu=false; S._fbImage=null;
     promptSheet({
       title: L("Enviar feedback","Send feedback"),
       label: L("¿Qué falla o qué te gustaría?","What's broken or what would you like?"),
@@ -3575,16 +3575,23 @@
       extraHTML:
         '<div class="fb-reward">'+IC.spark+'<span>'+L("Si reportas un <b>bug real</b> y lo confirmamos, te <b>recompensamos con créditos</b>.","If you report a <b>real bug</b> and we confirm it, you get <b>credits as a reward</b>.")+'</span></div>'+
         '<div class="field"><label class="field-label" for="rsFbType">'+L("Tipo","Type")+'</label>'+
-          '<select id="rsFbType" class="field-input"><option value="bug">'+L("Bug","Bug")+'</option><option value="idea">'+L("Idea o mejora","Idea or improvement")+'</option></select></div>',
-      readExtra: function(){ var s=document.getElementById("rsFbType"); return s?s.value:"bug"; },
+          '<select id="rsFbType" class="field-input"><option value="bug">'+L("Bug","Bug")+'</option><option value="idea">'+L("Idea o mejora","Idea or improvement")+'</option></select></div>'+
+        '<div class="field"><label class="field-label">'+L("Adjuntar captura (opcional)","Attach a screenshot (optional)")+'</label>'+
+          '<div class="fb-attach"><label class="fb-attach-btn">'+IC.plus+' '+L("Elegir imagen","Choose image")+
+            '<input type="file" id="rsFbImg" accept="image/*" onchange="try{window.RadarLoop.fbImage(this)}catch(e){}" hidden></label>'+
+            '<span class="fb-attach-name" id="rsFbImgName"></span></div>'+
+          '<div class="fb-attach-prev" id="rsFbImgPrev"></div></div>',
+      readExtra: function(){ var s=document.getElementById("rsFbType"); return {type:(s?s.value:"bug"), image:S._fbImage||null}; },
       submitLabel: L("Enviar","Send"),
       validate: function(v){ if(!v||v.trim().length<8) return L("Cuéntanos un poco más (mínimo 8 caracteres).","Tell us a bit more (min 8 characters)."); return null; },
-      onSubmit: function(v, type){ submitFeedback(v, type); }
+      onSubmit: function(v, extra){ submitFeedback(v, extra); }
     });
   }
-  function submitFeedback(text, type){
-    if(!isDemo()){ try{ apiPost("/api/feedback",{type:type, text:text, page:S.tab, plan:S.user.plan}); }catch(e){} }   // prod: fable cablea el endpoint
-    try{ if(window.posthog) window.posthog.capture("feedback_submitted",{type:type}); }catch(e){}
+  function submitFeedback(text, extra){
+    var type=(extra&&extra.type)||"bug", image=(extra&&extra.image)||null;
+    if(!isDemo()){ try{ apiPost("/api/feedback",{type:type, text:text, page:S.tab, plan:S.user.plan, image_b64:image}); }catch(e){} }
+    try{ if(window.posthog) window.posthog.capture("feedback_submitted",{type:type, has_image:!!image}); }catch(e){}
+    S._fbImage=null;
     showToast(type==="bug"
       ? L("¡Gracias! Si confirmamos el bug, te llegan créditos de regalo.","Thanks! If we confirm the bug, credits land in your account.")
       : L("¡Gracias por la idea! Las leemos todas.","Thanks for the idea! We read them all."));
@@ -5589,6 +5596,29 @@
       var q=(val||"").toLowerCase().replace(/^@+/,"");
       var rows=document.querySelectorAll("#radarRoot .gal-menu-row");
       for(var i=0;i<rows.length;i++){ var h=rows[i].getAttribute("data-handle")||""; rows[i].style.display=(h.indexOf(q)>=0)?"":"none"; }
-    }
+    },
+    // Feedback: lee la imagen adjunta, la REESCALA/comprime en canvas (máx 1280px,
+    // JPEG .8) → dataURL en S._fbImage; muestra nombre + miniatura. Sin re-render.
+    fbImage:function(input){
+      var f=input&&input.files&&input.files[0];
+      var nm=document.getElementById("rsFbImgName"), pv=document.getElementById("rsFbImgPrev");
+      if(!f || !/^image\//.test(f.type||"")){ S._fbImage=null; if(nm)nm.textContent=""; if(pv)pv.innerHTML=""; return; }
+      var rd=new FileReader();
+      rd.onload=function(){
+        var img=new Image();
+        img.onload=function(){
+          var max=1280, w=img.width||1, h=img.height||1;
+          if(w>max||h>max){ var s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+          try{ var c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); S._fbImage=c.toDataURL("image/jpeg",0.8); }
+          catch(e){ S._fbImage=rd.result; }
+          if(nm) nm.textContent=f.name;
+          if(pv) pv.innerHTML='<img src="'+S._fbImage+'" alt=""><button type="button" class="fb-attach-x" onclick="try{window.RadarLoop.fbClear()}catch(e){}">'+'×'+'</button>';
+        };
+        img.onerror=function(){ S._fbImage=null; };
+        img.src=rd.result;
+      };
+      rd.readAsDataURL(f);
+    },
+    fbClear:function(){ S._fbImage=null; var nm=document.getElementById("rsFbImgName"), pv=document.getElementById("rsFbImgPrev"), inp=document.getElementById("rsFbImg"); if(nm)nm.textContent=""; if(pv)pv.innerHTML=""; if(inp)inp.value=""; }
   };
 })();

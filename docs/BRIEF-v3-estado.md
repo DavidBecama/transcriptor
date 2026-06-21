@@ -55,6 +55,6 @@ Estado del rediseño **design system v3** (mockups de David). Pensado para que o
 
 ## 5. Notas de coordinación
 - **Lane de fable:** Métricas (datos reales IG) y todo lo de backend. El frontend v3 (`ed-*`, `guic-*`, `ce-*`, `mt-*`, `aj-*`, `tp-*`, `rgal-*`, `rdr-*`, `rk-*`, `fb-*`) es CSS nuevo aislado.
-- **Feedback (menú de cuenta):** nuevo `openFeedback`/`submitFeedback` (radar-loop.js) — sheet para reportar bug/idea con aviso de recompensa en créditos. En demo solo toast; en prod hace `POST /api/feedback {type,text,page,plan}` → **fable: crear ese endpoint** + flujo de revisión y abono de créditos al confirmar el bug.
+- **Feedback (menú de cuenta):** `openFeedback`/`submitFeedback` (radar-loop.js, sheet con textarea + tipo Bug/Idea + **adjuntar imagen** comprimida en cliente y enviada base64) + **endpoint creado** `POST /api/feedback` en `app.py` (`@require_auth`: hace `track_event` siempre + insert best-effort en tabla `feedback`). **FALTA fable:** (a) crear la **tabla `feedback`** (`user_id,type,text,page,plan,image_b64,status,created_at`) para que persista; (b) **flujo de revisión + abono de créditos** al confirmar el bug. En demo el front solo hace toast.
 - **NO** pushear skills privados (`C:\dev\_skills-privado\`). **NO** `git add -A` — añadir archivos concretos.
 - Real-mode escribe en la Supabase de **prod** → solo cuentas test, limpiar.
