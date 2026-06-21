@@ -24790,11 +24790,17 @@ async function logout() {
 
 // ── Topup ──────────────────────────────────────────────────────────────────
 function openTopup() {
-  if (!st.user) { openAuth("register"); return; }
-  document.getElementById("topupErr").classList.remove("on");
+  // En demo (sin login) mostramos la recarga igual (los packs son client-side).
+  if (!st.user && !window.__DEMO__) { openAuth("register"); return; }
+  const _e = document.getElementById("topupErr"); if (_e) _e.classList.remove("on");
   openModal("topupOverlay");
   loadTopupPacks();   // pinta los packs dinámicos (con caché en sesión)
 }
+// La isla (radar-loop.js) llama a estos por window.* → los exponemos explícitamente
+// (las function declarations ya están en el scope global; el alias es a prueba de bundlers).
+window.openTopupModal = openTopup;
+window.openTopup = openTopup;
+window.openUpgradeModal = openUpgradeModal;
 function pickTopup(el) {
   document.querySelectorAll(".topup-opt").forEach(o => o.classList.remove("on"));
   el.classList.add("on"); topupAmt = el.dataset.amt;
@@ -27626,6 +27632,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=73"></script>
+<script src="/static/js/radar-loop.js?v=74"></script>
 </body>
 </html>
