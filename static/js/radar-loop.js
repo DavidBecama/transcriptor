@@ -2919,6 +2919,11 @@
     // Durante el house tour NO montamos el 3D: su build bloquea el hilo y lagea la
     // transición a Cerebro. Queda el orb; se monta al abrir Cerebro de verdad (post-tour).
     var ov=document.querySelector('.tour-overlay'); if(ov && getComputedStyle(ov).display!=='none') return;
+    // v3: el orbe 3D vive OCULTO (el anillo del Cerebro es CSS/SVG; el stage está
+    // display:none). Si el stage no es visible (oculto o sin área), NO cargamos
+    // Three.js ni montamos el loop WebGL: rendería a un canvas invisible y satura la
+    // GPU/CPU sin beneficio (causa del "Cerebro pillado"). Si ya corría, lo paramos.
+    if(stage.offsetParent===null || stage.clientWidth===0 || stage.clientHeight===0){ pauseBrain3D(); return; }
     if(!brain3dEligible()){ _brain3dState=3; return; }
     if(_brain3dState===2){ if(window.RSBrain){ window.RSBrain.mount(stage, currentBrainState()); window.RSBrain.update(currentBrainState()); window.RSBrain.setOnAbsorb(onBrainAbsorb); } if(S._sigSeen==null) brainEmitSignals(); return; }
     if(_brain3dState===1) return;
