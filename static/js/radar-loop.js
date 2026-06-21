@@ -529,8 +529,14 @@
       body='<div class="onb-value-load"><span class="mini-spin" style="width:22px;height:22px;border-width:3px"></span> '+L("Radar en marcha — rastreando lo que petó en tu subnicho. En segundos lo tendrás en tu panel. Sigue y te espera ahí.","Radar running — tracking what blew up in your subniche. You'll have it in seconds. Keep going, it'll be waiting in your panel.")+'</div>';
     } else {
       var cards=(S.onb.valueReels||[]).map(function(r,i){
+        // Miniatura real del reel (thumb del subnicho); si no hay, gradiente + play.
+        var th=r.thumb||r.thumbnail_b64||r.thumbnail_url||null;
+        var thumbInner=th
+          ? '<img src="'+ESC(th)+'" alt="" loading="lazy">'
+          : '<div class="onb-vcard-ph" style="background:'+_galGrad(r.handle||String(i))+'">'+_icPlay+'</div>';
         return '<div class="onb-vcard onb-vcard--pick" data-act="onb-value-steal" data-i="'+i+'" role="button" tabindex="0" style="cursor:pointer">'+
-          '<div class="onb-vcard-top"><span class="ava bava">'+ESC(initialsOf(r.handle))+'</span><span class="onb-vcard-h">@'+ESC(r.handle)+'</span><span class="onb-vcard-x">'+IC.bolt+' '+ESC(r.mult)+'×</span></div>'+
+          '<div class="onb-vcard-thumb">'+thumbInner+'<span class="onb-vcard-x">'+IC.bolt+' '+ESC(r.mult)+'×</span></div>'+
+          '<div class="onb-vcard-top"><span class="ava bava">'+ESC(initialsOf(r.handle))+'</span><span class="onb-vcard-h">@'+ESC(r.handle)+'</span></div>'+
           '<div class="onb-vcard-cap">'+ESC(r.caption)+'</div>'+
           '<div class="onb-vcard-meta">'+IC.eye+' '+ESC(r.views)+' · '+ESC(r.tag)+'</div>'+
           '<div class="onb-vcard-steal" style="margin-top:10px;font-size:13px;font-weight:700;color:var(--rs-accent,#4f7cff);display:flex;align-items:center;gap:6px">'+IC.bolt+' '+L("Robar este","Steal this")+'</div>'+
@@ -791,11 +797,12 @@
   /* ── datos demo (para que el flujo sea clicable sin backend) ── */
   function onbDemoValueReels(){
     var subs=(S.onb.subniches||[]); var s=function(i){ return subs[i%Math.max(1,subs.length)]||S.onb.niche||"tu nicho"; };
+    var th=_demoThumbs()||[]; var pic=function(i){ return th.length?th[i%th.length]:null; };
     return [
-      {handle:"nicho_top1", mult:"5.8", views:"1,4 M", tag:"explota", caption:"El error de "+s(0)+" que todos cometen (y cómo evitarlo)"},
-      {handle:"creador_ref", mult:"3.2", views:"680 K", tag:"explota", caption:"Probé "+s(1)+" durante 30 días — esto pasó"},
-      {handle:"viral_"+_norm(s(0)).slice(0,5), mult:"2.6", views:"420 K", tag:"subiendo", caption:"3 trucos de "+s(0)+" que nadie te cuenta"},
-      {handle:"top_"+_norm(S.onb.niche||"nicho").slice(0,4), mult:"2.1", views:"310 K", tag:"subiendo", caption:"Por qué tu "+s(0)+" no funciona"}
+      {handle:"nicho_top1", mult:"5.8", views:"1,4 M", tag:"explota", caption:"El error de "+s(0)+" que todos cometen (y cómo evitarlo)", thumb:pic(0)},
+      {handle:"creador_ref", mult:"3.2", views:"680 K", tag:"explota", caption:"Probé "+s(1)+" durante 30 días — esto pasó", thumb:pic(1)},
+      {handle:"viral_"+_norm(s(0)).slice(0,5), mult:"2.6", views:"420 K", tag:"subiendo", caption:"3 trucos de "+s(0)+" que nadie te cuenta", thumb:pic(2)},
+      {handle:"top_"+_norm(S.onb.niche||"nicho").slice(0,4), mult:"2.1", views:"310 K", tag:"subiendo", caption:"Por qué tu "+s(0)+" no funciona", thumb:pic(3)}
     ];
   }
   function onbDemoComps(){
