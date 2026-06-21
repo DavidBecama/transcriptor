@@ -15182,7 +15182,7 @@
     <button class="modal-x" onclick="closeModal('upgradeOverlay')">✕</button>
     <p class="upgrade-slogan" data-i18n-es="Roba lo que funciona." data-i18n-en="Steal what works.">Roba lo que funciona.</p>
     <h2 data-i18n-es="Mejorar plan" data-i18n-en="Upgrade plan">Mejorar plan</h2>
-    <p data-i18n-es="Elige el plan que mejor se adapte. Cancela cuando quieras." data-i18n-en="Pick the plan that fits. Cancel anytime.">Elige el plan que mejor se adapte. Cancela cuando quieras.</p>
+    <p class="upgrade-sub" data-i18n-es="Elige el plan que mejor se adapte. Cancela cuando quieras." data-i18n-en="Pick the plan that fits. Cancel anytime.">Elige el plan que mejor se adapte. Cancela cuando quieras.</p>
     <div class="billing-toggle" data-host="upgradeOverlay" style="margin:8px auto 18px">
       <button type="button" class="billing-toggle-opt" data-cycle="month" onclick="setBillingCycle('month','upgradeOverlay')" data-i18n-es="Mensual" data-i18n-en="Monthly">Mensual</button>
       <button type="button" class="billing-toggle-opt on" data-cycle="year" onclick="setBillingCycle('year','upgradeOverlay')">
@@ -25391,7 +25391,10 @@ function openUpgradeModal(source) {
   try {
     var um = document.querySelector(".upgrade-modal");
     if (um) {
-      var uh = um.querySelector("h2"), up = um.querySelector("p");
+      // OJO: el 1er <p> del modal es .upgrade-slogan ("Roba lo que funciona.");
+      // el subtítulo es .upgrade-sub. Antes se cogía el slogan por error → se
+      // sobreescribía el eyebrow y quedaba duplicado con el subtítulo.
+      var uh = um.querySelector("h2"), up = um.querySelector(".upgrade-sub");
       var fromLimit = /free_limit|hazlo_mio|steal|guion|script/i.test(source || "");
       if (uh && up) {
         if (fromLimit) {
