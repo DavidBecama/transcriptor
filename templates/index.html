@@ -10593,6 +10593,16 @@
     .rs .mt-dur-bar { width:100%; border-radius:7px 7px 3px 3px; background:var(--surface-sunken); transform-origin:bottom; animation:mGrow .5s cubic-bezier(.16,1,.3,1); }
     .rs .mt-dur-bar.top { background:var(--brand-500,#2F5BFF); }
     .rs .mt-dur-l { font-size:11px; color:var(--text-tertiary); }
+    /* ganchos reales (aperturas de tus top reels) */
+    .rs .mt-hooks { display:flex; flex-direction:column; gap:10px; }
+    .rs .mt-hook { display:flex; align-items:center; gap:11px; }
+    .rs .mt-hook-rank { flex:none; width:22px; height:22px; border-radius:7px; background:var(--surface-sunken); color:var(--text-secondary); font-family:var(--font-mono); font-size:11px; display:flex; align-items:center; justify-content:center; }
+    .rs .mt-hook-tx { flex:1; font-size:13.5px; line-height:1.35; color:var(--text-primary); }
+    .rs .mt-hook-v { flex:none; font-size:11px; color:var(--text-tertiary); }
+    /* mejor momento real (franja + día ponderados por repros) */
+    .rs .mt-besttime { display:flex; flex-direction:column; gap:13px; }
+    .rs .mt-bt-line { font-size:13px; line-height:1.4; color:var(--text-secondary); margin:0; }
+    .rs .mt-bt-line b { color:var(--text-primary); }
     /* heatmap */
     .rs .mt-hm { display:flex; gap:10px; }
     .rs .mt-hm-rowl { display:flex; flex-direction:column; gap:6px; padding-top:24px; }
@@ -27636,6 +27646,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=75"></script>
+<script src="/static/js/radar-loop.js?v=76"></script>
 </body>
 </html>

@@ -203,6 +203,8 @@
       thumb: v.thumb||v.thumbnail_b64||v.thumbnail_url||null,
       dur: v.dur||durFmt(v.duration),
       date: v.date||relTime(v.published_at),
+      pubAt: v.pubAt||v.published_at||null,   // ISO crudo → tendencia por fecha + mejor hora (real)
+      tx: v.tx||v.transcription||null,        // transcript (Groq) si lo hay → ganchos reales
       top: !!(v.top || tag==="top"),
       viral: !!(v.viral || tag==="viral"),
       from_guion: v.from_guion||null, vsMedian: v.vsMedian||null
@@ -862,7 +864,8 @@
     if(isDemo()) return;
     if(!force && (S._lbReal || S._lbLoading)) return;
     S._lbLoading=true;
-    apiGet('/api/leaderboard').then(function(r){
+    var _pid=_pidOf(S.brandId);
+    apiGet('/api/leaderboard'+(_pid?('?project_id='+encodeURIComponent(_pid)):'')).then(function(r){
       S._lbLoading=false;
       if(r && r.ok && r.d){ S._lbReal=r.d; if(S.tab==="leaderboard") render(); }
     });
@@ -2146,6 +2149,51 @@
       '<p class="mt-pronto-p">'+L(es,en)+'</p></div>';
   }
   function _durSec(d){ var p=String(d||"").split(":"); return p.length===2 ? ((+p[0])*60+(+p[1])||0) : (+p[0]||0); }
+  // ── Reales desde el SCRAPE (Apify trae fecha+caption por reel) ──────────────
+  function _pubDate(v){ if(!v||!v.pubAt) return null; var d=new Date(String(v.pubAt).replace(" ","T")); return isNaN(d.getTime())?null:d; }
+  var _MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  var _MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  // TENDENCIA REAL: cada reel = una barra, ordenado por fecha de publicación, alto ∝ repros.
+  // NO es una curva de "plays por día" (eso es watch-time → Graph API); es repros por reel
+  // en el tiempo, 100% scrapeado. Necesita ≥2 reels con fecha; si no, "próximamente" honesto.
+  function _metTimeline(V){
+    var d=V.map(function(v){ return {v:v, t:_pubDate(v)}; }).filter(function(x){ return x.t; });
+    if(d.length<2) return _metPronto("En cuanto tenga ≥2 reels con fecha (los trae el scraping), aquí verás tus repros por reel a lo largo del tiempo.","Once I have ≥2 dated reels (the scrape provides it), you'll see your plays per reel over time.");
+    d.sort(function(a,b){ return a.t-b.t; });
+    d=d.slice(-14);   // últimos 14 reels publicados (cabe en la tarjeta)
+    var mx=Math.max.apply(null,d.map(function(x){return x.v.views||0;}).concat([1]));
+    var bars=d.map(function(x){ var vw=x.v.views||0, lab=x.t.getDate()+" "+(L(_MES,_MON)[x.t.getMonth()]);
+      return '<div class="mt-dur"><span class="mt-dur-v">'+fmtKM(vw)+'</span><div class="mt-dur-bar'+(vw===mx?" top":"")+'" style="height:'+Math.max(4,Math.round(vw/mx*100))+'%" title="'+ESC(lab)+'"></div><span class="mt-dur-l">'+ESC(lab)+'</span></div>'; }).join("");
+    return '<div class="mt-durs">'+bars+'</div>';
+  }
+  // MEJOR MOMENTO REAL: del timestamp de publicación de TUS reels, pondera por repros y
+  // saca la franja + el día que mejor te han rendido. No es un heatmap de audiencia online
+  // (eso es Graph API); es cuándo publicaste TÚ lo que más reprodujo. Necesita ≥3 con fecha.
+  function _metBestTime(V){
+    var d=V.map(function(v){ return {v:v, t:_pubDate(v)}; }).filter(function(x){ return x.t; });
+    if(d.length<3) return _metPronto("Con ≥3 reels con fecha te digo en qué franja y día publicaste lo que más rindió (sale del propio scraping).","With ≥3 dated reels I'll tell you which time-slot and day your best performers went out (from the scrape itself).");
+    var BK=[[0,6,"de madrugada","late night"],[6,12,"por la mañana","in the morning"],[12,15,"al mediodía","at midday"],[15,19,"por la tarde","in the afternoon"],[19,24,"por la noche","in the evening"]];
+    var DOW=L(["domingo","lunes","martes","miércoles","jueves","viernes","sábado"],["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]);
+    var bk=BK.map(function(){return 0;}), dw=[0,0,0,0,0,0,0];
+    d.forEach(function(x){ var vw=x.v.views||0, h=x.t.getHours(); dw[x.t.getDay()]+=vw;
+      for(var i=0;i<BK.length;i++){ if(h>=BK[i][0]&&h<BK[i][1]){ bk[i]+=vw; break; } } });
+    var bi=0; bk.forEach(function(val,i){ if(val>bk[bi]) bi=i; });
+    var di=0; dw.forEach(function(val,i){ if(val>dw[di]) di=i; });
+    var bmax=Math.max.apply(null,bk.concat([1]));
+    var bars=BK.map(function(b,i){ var top=(i===bi&&bk[i]>0); return '<div class="mt-dur"><span class="mt-dur-v">'+(bk[i]?fmtKM(bk[i]):"–")+'</span><div class="mt-dur-bar'+(top?" top":"")+'" style="height:'+Math.max(4,Math.round(bk[i]/bmax*100))+'%"></div><span class="mt-dur-l">'+L(b[2].replace(/^(de |por la |al )/,""),b[3].replace(/^(late |in the |at )/,""))+'</span></div>'; }).join("");
+    var line=L("Tus reels que más rindieron salieron <b>"+DOW[di]+"</b>, "+BK[bi][2]+".","Your best performers went out <b>"+DOW[di]+"</b>, "+BK[bi][3]+".");
+    return '<div class="mt-besttime"><p class="mt-bt-line">'+line+'</p><div class="mt-durs">'+bars+'</div></div>';
+  }
+  // GANCHOS REALES: la primera frase del caption (o transcript) de tus reels que más
+  // reprodujeron = los hooks que de verdad te funcionaron. Sin watch-time, sin inventar.
+  function _metHooks(V){
+    function opener(v){ var s=(v.tx||v.cap||"").replace(/\s+/g," ").trim(); if(!s) return ""; var cut=s.split(/(?<=[.?!…])\s/)[0]||s; if(cut.length>90) cut=cut.slice(0,88).replace(/\s\S*$/,"")+"…"; return cut; }
+    var top=V.slice().sort(function(a,b){ return (b.views||0)-(a.views||0); }).map(function(v){ return {o:opener(v), v:v}; }).filter(function(x){ return x.o; }).slice(0,3);
+    if(!top.length) return _metPronto("En cuanto lea el texto de tus reels (caption/transcripción) te enseño qué aperturas te rinden más.","Once I read your reels' text (caption/transcript) I'll show which openings perform best for you.");
+    return '<div class="mt-hooks">'+top.map(function(x,i){ return '<div class="mt-hook"><span class="mt-hook-rank">'+(i+1)+'</span>'+
+      '<span class="mt-hook-tx">«'+ESC(x.o)+'»</span>'+
+      '<span class="mt-hook-v mt-mono">'+fmtKM(x.v.views||0)+(x.v.vsMedian!=null?' · '+ESC(x.v.vsMedian)+'×':'')+'</span></div>'; }).join("")+'</div>';
+  }
   function metResumenHTML(){
     // DATOS REALES de tus vídeos publicados (metricVideos ← /metrics/videos). Lo que el
     // dato NO contiene (tendencia por fecha, audiencia IG, temas) → "próximamente" honesto,
@@ -2186,15 +2234,15 @@
       '<div class="mt-top-stat mt-top-mult"><div class="mt-mult">'+(v.vsMedian!=null?ESC(v.vsMedian)+"×":"–")+'</div><div class="mt-top-k">explota</div></div></div>'; }).join("");
     return '<div class="mt-stack">'+
       '<div class="mt-kpis">'+kpiH+'</div>'+
-      // tendencia por fecha: el dato de /metrics/videos no trae fecha → próximamente honesto
-      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Reproducciones · 14 días","Plays · 14 days")+'</span></div>'+_metPronto("La tendencia por día necesita la fecha de cada reel (insights de Instagram). En cuanto conecte ese dato, aquí verás la curva real.","Daily trend needs each reel's date (Instagram insights). Once connected, you'll see the real curve.")+'</div>'+
+      // tendencia REAL por fecha de publicación (el scrape trae el timestamp de cada reel)
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels en el tiempo","Your reels over time")+'</span><span class="mt-card-meta">'+L("repros por reel · por fecha","plays per reel · by date")+'</span></div>'+_metTimeline(V)+'</div>'+
       '<div class="mt-grid2">'+
         '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Desglose de interacción","Interaction breakdown")+'</span><span class="mt-card-meta">'+fmtKM(sInter)+' total</span></div><div class="mt-bars">'+engH+'</div></div>'+
         '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Duración óptima","Optimal length")+'</span><span class="mt-card-meta">'+L("repros medias · tus reels","avg plays · your reels")+'</span></div><div class="mt-durs">'+durH+'</div></div>'+
       '</div>'+
       '<div class="mt-grid2">'+
-        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Ganchos que funcionan","Hooks that work")+'</span></div>'+_metPronto("Analizo qué tipo de hook retiene mejor cuando tenga el watch-time de cada reel (insights de Instagram).","I'll analyze which hook retains best once I have each reel's watch-time (Instagram insights).")+'</div>'+
-        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos para publicar","Best times to post")+'</span></div>'+_metPronto("El mapa de horas necesita la fecha/hora de publicación de cada reel. Llega con los insights de Instagram.","The hours heatmap needs each reel's publish time. Coming with Instagram insights.")+'</div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Ganchos que funcionan","Hooks that work")+'</span><span class="mt-card-meta">'+L("aperturas de tus top reels","openers of your top reels")+'</span></div>'+_metHooks(V)+'</div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos para publicar","Best times to post")+'</span><span class="mt-card-meta">'+L("repros · tus publicaciones","plays · your posts")+'</span></div>'+_metBestTime(V)+'</div>'+
       '</div>'+
       '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels que más rinden","Your top-performing reels")+'</span><span class="mt-card-meta">'+V.length+' '+L("reels","reels")+'</span></div>'+topH+'</div>'+
     '</div>';
@@ -4961,7 +5009,7 @@
     var q=S.brandId?("?brand="+encodeURIComponent(S.brandId)):"";
     return Promise.all([
       fetch("/metrics/summary"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch("/api/metrics/insights",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch("/api/metrics/insights"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/metrics/videos"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
     ]).then(function(res){
       var met=res[0], ins=res[1], vids=res[2];
@@ -5481,10 +5529,10 @@
       top:{ title:"Llevo 3 semanas sin tocar mi bandeja", views:"1,4 M" },
       learned:["Tus reels de ~40s superan tu media de vistas","Abrir con pregunta te funciona (3 de tus mejores lo hacen)","Los hooks de «yo hice X y pasó Y» rinden 2,4× más que los de pregunta"],
       videos:[
-        { cap:"Llevo 3 semanas sin tocar mi bandeja…", views:1400000, likes:112000, comments:840, shares:31000, dur:"0:41", date:"hace 6 d", top:true, viral:true, from_guion:"Llevo 3 semanas sin tocar mi bandeja de entrada", vsMedian:5.8 },
-        { cap:"El prompt de 9 palabras que arregla ChatGPT", views:680000, likes:54000, comments:420, shares:12400, dur:"0:38", date:"hace 12 d", top:true, from_guion:"El prompt de 9 palabras que arregla ChatGPT", vsMedian:3.2 },
-        { cap:"Mi setup de creador en 2026 (tour)", views:90000, likes:5400, comments:80, shares:760, dur:"1:10", date:"hace 18 d" },
-        { cap:"3 automatizaciones que deberías tener ya", views:210000, likes:16000, comments:190, shares:3800, dur:"0:33", date:"hace 22 d", from_guion:"Automaticé mi facturación de freelance en una tarde", vsMedian:1.6 }
+        { cap:"Llevo 3 semanas sin tocar mi bandeja de entrada. Y no, no la estoy ignorando.", views:1400000, likes:112000, comments:840, shares:31000, dur:"0:41", date:"hace 6 d", pubAt:"2026-06-15T18:00:00", top:true, viral:true, from_guion:"Llevo 3 semanas sin tocar mi bandeja de entrada", vsMedian:5.8 },
+        { cap:"Hay 9 palabras que cambian por completo cómo te responde ChatGPT.", views:680000, likes:54000, comments:420, shares:12400, dur:"0:38", date:"hace 12 d", pubAt:"2026-06-09T20:30:00", top:true, from_guion:"El prompt de 9 palabras que arregla ChatGPT", vsMedian:3.2 },
+        { cap:"Mi setup de creador en 2026: cámara, luz y el truco del audio.", views:90000, likes:5400, comments:80, shares:760, dur:"1:10", date:"hace 18 d", pubAt:"2026-06-03T08:00:00" },
+        { cap:"El año pasado perdí 2.000€ en facturas que olvidé enviar. Este año, imposible.", views:210000, likes:16000, comments:190, shares:3800, dur:"0:33", date:"hace 22 d", pubAt:"2026-05-30T19:00:00", from_guion:"Automaticé mi facturación de freelance en una tarde", vsMedian:1.6 }
       ]
     };
   }
@@ -5493,6 +5541,7 @@
     var el=root(); if(!el) return;
     try{ window.RS_reloadRadar=loadBrandData; }catch(e){}   // puente: el chrome legacy recarga el Radar tras añadir competidor
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: al cambiar de marca no arrastres la vista de otro competidor
+    S._lbReal=null;   // ranking por-marca: fuerza recarga de /api/leaderboard de ESTA marca (no caché de la anterior)
     el.innerHTML=skeletonHTML();
     var q=S.brandId?("?brand="+encodeURIComponent(S.brandId)):"";
     // P0 aislamiento: el backend filtra por project_id ("brand" lo ignoraba) —
@@ -5503,7 +5552,7 @@
       fetch("/api/tracked-creators/reels"+(_pq?_pq+"&":"?")+"sort=explosion&limit=24",{credentials:"same-origin"}).then(function(r){return r.json();}).catch(function(){return{reels:[]};}),
       fetch("/metrics/summary"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/api/voice",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch("/api/metrics/insights",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch("/api/metrics/insights"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/metrics/videos"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       // Contenido REAL del usuario (solo prod): ideas guardadas + guiones persistidos.
       // /ideas y /scripts filtran por project_id (no por "brand"); la marca de la isla
