@@ -293,8 +293,8 @@
     return '<nav class="rail">'+
       '<img class="rail-logo" src="/static/img/branding/isotipo-128.png" srcset="/static/img/branding/isotipo-128.png 1x, /static/img/branding/isotipo-256.png 2x" alt="Reelscript">'+
       navTabs.map(function(t){return '<button class="rail-btn'+(S.tab===t[0]&&!S.legacy?" on":"")+'" data-act="tab" data-k="'+t[0]+'" data-tour="tab-'+t[0]+'">'+t[1]+'<span class="tip">'+t[2]+'</span></button>';}).join("")+
-      // Accesos a las secciones legacy reutilizadas (no son S.tab internos).
-      '<button class="rail-btn'+(S.legacy==="transc"?" on":"")+'" data-act="legacy" data-k="transc" aria-label="Analizar">'+IC.mic+'<span class="tip">Analizar</span></button>'+
+      // «Analizar» (transcribir un reel suelto) ya NO vive en el rail: se reubicó al
+      // Radar como acción «Analizar un reel» (junto a «Añadir reel»).
       '<button class="rail-btn'+(S.tab==="settings"&&!S.legacy?" on":"")+'" data-act="tab" data-k="settings" aria-label="Ajustes">'+IC.gear+'<span class="tip">Ajustes</span></button>'+
       // El spacer empuja el botón de cuenta al fondo del rail.
       '<span class="rail-spacer"></span>'+
@@ -952,6 +952,7 @@
     var bar='<div class="radar-addbar">'+
       '<button class="fchip ghost'+(S.addCompOpen?" on":"")+'" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
       '<button class="fchip ghost" data-act="add-reel">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
+      '<button class="fchip ghost" data-act="analyze-reel" title="'+L("Transcribe un reel suelto sin seguir a su autor","Transcribe a single reel without following its author")+'">'+IC.doc+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
       '<span style="flex:1"></span>'+
       '<button class="fchip ghost" data-act="refresh-radar" title="'+L("Busca lo nuevo de tus competidores","Check what\'s new from your competitors")+'">'+IC.repeat+' '+L("Actualizar radar","Refresh radar")+'</button>'+
     '</div>';
@@ -3526,6 +3527,18 @@
      onSubmit(v) recibe el valor ya validado. */
   function sheetHTML(){
     var sh=S.sheet; if(!sh) return '';
+    // Modo solo-lectura: sin input, solo extraHTML (p.ej. mostrar una transcripción)
+    // + un primario que cierra y un secundario opcional.
+    if(sh.readonly){
+      var innerR='<div class="sheet-body">'+
+        (sh.extraHTML||'')+
+        '<div class="sheet-actions">'+
+          (sh.secondaryLabel?'<button class="btn btn-md btn-secondary" data-act="sheet-secondary">'+ESC(sh.secondaryLabel)+'</button>':'')+
+          '<button class="btn btn-md btn-primary" data-act="sheet-close">'+ESC(sh.submitLabel||"Cerrar")+'</button>'+
+        '</div>'+
+      '</div>';
+      return overlayShellHTML(innerR, sh.title||"", "sheet-close", true, "sheet");
+    }
     var field = sh.multiline
       ? '<textarea class="field-textarea" id="rsSheetInput" rows="5" placeholder="'+ESC(sh.placeholder||"")+'">'+ESC(sh.initial||"")+'</textarea>'
       : '<input class="field-input" id="rsSheetInput" type="text" placeholder="'+ESC(sh.placeholder||"")+'" value="'+ESC(sh.initial||"")+'">';
@@ -3551,6 +3564,7 @@
     S.sheet={ title:opts.title, label:opts.label, placeholder:opts.placeholder, helper:opts.helper,
       multiline:!!opts.multiline, initial:opts.initial||"", submitLabel:opts.submitLabel,
       secondaryLabel:opts.secondaryLabel||null, extraHTML:opts.extraHTML||null,
+      readonly:!!opts.readonly,
       _validate:opts.validate||null, _readExtra:opts.readExtra||null,
       _onSubmit:opts.onSubmit||null, _onSecondary:opts.onSecondary||null, error:null };
     render();
@@ -4698,6 +4712,60 @@
       }
     });
   }
+  /* «Analizar un reel» (reubicación de la antigua página Analizar): transcribe un
+     reel suelto y MUESTRA el texto, SIN seguir al autor. Seguirlo es opcional
+     (botón secundario). Reusa /transcribe + poll /task (cero endpoints nuevos). */
+  var DEMO_REEL_TRANSCRIPT = "Si haces reels y no creces, no es por el algoritmo: es por el primer segundo. "+
+    "Mira esto. Los 3 ganchos que más retienen en tu nicho ahora mismo empiezan con una pregunta incómoda, "+
+    "un dato que rompe una creencia, o una promesa concreta con número. Coge cualquiera de los tres, ponle "+
+    "tu caso real detrás, y cierra pidiendo guardar el vídeo. Eso es todo. Guárdatelo y pruébalo en tu próximo reel.";
+  function analyzeReelOnly(){
+    promptSheet({
+      title:"Analizar un reel",
+      label:"URL del reel",
+      placeholder:"https://www.instagram.com/reel/…",
+      helper:isDemo()
+        ? "Pega la URL de un reel (Instagram/TikTok) y te muestro su transcripción. No sigue a su autor."
+        : "Transcribo el reel y te muestro el texto, sin seguir a su autor. Cuenta como 1 análisis.",
+      submitLabel:isDemo()?"Analizar":"Analizar · 1 análisis",
+      validate:function(v){ if(!/^https?:\/\/\S+\.\S+/i.test(v.trim())) return "Pega una URL válida (empieza por http)."; },
+      onSubmit:function(v){
+        if(isDemo()){ return showReelTranscript(DEMO_REEL_TRANSCRIPT, "nick_saraev"); }
+        analyzeReelGetText(v.trim());
+      }
+    });
+  }
+  function analyzeReelGetText(url){
+    showToast("Analizando el reel…");
+    apiPost("/transcribe",{url:url}).then(function(res){
+      if(!res.ok){ return showError((res.d&&res.d.error)||"No pude analizar el reel. Revisa el link."); }
+      var taskId=res.d&&res.d.task_id;
+      if(!taskId) return showError("No pude encolar el análisis. Inténtalo de nuevo.");
+      var tries=0;
+      (function poll(){
+        apiGet("/task/"+encodeURIComponent(taskId)).then(function(r){
+          var d=r.d||{};
+          if(d.state==="success"){ return showReelTranscript((d.text||"").trim(), d.username||null); }
+          if(d.state==="error") return showError(d.error||"El análisis falló. No se ha gastado tu análisis.");
+          if(++tries>48) return showError("El análisis está tardando demasiado. Inténtalo de nuevo en un rato.");
+          setTimeout(poll, 2500);
+        });
+      })();
+    });
+  }
+  function showReelTranscript(text, username){
+    if(!text){ return showToast("La transcripción salió vacía. Prueba con otro reel."); }
+    var box='<div class="field-label" style="margin-bottom:8px">'+L("Transcripción","Transcript")+'</div>'+
+      '<div class="analyze-tx">'+ESC(text)+'</div>';
+    promptSheet({
+      readonly:true,
+      title:L("Reel analizado","Reel analyzed"),
+      extraHTML:box,
+      submitLabel:L("Cerrar","Close"),
+      secondaryLabel: username?(L("Seguir a @","Follow @")+username):null,
+      onSecondary: username?function(){ _followAuthor(username); }:null
+    });
+  }
   /* A · «Añadir reel» REAL — encadena flujos que ya existen (cero endpoints nuevos):
        1. POST /transcribe — cobra 1 análisis free / crédito (backend = verdad; 402 = muro).
        2. poll GET /task/<id> — la task devuelve `username` (autor del reel).
@@ -5218,6 +5286,7 @@
     if(act==="gal-menu"){ S.galMenu=!S.galMenu; return render(); }   // desplegable «+N» de competidores que no caben
     if(act==="expand-feed"){ S.feedExpanded=true; return render(); }
     if(act==="add-reel") return addReelManual();
+    if(act==="analyze-reel") return analyzeReelOnly();
     // growth-2: onboarding de activación
     // onboarding v2 (7 pasos)
     if(act==="onb-handle-next") return onbHandleNext();

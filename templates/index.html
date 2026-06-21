@@ -9720,6 +9720,10 @@
     .rs .sheet-body .field-label { display:block; text-transform:none; letter-spacing:0; font-size:13.5px; font-weight:600; color:var(--text-primary); margin:0; }
     .rs .sheet-body .field-input, .rs .sheet-body .field-textarea { width:100%; }
     .rs .sheet-actions { display:flex; gap:10px; justify-content:flex-end; }
+    /* «Analizar un reel»: caja de transcripción (solo lectura, scrollable) */
+    .rs .analyze-tx { max-height:46vh; overflow-y:auto; white-space:pre-wrap; line-height:1.55;
+      font-size:14px; color:var(--text-secondary); background:var(--surface-overlay);
+      border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px; }
     .rs--mobile .sheet-body { padding:20px 16px; }
     /* generating */
     .rs .gen { height:100%; min-height:460px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:40px; text-align:center; }
@@ -27608,6 +27612,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=71"></script>
+<script src="/static/js/radar-loop.js?v=72"></script>
 </body>
 </html>
