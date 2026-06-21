@@ -3107,6 +3107,116 @@
         '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
       '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+conveyorHTML()+'</div>';
   }
+  /* v3 (mockup David · «Editor de guion»): overlay a pantalla completa con barra
+     propia (‹ Guiones · /editor · estado guardado · Copiar · Marcar grabado) y dos
+     columnas — documento editable (badge+fuente+mult, hook H1, barra IA, bloques
+     Gancho/Desarrollo/CTA, pie con duración + teleprónter) y rail derecho (reel
+     fuente, transcripción, variantes de gancho, Regenerar / Roba como un artista).
+     Edición inline persistida vía window.RadarLoop.editSave (onblur). */
+  function _wordCount(txt){ return (String(txt||"").trim().match(/\S+/g)||[]).length; }
+  function scriptEditorHTML(){
+    var g=(S.activeGuionId && guionById(S.activeGuionId))||null;
+    var r=S.reel||{};
+    var s=g?{hook:g.hook||"",beats:g.beats||[],close:g.close||""}:((r.script)||{hook:"",beats:[],close:""});
+    var gid=g?g.id:"";
+    var title=(g&&g.title)||s.hook||L("Tu guión","Your script");
+    var handle=(g&&g.from)?String(g.from).replace(/^@/,""):((r.creator&&r.creator.handle)||"");
+    var mult=(g&&(g.mult||g.fromMult))||r.explosionTxt||null;
+    var multTxt=mult?(String(mult).replace(/×\s*$/,"")+"×"):"";
+    var when=r.when||(g&&g.when)||"";
+    var rec=!!(g&&g.status==="recorded");
+    // bloques editables (contenteditable → editSave onblur)
+    var develop=(s.beats||[]).join("\n");
+    var blocks=[
+      [L("Gancho · primeros 3 s","Hook · first 3 s"),"hook",s.hook],
+      [L("Desarrollo","Body"),"develop",develop],
+      [L("CTA · cierre","CTA · close"),"close",s.close]
+    ];
+    var blocksH=blocks.map(function(b){
+      return '<div class="ed-block">'+
+        '<div class="ed-block-head"><span class="ed-block-k">'+ESC(b[0])+'</span>'+
+          '<button class="ed-rewrite" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.repeat+' '+L("Reescribir","Rewrite")+'</button></div>'+
+        '<p class="ed-block-body" contenteditable="true" spellcheck="false"'+(gid?' onblur="try{window.RadarLoop.editSave(\''+ESC(gid)+'\',\''+b[1]+'\',this.innerText)}catch(e){}"':'')+'>'+ESC(b[2]||"")+'</p>'+
+      '</div>';
+    }).join("");
+    // barra IA
+    var ai=[["Acortar",IC.arrL],["Más gancho",IC.spark],["Cambiar tono",IC.layers],["Más ejemplos",IC.plus]];
+    var aiH=ai.map(function(a){ return '<button class="ed-ai" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+a[1]+' '+L(a[0],a[0])+'</button>'; }).join("");
+    // rail · fuente
+    var th=_demoThumbs(); var thumb=(th&&th.length)?th[0]:null;
+    var thumbInner=thumb?'<img src="'+ESC(thumb)+'" alt="" loading="lazy">':'<div class="ed-src-ph" style="background:'+_galGrad(gid||handle||"src")+'"></div>';
+    var srcPanel = handle ? ('<div class="ed-rail-block">'+
+      '<span class="ed-rail-k">'+L("› fuente","› source")+'</span>'+
+      '<div class="ed-src">'+
+        '<div class="ed-src-thumb">'+thumbInner+
+          (multTxt?'<span class="ed-src-mult">'+IC.bolt+' '+ESC(multTxt)+'</span>':'')+
+          '<span class="ed-src-play">'+_icPlay+'</span>'+
+          (r.dur?'<span class="ed-src-dur">'+ESC(r.dur)+'</span>':'')+
+        '</div>'+
+        '<div class="ed-src-info"><span class="ed-src-meta">@'+ESC(handle)+(when?' · '+ESC(when):'')+'</span>'+
+          '<div class="ed-src-stats">'+
+            (r.views?'<div><div class="ed-src-v">'+ESC(r.views)+'</div><div class="ed-src-l">views</div></div>':'')+
+            (r.likes?'<div><div class="ed-src-v">'+ESC(r.likes)+'</div><div class="ed-src-l">likes</div></div>':'')+
+          '</div>'+
+          (r.id?'<button class="btn btn-sm btn-secondary" data-act="reel-original" data-id="'+ESC(r.id)+'">'+L("Ver original","View original")+'</button>':'')+
+        '</div>'+
+      '</div>'+
+    '</div>') : '';
+    // rail · transcripción
+    var txText=(S._tx&&S._tx.status==="ok"&&S._tx.text)?S._tx.text:(develop||"");
+    var txPanel = txText ? ('<div class="ed-rail-block"><span class="ed-rail-k">'+L("› transcripción detectada","› transcript detected")+'</span>'+
+      '<div class="ed-tx">'+ESC(txText)+'</div></div>') : '';
+    // rail · variantes de gancho
+    var variants=[]; variants.push(s.hook);
+    if(g&&g.hooks) g.hooks.forEach(function(h){ if(h&&variants.indexOf(h)<0) variants.push(h); });
+    variants=variants.filter(Boolean);
+    var varH=variants.map(function(h,i){
+      var sel=(i===0);
+      return '<button class="ed-var'+(sel?' on':'')+'"'+(gid&&i>0?' data-act="ed-usehook" data-id="'+ESC(gid)+'" data-i="'+(i-1)+'"':'')+'>'+
+        '<span class="ed-var-dot"></span><span class="ed-var-t">'+ESC(h)+'</span></button>';
+    }).join("");
+    var varPanel = variants.length ? ('<div class="ed-rail-block"><div class="ed-rail-head"><span class="ed-rail-title">'+L("Variantes de gancho","Hook variants")+'</span><span class="ed-rail-tag">'+L("tu voz","your voice")+'</span></div>'+varH+'</div>') : '';
+    var nWords=_wordCount(s.hook)+_wordCount(develop)+_wordCount(s.close);
+    var secs=Math.max(1,Math.round(nWords/2.5));
+    var recBtn=rec
+      ? '<button class="btn btn-md ed-rec-on" data-act="gui-toggle-rec" data-id="'+ESC(gid)+'">'+IC.check+' '+L("Grabado","Recorded")+'</button>'
+      : '<button class="btn btn-md btn-primary" data-act="'+(gid?'gui-toggle-rec':'record')+'"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.mic+' '+L("Marcar grabado","Mark recorded")+'</button>';
+    var copyTxt=[title,s.hook].concat(s.beats||[],[s.close]).filter(Boolean).join("\n\n");
+    return '<div class="overlay ed-overlay" role="dialog" aria-modal="true" aria-label="'+L("Editor de guion","Script editor")+'">'+
+      '<div class="ed-bar">'+
+        '<div class="ed-bar-l">'+
+          '<button class="ed-back" data-act="ed-close">'+IC.back+' '+L("Guiones","Scripts")+'</button>'+
+          '<span class="ed-crumb">/ '+L("editor","editor")+'</span>'+
+          '<span class="ed-save"><span class="ed-save-dot"></span>'+L("guardado","saved")+'</span>'+
+        '</div>'+
+        '<div class="ed-bar-r">'+
+          '<button class="btn btn-md btn-secondary" data-act="copy" data-txt="'+ESC(copyTxt)+'">'+IC.doc+' '+L("Copiar","Copy")+'</button>'+
+          recBtn+
+        '</div>'+
+      '</div>'+
+      '<div class="ed-body">'+
+        '<div class="ed-doc">'+
+          '<div class="ed-meta">'+
+            '<span class="ed-badge'+(rec?' done':'')+'">'+(rec?IC.check+' '+L("Grabado","Recorded"):L("Por grabar","To record"))+'</span>'+
+            (handle?'<span class="ed-from">'+IC.repeat+' '+L("Robado de","Stolen from")+' <b>@'+ESC(handle)+'</b></span>':'')+
+            (multTxt?'<span class="ed-mult">'+ESC(multTxt)+'</span>':'')+
+          '</div>'+
+          '<h1 class="ed-hook" contenteditable="true" spellcheck="false"'+(gid?' onblur="try{window.RadarLoop.editSave(\''+ESC(gid)+'\',\'title\',this.innerText)}catch(e){}"':'')+'>'+ESC(title)+'</h1>'+
+          '<div class="ed-aitools">'+aiH+'</div>'+
+          blocksH+
+          '<div class="ed-doc-foot"><span class="ed-count">~'+secs+' s '+L("al hablar","spoken")+' · '+nWords+' '+L("palabras","words")+'</span>'+
+            '<button class="btn btn-md btn-secondary" data-act="'+(gid?'gui-record':'record')+'"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.mic+' '+L("Modo teleprónter","Teleprompter mode")+'</button></div>'+
+        '</div>'+
+        '<div class="ed-rail">'+
+          srcPanel+txPanel+varPanel+
+          '<div class="ed-rail-cta">'+
+            '<button class="btn btn-lg btn-primary" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.bolt+' '+L("Regenerar guion","Regenerate script")+'</button>'+
+            '<button class="btn btn-md btn-secondary" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.repeat+' '+L("Roba como un artista","Steal like an artist")+'</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
   function formatResultHTML(kind){
     var r=S.reel,s=r.script||{hook:"",beats:[],close:""};
     var meta={hooks:["5 hooks, listos para elegir","Tu mismo guión empieza de 5 formas. Cambia el primero y cambia todo."],carousel:["Tu carrusel, slide a slide","Desliza para ver las tarjetas. La idea del reel, ahora también en feed."],linkedin:["Tu post de LinkedIn","Mismo ángulo, registro profesional. Otro público, cero esfuerzo extra."],x:["Tu hilo de X","El guión partido en tuits que encadenan. Copia y publica."],serie:["Tu serie de 3 está lista","Tres días de contenido que se sostienen entre sí. La semana resuelta."]}[kind]||["Listo",""];
@@ -3293,7 +3403,7 @@
     else if(S.tab==="team") html+=teamHTML();
     html+='</div>';  // /.work
     if(S.view==="gen") html+=overlayShellHTML(generatingHTML(S.genKind),"Trabajando…","close-feed",true);
-    else if(S.view==="script") html+=overlayShellHTML(scriptRevealHTML(),"Tu guión, en tu voz","close-feed",true);
+    else if(S.view==="script") html+=scriptEditorHTML();   // v3: editor completo (mockup David)
     else if(S.view==="result") html+=overlayShellHTML(formatResultHTML(S.resultKind),"Listo","back-script",false);
     else if(S.view==="perf") html+=overlayShellHTML(guiPerfHTML(),"Rendimiento del guion","close-feed",true);
     else if(S.view==="prompter") html+=teleprompterHTML();
@@ -4871,6 +4981,8 @@
     }
     if(act==="gui-record"){ var g=guionById(id); if(g){ S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; S.view="prompter"; render(); } return; }
     if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.view="script"; render(); } return; }   // v3 «Abrir guion» → editor
+    if(act==="ed-close"){ S.view="feed"; S.tab="guiones"; S.activeGuionId=null; return render(); }   // v3 editor → vuelve a Guiones
+    if(act==="ed-usehook"){ var eg=guionById(id); var ei=parseInt(btn.getAttribute("data-i"),10); if(eg&&eg.hooks&&eg.hooks[ei]!=null){ var prev=eg.hook; eg.hook=eg.hooks[ei]; eg.hooks[ei]=prev; if(eg.title===prev) eg.title=eg.hook; } return render(); }   // v3: elegir variante de gancho
     if(act==="gui-duplicate"){ var gd=guionById(id); if(gd){ var nid=addGuion({title:gd.title,hook:gd.hook,beats:(gd.beats||[]).slice(),close:gd.close,hooks:(gd.hooks||[]).slice(),from:gd.from,type:gd.type}); var ng=guionById(nid); if(ng){ ng.mult=gd.mult||gd.fromMult; } render(); showToast(L("Guion duplicado — listo para retocar.","Script duplicated — ready to tweak.")); } return; }
     if(act==="gui-toggle-rec"){ var g2=guionById(id); if(g2){ g2.status=(g2.status==="recorded")?"draft":"recorded"; if(g2.status==="recorded"&&S.stats) S.stats.stolen_today+=1; render(); showToast(g2.status==="recorded"?"Marcado como grabado.":"Vuelto a borrador."); persistRecStatus(g2); } return; }
     if(act==="gui-discard"){ var g3=guionById(id); if(g3){ g3.status="discarded"; S._lastDiscarded=id; render(); showToast("Descartado.","Deshacer","undo-discard"); persistRecStatus(g3); } return; }   // T9: descartar siempre con vuelta atrás
@@ -5100,6 +5212,16 @@
     },
     // T2: puente para que el CRUD legacy de asistentes (modal en index.html)
     // repinte la isla tras crear/editar/borrar. Seguro si la isla no está montada.
-    refresh:function(){ try{ render(); }catch(e){} }
+    refresh:function(){ try{ render(); }catch(e){} },
+    // v3 editor: persiste la edición inline (contenteditable onblur) sin re-render
+    // — preserva el cursor. Campos: title · hook · develop(→beats) · close.
+    editSave:function(gid,field,value){
+      var g=guionById(gid); if(!g) return;
+      value=(value==null?"":String(value)).replace(/ /g," ").trim();
+      if(field==="title") g.title=value;
+      else if(field==="hook") g.hook=value;
+      else if(field==="close") g.close=value;
+      else if(field==="develop") g.beats=value?value.split(/\n+/).map(function(x){return x.trim();}).filter(Boolean):[];
+    }
   };
 })();
