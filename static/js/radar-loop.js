@@ -305,7 +305,6 @@
     var tabName=({dashboard:"RADAR",ideas:"IDEAS",guiones:"GUIONES",metrics:"MÉTRICAS",leaderboard:"RANKING",brain:"CEREBRO",team:"EQUIPO"})[S.tab]||"";
     var crumb;
     crumb='<span class="crumb">/ '+tabName+'</span>';   // B3: sin portfolio/"Todas las marcas"
-    var streak=(S.user.streak>0)?'<span class="cmd-streak" title="Días seguidos creando">'+IC.spark+' Racha '+S.user.streak+'</span>':'';
     var demoToggle=isDemo()?'<div class="demo-plan" title="Solo demo: cambia de plan"><span class="dp-k">DEMO</span>'+
       '<button class="dp'+(S._demoFree===true?" on":"")+'" data-act="demo-plan" data-k="free">Free</button>'+
       '<button class="dp'+(!S._demoFree && S.plan==="creador"?" on":"")+'" data-act="demo-plan" data-k="creador">Creador</button>'+
@@ -317,10 +316,9 @@
       // T1 (IDI): captura de ideas siempre a mano, en cualquier vista de la isla.
       '<button class="cmd-idea" data-act="idea-capture" title="Apunta una idea — se desarrolla en Guiones" aria-label="Apunta una idea"><span class="cmd-idea-bulb">'+IC.bulb+'</span><span class="cmd-idea-t">Apunta una idea</span></button>'+
       demoToggle+
-      // Nivel del Cerebro como overlay persistente arriba del todo (en todas las
-      // páginas), estilo videojuego — pedido por David (Fathom 18/06). Centrado.
-      '<span class="cmd-brain-center">'+brainBadgeHTML()+'</span>'+
-      streak+
+      // v3 (mockup David): barra limpia — fuera el badge Cerebro y la Racha del
+      // command bar (el Cerebro sigue accesible por su pestaña). Solo queda el
+      // estado de plan/créditos a la derecha. demoToggle es solo-demo (no va a prod).
       pillStatHTML()+
     '</div>';
   }
