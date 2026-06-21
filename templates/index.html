@@ -8898,7 +8898,8 @@
       position: fixed; inset: 0; background: transparent;
       z-index: 10000; transition: opacity .25s;
     }
-    .tour-highlight { position: relative; z-index: 10001; border-radius: var(--rsm); }
+    .tour-highlight { position: relative; z-index: 10001; border-radius: var(--rsm); pointer-events: none; }   /* solo visual: no clicable; únicos botones funcionales = los del tutorial */
+    .tour-highlight.tour-clickable { pointer-events: auto; }   /* paso interactivo (hold): el botón resaltado SÍ recibe el clic (ej. «Roba la idea») */
     /* Spotlight: oscurece TODO menos el hueco del elemento (box-shadow gigante).
        Vive a nivel de body → inmune al stacking context del island, así lo de
        dentro queda a brillo real, no atenuado por la capa del tour. */
@@ -9621,7 +9622,7 @@
     /* whale */
     /* v3 mockup David — «Llena mi semana»: fila degradada, icono azul + chispa naranja,
        título Clash, píldora EN LOTE y CTA azul a la derecha. */
-    .rs .whale { position:relative; overflow:hidden; border-radius:20px; padding:22px; margin:18px 0 22px; background:linear-gradient(100deg, var(--surface-raised), var(--surface-sunken)); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:space-between; gap:18px; }
+    .rs .whale { position:relative; overflow:hidden; border-radius:20px; padding:22px 24px; margin:18px 0 22px; min-height:116px; background:linear-gradient(100deg, var(--surface-raised), var(--surface-sunken)); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:space-between; gap:18px; }
     .rs .whale .whale-l { display:flex; align-items:center; gap:18px; min-width:0; }
     .rs .whale .whale-ic { width:54px; height:54px; border-radius:15px; background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
     .rs .whale .whale-ic svg { width:24px; height:24px; color:#FF8A3D; fill:#FF8A3D; }
@@ -9633,14 +9634,14 @@
     .rs .whale .whale-sub b { color:var(--text-primary); font-weight:600; }
     .rs .whale > .btn { flex:none; }
     /* v3 mockup David — fila «progreso / cerebro» */
-    .rs .rcb { display:flex; align-items:center; gap:18px; padding:18px 20px; margin:18px 0 22px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:16px; }
-    .rs .rcb .rcb-ic { width:46px; height:46px; border-radius:13px; background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-    .rs .rcb .rcb-ic svg { width:22px; height:22px; color:#fff; }
+    .rs .rcb { display:flex; align-items:center; gap:18px; padding:22px 24px; margin:18px 0 22px; min-height:116px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:20px; }
+    .rs .rcb .rcb-ic { width:54px; height:54px; border-radius:15px; background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+    .rs .rcb .rcb-ic svg { width:24px; height:24px; color:#fff; }
     .rs .rcb .rcb-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:8px; }
     .rs .rcb .rcb-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .rs .rcb .rcb-lvl { font-size:12px; font-weight:600; color:var(--text-tertiary); }
     .rs .rcb .rcb-prog { font-family:var(--font-mono); font-size:11px; color:var(--brand-500,#2F5BFF); }
-    .rs .rcb .rcb-desc { font-size:14px; color:var(--text-secondary); max-width:560px; }
+    .rs .rcb .rcb-desc { font-size:14.5px; line-height:1.45; color:var(--text-secondary); max-width:560px; }
     .rs .rcb .rcb-desc b { color:var(--text-primary); font-weight:600; }
     .rs .rcb .rcb-bars { display:flex; gap:6px; margin-top:1px; }
     .rs .rcb .rcb-seg { width:48px; height:6px; border-radius:999px; background:var(--surface-sunken); }
@@ -9952,7 +9953,8 @@
       background:linear-gradient(160deg, color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)), var(--surface-raised));
       padding:32px 30px; box-shadow:var(--shadow-lg); }
     .rs .onb-box--wide { max-width:560px; }
-    .rs .onb-screen-inner:has(.onb-box--wide) { max-width:720px; }
+    /* todos los pasos al MISMO ancho (560): si el paso 4 ensancha el shell, la barra de
+       progreso crecía y se descentraba respecto a los demás pasos. */
     .rs .onb-box .btn-primary, .rs .onb-cta { width:100%; justify-content:center; margin-top:16px; }
     .rs .onb-row { display:flex; gap:10px; align-items:center; margin-top:18px; }
     .rs .onb-row .onb-cta { flex:1; margin-top:0; }
@@ -9982,9 +9984,11 @@
     .rs .onb-tags-ph { color:var(--text-tertiary); font-size:13.5px; align-self:center; }
     .rs .onb-tag { display:inline-flex; align-items:center; gap:5px; min-height:36px; padding:0 13px; border-radius:99px; border:1px solid var(--border-default); background:var(--surface-base); color:var(--text-secondary); font:inherit; font-family:var(--font-body); font-weight:600; font-size:13px; cursor:pointer; }
     .rs .onb-tag:hover { border-color:var(--brand-400); color:var(--text-primary); }
-    .rs .onb-tag.on { background:color-mix(in srgb, var(--brand-500) 18%, transparent); border-color:var(--brand-500); color:var(--brand-200); }
-    .rs[data-theme="light"] .onb-tag.on { color:var(--brand-700); }
+    .rs .onb-tag.on { background:var(--brand-500); border-color:var(--brand-500); color:#fff; }
+    .rs[data-theme="light"] .onb-tag.on { background:var(--brand-500); border-color:var(--brand-500); color:#fff; }
+    .rs .onb-tag.on:hover { color:#fff; border-color:var(--brand-500); }
     .rs .onb-tag b { font-weight:700; opacity:.7; }
+    .rs .onb-tag.on b { opacity:.85; color:#fff; }
     .rs .onb-tagadd { display:flex; align-items:center; gap:0; border:1.5px solid var(--border-strong); border-radius:13px; background:var(--surface-base); padding:0 6px 0 12px; margin-bottom:14px; }
     .rs .onb-tagadd:focus-within { border-color:var(--brand-500); }
     .rs .onb-hash { color:var(--text-tertiary); font-size:16px; font-weight:600; }
@@ -10270,15 +10274,16 @@
     /* hero row */
     .rs .ce-hero-row { display:flex; gap:24px; align-items:stretch; flex-wrap:wrap; }
     .rs .ce-hero { flex:1; min-width:360px; display:flex; align-items:center; gap:30px; padding:28px 32px; background:linear-gradient(120deg, var(--brand-50, rgba(47,91,255,.16)), var(--surface-raised)); border:1px solid var(--border-default); border-radius:20px; }
-    .rs .ce-ring { position:relative; width:172px; height:172px; flex:none; }
-    .rs .ce-ring-svg { transform:rotate(-90deg); }
+    .rs .ce-ring { flex:none; display:flex; flex-direction:column; align-items:center; gap:12px; }
+    .rs .ce-ring-circle { position:relative; width:172px; height:172px; }
+    .rs .ce-ring-svg { transform:rotate(-90deg); display:block; }
     .rs .ce-ring-prog { transition:stroke-dashoffset .6s cubic-bezier(.16,1,.3,1); filter:drop-shadow(0 0 7px var(--brand-50, rgba(47,91,255,.4))); }
-    .rs .ce-ring-c { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; }
-    .rs .ce-brain-svg { overflow:visible; }
+    .rs .ce-ring-c { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+    .rs .ce-brain-svg { overflow:visible; display:block; }
     .rs .ce-breathe { transform-box:fill-box; transform-origin:center; animation:ceBreathe 4s ease-in-out infinite; }
     .rs .ceN { transform-box:fill-box; transform-origin:center; animation:ceNode 2.6s ease-in-out infinite; }
-    .rs .ce-ring-lvl { font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; color:var(--text-tertiary); }
-    .rs .ce-ring-lvl b { font-family:var(--font-display); font-weight:700; font-size:18px; color:var(--text-primary); }
+    .rs .ce-ring-lvl { display:inline-flex; align-items:baseline; gap:7px; font-family:var(--font-mono); font-size:13px; letter-spacing:.08em; color:var(--text-tertiary); }
+    .rs .ce-ring-lvl b { font-family:var(--font-display); font-weight:700; font-size:24px; color:var(--text-primary); }
     .rs .ce-hero-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:10px; }
     .rs .ce-kicker { font-family:var(--font-accent); font-weight:700; font-size:14px; letter-spacing:.05em; color:var(--brand-500,#2F5BFF); text-transform:uppercase; }
     .rs .ce-hero-title { font-family:var(--font-display); font-weight:600; font-size:24px; line-height:1.2; color:var(--text-primary); }
@@ -10337,7 +10342,8 @@
     .rs--mobile .ce-stats { width:100%; } .rs--mobile .ce-grid, .rs--mobile .ce-missions-grid { grid-template-columns:1fr; }
     /* ── v3 mockup David · Editor de guion ─────────────────────────────── */
     @keyframes edShim { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-    .rs .ed-overlay { display:flex; flex-direction:column; padding:0; background:var(--surface-base, var(--bg, #090C15)); }
+    .rs .ed-overlay { position:fixed; top:0; right:0; bottom:0; left:64px; z-index:60; display:flex; flex-direction:column; padding:0; background:var(--surface-base, var(--bg, #090C15)); }
+    .rs--mobile .ed-overlay { left:0; }
     .rs .ed-bar { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 26px; border-bottom:1px solid var(--border-default); flex:none; }
     .rs .ed-bar-l { display:flex; align-items:center; gap:12px; min-width:0; flex-wrap:wrap; }
     .rs .ed-back { display:inline-flex; align-items:center; gap:7px; background:var(--surface-overlay); border:1px solid var(--border-default); border-radius:10px; padding:8px 13px; color:var(--text-secondary); font-family:inherit; font-weight:600; font-size:13.5px; cursor:pointer; }
@@ -10523,10 +10529,11 @@
     .rs .mt-kpi-spark { flex:none; }
     .rs .mt-kpi-d { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:var(--success-fg,#3FE0A0); }
     /* trend */
-    .rs .mt-trend { display:flex; align-items:flex-end; gap:8px; height:170px; }
-    .rs .mt-tb { flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; height:100%; justify-content:flex-end; }
+    .rs .mt-trend { display:flex; align-items:flex-end; gap:8px; height:190px; }
+    .rs .mt-tb { flex:1; display:flex; flex-direction:column; align-items:center; height:100%; }
+    .rs .mt-tb-col { width:100%; flex:1; min-height:0; display:flex; align-items:flex-end; }   /* línea base común: las barras se apoyan abajo, los números van debajo */
     .rs .mt-tb-fill { width:100%; border-radius:5px 5px 0 0; background:linear-gradient(180deg, var(--brand-300,#6E92FF), var(--brand-500,#2F5BFF)); transform-origin:bottom; animation:mGrow .5s cubic-bezier(.16,1,.3,1); }
-    .rs .mt-tb-l { font-size:10px; color:var(--text-tertiary); font-family:var(--font-mono); }
+    .rs .mt-tb-l { height:16px; line-height:16px; margin-top:8px; font-size:10px; color:var(--text-tertiary); font-family:var(--font-mono); }
     /* bars (engagement/hooks/temas/share/edad/ubic) */
     .rs .mt-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
     .rs .mt-grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; align-items:start; }
@@ -11156,9 +11163,9 @@
       color:var(--success-fg, #22c55e); border:1px solid color-mix(in srgb, var(--success-fg, #22c55e) 30%, transparent); background:color-mix(in srgb, var(--success-fg, #22c55e) 9%, transparent); }
     .rs .lb-momentum b { color:var(--success-fg, #22c55e); font-weight:800; }
     .rs .lb-note { font-size:12px; color:var(--text-tertiary); margin:0 2px 18px; }
-    .rs .feature { display:grid; grid-template-columns:210px 1fr 150px; border:1px solid var(--border-default); border-radius:20px; background:var(--surface-raised); box-shadow:var(--shadow-lg); overflow:hidden; margin-bottom:14px; max-height:460px; }
+    .rs .feature { display:grid; grid-template-columns:210px 1fr 150px; border:1px solid var(--border-default); border-radius:20px; background:var(--surface-raised); box-shadow:var(--shadow-lg); overflow:hidden; margin-bottom:14px; min-height:400px; max-height:560px; }
     /* Carrusel de 2-3 oportunidades (Fathom 18/06) */
-    .rs .opp-carousel { position:relative; margin-bottom:14px; }
+    .rs .opp-carousel { position:relative; margin-bottom:36px; }
     .rs .opp-track { display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth; -ms-overflow-style:none; scrollbar-width:none; }
     .rs .opp-track::-webkit-scrollbar { display:none; }
     /* Peek de la siguiente oportunidad: el slide deja asomar el borde del próximo → se
@@ -11217,16 +11224,22 @@
     .rs .feature-thumb .thumb-tag { position:absolute; left:12px; bottom:12px; z-index:2; color:rgba(255,255,255,.66); }
     .rs .feature-thumb .dur { position:absolute; right:12px; bottom:12px; z-index:2; }
     /* Cuerpo COMPACTO: hook + nota + CTA juntos, sin hueco muerto (nada de margin-top:auto). */
-    .rs .feature-main { padding:22px 24px; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:11px; }
-    .rs .feature-eyebrow { font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--brand-500); margin-bottom:0; display:flex; align-items:center; gap:9px; }
+    .rs .feature-main { padding:30px 34px; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:24px; }
+    .rs .feature-eyebrow { font-family:var(--font-body); font-size:12.5px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--brand-500); margin-bottom:0; display:flex; align-items:center; gap:9px; }
     .rs .feature-eyebrow .who { color:var(--text-tertiary); }
-    .rs .feature-cap { font-family:var(--font-display-2); font-weight:600; font-size:24px; line-height:1.15; letter-spacing:-.02em; color:var(--text-primary); margin:0; text-wrap:balance; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .rs .feature-cap { font-family:var(--font-display-2); font-weight:600; font-size:28px; line-height:1.2; letter-spacing:-.015em; color:var(--text-primary); margin:0; text-wrap:balance; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .rs .feature-sum { font-size:14px; line-height:1.5; color:var(--text-secondary); margin:0; max-width:54ch; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .rs .feature-why { display:flex; gap:9px; font-size:13px; line-height:1.45; color:var(--text-secondary); padding:10px 12px; border-radius:8px; background:var(--surface-overlay); border:1px solid var(--border-default); margin:0; }
+    .rs .feature-why { display:flex; gap:10px; font-size:14.5px; line-height:1.5; color:var(--text-secondary); padding:14px 16px; border-radius:13px; background:var(--surface-overlay); border:1px solid var(--border-default); margin:0; }
     .rs .feature-why svg { width:15px; height:15px; flex-shrink:0; color:#FF8A3D; margin-top:1px; }   /* v3 David: naranja = chispazo de explosión */
     .rs .feature-actions { display:flex; gap:10px; margin-top:2px; align-items:center; }
+    /* v3 mockup David — estrella «Guardar» junto a «Roba la idea»: cuadrado 48px, borde 3D */
+    .rs .feature-actions .iconbtn { width:48px; height:48px; flex:none; display:inline-flex; align-items:center; justify-content:center; background:var(--surface-overlay); border:1px solid var(--border-strong); border-bottom:3px solid var(--border-strong); border-radius:13px; color:var(--text-tertiary); cursor:pointer; transition:all .15s var(--ease); }
+    .rs .feature-actions .iconbtn:hover { color:var(--text-primary); border-color:var(--brand-500); }
+    .rs .feature-actions .iconbtn:active { transform:translateY(1px); border-bottom-width:1px; }
+    .rs .feature-actions .iconbtn.on { color:var(--warning, #FF8A3D); border-color:var(--warning, #FF8A3D); }
+    .rs .feature-actions .iconbtn svg { width:20px; height:20px; }
     .rs .feature-data { border-left:1px solid var(--border-default); padding:20px 18px; display:flex; flex-direction:column; justify-content:center; gap:14px; background:var(--surface-overlay); }
-    .rs .dmetric .dk { font-family:var(--font-mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-tertiary); }
+    .rs .dmetric .dk { font-family:var(--font-body); font-size:12px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--text-tertiary); }
     .rs .dmetric .dv { font-family:var(--font-mono); font-size:21px; font-weight:500; letter-spacing:-.02em; color:var(--text-primary); margin-top:5px; font-variant-numeric:tabular-nums; }
     .rs .dmetric.big .dv { font-size:38px; color:var(--brand-500); }
     .rs .dbar { height:4px; border-radius:9999px; background:var(--surface-base); overflow:hidden; margin-top:9px; } .rs .dbar i { display:block; height:100%; background:var(--success-fg); border-radius:9999px; }   /* v3 David: barra de explosión en verde */
@@ -11521,7 +11534,8 @@
     /* ── Reglas 1/2: la telemetría (mono) ya está en .eyebrow/.stat-v/.dur/.opp-count
        vía var(--font-mono); los labels van en Schibsted (var(--font-body)) por defecto.
        Reforzamos el carácter "detección" de la eyebrow y el contador en directo. ── */
-    .rs .eyebrow, .rs .opp-count, .rs .feature-eyebrow { font-family: var(--font-mono); letter-spacing:.02em; }
+    .rs .eyebrow, .rs .opp-count { font-family: var(--font-mono); letter-spacing:.02em; }
+    .rs .feature-eyebrow { font-family: var(--font-body); letter-spacing:0; }   /* v3 David: eyebrow oportunidad en frase, no mono */
     .rs .pip { background: var(--success); }
 
     /* ── CEREBRO · anillo circular del hero (mockup Cerebro.dc.html) ── */
@@ -11675,7 +11689,44 @@
     /* ── GALERÍAS de miniaturas + modal Comunidad (port de Leonard, restylado v3) ──
        Filas horizontales de tarjetas 9:16 (competencia) + teaser Comunidad con
        mini-modal animado. CSS ya en token-names v3 → adopta los valores del sistema. */
-    .rs .rgal { margin:8px 0 26px; }
+    .rs .rgal { margin:8px 0 26px; display:flex; flex-direction:column; gap:16px; }
+    /* v3 mockup David — «Competidores en el radar» (chips) + línea de galería + empty */
+    .rs .rgal-comps-head { display:flex; align-items:center; gap:14px; flex-wrap:nowrap; }
+    .rs .rgal-comps-t { font-size:13px; font-weight:600; color:var(--text-tertiary); flex:none; white-space:nowrap; }
+    /* tira de chips con scroll horizontal (caben 20+ competidores sin romper la fila) */
+    .rs .rgal-comps { flex:1; min-width:0; display:flex; align-items:center; gap:9px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; padding-bottom:2px; }
+    .rs .rgal-comps::-webkit-scrollbar { display:none; }
+    .rs .rgal-chip { flex:none; }
+    .rs .rgal-chip { display:inline-flex; align-items:center; gap:8px; padding:7px 13px; border-radius:999px; background:var(--surface-raised); border:1px solid var(--border-default); color:var(--text-secondary); font-family:inherit; font-weight:600; font-size:13.5px; cursor:pointer; transition:all .18s var(--ease); }
+    .rs .rgal-chip.on { background:var(--brand-50, rgba(47,91,255,.16)); border-color:var(--brand-500,#2F5BFF); color:var(--text-primary); }
+    .rs .rgal-chip-av { width:24px; height:24px; border-radius:999px; background:var(--surface-sunken); display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:10px; color:var(--text-secondary); }
+    .rs .rgal-chip-n { font-family:var(--font-mono); font-size:11px; color:var(--text-tertiary); }
+    /* v3 — desplegable «+N» de competidores con buscador */
+    .rs .rgal-more-wrap { position:relative; flex:none; }
+    .rs .rgal-morebtn { color:var(--text-secondary); }
+    .rs .rgal-morebtn.on { background:var(--surface-overlay); border-color:var(--border-strong); color:var(--text-primary); }
+    .rs .gal-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:40; width:280px; max-width:80vw; background:var(--surface-raised); border:1px solid var(--border-strong); border-radius:14px; box-shadow:0 18px 44px -18px rgba(0,0,0,.6); padding:10px; display:flex; flex-direction:column; gap:9px; }
+    .rs .gal-menu-search { width:100%; padding:9px 12px; border-radius:10px; background:var(--surface-overlay); border:1px solid var(--border-default); color:var(--text-primary); font-family:inherit; font-size:13.5px; outline:none; }
+    .rs .gal-menu-search:focus { border-color:var(--brand-500,#2F5BFF); }
+    .rs .gal-menu-list { display:flex; flex-direction:column; gap:3px; max-height:260px; overflow-y:auto; }
+    .rs .gal-menu-row { display:flex; align-items:center; gap:9px; width:100%; padding:8px 9px; border-radius:10px; background:transparent; border:none; cursor:pointer; font-family:inherit; font-size:13.5px; color:var(--text-secondary); text-align:left; transition:background .14s var(--ease); }
+    .rs .gal-menu-row:hover { background:var(--surface-overlay); color:var(--text-primary); }
+    .rs .gal-menu-row.on { background:var(--brand-50, rgba(47,91,255,.16)); color:var(--text-primary); }
+    .rs .gal-menu-h { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rs .rgal-add { flex:none; display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:999px; background:transparent; border:1px dashed var(--border-strong); color:var(--text-secondary); font-family:inherit; font-weight:600; font-size:13.5px; cursor:pointer; white-space:nowrap; }
+    .rs .rgal-add svg { width:14px; height:14px; }
+    .rs .rgal-galline-row { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .rs .rgal-galline { font-size:14px; color:var(--text-tertiary); }
+    .rs .rgal-galline b { color:var(--text-secondary); font-weight:600; }
+    .rs .rgal-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:48px; background:var(--surface-raised); border:1px dashed var(--border-strong); border-radius:18px; text-align:center; }
+    .rs .rgal-empty-h { font-family:var(--font-accent); font-weight:700; font-size:19px; color:var(--text-primary); }
+    .rs .rgal-empty-s { font-size:14px; color:var(--text-tertiary); }
+    /* v3 mockup David — pestañas de «Más señales» */
+    .rs .signals-head { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .rs .sig-tabs { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+    .rs .sig-tab { display:inline-flex; align-items:center; gap:6px; padding:9px 15px; border-radius:12px; background:transparent; border:1px solid var(--border-default); color:var(--text-secondary); font-family:inherit; font-weight:600; font-size:14px; cursor:pointer; transition:all .18s var(--ease); }
+    .rs .sig-tab.on { background:var(--surface-overlay); border-color:var(--border-strong); border-bottom:3px solid var(--border-strong); color:var(--text-primary); }
+    .rs .sig-tab svg { width:14px; height:14px; }
     .rs .rgal-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:13px; }
     .rs .rgal-t { font-family:var(--font-display); font-size:19px; font-weight:600; letter-spacing:-.015em; color:var(--text-primary); }
     .rs .rgal-sub { font-family:var(--font-body); font-size:12.5px; font-weight:500; color:var(--text-tertiary); margin-left:9px; }
@@ -25574,21 +25625,27 @@ const _TOUR_EN = (document.documentElement.lang || "es").toLowerCase().indexOf("
 //   awaitGone: 'sel' → avanza cuando ESE elemento desaparece (p.ej. al cerrar el reveal).
 const TOUR_STEPS = _TOUR_EN ? [
   { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "Your Radar. Every day I bring you the reels exploding in your niche, sorted by what deserves your next script." },
-  { tab: 'dashboard', target: '.feature',                    text: "Today's opportunity: the most explosive reel in your niche, with the why behind why it worked. You don't start from scratch." },
-  { tab: 'dashboard', target: '[data-act="steal"]',          text: "Try it 👇 Hit «Steal the idea» and I'll turn it into your first script — in your voice, ready to record.", hold: true, awaitEl: '.script-hook' },
-  {                   target: '.belt',                       text: "Done! From here you multiply your script: record it, steal the next signal… and it's already saved for you automatically." },
-  {                   target: '[data-act="close-feed"]',     text: "Close it whenever you like 👆 — your script is already waiting for you in Scripts.", hold: true, awaitGone: '.script-hook' },
-  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "And here it is — your first script, saved. Everything you steal lives here, ready to record and reuse." },
+  { tab: 'dashboard', target: '.feature',                    text: "Today's opportunity: the most explosive reel in your niche, with the why behind it. You don't start from scratch." },
+  { tab: 'dashboard', target: '.rgal',                       text: "Your competitors and their gallery: filter by whoever you want and open metrics + transcript for each reel." },
+  { tab: 'dashboard', target: '.feature [data-act="steal"]', text: "Try it 👇 Hit «Steal the idea» and I'll turn it into your first script — in your voice, ready to record.", hold: true, awaitEl: '.script-hook' },
+  {                   target: '.script-hook', ephemeral: true, noFrame: true, text: "This is the script I just created in your voice. From here you record it, regenerate it or turn it into other formats — and it auto-saves to Scripts." },
+  {                   target: '.chain[data-k="record"]', ephemeral: true, text: "«Record it now»: opens the teleprompter and you read it straight to camera — free." },
+  {                   target: '.chain[data-k="next"]',   ephemeral: true, text: "Or «Steal the next signal» without leaving: chain scripts back to back and keep the loop going." },
+  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "And here it is — your first script, saved. Everything you steal lives here, ready to record, edit and reuse." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Your Brain: it learns your voice. The more you create, the more the next one sounds like you. That's the moat." },
+  { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "The ranking: see how you stack up against other creators in your niche — and climb." },
   { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Metrics: see what's working on your account and double down. This is where the loop closes." },
 ] : [
   { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "Tu Radar. Cada día te traigo los reels que están explotando en tu nicho, ordenados por lo que merece tu próximo guion." },
   { tab: 'dashboard', target: '.feature',                    text: "Tu oportunidad de hoy: el reel más explosivo de tu nicho, con el porqué de por qué funcionó. No empiezas de cero." },
-  { tab: 'dashboard', target: '[data-act="steal"]',          text: "Pruébalo 👇 Pulsa «Roba la idea» y te lo convierto en tu primer guión — en tu voz, listo para grabar.", hold: true, awaitEl: '.script-hook' },
-  {                   target: '.belt',                       text: "¡Hecho! Desde aquí multiplicas tu guión: grábalo, roba la siguiente señal… y ya se ha guardado solo, automáticamente." },
-  {                   target: '[data-act="close-feed"]',     text: "Ciérralo cuando quieras 👆 — tu guión ya te espera en Guiones.", hold: true, awaitGone: '.script-hook' },
-  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Y aquí está: tu primer guión, ya guardado. Todo lo que robas vive aquí, listo para grabar y reutilizar." },
+  { tab: 'dashboard', target: '.rgal',                       text: "Tus competidores y su galería: filtra por quien quieras y abre métricas + transcripción de cada reel." },
+  { tab: 'dashboard', target: '.feature [data-act="steal"]', text: "Pruébalo 👇 Pulsa «Roba la idea» y te lo convierto en tu primer guión — en tu voz, listo para grabar.", hold: true, awaitEl: '.script-hook' },
+  {                   target: '.script-hook', ephemeral: true, noFrame: true, text: "Este es el guión que acabo de crear en tu voz. Desde aquí lo grabas, lo regeneras o lo conviertes en otros formatos — y se guarda solo en Guiones." },
+  {                   target: '.chain[data-k="record"]', ephemeral: true, text: "«Grábalo ahora»: abre el teleprónter y lo lees directo a cámara — gratis." },
+  {                   target: '.chain[data-k="next"]',   ephemeral: true, text: "O «Roba la siguiente señal» sin salir: encadenas guiones uno tras otro y el bucle no para." },
+  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Y aquí está: tu primer guión, ya guardado. Todo lo que robas vive aquí, listo para grabar, editar y reutilizar." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Tu Cerebro: aprende tu voz. Cuanto más creas, más tuyo suena lo siguiente. Ese es el moat." },
+  { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "El ranking: mira cómo vas frente a otros creadores de tu nicho — y sube posiciones." },
   { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Métricas: mira qué funciona en tu cuenta y dóblalo. Aquí se cierra el círculo." },
 ];
 
@@ -25630,7 +25687,9 @@ function startTour() {
   if (!tourOverlay) {
     tourOverlay = document.createElement("div");
     tourOverlay.className = "tour-overlay";
-    tourOverlay.addEventListener("click", skipTour);
+    // El clic fuera NO cierra el tour ni llega a la página: el overlay captura y traga
+    // los clics (solo funcionan los botones del propio tutorial). Evita bugs.
+    tourOverlay.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); });
     document.body.appendChild(tourOverlay);
   }
   tourOverlay.style.display = "block";
@@ -25668,14 +25727,28 @@ function renderTourStep() {
   const el = document.querySelector(step.target);
 
   // Remove previous highlight
-  document.querySelectorAll(".tour-highlight").forEach(e => e.classList.remove("tour-highlight"));
+  document.querySelectorAll(".tour-highlight").forEach(e => e.classList.remove("tour-highlight", "tour-clickable"));
 
   if (!el) { nextTourStep(); return; }
 
-  // Scroll INSTANTÁNEO (no smooth) → el rect es final ya, el spotlight cae en su
-  // sitio sin lag ni recuadro arrastrado.
-  el.scrollIntoView({ behavior: "auto", block: "center" });
-  el.classList.add("tour-highlight");
+  // Reset del fondo del overlay (en pasos normales el oscurecido lo da el spotlight).
+  if (tourOverlay) tourOverlay.style.background = step.noFrame ? "rgba(5,7,13,.55)" : "";
+
+  if (!step.noFrame) {
+    // Scroll INSTANTÁNEO (no smooth) → el rect es final ya, el spotlight cae en su
+    // sitio sin lag ni recuadro arrastrado. El contenedor (.scroll) tiene
+    // scroll-behavior:smooth, que animaría el scroll y haría que el foco se "recolocara";
+    // lo neutralizamos durante el salto.
+    const _sc = el.closest('.scroll, .oscroll');
+    const _prevSB = _sc ? _sc.style.scrollBehavior : "";
+    if (_sc) _sc.style.scrollBehavior = "auto";
+    el.scrollIntoView({ behavior: "auto", block: "center" });
+    if (_sc) _sc.style.scrollBehavior = _prevSB;
+    el.classList.add("tour-highlight");
+    // En pasos interactivos (hold) el elemento resaltado SÍ es clicable (el usuario
+    // pulsa el botón real, p.ej. «Roba la idea»); en los demás es solo visual.
+    if (step.hold) el.classList.add("tour-clickable");
+  }
 
   // Dots
   const dots = TOUR_STEPS.map((_, i) =>
@@ -25704,6 +25777,20 @@ function renderTourStep() {
   `;
   tourTooltip.style.display = "block";
 
+  // Paso SIN encuadre (noFrame): nada de spotlight; oscurecemos todo y dejamos el
+  // texto a un lado (centrado vertical en escritorio; bottom-sheet en móvil).
+  if (step.noFrame) {
+    if (tourSpotlight) tourSpotlight.style.display = "none";
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      tourTooltip.classList.add("on");
+      if (window.innerWidth >= 768) {
+        tourTooltip.style.left = "140px";
+        tourTooltip.style.top = Math.max(20, Math.round((window.innerHeight - tourTooltip.offsetHeight) / 2)) + "px";
+      } else { tourTooltip.style.top = ""; tourTooltip.style.left = ""; }
+    }));
+    return;
+  }
+
   // Arranca la espera de acción para los pasos interactivos. Además, en cuanto el
   // usuario PULSA el target (crear / cerrar), ocultamos el foco AL INSTANTE — sin
   // esperar al poll ni al tracking — para que no quede el recuadro flotando.
@@ -25729,8 +25816,12 @@ function renderTourStep() {
     var t0 = performance.now();
     (function track() {
       if (!tourActive || tourHoldFocusHidden) { tourTrackRaf = 0; return; }   // acabó o ya actuó → no repintes el oscurecido
-      positionSpotlight(el); positionTooltip(el);
-      if (performance.now() - t0 < 1000) tourTrackRaf = requestAnimationFrame(track);
+      // Re-consultar el target cada frame: páginas pesadas (Cerebro) re-renderizan
+      // y reemplazan el nodo → el «el» capturado quedaría obsoleto (rect 0,0 → spotlight
+      // arriba a la izquierda). Con la re-consulta el foco sigue al nodo vivo.
+      var cur = document.querySelector(step.target);
+      if (cur) { cur.classList.add("tour-highlight"); if (step.hold) cur.classList.add("tour-clickable"); positionSpotlight(cur); positionTooltip(cur); }
+      if (performance.now() - t0 < 1500) tourTrackRaf = requestAnimationFrame(track);
       else tourTrackRaf = 0;
     })();
   }));
@@ -25788,7 +25879,12 @@ function nextTourStep() {
 
 function prevTourStep() {
   if (tourStep <= 0) return;
-  tourStep--;
+  // «Atrás» salta los pasos efímeros/interactivos (robar la idea, el guión recién
+  // creado): su ventana ya no existe al volver, así que retrocede hasta el último
+  // paso estable (p.ej. competidores).
+  let i = tourStep - 1;
+  while (i > 0 && (TOUR_STEPS[i].hold || TOUR_STEPS[i].ephemeral)) i--;
+  tourStep = i;
   showTourStep();
 }
 
@@ -25797,18 +25893,19 @@ function skipTour() {
   endTour();
 }
 
-// Brief David v3: el house tour se cierra con Esc (además del botón «Saltar» y del
-// clic fuera). Listener único; solo actúa si el tour está activo.
+// El house tour NO se cierra con Esc (decisión usuario): solo con los botones del
+// propio tutorial (Saltar / Listo). Mientras está activo, Esc se traga para que no
+// cierre overlays de debajo por accidente.
 document.addEventListener("keydown", function (e) {
-  if (e.key === "Escape" && tourActive) { e.preventDefault(); skipTour(); }
-});
+  if (e.key === "Escape" && tourActive) { e.preventDefault(); e.stopPropagation(); }
+}, true);
 
 function endTour() {
   tourActive = false;
   clearHoldWatch();
   if (tourTrackRaf) { cancelAnimationFrame(tourTrackRaf); tourTrackRaf = 0; }   // mata el tracking → no deja el oscurecido pegado
   document.querySelectorAll(".tour-highlight").forEach(e => e.classList.remove("tour-highlight"));
-  if (tourOverlay) { tourOverlay.style.pointerEvents = ""; tourOverlay.style.display = "none"; }
+  if (tourOverlay) { tourOverlay.style.pointerEvents = ""; tourOverlay.style.background = ""; tourOverlay.style.display = "none"; }
   if (tourTooltip) { tourTooltip.classList.remove("on"); tourTooltip.style.display = "none"; }
   if (tourSpotlight) tourSpotlight.style.display = "none";
   localStorage.setItem("onboarding_completed", "true");
@@ -25820,6 +25917,12 @@ function endTour() {
 // [data-act="steal"], .searchbox). Si algún target no existe en esa vista, showTourStep
 // hace skip automático (if(!el) nextTourStep()), así que el arranque es robusto.
 window.addEventListener("DOMContentLoaded", () => {
+  // Probar SOLO el tutorial: añade ?tour=1 a la URL → lo lanza directo (ignora el
+  // onboarding y el flag de completado). Útil para QA del propio tour.
+  if (/[?&]tour=1\b/.test(location.search)) {
+    setTimeout(() => { if (document.querySelector('#radarRoot .rail')) startTour(); }, 1500);
+    return;
+  }
   if (document.body.classList.contains("workspace") && !localStorage.getItem("onboarding_completed")
       && !/headless/i.test(navigator.userAgent)) {   // headless (harness) → no auto-tour, no interfiere
     // No arrancar si el onboarding v2 está en pantalla: el island lo dispara al
@@ -27425,6 +27528,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=47"></script>
+<script src="/static/js/radar-loop.js?v=64"></script>
 </body>
 </html>

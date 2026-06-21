@@ -173,7 +173,10 @@ async function main() {
     var work=document.querySelector('#radarRoot .work'); if(!work) return {err:'no work'};
     var fold=window.innerHeight;
     var prim=[].slice.call(work.querySelectorAll('.btn-primary')).filter(function(b){
-      var r=b.getBoundingClientRect(); return r.top < fold && r.bottom > 0 && r.width>0;
+      var r=b.getBoundingClientRect();
+      // visible de verdad: dentro del fold vertical Y horizontal (los slides 2/3 del
+      // carrusel de oportunidades están desplazados fuera de pantalla a la derecha).
+      return r.top < fold && r.bottom > 0 && r.width>0 && r.left < window.innerWidth && r.right > 0;
     });
     return { n: prim.length, labels: prim.map(function(b){return b.textContent.trim();}) };
   })()`);
@@ -360,13 +363,12 @@ async function main() {
   const backH = await evaluate(`(function(){ var b=document.querySelector('#radarRoot .overlay .obar .back'); return b?Math.round(b.getBoundingClientRect().height):0; })()`);
   check("móvil: botón cerrar/volver de overlay ≥44px", backH >= 44, String(backH));
   await key("Escape"); await sleep(2000);   // deja resolver el robo demo en background
-  // Fix review (T8): tabs de marca en agencia móvil ≥44px.
+  // v3 (mockup David): los tabs de marca se quitaron del Radar; el cambio de marca
+  // vive en el selector de la barra superior (.brand-switch). Comprobamos que existe
+  // y es target táctil ≥44px en agencia móvil.
   await nav(`${BASE}/profile/radar?plan=agencia&b=b1`);
-  const btabs = await evaluate(`(function(){
-    return [].slice.call(document.querySelectorAll('#radarRoot .btab')).slice(0,5)
-      .map(function(b){ return Math.round(b.getBoundingClientRect().height); });
-  })()`);
-  check("móvil agencia: tabs de marca ≥44px", btabs.length > 0 && btabs.every((h) => h >= 44), JSON.stringify(btabs));
+  const bsw = await evaluate(`(function(){ var b=document.querySelector('#radarRoot .brand-switch'); return b?Math.round(b.getBoundingClientRect().height):0; })()`);
+  check("móvil agencia: selector de marca ≥44px", bsw >= 44, String(bsw));
   await send("Emulation.clearDeviceMetricsOverride", {}, sid);
 
   console.log(`\n═══ RESULTADO: ${passed} ✓ · ${failed} ✗ ═══`);

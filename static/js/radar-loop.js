@@ -555,7 +555,7 @@
     }
     var ready=!S.onb.ahaLoading && S.onb.ahaScript;
     var row = ready
-      ? '<div class="onb-row"><button class="btn btn-ghost" data-act="onb-value-reset">← '+L("Elegir otro","Pick another")+'</button><button class="btn btn-lg btn-primary onb-cta" data-act="onb-value-next">'+IC.arr+' '+L("Sigamos — guárdalo y a por más","Let's go — save it and grab more")+'</button></div>'
+      ? '<div class="onb-row"><button class="btn btn-ghost" data-act="onb-value-reset">← '+L("Elegir otro","Pick another")+'</button><button class="btn btn-lg btn-primary onb-cta" data-act="onb-value-next">'+IC.arr+' '+L("Sigamos","Let's go")+'</button></div>'
       : '';
     return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Tu primer guión","Your first script")+'</div>',
       L("Esto ya es tuyo. Tu primer guion, en 1 clic.","This is yours now. Your first script, in 1 click."),
@@ -582,7 +582,7 @@
     var nPick=(S.onb.competitors||[]).filter(function(c){return c.picked;}).length;
     // Cargando → SIN botón de avanzar (solo Atrás): no aparece antes que los resultados.
     var compCta=S.onb.compLoading ? ''
-      : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick+" y seguir","Follow "+nPick+" and continue")+'</button>';
+      : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick,"Follow "+nPick)+'</button>';
     return onbCardWrap(onbEyebrow(L("a quién vigilamos","who to watch")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
       L("Los que más explotan en tu nicho. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
       body+onbErr()+
@@ -636,8 +636,7 @@
     var dots=ONB_STEPS.map(function(s,n){ return '<span class="onbp-dot'+(n<=i?" on":"")+'"></span>'; }).join("");
     return '<div class="onb-screen"><div class="onb-screen-bg" aria-hidden="true"></div>'+
       '<div class="onb-screen-inner">'+
-        '<div class="onb-top"><span class="onb-logo">'+IC.bolt+' ReelScript</span>'+
-          (i>0&&S.onb.step!=="close"?'<button class="onb-skip-top" data-act="onb-skip">'+L("Saltar configuración","Skip setup")+'</button>':'')+'</div>'+
+        '<div class="onb-top"><span class="onb-logo">'+IC.bolt+' ReelScript</span></div>'+
         '<div class="onb-prog"><div class="onbp-dots">'+dots+'</div><span class="onbp-lbl">'+L("Paso","Step")+' '+(i+1)+' '+L("de","of")+' '+ONB_STEPS.length+'</span></div>'+
         onbStepHTML()+
       '</div></div>';
@@ -689,7 +688,7 @@
       done((r.ok&&r.d&&Array.isArray(r.d.reels))?r.d.reels:[]);
     });
   }
-  function onbValueNext(){ onbTrack("onb_step_completed",{value_reels:(S.onb.valueReels||[]).length}); onbGoto("competitors"); onbLoadComps(); }
+  function onbValueNext(){ onbTrack("onb_step_completed",{value_reels:(S.onb.valueReels||[]).length}); if(!(S.onb.competitors||[]).length) S.onb.compLoading=true; onbGoto("competitors"); onbLoadComps(); }
   // AHA: roba el reel i → genera el guion en su voz y lo muestra en el flujo.
   function onbValueSteal(i){
     var r=(S.onb.valueReels||[])[i]; if(!r) return;
@@ -1046,19 +1045,59 @@
       '<button class="btn btn-md btn-primary crd-steal-full" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba la idea","Steal the idea")+'</button>'+
     '</div>';
   }
+  // v3 (mockup David · «Competidores en el radar» + galería): fila de chips por
+  // competidor (avatar+@handle+count, filtran la galería) + «Añadir», línea
+  // «Galería · X — pulsa Ver métricas…» + flechas, track de cards y empty state.
   function competitorGalleryHTML(){
-    var reels=feedReels(); if(!reels.length) return '';
+    if(!S.reels.length) return '';
     var imgs=_demoThumbs();
-    var cards=reels.slice(0,12).map(function(r,i){
-      return competitorReelCardHTML(r, imgs?imgs[i%imgs.length]:null);
-    }).join("");
+    // competidores derivados de los reels (estables, no dependen del filtro)
+    var byComp={}; S.reels.forEach(function(r){ var h=(r.creator&&r.creator.handle)||""; if(!h) return; if(!byComp[h]) byComp[h]={handle:h, n:0}; byComp[h].n++; });
+    var comps=Object.keys(byComp).map(function(h){ return byComp[h]; });
+    var active=S.galComp||null;
+    // chips COMPACTOS y uniformes (tamaño «Todos», sin avatar).
+    var chip=function(h,label,n,on){
+      return '<button class="rgal-chip'+(on?' on':'')+'" data-act="gal-comp" data-k="'+ESC(h)+'">'+ESC(label)+
+        (n!=null?'<span class="rgal-chip-n">'+n+'</span>':'')+'</button>';
+    };
+    // Solo 3-4 visibles; el resto en un desplegable con buscador. Si el activo está
+    // oculto, lo subo a la cabeza para que se vea seleccionado.
+    var MAXVIS=3;
+    var ordered=comps.slice();
+    if(active){ var ai=ordered.map(function(c){return c.handle;}).indexOf(active); if(ai>=MAXVIS){ var a=ordered.splice(ai,1)[0]; ordered.unshift(a); } }
+    var vis=ordered.slice(0,MAXVIS), hidden=ordered.slice(MAXVIS);
+    var chips=chip("",L("Todos","All"),S.reels.length,!active)+
+      vis.map(function(c){ return chip(c.handle,"@"+c.handle,c.n,active===c.handle); }).join("");
+    // desplegable con buscador para el resto (gente seguida que no cabe en la fila).
+    // VA FUERA de la tira con scroll (.rgal-comps tiene overflow → recortaría el menú).
+    var moreWrap="";
+    if(hidden.length){
+      var rows=comps.map(function(c){
+        return '<button class="gal-menu-row'+(active===c.handle?' on':'')+'" data-act="gal-comp" data-k="'+ESC(c.handle)+'" data-handle="'+ESC(c.handle.toLowerCase())+'">'+
+          '<span class="rgal-chip-av">'+ESC(initialsOf(c.handle))+'</span><span class="gal-menu-h">@'+ESC(c.handle)+'</span><span class="rgal-chip-n">'+c.n+'</span></button>';
+      }).join("");
+      var dd=S.galMenu?('<div class="gal-menu">'+
+        '<input class="gal-menu-search" type="text" autocomplete="off" spellcheck="false" placeholder="'+L("Buscar competidor…","Search competitor…")+'" oninput="try{window.RadarLoop.galSearch(this.value)}catch(e){}">'+
+        '<div class="gal-menu-list">'+rows+'</div></div>'):'';
+      moreWrap='<span class="rgal-more-wrap"><button class="rgal-chip rgal-morebtn'+(S.galMenu?' on':'')+'" data-act="gal-menu">+'+hidden.length+' '+IC.chev+'</button>'+dd+'</span>';
+    }
+    // reels mostrados: feed (respeta filtro explosión/recientes/fav) + filtro de competidor
+    var reels=feedReels(); if(active) reels=reels.filter(function(r){ return (r.creator&&r.creator.handle)===active; });
+    var activeLabel=active?("@"+active):L("todos los competidores","all competitors");
     var arrows='<div class="rgal-arrows">'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
     '</div>';
-    return '<section class="rgal"><div class="rgal-head"><div class="rgal-t">'+L("Tu competencia","Your competition")+
-      '<span class="rgal-sub">'+L("pulsa «Ver métricas» para transcripción y datos","tap «See metrics» for transcript and data")+'</span></div>'+arrows+'</div>'+
-      '<div class="rgal-track crd-track">'+cards+'</div></section>';
+    var body = reels.length
+      ? '<div class="rgal-track crd-track">'+reels.slice(0,12).map(function(r,i){ return competitorReelCardHTML(r, imgs?imgs[i%imgs.length]:null); }).join("")+'</div>'
+      : '<div class="rgal-empty"><span class="rgal-empty-h">'+L("Nada que robar aquí… todavía","Nothing to steal here… yet")+'</span><span class="rgal-empty-s">'+L("Este competidor no tiene reels explosivos esta semana.","This competitor has no explosive reels this week.")+'</span></div>';
+    return '<section class="rgal">'+
+      '<div class="rgal-comps-head"><span class="rgal-comps-t">'+L("Competidores en el radar","Competitors on the radar")+'</span>'+
+        '<div class="rgal-comps">'+chips+'</div>'+moreWrap+
+        '<button class="rgal-add" data-act="add-comp">'+IC.plus+' '+L("Añadir","Add")+'</button></div>'+
+      '<div class="rgal-galline-row"><div class="rgal-galline">'+L("Galería · ","Gallery · ")+'<b>'+ESC(activeLabel)+'</b> — '+L("pulsa <b>Ver métricas</b> para abrir transcripción y datos.","tap <b>See metrics</b> to open transcript and data.")+'</div>'+arrows+'</div>'+
+      body+
+    '</section>';
   }
   function communityGalleryHTML(){
     return '<section class="rgal"><div class="rgal-head"><div class="rgal-t">'+
@@ -1159,11 +1198,9 @@
       '<div class="feature-main">'+
         '<div class="feature-eyebrow">Oportunidad #'+idx+' <span class="who">· @'+ESC(r.creator.handle)+' · '+ESC(r.when)+'</span></div>'+
         '<h2 class="feature-cap">'+ESC(r.cap)+'</h2>'+
-        (r.sum?'<p class="feature-sum">'+ESC(r.sum)+'</p>':'')+
         '<div class="feature-why">'+IC.spark+'<span>'+ESC(why)+'</span></div>'+
-        '<div class="feature-actions"><button class="btn btn-lg '+(idx===1?'btn-primary':'btn-secondary')+'" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' Roba la idea</button>'+
-          '<button class="iconbtn'+(S.favs[r.id]?" on":"")+'" data-act="fav" data-id="'+ESC(r.id)+'" title="Guardar">'+(S.favs[r.id]?IC.star:IC.starO)+'</button>'+
-          '<button class="iconbtn" data-act="reel-dismiss" data-id="'+ESC(r.id)+'" title="No me interesa — trae otro" aria-label="Descartar y traer otro">'+IC.x+'</button></div>'+
+        '<div class="feature-actions"><button class="btn btn-lg btn-primary" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' Roba la idea</button>'+
+          '<button class="iconbtn'+(S.favs[r.id]?" on":"")+'" data-act="fav" data-id="'+ESC(r.id)+'" title="Guardar">'+(S.favs[r.id]?IC.star:IC.starO)+'</button></div>'+
         scarce+
       '</div>'+
       '<div class="feature-data">'+
@@ -1386,7 +1423,7 @@
 
     // B: vista «Reels de @X» — todos los reels del competidor, sin recorte.
     if(S.creatorFilter){
-      return '<div class="scroll"><div class="canvas">'+head+(isAgency()?brandTabsHTML():"")+creatorReelsHTML()+'</div></div>';
+      return '<div class="scroll"><div class="canvas">'+head+""+creatorReelsHTML()+'</div></div>';
     }
 
     if(sorted.length===0){
@@ -1396,7 +1433,7 @@
       if(showOnboarding()){
         return '<div class="scroll"><div class="canvas">'+head+onboardingHTML()+'</div></div>';
       }
-      return '<div class="scroll"><div class="canvas">'+head+(isAgency()?brandTabsHTML():"")+statbarHTML()+
+      return '<div class="scroll"><div class="canvas">'+head+""+statbarHTML()+
         radarAddBarHTML()+        // B1: añadir competidor SIEMPRE accesible, también con el radar vacío
         trackedManageHTML()+
         voiceOnboardCardHTML()+   // B6: en first-run sin reels, el banner de voz es lo primero que aporta
@@ -1415,21 +1452,20 @@
     //   se DEMOTAN bajo la espina para no romper la jerarquía visual de David.
     return '<div class="scroll"><div class="canvas">'+
       radarHeroHTML()+            // hero con scope animado + stats (sustituye phead+statbar)
-      (isAgency()?brandTabsHTML():"")+
+      ""+
       opportunityCarouselHTML(heroN)+   // OPORTUNIDAD justo tras el hero (acción sobre el fold)
-      (S.reels.length?(radarAddBarHTML()+filtersHTML()+competitorGalleryHTML()):"")+   // competidores + galería
+      (S.reels.length?competitorGalleryHTML():"")+   // competidores (chips) + galería (mockup David)
       radarCerebroRowHTML()+     // progreso/cerebro (nivel + barra + Crear guion)
       (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+   // llena mi semana
-      // ── banners promo demotados (features reales, fuera de la espina) ──
-      flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro
-      trackedManageHTML()+
-      activationProgressHTML()+   // endowed progress: «1/4 · Roba tu primera idea»
-      seedBannerHTML()+           // SPEC #3: aviso «esto petó en tu nicho» con seed
-      suggestedCompHTML()+        // sugerir competidores proactivamente (Fathom 18/06)
-      voiceOnboardCardHTML()+     // B6+T1: banner de voz
-      nextSeriesHTML("dash")+     // B1+T1: "tu próxima serie"
-      radarSignalsListHTML(rest)+ // «Más señales · N» — el resto de señales del día (mockup David)
-      (S.reels.length?communityGalleryHTML():"")+   // muro comunidad
+      // ── bloques bajo la espina (recortados por decisión del usuario) ──
+      flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro (condicional)
+      (S.reels.length?radarAddBarHTML():"")+   // añadir competidor/reel + actualizar  ← SE QUEDA
+      seedBannerHTML()+           // aviso «esto petó en tu nicho» (solo radar-seed, demo vacío)
+      suggestedCompHTML()+        // «Te lo sugiero · Nuevo en tu nicho»               ← SE QUEDA
+      (S.reels.length?communityGalleryHTML():"")+   // «Creaciones de la comunidad»    ← SE QUEDA
+      // QUITADOS (mockup David / petición usuario): trackedManageHTML (Tus competidores),
+      // activationProgressHTML (Activa tu cuenta), voiceOnboardCardHTML (Enséñame tu voz),
+      // nextSeriesHTML (Tu próxima serie), radarSignalsListHTML (Más señales).
     '</div></div>';
   }
 
@@ -1681,9 +1717,11 @@
     // titular = hook/título; «gancho detectado» = la apertura (o 1er beat) que lo explica
     var headline=g.title||g.hook||"Guión";
     var gancho=(g.hook&&g.hook!==g.title)?g.hook:((g.beats&&g.beats[0])||g.sum||"");
-    var moreRow=(aprBtn||pub||bodyToggle||toggle)?('<div class="guic-more">'+aprBtn+pub+bodyToggle+toggle+
+    // Petición usuario: en la card solo Aprobar (agencia) / Descartar; lo demás
+    // (rendimiento, ver guión completo, hooks alternativos) se accede desde el editor.
+    var moreRow='<div class="guic-more">'+aprBtn+
         '<button class="gui-hooks-toggle guic-discard" data-act="gui-discard" data-id="'+g.id+'" title="Descartar">'+IC.x+' '+L("Descartar","Discard")+'</button>'+
-      '</div>'):'';
+      '</div>';
     return '<div class="guic-wrap"><div class="guic'+(rec?" is-rec":"")+'">'+
       '<div class="guic-top">'+badge+metaR+'</div>'+
       '<h3 class="guic-hook">'+ESC(headline)+'</h3>'+
@@ -1693,7 +1731,6 @@
         '<button class="btn btn-md btn-secondary" data-act="'+(rec?"gui-duplicate":"gui-toggle-rec")+'" data-id="'+g.id+'">'+(rec?L("Duplicar","Duplicate"):L("Marcar grabado","Mark recorded"))+'</button>'+
       '</div>'+
       moreRow+
-      bodyFull+hooksList+
     '</div></div>';
   }
   function guionesHTML(){
@@ -2109,7 +2146,7 @@
     }).join("");
     var trend=[42,55,48,61,58,73,67,71,64,82,78,88,79,92]; var th=_mBars(trend);
     var tlabels=["","","","","5","","","","","10","","","","14"];
-    var trendBars=trend.map(function(v,i){ return '<div class="mt-tb"><div class="mt-tb-fill" style="height:'+th[i]+'"></div><span class="mt-tb-l">'+tlabels[i]+'</span></div>'; }).join("");
+    var trendBars=trend.map(function(v,i){ return '<div class="mt-tb"><div class="mt-tb-col"><div class="mt-tb-fill" style="height:'+th[i]+'"></div></div><span class="mt-tb-l">'+tlabels[i]+'</span></div>'; }).join("");
     var eng=[["Me gusta","31 K",31],["Guardados","9,1 K",9.1],["Compartidos","6,3 K",6.3],["Comentarios","4,7 K",4.7]]; var emax=31;
     var engH=eng.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+r[0]+'</span><span class="mt-mono">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+Math.round(r[2]/emax*100)+'%"></i></div></div>'; }).join("");
     var hooks=[["“Comenta X y te mando…”","82%"],["“Acaba de pasar…”","74%"],["“Nadie te cuenta que…”","61%"],["“3 cosas que…”","44%"]];
@@ -3048,12 +3085,15 @@
     return '<div class="ce-hero-row">'+
       '<div class="ce-hero">'+
         '<div class="ce-ring">'+
-          '<svg width="172" height="172" viewBox="0 0 172 172" class="ce-ring-svg" aria-hidden="true">'+
-            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
-            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+off+'" class="ce-ring-prog"/>'+
-          '</svg>'+
-          '<div class="ce-ring-c">'+_ceBrainSVG+'<span class="ce-ring-lvl">'+L("NIVEL","LEVEL")+' <b>'+lv.level+'</b></span></div>'+
-          '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
+          '<div class="ce-ring-circle">'+
+            '<svg width="172" height="172" viewBox="0 0 172 172" class="ce-ring-svg" aria-hidden="true">'+
+              '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
+              '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+off+'" class="ce-ring-prog"/>'+
+            '</svg>'+
+            '<div class="ce-ring-c">'+_ceBrainSVG+'</div>'+
+            '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
+          '</div>'+
+          '<span class="ce-ring-lvl">'+L("NIVEL","LEVEL")+' <b>'+lv.level+'</b></span>'+
         '</div>'+
         '<div class="ce-hero-body">'+
           '<div class="ce-kicker">'+ESC(kicker)+'</div>'+
@@ -3088,7 +3128,7 @@
       [1,L("Aprendiz","Apprentice"),L("Detección básica de señales","Basic signal detection")],
       [2,L("Imitador","Imitator"),L("Tu voz aprendida · guiones con tu tono","Your voice learned · scripts in your tone")],
       [3,L("Ladrón","Thief"),L("«Llena mi semana» · 5 guiones de golpe","«Fill my week» · 5 scripts at once")],
-      [4,L("Estratega","Strategist"),L("Competidores ilimitados · métricas Pro","Unlimited competitors · Pro metrics")],
+      [4,L("Estratega","Strategist"),L("Más competidores en el radar · métricas Pro","More competitors on the radar · Pro metrics")],
       [5,L("Viral","Viral"),L("Autopiloto · el Cerebro escribe solo","Autopilot · the Brain writes by itself")]
     ];
     var cur=lv.level||1;
@@ -3187,59 +3227,12 @@
       brainHeroV3HTML(lv, voicePct)+
       '<div class="ce-grid">'+brainKnowHTML(v)+brainLevelsHTML(lv)+'</div>'+
       brainMissionsHTML(lv)+
-      // ── features avanzadas (intactas, debajo de la espina) ──
-      (lv.next&&lv.next>=4 ? '<div class="brain-autonote">'+IC.spark+' Analizo tu perfil <b>2×/semana</b> sin que hagas nada — cuando publicas, tu nivel sube en el siguiente análisis. ¿Con prisa? Fuérzalo abajo.</div>' : '')+
-      // Entrenar (inversión): valora hooks → afina tu gusto + alimenta el cerebro 3D.
-      brainTrainHTML()+
-      // Tinder de TUS guiones (Fathom 18/06, David): swipe sobre lo que ya creaste →
-      // refina la voz y entrena el Cerebro. Solo aparece con >=3 guiones propios.
-      guionTinderHTML()+
-      // Forzar re-scrape del propio perfil (Fathom 18/06): adelanta el análisis auto
-      // 2×/sem a cambio de créditos. Siempre disponible (publicaste → sube ya de nivel).
-      '<div class="brain-section-t">'+L("Sube de nivel ya","Level up now")+'</div>'+
-      '<div class="bt-load" style="justify-content:space-between;gap:14px;margin-bottom:20px">'+
-        '<span>'+L("¿Publicaste algo nuevo? Re-analizo tu perfil ahora y tu nivel sube en cuanto detecte tus reels — sin esperar al análisis automático (2×/semana).","Published something new? I re-scan your profile now and your level rises as soon as I detect your reels — no waiting for the automatic scan (2×/week).")+'</span>'+
-        '<button class="btn btn-sm btn-secondary" style="flex-shrink:0" data-act="force-scrape">'+IC.spark+' '+L("Re-analizar mi perfil · 10 cr","Re-scan my profile · 10 cr")+'</button>'+
-      '</div>'+
-      // Analizar un reel suelto (sin añadirlo como competidor) — atajo al panel Analizar.
-      '<div class="brain-section-t">'+L("Analiza un reel suelto","Analyze a one-off reel")+'</div>'+
-      '<div class="bt-load" style="justify-content:space-between;gap:14px;margin-bottom:20px">'+
-        '<span>'+L("¿Viste un reel que te llamó? Pégalo y lo transcribo — sin añadirlo a tu radar.","Saw a reel that caught your eye? Paste it and I'll transcribe it — without adding it to your radar.")+'</span>'+
-        '<button class="btn btn-sm btn-secondary" style="flex-shrink:0" data-act="legacy" data-k="transc">'+IC.mic+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
-      '</div>'+
-      // A1: selector de TONO preset (personalidad cuando aún no hay voz personal)
-      toneSelectorHTML()+
-      // CAPTURA del moat (si aún no hay voz) o EVIDENCIA real (si ya aprendió)
-      (hasRealVoice() ? voiceEvidenceHTML() : voiceCaptureHTML())+
-      // fuentes del conocimiento
-      '<div class="brain-section-t">De qué me alimento</div>'+
-      '<div class="brain-sources">'+sources+'</div>'+
-      // lo que sé de tu voz
-      '<div class="brain-section-t">Lo que sé de tu voz</div>'+
-      '<div class="brain-voice">'+
-        '<div class="voice-row"><span class="voice-k">Tono</span><span class="voice-val">'+ESC(v.tono)+'</span></div>'+
-        '<div class="voice-row"><span class="voice-k">Tus frases</span><span class="voice-val">'+frases+'</span></div>'+
-        '<div class="voice-row"><span class="voice-k">Estructura</span><span class="voice-val">'+ESC(v.estructura)+'</span></div>'+
-        '<div class="voice-row"><span class="voice-k">Duración</span><span class="voice-val">'+ESC(v.duracion)+'</span></div>'+
-        '<div class="voice-row"><span class="voice-k">Evito</span><span class="voice-val">'+ESC(v.evita)+'</span></div>'+
-      '</div>'+
-      // T2: tus asistentes — estilos propios para guionizar, LISTADOS inline
-      // (visibilidad del estado, reconocer>recordar). Reusa los CRUD globales
-      // (openAssistantModal/editAssistant/deleteAssistant + el modal existente).
-      // «Gestionar» abre el panel legacy completo (reparentado, data-act=legacy).
-      '<div class="brain-section-t">Tus asistentes'+(nAsst?' <span class="brain-tag">'+nAsst+'</span>':'')+'</div>'+
-      brainAsstListHTML(nAsst)+
-      '<div class="cluster cluster-sm" style="margin:12px 0 18px;gap:10px">'+
-        '<button class="btn btn-md btn-secondary" onclick="openAssistantModal()">'+IC.bulb+' Nuevo asistente</button>'+
-        '<button class="btn btn-md btn-ghost" data-act="legacy" data-k="assistants">'+IC.gear+' Gestionar</button>'+
-      '</div>'+
-      // lo que funciona (métricas)
-      '<div class="brain-section-t">Lo que funciona en tu cuenta'+(learned.length?' <span class="brain-tag">de tus métricas</span>':'')+'</div>'+
-      '<div class="learn" style="margin-bottom:18px"><div class="learn-list">'+learnList+'</div></div>'+
-      nextSeriesHTML("brain")+   // B1: la sugerencia de próxima serie, justo bajo lo que funciona (aquí SÍ primaria — T1)
-      // de quién aprendo
-      '<div class="brain-section-t">De quién aprendo</div>'+
-      '<div class="brain-comps">'+compList+'</div>'+
+      // v3 (mockup David): el Cerebro queda SOLO con la espina (header + anillo +
+      // «Lo que ya sé de ti» + niveles + misiones). Las features densas anteriores
+      // (entrenar, tinder, re-analizar, analizar reel, tono, voz, fuentes,
+      // asistentes, métricas, próxima serie, competidores) se han RETIRADO de esta
+      // pantalla por decisión del usuario — sus funciones siguen definidas/usables
+      // desde otros puntos, pero ya no se pintan aquí.
     '</div></div>';
   }
 
@@ -3696,7 +3689,15 @@
     // Teleprónter: preservar la posición de scroll a través del re-render (los toggles
     // de play/velocidad/texto re-pintan; sin esto el scroll saltaría a 0).
     var _tpScroll=null; if(S.view==="prompter"){ var _tpe=document.getElementById("rsTpScroll"); if(_tpe) _tpScroll=_tpe.scrollTop; }
+    // Preservar el scroll del contenedor principal entre repintados (filtros, fav,
+    // expandir, chips… repintan toda la isla y, sin esto, saltaría arriba del todo).
+    // Solo se restaura si sigues en la MISMA pantalla (misma pestaña/vista); al
+    // cambiar de tab o abrir un overlay sí empieza arriba, que es lo esperado.
+    var _scKey=S.tab+"|"+(S.view||"feed")+"|"+(S.creatorFilter?S.creatorFilter.id:"");
+    var _scTop=null; var _scEl=document.querySelector("#radarRoot .work .scroll"); if(_scEl) _scTop=_scEl.scrollTop;
     view.innerHTML=html;
+    if(_scTop!=null && S._scKey===_scKey){ var _scEl2=document.querySelector("#radarRoot .work .scroll"); if(_scEl2){ _scEl2.style.scrollBehavior="auto"; _scEl2.scrollTop=_scTop; _scEl2.style.scrollBehavior=""; } }
+    S._scKey=_scKey;
     if(_tpScroll!=null){ var _tpe2=document.getElementById("rsTpScroll"); if(_tpe2) _tpe2.scrollTop=_tpScroll; }
     // T4: el error persistente sobrevive a los re-render mutando el nodo estable.
     var errN=document.getElementById("rsErr"),errM=document.getElementById("rsErrMsg");
@@ -4006,7 +4007,17 @@
     var moreToggle = (!S.feedExpanded && rest.length>5)
       ? '<div class="signals-more"><button class="see-all" data-act="expand-feed">'+IC.repeat+' '+L("Ver las "+rest.length+" oportunidades","See all "+rest.length+" opportunities")+'</button></div>'
       : '';
-    return '<section class="signals"><div class="signals-head"><span class="signals-t">'+L("Más señales · "+rest.length,"More signals · "+rest.length)+'</span></div>'+
+    // v3 (mockup David): cabecera «Más señales · N» + pestañas Explotando/Recientes/
+    // Favoritos (S.filter) + «Añadir competidor» dashed.
+    var f=S.filter||"explosion";
+    var tab=function(k,label,icon){ return '<button class="sig-tab'+(f===k?" on":"")+'" data-act="filter" data-k="'+k+'">'+(icon||"")+label+'</button>'; };
+    var tabs='<div class="sig-tabs">'+
+      tab("explosion",L("Explotando","Exploding"),IC.spark+' ')+
+      tab("recent",L("Recientes","Recent"),"")+
+      tab("fav",L("Favoritos","Favorites"),IC.starO+' ')+
+      '<button class="rgal-add" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+    '</div>';
+    return '<section class="signals"><div class="signals-head"><span class="signals-t">'+L("Más señales · "+rest.length,"More signals · "+rest.length)+'</span>'+tabs+'</div>'+
       '<div class="signals-list">'+rows+'</div>'+moreToggle+'</section>';
   }
   function loadReelTranscript(id){
@@ -4963,6 +4974,7 @@
       if(S.acctMenu){ e.preventDefault(); S.acctMenu=false; return render(); }
       if(S.brandMenu){ e.preventDefault(); S.brandMenu=false; return render(); }
       if(S.communityInfo){ e.preventDefault(); S.communityInfo=false; return render(); }
+      if(S.galMenu){ e.preventDefault(); S.galMenu=false; return render(); }
       if(S.view && S.view!=="feed"){
         e.preventDefault();
         if(S.view==="result"){ S.view="script"; return render(); }
@@ -5127,6 +5139,8 @@
       return;
     }
     if(act==="gal-expand"){ S._galOpen=(S._galOpen===id)?null:id; return render(); }   // expand inline de la galería (mockup David)
+    if(act==="gal-comp"){ S.galComp=(k&&S.galComp!==k)?k:null; S._galOpen=null; S.galMenu=false; return render(); }   // filtro por competidor (chips «Competidores en el radar»)
+    if(act==="gal-menu"){ S.galMenu=!S.galMenu; return render(); }   // desplegable «+N» de competidores que no caben
     if(act==="expand-feed"){ S.feedExpanded=true; return render(); }
     if(act==="add-reel") return addReelManual();
     // growth-2: onboarding de activación
@@ -5512,6 +5526,12 @@
       else if(field==="hook") g.hook=value;
       else if(field==="close") g.close=value;
       else if(field==="develop") g.beats=value?value.split(/\n+/).map(function(x){return x.trim();}).filter(Boolean):[];
+    },
+    // v3 buscador del desplegable de competidores: filtra filas en DOM (sin re-render → no pierde foco)
+    galSearch:function(val){
+      var q=(val||"").toLowerCase().replace(/^@+/,"");
+      var rows=document.querySelectorAll("#radarRoot .gal-menu-row");
+      for(var i=0;i<rows.length;i++){ var h=rows[i].getAttribute("data-handle")||""; rows[i].style.display=(h.indexOf(q)>=0)?"":"none"; }
     }
   };
 })();
