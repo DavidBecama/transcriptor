@@ -10624,6 +10624,44 @@
     .rs--mobile .mt-comp { overflow-x:auto; -webkit-overflow-scrolling:touch; }
     .rs--mobile .mt-comp-table { min-width:560px; }
     .rs--mobile .mt-top-row { gap:10px; } .rs--mobile .mt-top-title { font-size:13px; }
+    /* ── v3 · Ranking (leaderboard) ────────────────────────────────────── */
+    .rs .rk-canvas { display:flex; flex-direction:column; gap:22px; }
+    .rs .rk-head { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+    .rs .rk-eyebrow { display:inline-flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; color:var(--brand-500,#2F5BFF); margin-bottom:12px; }
+    .rs .rk-eye-dot { width:8px; height:8px; border-radius:99px; background:var(--brand-500,#2F5BFF); }
+    .rs .rk-h1 { font-family:var(--font-display); font-weight:700; font-size:44px; line-height:1; letter-spacing:-.02em; color:var(--text-primary); margin:0 0 12px; }
+    .rs .rk-sub { font-size:18px; line-height:1.5; color:var(--text-secondary); margin:0; max-width:520px; }
+    .rs .rk-sync { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:99px; font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); }
+    .rs .rk-sync-dot { width:7px; height:7px; border-radius:50%; background:var(--brand-500,#2F5BFF); }
+    .rs .rk-hero { display:flex; align-items:center; gap:28px; padding:26px 30px; background:linear-gradient(120deg, var(--brand-50, rgba(47,91,255,.16)), var(--surface-raised)); border:1px solid var(--border-default); border-radius:20px; flex-wrap:wrap; }
+    .rs .rk-rank { flex:none; display:flex; align-items:baseline; gap:4px; color:var(--text-primary); }
+    .rs .rk-rank-hash { font-family:var(--font-display); font-weight:700; font-size:30px; color:var(--brand-500,#2F5BFF); }
+    .rs .rk-rank-n { font-family:var(--font-display); font-weight:700; font-size:64px; line-height:1; letter-spacing:-.02em; }
+    .rs .rk-rank-of { font-family:var(--font-mono); font-size:13px; color:var(--text-tertiary); }
+    .rs .rk-hero-body { flex:1; min-width:240px; display:flex; flex-direction:column; gap:10px; }
+    .rs .rk-hero-val { font-family:var(--font-display); font-weight:700; font-size:26px; color:var(--text-primary); }
+    .rs .rk-hero-unit { font-family:var(--font-body); font-weight:500; font-size:14px; color:var(--text-tertiary); }
+    .rs .rk-hero .lb-goal, .rs .rk-hero .lb-momentum { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--text-secondary); margin:0; }
+    .rs .rk-hero .lb-goal b, .rs .rk-hero .lb-momentum b { color:var(--text-primary); }
+    .rs .rk-hero .lb-goal svg, .rs .rk-hero .lb-momentum svg { width:15px; height:15px; color:var(--brand-400,#6E92FF); flex:none; }
+    .rs .rk-list { display:flex; flex-direction:column; gap:6px; }
+    .rs .rk-row { display:flex; align-items:center; gap:14px; padding:13px 16px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:14px; }
+    .rs .rk-row.me { background:var(--brand-50, rgba(47,91,255,.16)); border-color:var(--brand-500,#2F5BFF); }
+    .rs .rk-pos { width:30px; flex:none; text-align:center; font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-tertiary); }
+    .rs .rk-pos.top { color:#0c0f17; border-radius:8px; padding:3px 0; }
+    .rs .rk-pos.t1 { background:linear-gradient(140deg,#FFD66B,#E8B53C); } .rs .rk-pos.t2 { background:linear-gradient(140deg,#D9E1EE,#AEB9CC); } .rs .rk-pos.t3 { background:linear-gradient(140deg,#E7B07E,#C98A52); }
+    .rs .rk-ava { width:34px; height:34px; flex:none; border-radius:99px; background:var(--surface-overlay); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); }
+    .rs .rk-h { flex:1; min-width:0; font-weight:600; font-size:14.5px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rs .rk-you { font-family:var(--font-mono); font-size:11px; color:var(--brand-500,#2F5BFF); margin-left:6px; }
+    .rs .rk-val { flex:none; font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-primary); }
+    .rs .rk-unit { font-family:var(--font-body); font-weight:500; font-size:11px; color:var(--text-tertiary); }
+    .rs .rk-g { flex:none; width:54px; text-align:right; font-family:var(--font-mono); font-size:12.5px; font-weight:600; }
+    .rs .rk-g.up { color:var(--success-fg,#3FE0A0); } .rs .rk-g.down { color:var(--danger-fg,#FF6B6B); }
+    .rs .rk-beat { flex:none; } .rs .rk-beat-sp { flex:none; width:96px; }
+    .rs .rk-cta { display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+    .rs .rk-note { font-size:12.5px; line-height:1.5; color:var(--text-tertiary); margin:6px 0 0; }
+    .rs .rk-note b { color:var(--text-secondary); }
+    .rs--mobile .rk-beat-sp { display:none; } .rs--mobile .rk-row { flex-wrap:wrap; } .rs--mobile .rk-h { flex-basis:55%; }
     .rs .gui-list { padding:0 0 40px; display:flex; flex-direction:column; gap:10px; }
     .rs .gui-card { display:flex; align-items:center; gap:12px; padding:15px 16px; border:1px solid var(--border-default); border-radius:14px; background:var(--surface-raised); }
     .rs .gui-main { flex:1; min-width:0; }
@@ -27532,6 +27570,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=67"></script>
+<script src="/static/js/radar-loop.js?v=68"></script>
 </body>
 </html>

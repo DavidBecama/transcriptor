@@ -2632,29 +2632,39 @@
     }
     var items=rows.map(function(r,i){
       var g=r.growth, gtxt=(g>=0?'↑':'↓')+Math.abs(g)+'%';
-      var pos=String(i+1);
-      return '<div class="lb-row'+(r.you?' me':'')+'">'+
-        '<span class="lb-pos">'+pos+'</span>'+
-        '<span class="ava bava">'+ESC(initialsOf(r.handle))+'</span>'+
-        '<span class="lb-h">@'+ESC(r.handle)+(r.you?' <b>('+L("tú","you")+')</b>':'')+'</span>'+
-        '<span class="lb-f">'+_fmtK(r.followers)+'</span>'+
-        '<span class="lb-g '+(g>=0?'up':'down')+'">'+gtxt+'</span>'+
-        ((!r.you && !S.versus)?'<button class="lb-challenge" data-act="versus-start" data-id="'+ESC(r.handle)+'">'+IC.bolt+' '+L("Supéralo","Beat it")+'</button>':'<span class="lb-challenge-sp"></span>')+
+      return '<div class="rk-row'+(r.you?' me':'')+'">'+
+        '<span class="rk-pos'+(i<3?' top t'+(i+1):'')+'">'+(i+1)+'</span>'+
+        '<span class="rk-ava">'+ESC(initialsOf(r.handle))+'</span>'+
+        '<span class="rk-h">@'+ESC(r.handle)+(r.you?' <span class="rk-you">'+L("tú","you")+'</span>':'')+'</span>'+
+        '<span class="rk-val">'+_fmtK(r.followers)+' <span class="rk-unit">'+ESC(unit)+'</span></span>'+
+        '<span class="rk-g '+(g>=0?'up':'down')+'">'+gtxt+'</span>'+
+        ((!r.you && !S.versus)?'<button class="btn btn-sm btn-secondary rk-beat" data-act="versus-start" data-id="'+ESC(r.handle)+'">'+IC.bolt+' '+L("Supéralo","Beat it")+'</button>':'<span class="rk-beat-sp"></span>')+
       '</div>';
     }).join("");
-    return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Ranking · @"+(b.handle||S.user.handle||""), L("Ranking","Ranking"), L("Tu posición frente a tus competidores del nicho. Sube de puesto creando y publicando más.","Where you stand against your niche competitors. Climb by creating and publishing more."))+
+    var myRank=myIdx+1;
+    return '<div class="scroll"><div class="canvas rk-canvas">'+
+      // cabecera v3
+      '<header class="rk-head"><div class="rk-head-l">'+
+        '<div class="rk-eyebrow"><span class="rk-eye-dot"></span>'+L("tu posición en el nicho","your spot in the niche")+'</div>'+
+        '<h1 class="rk-h1">'+L("Ranking","Ranking")+'</h1>'+
+        '<p class="rk-sub">'+L("Tu posición frente a tus competidores. Sube de puesto creando y publicando más.","Where you stand vs your competitors. Climb by creating and publishing more.")+'</p></div>'+
+        '<div class="rk-sync"><span class="rk-sync-dot"></span>@'+ESC(b.handle||S.user.handle||"tu_cuenta")+'</div></header>'+
+      // hero: tu posición
+      '<div class="rk-hero">'+
+        '<div class="rk-rank"><span class="rk-rank-hash">#</span><span class="rk-rank-n">'+(myRank>0?myRank:"–")+'</span><span class="rk-rank-of">'+L("de "+rows.length,"of "+rows.length)+'</span></div>'+
+        '<div class="rk-hero-body">'+
+          '<div class="rk-hero-val">'+_fmtK(me.followers||0)+' <span class="rk-hero-unit">'+ESC(unit)+'</span></div>'+
+          goal+momentum+
+        '</div>'+
+      '</div>'+
       versusCardHTML()+
-      momentum+
-      goal+
       versusHintHTML()+
-      '<div class="leaderboard">'+items+'</div>'+
-      // #2 conectar el ranking con la acción del producto (el loop) — CTA primario.
-      '<div class="cluster cluster-sm" style="margin:16px 0 8px;gap:10px">'+
+      '<div class="rk-list">'+items+'</div>'+
+      '<div class="rk-cta">'+
         '<button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Roba y publica más para subir","Steal & publish more to climb")+'</button>'+
         '<button class="btn btn-md btn-secondary" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add a competitor")+'</button>'+
       '</div>'+
-      '<p class="lb-note">'+(lbIsViews()
+      '<p class="rk-note">'+(lbIsViews()
         ? L("El ranking va por <b>views medias por reel</b> (lo que de verdad scrapeamos). Conecta tu Instagram para ver tu posición.","Ranking is by <b>average views per reel</b> (what we actually scrape). Connect your Instagram to see your spot.")
         : L("Las cifras de competidores son estimaciones del nicho; tus métricas reales salen al conectar Instagram.","Competitor figures are niche estimates; your real metrics appear once you connect Instagram."))+'</p>'+
       communitySoonHTML()+

@@ -11,7 +11,7 @@ Estado del rediseño **design system v3** (mockups de David). Pensado para que o
 - **Arrancar demo (Windows):**
   `DEMO_MODE=1 PORT=5059 FLASK_DEBUG=0 /c/dev/transcriptor/.venv/Scripts/python.exe app.py`
   La isla vive en **http://localhost:5059/es/** (la home redirige a `/es/`). Tras editar, **reinicia el server** (Flask cachea el template) y recarga con **Ctrl+Shift+R** (la caché del navegador es la causa #1 de "no veo cambios"). El server es **flaky** (se cae solo) → si HTTP 000, relánzalo.
-- **Cache-bust de la isla:** `templates/index.html` referencia `static/js/radar-loop.js?v=N`. **Sube N** en cada cambio de JS (vamos por **v=65**).
+- **Cache-bust de la isla:** `templates/index.html` referencia `static/js/radar-loop.js?v=N`. **Sube N** en cada cambio de JS (vamos por **v=68**).
 
 ## 1. Gates (obligatorio antes de pushear)
 - **Harness:** `node scripts/verify-island.mjs <URL>` → debe dar **30/30**. El script tiene hardcodeado el Chrome de macOS; en Windows usa una copia parcheada:
@@ -44,15 +44,16 @@ Estado del rediseño **design system v3** (mockups de David). Pensado para que o
 
 **MÉTRICAS (marco David + datos reales, parcial):** la vista **Resumen** deriva de tus vídeos reales (`metricVideos()` ← `/api/metrics`): **KPIs** (Reproducciones, Interacciones, Me gusta, Comentarios, Compartidos), **Desglose de interacción** y **Top reels**. Fallback a la muestra del diseño si no hay vídeos.
 
+**RANKING (leaderboard) — rediseñado a v3** (`leaderboardPageHTML`, clases `.rk-*`): cabecera Clash + sub + sync pill, **hero «tu posición»** (#N de M + tu valor + objetivo/momentum), lista de filas con podio (top-3 medalla), tú resaltado, growth ↑/↓ y botón **«Supéralo»** (versus). Conserva datos/handlers reales (`leaderboardRows`/`lbReal`/`versus-start`). NO había mockup de David — hecho al sistema v3.
+
 ## 4. QUEDA — para fable
 
 1. **MÉTRICAS — completar con backend real (tu lane).** En `metResumenHTML`/`metAudienciaHTML`/`metCompetidoresHTML` (radar-loop.js) siguen como **muestra del diseño**: la **tendencia 14 días**, **ganchos que funcionan**, **temas que explotan**, **heatmap de horas**, toda la vista **Audiencia** (crecimiento, alcance por tipo, edad/género/ubicaciones) y **Competidores** (tabla, cuota de atención). El dato actual de `S.metrics.videos` no las contiene → hay que traerlas de `/api/metrics*` (IG insights). El marco visual `.mt-*` ya está; solo enchufar datos. ⚠️ La función antigua de métricas reales quedó **definida sin uso** — revisa si reaprovechas su lógica.
-2. **RANKING (leaderboard) — falta visual v3.** No entraba en los 7 mockups; sigue con el look anterior (`leaderboardPageHTML`). Rediseñar al sistema v3.
-3. **Quitar la página «Analizar»** (panel legacy `transc`, icono micro del rail en `railHTML`) y **reubicar la función de analizar un reel concreto** (pegar URL → transcribir/analizar sin añadirlo como competidor). Decidir dónde vive (¿«Añadir reel» del Radar? ¿editor? ¿acción suelta?).
-4. **Chips por-competidor / galería:** funcionan; revisar con datos reales (en prod los competidores salen de `/api/tracked-creators/reels`).
-5. **Merge `--no-ff` a `prod` + release** (lo coordina David). Hay un merge local de prueba (`23b5c6d`) en el clon, NO pusheado.
+2. **Quitar la página «Analizar»** (panel legacy `transc`, icono micro del rail en `railHTML`) y **reubicar la función de analizar un reel concreto** (pegar URL → transcribir/analizar sin añadirlo como competidor). Decidir dónde vive (¿«Añadir reel» del Radar? ¿editor? ¿acción suelta?).
+3. **Chips por-competidor / galería:** funcionan; revisar con datos reales (en prod los competidores salen de `/api/tracked-creators/reels`).
+4. **Merge `--no-ff` a `prod` + release** (lo coordina David). Hay un merge local de prueba (`23b5c6d`) en el clon, NO pusheado.
 
 ## 5. Notas de coordinación
-- **Lane de fable:** Métricas (datos reales IG) y todo lo de backend. El frontend v3 (`ed-*`, `guic-*`, `ce-*`, `mt-*`, `aj-*`, `tp-*`, `rgal-*`, `rdr-*`) es CSS nuevo aislado.
+- **Lane de fable:** Métricas (datos reales IG) y todo lo de backend. El frontend v3 (`ed-*`, `guic-*`, `ce-*`, `mt-*`, `aj-*`, `tp-*`, `rgal-*`, `rdr-*`, `rk-*`) es CSS nuevo aislado.
 - **NO** pushear skills privados (`C:\dev\_skills-privado\`). **NO** `git add -A` — añadir archivos concretos.
 - Real-mode escribe en la Supabase de **prod** → solo cuentas test, limpiar.
