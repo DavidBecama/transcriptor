@@ -11520,6 +11520,12 @@
       /* el rail es barra inferior fija (~62px) → deja hueco para que el último
          contenido no quede tapado al hacer scroll hasta abajo. */
       .rs .scroll { padding-bottom:72px; }
+      /* Ranking: las píldoras "Te faltan…/Subiendo…" eran inline-flex → el texto y
+         los <b> se repartían en una fila sin wrap y se cortaban. En móvil que fluyan
+         como texto normal (bloque) con el icono inline. + hero más compacto. */
+      .rs .rk-hero { padding:20px; gap:16px; }
+      .rs .rk-hero .lb-goal, .rs .rk-hero .lb-momentum { display:block; }
+      .rs .rk-hero .lb-goal svg, .rs .rk-hero .lb-momentum svg { display:inline; vertical-align:-2px; margin-right:6px; }
       .rs .rail-logo, .rs .rail-spacer, .rs .rail-ava { display:none; }
       .rs .rs-acct-menu { left:8px; right:8px; bottom:72px; min-width:0; }   /* sobre la barra inferior */
       .rs .rail-btn.on::before { left:11px; right:11px; top:auto; bottom:-8px; width:auto; height:3px; border-radius:3px 3px 0 0; }
