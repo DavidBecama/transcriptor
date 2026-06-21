@@ -54,6 +54,7 @@ Estado del rediseño **design system v3** (mockups de David). Pensado para que o
 4. **Merge `--no-ff` a `prod` + release** (lo coordina David). Hay un merge local de prueba (`23b5c6d`) en el clon, NO pusheado.
 
 ## 5. Notas de coordinación
-- **Lane de fable:** Métricas (datos reales IG) y todo lo de backend. El frontend v3 (`ed-*`, `guic-*`, `ce-*`, `mt-*`, `aj-*`, `tp-*`, `rgal-*`, `rdr-*`, `rk-*`) es CSS nuevo aislado.
+- **Lane de fable:** Métricas (datos reales IG) y todo lo de backend. El frontend v3 (`ed-*`, `guic-*`, `ce-*`, `mt-*`, `aj-*`, `tp-*`, `rgal-*`, `rdr-*`, `rk-*`, `fb-*`) es CSS nuevo aislado.
+- **Feedback (menú de cuenta):** nuevo `openFeedback`/`submitFeedback` (radar-loop.js) — sheet para reportar bug/idea con aviso de recompensa en créditos. En demo solo toast; en prod hace `POST /api/feedback {type,text,page,plan}` → **fable: crear ese endpoint** + flujo de revisión y abono de créditos al confirmar el bug.
 - **NO** pushear skills privados (`C:\dev\_skills-privado\`). **NO** `git add -A` — añadir archivos concretos.
 - Real-mode escribe en la Supabase de **prod** → solo cuentas test, limpiar.

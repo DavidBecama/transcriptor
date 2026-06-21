@@ -10662,6 +10662,11 @@
     .rs .rk-note { font-size:12.5px; line-height:1.5; color:var(--text-tertiary); margin:6px 0 0; }
     .rs .rk-note b { color:var(--text-secondary); }
     .rs--mobile .rk-beat-sp { display:none; } .rs--mobile .rk-row { flex-wrap:wrap; } .rs--mobile .rk-h { flex-basis:55%; }
+    /* aviso de recompensa del feedback (sheet) */
+    .rs .fb-reward { display:flex; align-items:flex-start; gap:9px; padding:12px 14px; border-radius:12px; background:var(--success-bg, rgba(63,224,160,.12)); border:1px solid var(--success, #2FD18A); color:var(--text-secondary); font-size:13.5px; line-height:1.45; margin:2px 0 4px; }
+    .rs .fb-reward svg { width:16px; height:16px; flex:none; margin-top:1px; color:var(--success-fg, #3FE0A0); }
+    .rs .fb-reward b { color:var(--text-primary); font-weight:600; }
+    .rs .fb-reward + .field { margin-top:14px; }
     .rs .gui-list { padding:0 0 40px; display:flex; flex-direction:column; gap:10px; }
     .rs .gui-card { display:flex; align-items:center; gap:12px; padding:15px 16px; border:1px solid var(--border-default); border-radius:14px; background:var(--surface-raised); }
     .rs .gui-main { flex:1; min-width:0; }
@@ -27570,6 +27575,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=68"></script>
+<script src="/static/js/radar-loop.js?v=69"></script>
 </body>
 </html>

@@ -275,6 +275,7 @@
           '</span>'+
         '</div>'+
         '<button class="brand-opt" data-act="acct-settings" role="menuitem">'+IC.gear+' Configuración</button>'+
+        '<button class="brand-opt" data-act="acct-feedback" role="menuitem">'+IC.chat+' '+L("Enviar feedback","Send feedback")+'</button>'+
         '<button class="brand-opt rs-acct-logout" data-act="acct-logout" role="menuitem">'+IC.logout+' Cerrar sesión</button>'+
       '</div>';
   }
@@ -3560,6 +3561,34 @@
   }
   function submitSheet(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSubmit); }
   function submitSheetSecondary(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSecondary); }
+  /* Feedback (menú de cuenta): reportar bug o pedir mejora. Aviso de recompensa en
+     créditos si el bug es real. En prod → POST /api/feedback (fable lo cablea);
+     en demo solo confirma con toast. Reusa el promptSheet (textarea + tipo). */
+  function openFeedback(){
+    S.acctMenu=false;
+    promptSheet({
+      title: L("Enviar feedback","Send feedback"),
+      label: L("¿Qué falla o qué te gustaría?","What's broken or what would you like?"),
+      multiline: true,
+      placeholder: L("Describe el bug (con los pasos para reproducirlo) o la mejora que pides…","Describe the bug (with steps to reproduce) or the improvement you want…"),
+      helper: L("Cuanto más detalle, mejor podemos ayudarte.","The more detail, the better we can help."),
+      extraHTML:
+        '<div class="fb-reward">'+IC.spark+'<span>'+L("Si reportas un <b>bug real</b> y lo confirmamos, te <b>recompensamos con créditos</b>.","If you report a <b>real bug</b> and we confirm it, you get <b>credits as a reward</b>.")+'</span></div>'+
+        '<div class="field"><label class="field-label" for="rsFbType">'+L("Tipo","Type")+'</label>'+
+          '<select id="rsFbType" class="field-input"><option value="bug">'+L("Bug","Bug")+'</option><option value="idea">'+L("Idea o mejora","Idea or improvement")+'</option></select></div>',
+      readExtra: function(){ var s=document.getElementById("rsFbType"); return s?s.value:"bug"; },
+      submitLabel: L("Enviar","Send"),
+      validate: function(v){ if(!v||v.trim().length<8) return L("Cuéntanos un poco más (mínimo 8 caracteres).","Tell us a bit more (min 8 characters)."); return null; },
+      onSubmit: function(v, type){ submitFeedback(v, type); }
+    });
+  }
+  function submitFeedback(text, type){
+    if(!isDemo()){ try{ apiPost("/api/feedback",{type:type, text:text, page:S.tab, plan:S.user.plan}); }catch(e){} }   // prod: fable cablea el endpoint
+    try{ if(window.posthog) window.posthog.capture("feedback_submitted",{type:type}); }catch(e){}
+    showToast(type==="bug"
+      ? L("¡Gracias! Si confirmamos el bug, te llegan créditos de regalo.","Thanks! If we confirm the bug, credits land in your account.")
+      : L("¡Gracias por la idea! Las leemos todas.","Thanks for the idea! We read them all."));
+  }
   var _tpPlay='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
   var _tpPause='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>';
   var _icMirror='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7 4 12l4 5"/><path d="m16 7 4 5-4 5"/></svg>';
@@ -5053,6 +5082,7 @@
     if(act==="acct-toggle"){ S.acctMenu=!S.acctMenu; S.brandMenu=false; return render(); }
     if(act==="acct-close"){ S.acctMenu=false; return render(); }
     if(act==="acct-settings"){ S.acctMenu=false; return openLegacy("settings"); }
+    if(act==="acct-feedback"){ return openFeedback(); }
     if(act==="acct-logout"){ S.acctMenu=false;
       // Reusa el logout real de la chrome (POST /auth/logout + reset tracking + redirect).
       if(typeof window.logout==="function") return window.logout();
