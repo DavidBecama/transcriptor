@@ -294,7 +294,7 @@
       navTabs.map(function(t){return '<button class="rail-btn'+(S.tab===t[0]&&!S.legacy?" on":"")+'" data-act="tab" data-k="'+t[0]+'" data-tour="tab-'+t[0]+'">'+t[1]+'<span class="tip">'+t[2]+'</span></button>';}).join("")+
       // Accesos a las secciones legacy reutilizadas (no son S.tab internos).
       '<button class="rail-btn'+(S.legacy==="transc"?" on":"")+'" data-act="legacy" data-k="transc" aria-label="Analizar">'+IC.mic+'<span class="tip">Analizar</span></button>'+
-      '<button class="rail-btn'+(S.legacy==="settings"?" on":"")+'" data-act="legacy" data-k="settings" aria-label="Configuración">'+IC.gear+'<span class="tip">Configuración</span></button>'+
+      '<button class="rail-btn'+(S.tab==="settings"&&!S.legacy?" on":"")+'" data-act="tab" data-k="settings" aria-label="Ajustes">'+IC.gear+'<span class="tip">Ajustes</span></button>'+
       // El spacer empuja el botón de cuenta al fondo del rail.
       '<span class="rail-spacer"></span>'+
       '<button class="rail-acct'+(S.acctMenu?" on":"")+'" data-act="acct-toggle" aria-label="Tu cuenta" aria-haspopup="menu" aria-expanded="'+(S.acctMenu?"true":"false")+'">'+ESC(initialsOf(S.user.handle||S.user.name||S.user.email||"U"))+'</button>'+
@@ -303,7 +303,7 @@
     acctMenuHTML();
   }
   function cmdHTML(){
-    var tabName=({dashboard:"RADAR",ideas:"IDEAS",guiones:"GUIONES",metrics:"MÉTRICAS",leaderboard:"RANKING",brain:"CEREBRO",team:"EQUIPO"})[S.tab]||"";
+    var tabName=({dashboard:"RADAR",ideas:"IDEAS",guiones:"GUIONES",metrics:"MÉTRICAS",leaderboard:"RANKING",brain:"CEREBRO",team:"EQUIPO",settings:"AJUSTES"})[S.tab]||"";
     var crumb;
     crumb='<span class="crumb">/ '+tabName+'</span>';   // B3: sin portfolio/"Todas las marcas"
     var demoToggle=isDemo()?'<div class="demo-plan" title="Solo demo: cambia de plan"><span class="dp-k">DEMO</span>'+
@@ -1767,6 +1767,138 @@
         '<button class="btn btn-lg btn-primary" data-act="gen5ideas">'+IC.bolt+' '+L("Generar 5 ideas","Generate 5 ideas")+'</button>'+
       '</div>'+grid+
     '</section>';
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     AJUSTES (mockup David) — página isla con 3 sub-pestañas: Perfil y voz ·
+     Plan y créditos · Afiliados. Datos reales donde existen (handle, plan,
+     créditos, tono, muletillas); facturas/afiliados son demo (sin backend).
+     ════════════════════════════════════════════════════════════════ */
+  var AJ_TONES=["Directo","Humor seco","Cercano","Sin rodeos","Provocador","Didáctico","Motivador","Técnico"];
+  function ajustesInit(){
+    if(S.setTab) return;
+    S.setTab="perfil";
+    var v=brainVoice(brand()); var sel={};
+    var base=(v.tono||"Directo, Cercano").split(/[,·]/).map(function(x){return x.trim();}).filter(Boolean);
+    AJ_TONES.forEach(function(t){ sel[t]=base.some(function(b){return b.toLowerCase()===t.toLowerCase();}); });
+    if(!base.length){ sel["Directo"]=true; sel["Cercano"]=true; }
+    S.setTones=sel;
+    S.setPrefs={notif:true, semanal:true, beta:false};
+  }
+  function ajustesHTML(){
+    ajustesInit();
+    var b=brand();
+    var name=S.user.name||b.name||"Tu cuenta";
+    var handle=(b.handle||S.user.handle||"tu_cuenta").replace(/^@/,"");
+    var lv=brainLevel();
+    var tab=S.setTab||"perfil";
+    var subtabs=[["perfil",L("Perfil y voz","Profile & voice")],["plan",L("Plan y créditos","Plan & credits")],["afiliados",L("Afiliados","Affiliates")]];
+    var tabsH='<div class="aj-tabs">'+subtabs.map(function(t){
+      return '<button class="aj-tab'+(tab===t[0]?" on":"")+'" data-act="set-tab" data-k="'+t[0]+'">'+t[1]+'</button>';
+    }).join("")+'</div>';
+    var body="";
+    if(tab==="perfil") body=ajPerfilHTML(name,handle,lv);
+    else if(tab==="plan") body=ajPlanHTML();
+    else body=ajAfiliadosHTML();
+    return '<div class="scroll"><div class="canvas aj-canvas">'+
+      '<header class="aj-head"><h1 class="aj-h1">'+L("Ajustes","Settings")+'</h1>'+tabsH+'</header>'+
+      body+
+    '</div></div>';
+  }
+  function ajPerfilHTML(name,handle,lv){
+    var v=brainVoice(brand());
+    var reels=hasRealVoice()?(S.voice.source_count||0):(brand().reelsAnalyzed||47);
+    var tonos=AJ_TONES.map(function(t){ var on=!!S.setTones[t];
+      return '<button class="aj-tono'+(on?" on":"")+'" data-act="set-tone" data-k="'+ESC(t)+'">'+(on?IC.check+' ':'')+ESC(t)+'</button>';
+    }).join("");
+    var frases=(v.frases&&v.frases.length)?v.frases.map(function(f){return '“'+ESC(f)+'”';}).join(", ") : "“que no te engañen”, “comenta X y te lo paso”";
+    var prefs=[
+      ["notif",L("Avísame cuando algo explote","Tell me when something blows up"),L("Notificación en cuanto un competidor reviente un reel","A ping the moment a competitor's reel blows up")],
+      ["semanal",L("Resumen semanal del radar","Weekly radar digest"),L("Cada lunes, lo que más explotó en tu nicho","Every Monday, what blew up most in your niche")],
+      ["beta",L("Funciones beta","Beta features"),L("Prueba lo nuevo antes que nadie (puede romperse)","Try the new stuff first (may break)")]
+    ].map(function(p,i){
+      var on=!!S.setPrefs[p[0]];
+      return '<div class="aj-pref'+(i>0?" bt":"")+'"><div><div class="aj-pref-l">'+p[1]+'</div><div class="aj-pref-s">'+p[2]+'</div></div>'+
+        '<button class="aj-toggle'+(on?" on":"")+'" data-act="set-pref" data-k="'+p[0]+'" role="switch" aria-checked="'+(on?"true":"false")+'"><span class="aj-knob"></span></button></div>';
+    }).join("");
+    return '<div class="aj-stack">'+
+      // identity
+      '<div class="aj-card aj-identity">'+
+        '<div class="aj-avatar">'+ESC(initialsOf(name))+'</div>'+
+        '<div class="aj-id"><div class="aj-id-name">'+ESC(name)+'</div><div class="aj-id-handle">@'+ESC(handle)+'</div></div>'+
+        '<span class="aj-lvl">'+IC.brain+' '+L("Cerebro · Nivel "+lv.level,"Brain · Level "+lv.level)+'</span>'+
+        '<button class="btn btn-md btn-secondary" data-act="ajustes-edit">'+L("Editar perfil","Edit profile")+'</button>'+
+      '</div>'+
+      // voz
+      '<div class="aj-card aj-voice">'+
+        '<div class="aj-voice-head"><div><div class="aj-card-t">'+L("Tu voz","Your voice")+'</div>'+
+          '<div class="aj-card-s">'+L("La saqué de tus reels. Cada guion sale con este tono — edítalo y se nota al instante.","I pulled it from your reels. Every script comes out in this tone — edit it and you'll notice instantly.")+'</div></div>'+
+          '<span class="aj-derived">'+L("› derivada de "+reels+" reels","› derived from "+reels+" reels")+'</span></div>'+
+        '<div class="aj-tonos">'+tonos+'</div>'+
+        '<div class="aj-mulet-wrap"><span class="aj-mulet-k">'+L("Muletillas y expresiones tuyas","Your catchphrases & expressions")+'</span><div class="aj-mulet">'+frases+'</div></div>'+
+        '<div class="aj-voice-foot"><div class="aj-slider-row"><span>'+L("Nivel de humor seco","Dry humor level")+'</span><div class="aj-slider"><div class="aj-slider-fill" style="width:68%"></div><div class="aj-slider-knob" style="left:68%"></div></div></div>'+
+          '<button class="btn btn-md btn-primary" data-act="ajustes-save-voice">'+L("Guardar voz","Save voice")+'</button></div>'+
+      '</div>'+
+      // preferencias
+      '<div class="aj-card aj-prefs">'+prefs+'</div>'+
+    '</div>';
+  }
+  function ajPlanHTML(){
+    var plan=(S.user.plan||"free"); var planName=plan==="free"?"Free":(plan==="agencia"?"Agencia":(plan==="creador"?"Creador":"Pro"));
+    var cr=S.user.credits||0; var capMonth=30; var pct=Math.max(2,Math.min(100,Math.round(cr/capMonth*100)));
+    var nGuiones=S.guiones.filter(function(g){return g.status!=="discarded";}).length;
+    var usage=[
+      [L("Guiones generados","Scripts generated"), String(nGuiones)],
+      [L("Reels analizados","Reels analyzed"), String(hasRealVoice()?(S.voice.source_count||0):(brand().reelsAnalyzed||0)).replace(/\B(?=(\d{3})+(?!\d))/g," ")],
+      [L("«Llena mi semana»","«Fill my week»"), "2"]
+    ].map(function(u){ return '<div class="aj-usage-row"><span>'+u[0]+'</span><span class="aj-usage-v">'+ESC(u[1])+'</span></div>'; }).join("");
+    var invoices=[["14 jun 2026","19,00€"],["14 may 2026","19,00€"],["14 abr 2026","19,00€"]].map(function(iv,i){
+      return '<div class="aj-inv'+(i>0?" bt":"")+'"><div class="aj-inv-l">'+IC.doc+' <span>'+iv[0]+'</span></div>'+
+        '<span class="aj-inv-amt">'+iv[1]+'</span><span class="aj-inv-paid">'+IC.check+' '+L("Pagada","Paid")+'</span>'+
+        '<button class="aj-inv-dl" data-act="noop">'+L("Descargar","Download")+'</button></div>';
+    }).join("");
+    return '<div class="aj-stack">'+
+      '<div class="aj-plan-grid">'+
+        '<div class="aj-card aj-plancard">'+
+          '<div class="aj-plan-top"><span class="aj-plan-badge">'+IC.spark+' '+L("PLAN ","PLAN ")+ESC(planName.toUpperCase())+'</span><span class="aj-plan-renew">'+L("renueva 14 jul","renews Jul 14")+'</span></div>'+
+          '<div class="aj-plan-price"><span class="aj-plan-n">19€</span><span class="aj-plan-per">/ '+L("mes","mo")+'</span></div>'+
+          '<div class="aj-plan-cred"><div class="aj-plan-cred-row"><span>'+L("Créditos del mes","Credits this month")+'</span><span class="aj-mono">'+cr+' / '+capMonth+'</span></div>'+
+            '<div class="aj-cred-bar"><div class="aj-cred-fill" style="width:'+pct+'%"></div></div>'+
+            '<span class="aj-cred-note">'+L("1 crédito = 1 guion completo con tu voz.","1 credit = 1 full script in your voice.")+'</span></div>'+
+          '<div class="aj-plan-cta"><button class="btn btn-md btn-primary" data-act="open-plans">'+L("Recargar créditos","Top up credits")+'</button>'+
+            '<button class="btn btn-md btn-secondary" data-act="open-plans">'+L("Cambiar plan","Change plan")+'</button></div>'+
+        '</div>'+
+        '<div class="aj-card aj-usage"><span class="aj-card-t">'+L("Este mes","This month")+'</span>'+usage+'</div>'+
+      '</div>'+
+      '<div class="aj-card aj-invoices">'+invoices+'</div>'+
+    '</div>';
+  }
+  function ajAfiliadosHTML(){
+    var kpis=[
+      [L("Comisión acumulada","Total commission"),"342€","var(--success-fg,#3FE0A0)",L("desde marzo","since March")],
+      [L("Referidos activos","Active referrals"),"11","var(--text-primary)",L("de 19 registrados","of 19 signed up")],
+      [L("Pendiente de pago","Pending payout"),"58€","var(--text-primary)",L("se abona el 1 de jul","paid out Jul 1")]
+    ].map(function(k){ return '<div class="aj-card aj-kpi"><span class="aj-kpi-l">'+k[0]+'</span><span class="aj-kpi-v" style="color:'+k[2]+'">'+k[1]+'</span><span class="aj-kpi-s">'+k[3]+'</span></div>'; }).join("");
+    var link="reelscript.app/r/"+((brand().handle||S.user.handle||"tu").replace(/^@/,"")).slice(0,10);
+    var refs=[
+      ["MA","@marcos.ai",L("hace 3 días","3 days ago"),L("Pro activo","Pro active"),"var(--success-fg,#3FE0A0)","+5,7€"],
+      ["LU","@lucia.crea",L("hace 1 sem","1 wk ago"),L("Pro activo","Pro active"),"var(--success-fg,#3FE0A0)","+5,7€"],
+      ["JU","@juanpe",L("hace 2 sem","2 wk ago"),L("Prueba","Trial"),"var(--text-tertiary)","—"],
+      ["SO","@sofiamkt",L("hace 3 sem","3 wk ago"),L("Pro activo","Pro active"),"var(--success-fg,#3FE0A0)","+5,7€"]
+    ].map(function(r,i){
+      return '<div class="aj-ref'+(i>0?" bt":"")+'"><div class="aj-ref-l"><span class="aj-ref-av">'+r[0]+'</span><div><div class="aj-ref-n">'+r[1]+'</div><div class="aj-ref-d">'+r[2]+'</div></div></div>'+
+        '<span class="aj-ref-st" style="color:'+r[4]+'">'+r[3]+'</span><span class="aj-ref-amt">'+r[5]+'</span></div>';
+    }).join("");
+    return '<div class="aj-stack">'+
+      '<div class="aj-kpis">'+kpis+'</div>'+
+      '<div class="aj-card aj-afflink">'+
+        '<div><div class="aj-card-t">'+L("Tu enlace de afiliado","Your affiliate link")+'</div>'+
+          '<div class="aj-card-s">'+L("Te llevas el <b>30%</b> recurrente de cada uno que entre por aquí.","You earn a recurring <b>30%</b> from everyone who joins through here.")+'</div></div>'+
+        '<div class="aj-afflink-r"><span class="aj-afflink-url">'+ESC(link)+'</span>'+
+          '<button class="btn btn-md btn-primary" data-act="copy" data-txt="'+ESC("https://"+link)+'">'+IC.doc+' '+L("Copiar","Copy")+'</button></div>'+
+      '</div>'+
+      '<div class="aj-card aj-refs">'+refs+'</div>'+
+    '</div>';
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -3425,6 +3557,7 @@
     else if(S.tab==="metrics") html+=metricsHTML();
     else if(S.tab==="leaderboard") html+=leaderboardPageHTML();
     else if(S.tab==="brain") html+=brainHTML();
+    else if(S.tab==="settings") html+=ajustesHTML();   // v3: Ajustes como página isla (mockup David)
     else if(S.tab==="team") html+=teamHTML();
     html+='</div>';  // /.work
     if(S.view==="gen") html+=overlayShellHTML(generatingHTML(S.genKind),"Trabajando…","close-feed",true);
@@ -5007,6 +5140,13 @@
     if(act==="gui-record"){ var g=guionById(id); if(g){ S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; S.view="prompter"; render(); } return; }
     if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.view="script"; render(); } return; }   // v3 «Abrir guion» → editor
     if(act==="ed-close"){ S.view="feed"; S.tab="guiones"; S.activeGuionId=null; return render(); }   // v3 editor → vuelve a Guiones
+    // v3 Ajustes (página isla)
+    if(act==="set-tab"){ S.setTab=k; return render(); }
+    if(act==="set-tone"){ ajustesInit(); S.setTones[k]=!S.setTones[k]; return render(); }
+    if(act==="set-pref"){ ajustesInit(); S.setPrefs[k]=!S.setPrefs[k]; return render(); }
+    if(act==="ajustes-edit"){ return openLegacy("settings"); }   // perfil/cuenta real → ajustes legacy
+    if(act==="ajustes-save-voice"){ showToast(L("Voz guardada — tus próximos guiones salen con este tono.","Voice saved — your next scripts come out in this tone.")); return; }
+    if(act==="noop"){ return; }
     if(act==="ed-usehook"){ var eg=guionById(id); var ei=parseInt(btn.getAttribute("data-i"),10); if(eg&&eg.hooks&&eg.hooks[ei]!=null){ var prev=eg.hook; eg.hook=eg.hooks[ei]; eg.hooks[ei]=prev; if(eg.title===prev) eg.title=eg.hook; } return render(); }   // v3: elegir variante de gancho
     if(act==="gui-duplicate"){ var gd=guionById(id); if(gd){ var nid=addGuion({title:gd.title,hook:gd.hook,beats:(gd.beats||[]).slice(),close:gd.close,hooks:(gd.hooks||[]).slice(),from:gd.from,type:gd.type}); var ng=guionById(nid); if(ng){ ng.mult=gd.mult||gd.fromMult; } render(); showToast(L("Guion duplicado — listo para retocar.","Script duplicated — ready to tweak.")); } return; }
     if(act==="gui-toggle-rec"){ var g2=guionById(id); if(g2){ g2.status=(g2.status==="recorded")?"draft":"recorded"; if(g2.status==="recorded"&&S.stats) S.stats.stolen_today+=1; render(); showToast(g2.status==="recorded"?"Marcado como grabado.":"Vuelto a borrador."); persistRecStatus(g2); } return; }
