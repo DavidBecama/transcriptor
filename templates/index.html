@@ -24946,17 +24946,25 @@ function whopPlanId(cfg, plan, cycle, cur) {
 let _whopCheckoutPending = false;
 function whopCheckout(planId, opts) {
   if (!planId) { showToast(currentLang === "es" ? "Plan no configurado" : "Plan not configured"); return; }
-  const cfg = _billingCfg || {};
-  const base = (cfg.whop && cfg.whop.checkout_base) || "https://whop.com/checkout";
-  const uid = (st.user && st.user.id) || "";
-  let url = base + "/" + planId + "?metadata[user_id]=" + encodeURIComponent(uid);
-  // Auto-aplica el cupón de apertura cuando el CTA viene del flash/pop-up (opts.promo).
-  if (opts && opts.promo) url += "&" + WHOP_PROMO.param + "=" + encodeURIComponent(WHOP_PROMO.code);
-  // Pestaña nueva: la app se queda intacta (el «atrás» del checkout ya no saca a la
-  // landing). Si el navegador bloquea el popup, fallback al mismo tab.
-  const w = window.open(url, "_blank");
-  if (w) _whopCheckoutPending = true;
-  else window.location.href = url;
+  // El user_id viaja como metadata del CHECKOUT-SESSION creado server-side (el link
+  // pelado ?metadata[user_id]= NO lo captura Whop). Abrimos la pestaña ya (síncrono)
+  // para no chocar con el bloqueador de popups y la apuntamos al purchase_url.
+  const w = window.open("about:blank", "_blank");
+  const fail = (msg) => { if (w) { try { w.close(); } catch (e) {} } showToast(msg || (currentLang === "es" ? "No se pudo abrir el checkout" : "Couldn't open checkout")); };
+  fetch("/whop/checkout-session", {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan_id: planId }),
+  }).then(r => r.json().then(d => ({ ok: r.ok, d })))
+    .then(({ ok, d }) => {
+      if (!ok || !d || !d.url) { fail(d && d.error); return; }
+      let url = d.url;
+      // Auto-aplica el cupón de apertura cuando el CTA viene del flash/pop-up (opts.promo).
+      if (opts && opts.promo) url += (url.indexOf("?") >= 0 ? "&" : "?") + WHOP_PROMO.param + "=" + encodeURIComponent(WHOP_PROMO.code);
+      _whopCheckoutPending = true;
+      if (w) w.location.href = url; else window.location.href = url;
+    })
+    .catch(() => fail());
 }
 // Al volver al tab de la app tras el checkout de Whop, refrescamos plan/créditos
 // (el webhook ya habrá actualizado el perfil server-side).
