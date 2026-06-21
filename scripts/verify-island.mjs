@@ -104,7 +104,7 @@ async function nav(url) {
   for (let i = 0; i < 60; i++) {
     await sleep(250);
     try {
-      const ready = await evaluate(`!!document.querySelector('#radarRoot .phead')`); // .rail ya está en el skeleton; .phead = vista real
+      const ready = await evaluate(`!!document.querySelector('#radarRoot .cmd')`); // v3: cada página tiene su header propio (no .phead); .cmd (command bar) = vista real montada
       if (ready) { await sleep(400); return true; }
     } catch {}
   }
@@ -186,7 +186,7 @@ async function main() {
   await key("Enter");        // Enter → acción primaria GRATIS «Guardar idea»
   await sleep(400);
   await click('[data-act="tab"][data-k="guiones"]'); await sleep(300);
-  const onIdeas = await evaluate(`!!document.querySelector('#radarRoot .ideas-zone') && document.body.textContent.indexOf('Idea de prueba desde harness')>-1`);
+  const onIdeas = await evaluate(`!!document.querySelector('#radarRoot .guiu') && document.body.textContent.indexOf('Idea de prueba desde harness')>-1`);
   check("bombilla → «Guardar idea» (gratis) aparece en Guiones", onIdeas);
 
   // overlay + Esc: robar desde Dashboard
@@ -278,7 +278,7 @@ async function main() {
   /* ═══ Fix review (T6): re-robar un reel en vuelo NO duplica el guion ═══ */
   console.log("\n■ T6 · robo en vuelo sin duplicados");
   await nav(`${BASE}/profile/radar?plan=creador&t=guiones`);
-  const g0 = await evaluate(`document.querySelectorAll('#radarRoot .gui-card').length`);
+  const g0 = await evaluate(`document.querySelectorAll('#radarRoot .guic').length`);
   await click('[data-act="tab"][data-k="dashboard"]'); await sleep(200);
   await click('.feature [data-act="steal"]'); await sleep(150);
   await key("Escape"); await sleep(150);              // manda el robo a background
@@ -289,7 +289,7 @@ async function main() {
   })()`);
   await key("Escape"); await sleep(150);
   await click('[data-act="tab"][data-k="guiones"]'); await sleep(250);
-  const g1 = await evaluate(`document.querySelectorAll('#radarRoot .gui-card').length`);
+  const g1 = await evaluate(`document.querySelectorAll('#radarRoot .guic').length`);
   check("re-robo del mismo reel en vuelo → 1 solo guion nuevo (y reveal)", dup.reveal && g1 === g0 + 1, JSON.stringify({ g0, g1, reveal: dup.reveal }));
 
   /* ═══ Loop completo (los 4 momentos): despertar → robo → reveal → grabar ═══ */
@@ -311,13 +311,13 @@ async function main() {
   /* ═══ T9: deshacer al descartar guion ═══ */
   console.log("\n■ T9 · deshacer descarte");
   await nav(`${BASE}/profile/radar?plan=creador&t=guiones`);
-  const antes = await evaluate(`document.querySelectorAll('#radarRoot .gui-card').length`);
+  const antes = await evaluate(`document.querySelectorAll('#radarRoot .guic').length`);
   await click('[data-act="gui-discard"]'); await sleep(250);
-  const tras = await evaluate(`document.querySelectorAll('#radarRoot .gui-card').length`);
+  const tras = await evaluate(`document.querySelectorAll('#radarRoot .guic').length`);
   await click('#rsToastAct'); await sleep(250);
   const t9 = await evaluate(`(function(){
-    var n=document.querySelectorAll('#radarRoot .gui-card').length;
-    var pill=document.querySelector('#radarRoot .gui-pill'); // primera card = la restaurada
+    var n=document.querySelectorAll('#radarRoot .guic').length;
+    var pill=document.querySelector('#radarRoot .guic-badge'); // primera card = la restaurada
     return { n:n, pill:pill?pill.textContent.trim():null };
   })()`);
   check("descartar quita la card y «Deshacer» la restaura a «Por grabar»",

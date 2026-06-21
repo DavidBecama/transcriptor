@@ -3460,7 +3460,7 @@
           '<div class="ed-aitools">'+aiH+'</div>'+
           blocksH+
           '<div class="ed-doc-foot"><span class="ed-count">~'+secs+' s '+L("al hablar","spoken")+' · '+nWords+' '+L("palabras","words")+'</span>'+
-            '<button class="btn btn-md btn-secondary" data-act="'+(gid?'gui-record':'record')+'"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.mic+' '+L("Modo teleprónter","Teleprompter mode")+'</button></div>'+
+            '<button class="btn btn-md btn-secondary" data-act="chain" data-k="record">'+IC.mic+' '+L("Modo teleprónter","Teleprompter mode")+'</button></div>'+
         '</div>'+
         '<div class="ed-rail">'+
           srcPanel+txPanel+varPanel+
@@ -3685,7 +3685,8 @@
     else if(S.tab==="team") html+=teamHTML();
     html+='</div>';  // /.work
     if(S.view==="gen") html+=overlayShellHTML(generatingHTML(S.genKind),"Trabajando…","close-feed",true);
-    else if(S.view==="script") html+=scriptEditorHTML();   // v3: editor completo (mockup David)
+    else if(S.view==="script") html+=overlayShellHTML(scriptRevealHTML(),"Tu guión, en tu voz","close-feed",true);   // reveal «aha» tras robar
+    else if(S.view==="editor") html+=scriptEditorHTML();   // v3: editor completo (mockup David), desde «Abrir guion»
     else if(S.view==="result") html+=overlayShellHTML(formatResultHTML(S.resultKind),"Listo","back-script",false);
     else if(S.view==="perf") html+=overlayShellHTML(guiPerfHTML(),"Rendimiento del guion","close-feed",true);
     else if(S.view==="prompter") html+=teleprompterHTML();
@@ -5262,7 +5263,7 @@
       return;
     }
     if(act==="gui-record"){ var g=guionById(id); if(g){ S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; S.view="prompter"; render(); } return; }
-    if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.view="script"; render(); } return; }   // v3 «Abrir guion» → editor
+    if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.reel={id:go.from,creator:{handle:(go.from||"").replace(/^@/,"")},script:{hook:go.hook,beats:go.beats,close:go.close},dur:"",views:"",likes:"",when:go.when||""}; S.view="editor"; render(); } return; }   // v3 «Abrir guion» → editor (vista propia)
     if(act==="ed-close"){ S.view="feed"; S.tab="guiones"; S.activeGuionId=null; return render(); }   // v3 editor → vuelve a Guiones
     // v3 Ajustes (página isla)
     if(act==="set-tab"){ S.setTab=k; return render(); }
