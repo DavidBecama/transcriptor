@@ -104,7 +104,7 @@ async function nav(url) {
   for (let i = 0; i < 60; i++) {
     await sleep(250);
     try {
-      const ready = await evaluate(`!!document.querySelector('#radarRoot .phead')`); // .rail ya está en el skeleton; .phead = vista real
+      const ready = await evaluate(`!!document.querySelector('#radarRoot .cmd')`); // v3: cada página tiene su header propio (no .phead); .cmd (command bar) = vista real montada
       if (ready) { await sleep(400); return true; }
     } catch {}
   }
@@ -173,7 +173,10 @@ async function main() {
     var work=document.querySelector('#radarRoot .work'); if(!work) return {err:'no work'};
     var fold=window.innerHeight;
     var prim=[].slice.call(work.querySelectorAll('.btn-primary')).filter(function(b){
-      var r=b.getBoundingClientRect(); return r.top < fold && r.bottom > 0 && r.width>0;
+      var r=b.getBoundingClientRect();
+      // visible de verdad: dentro del fold vertical Y horizontal (los slides 2/3 del
+      // carrusel de oportunidades están desplazados fuera de pantalla a la derecha).
+      return r.top < fold && r.bottom > 0 && r.width>0 && r.left < window.innerWidth && r.right > 0;
     });
     return { n: prim.length, labels: prim.map(function(b){return b.textContent.trim();}) };
   })()`);
@@ -186,7 +189,7 @@ async function main() {
   await key("Enter");        // Enter → acción primaria GRATIS «Guardar idea»
   await sleep(400);
   await click('[data-act="tab"][data-k="guiones"]'); await sleep(300);
-  const onIdeas = await evaluate(`!!document.querySelector('#radarRoot .ideas-zone') && document.body.textContent.indexOf('Idea de prueba desde harness')>-1`);
+  const onIdeas = await evaluate(`!!document.querySelector('#radarRoot .guiu') && document.body.textContent.indexOf('Idea de prueba desde harness')>-1`);
   check("bombilla → «Guardar idea» (gratis) aparece en Guiones", onIdeas);
 
   // overlay + Esc: robar desde Dashboard
@@ -278,7 +281,7 @@ async function main() {
   /* ═══ Fix review (T6): re-robar un reel en vuelo NO duplica el guion ═══ */
   console.log("\n■ T6 · robo en vuelo sin duplicados");
   await nav(`${BASE}/profile/radar?plan=creador&t=guiones`);
-  const g0 = await evaluate(`document.querySelectorAll('#radarRoot .gui-card').length`);
+  const g0 = await evaluate(`document.querySelectorAll('#radarRoot .guic').length`);
   await click('[data-act="tab"][data-k="dashboard"]'); await sleep(200);
   await click('.feature [data-act="steal"]'); await sleep(150);
   await key("Escape"); await sleep(150);              // manda el robo a background
@@ -289,7 +292,7 @@ async function main() {
   })()`);
   await key("Escape"); await sleep(150);
   await click('[data-act="tab"][data-k="guiones"]'); await sleep(250);
-  const g1 = await evaluate(`document.querySelectorAll('#radarRoot .gui-card').length`);
+  const g1 = await evaluate(`document.querySelectorAll('#radarRoot .guic').length`);
   check("re-robo del mismo reel en vuelo → 1 solo guion nuevo (y reveal)", dup.reveal && g1 === g0 + 1, JSON.stringify({ g0, g1, reveal: dup.reveal }));
 
   /* ═══ Loop completo (los 4 momentos): despertar → robo → reveal → grabar ═══ */
@@ -311,13 +314,13 @@ async function main() {
   /* ═══ T9: deshacer al descartar guion ═══ */
   console.log("\n■ T9 · deshacer descarte");
   await nav(`${BASE}/profile/radar?plan=creador&t=guiones`);
-  const antes = await evaluate(`document.querySelectorAll('#radarRoot .gui-card').length`);
+  const antes = await evaluate(`document.querySelectorAll('#radarRoot .guic').length`);
   await click('[data-act="gui-discard"]'); await sleep(250);
-  const tras = await evaluate(`document.querySelectorAll('#radarRoot .gui-card').length`);
+  const tras = await evaluate(`document.querySelectorAll('#radarRoot .guic').length`);
   await click('#rsToastAct'); await sleep(250);
   const t9 = await evaluate(`(function(){
-    var n=document.querySelectorAll('#radarRoot .gui-card').length;
-    var pill=document.querySelector('#radarRoot .gui-pill'); // primera card = la restaurada
+    var n=document.querySelectorAll('#radarRoot .guic').length;
+    var pill=document.querySelector('#radarRoot .guic-badge'); // primera card = la restaurada
     return { n:n, pill:pill?pill.textContent.trim():null };
   })()`);
   check("descartar quita la card y «Deshacer» la restaura a «Por grabar»",
@@ -360,13 +363,12 @@ async function main() {
   const backH = await evaluate(`(function(){ var b=document.querySelector('#radarRoot .overlay .obar .back'); return b?Math.round(b.getBoundingClientRect().height):0; })()`);
   check("móvil: botón cerrar/volver de overlay ≥44px", backH >= 44, String(backH));
   await key("Escape"); await sleep(2000);   // deja resolver el robo demo en background
-  // Fix review (T8): tabs de marca en agencia móvil ≥44px.
+  // v3 (mockup David): los tabs de marca se quitaron del Radar; el cambio de marca
+  // vive en el selector de la barra superior (.brand-switch). Comprobamos que existe
+  // y es target táctil ≥44px en agencia móvil.
   await nav(`${BASE}/profile/radar?plan=agencia&b=b1`);
-  const btabs = await evaluate(`(function(){
-    return [].slice.call(document.querySelectorAll('#radarRoot .btab')).slice(0,5)
-      .map(function(b){ return Math.round(b.getBoundingClientRect().height); });
-  })()`);
-  check("móvil agencia: tabs de marca ≥44px", btabs.length > 0 && btabs.every((h) => h >= 44), JSON.stringify(btabs));
+  const bsw = await evaluate(`(function(){ var b=document.querySelector('#radarRoot .brand-switch'); return b?Math.round(b.getBoundingClientRect().height):0; })()`);
+  check("móvil agencia: selector de marca ≥44px", bsw >= 44, String(bsw));
   await send("Emulation.clearDeviceMetricsOverride", {}, sid);
 
   console.log(`\n═══ RESULTADO: ${passed} ✓ · ${failed} ✗ ═══`);

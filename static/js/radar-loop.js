@@ -95,7 +95,8 @@
     chat:'<svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M21 12a8 8 0 01-11.5 7.2L4 20l.9-5.2A8 8 0 1121 12z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
     users:'<svg viewBox="0 0 24 24" fill="none" width="18" height="18"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 20a5.5 5.5 0 0111 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M16 6.2a3 3 0 010 5.6M20.5 19.5a5 5 0 00-3.2-4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
     gear:'<svg viewBox="0 0 24 24" fill="none" width="18" height="18"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2V19a2 2 0 11-4 0v-.1a1.7 1.7 0 00-2.9-1.2l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.7 1.7 0 004.6 13H4.5a2 2 0 110-4h.1a1.7 1.7 0 001.2-2.9l-.1-.1a2 2 0 112.8-2.8l.1.1A1.7 1.7 0 0011 4.6V4.5a2 2 0 114 0v.1a1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1A1.7 1.7 0 0019.4 11h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.6 1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
-    logout:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    logout:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    edit:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M4 13.5V19a1 1 0 0 0 1 1h5.5M15 5l4 4-9 9H6v-4z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
 
   // Spinner CSS inyectado una vez.
@@ -274,6 +275,7 @@
           '</span>'+
         '</div>'+
         '<button class="brand-opt" data-act="acct-settings" role="menuitem">'+IC.gear+' Configuración</button>'+
+        '<button class="brand-opt" data-act="acct-feedback" role="menuitem">'+IC.chat+' '+L("Enviar feedback","Send feedback")+'</button>'+
         '<button class="brand-opt rs-acct-logout" data-act="acct-logout" role="menuitem">'+IC.logout+' Cerrar sesión</button>'+
       '</div>';
   }
@@ -291,9 +293,9 @@
     return '<nav class="rail">'+
       '<img class="rail-logo" src="/static/img/branding/isotipo-128.png" srcset="/static/img/branding/isotipo-128.png 1x, /static/img/branding/isotipo-256.png 2x" alt="Reelscript">'+
       navTabs.map(function(t){return '<button class="rail-btn'+(S.tab===t[0]&&!S.legacy?" on":"")+'" data-act="tab" data-k="'+t[0]+'" data-tour="tab-'+t[0]+'">'+t[1]+'<span class="tip">'+t[2]+'</span></button>';}).join("")+
-      // Accesos a las secciones legacy reutilizadas (no son S.tab internos).
-      '<button class="rail-btn'+(S.legacy==="transc"?" on":"")+'" data-act="legacy" data-k="transc" aria-label="Analizar">'+IC.mic+'<span class="tip">Analizar</span></button>'+
-      '<button class="rail-btn'+(S.legacy==="settings"?" on":"")+'" data-act="legacy" data-k="settings" aria-label="Configuración">'+IC.gear+'<span class="tip">Configuración</span></button>'+
+      // «Analizar» (transcribir un reel suelto) ya NO vive en el rail: se reubicó al
+      // Radar como acción «Analizar un reel» (junto a «Añadir reel»).
+      '<button class="rail-btn'+(S.tab==="settings"&&!S.legacy?" on":"")+'" data-act="tab" data-k="settings" aria-label="Ajustes">'+IC.gear+'<span class="tip">Ajustes</span></button>'+
       // El spacer empuja el botón de cuenta al fondo del rail.
       '<span class="rail-spacer"></span>'+
       '<button class="rail-acct'+(S.acctMenu?" on":"")+'" data-act="acct-toggle" aria-label="Tu cuenta" aria-haspopup="menu" aria-expanded="'+(S.acctMenu?"true":"false")+'">'+ESC(initialsOf(S.user.handle||S.user.name||S.user.email||"U"))+'</button>'+
@@ -302,10 +304,9 @@
     acctMenuHTML();
   }
   function cmdHTML(){
-    var tabName=({dashboard:"RADAR",ideas:"IDEAS",guiones:"GUIONES",metrics:"MÉTRICAS",leaderboard:"RANKING",brain:"CEREBRO",team:"EQUIPO"})[S.tab]||"";
+    var tabName=({dashboard:"RADAR",ideas:"IDEAS",guiones:"GUIONES",metrics:"MÉTRICAS",leaderboard:"RANKING",brain:"CEREBRO",team:"EQUIPO",settings:"AJUSTES"})[S.tab]||"";
     var crumb;
     crumb='<span class="crumb">/ '+tabName+'</span>';   // B3: sin portfolio/"Todas las marcas"
-    var streak=(S.user.streak>0)?'<span class="cmd-streak" title="Días seguidos creando">'+IC.spark+' Racha '+S.user.streak+'</span>':'';
     var demoToggle=isDemo()?'<div class="demo-plan" title="Solo demo: cambia de plan"><span class="dp-k">DEMO</span>'+
       '<button class="dp'+(S._demoFree===true?" on":"")+'" data-act="demo-plan" data-k="free">Free</button>'+
       '<button class="dp'+(!S._demoFree && S.plan==="creador"?" on":"")+'" data-act="demo-plan" data-k="creador">Creador</button>'+
@@ -317,10 +318,9 @@
       // T1 (IDI): captura de ideas siempre a mano, en cualquier vista de la isla.
       '<button class="cmd-idea" data-act="idea-capture" title="Apunta una idea — se desarrolla en Guiones" aria-label="Apunta una idea"><span class="cmd-idea-bulb">'+IC.bulb+'</span><span class="cmd-idea-t">Apunta una idea</span></button>'+
       demoToggle+
-      // Nivel del Cerebro como overlay persistente arriba del todo (en todas las
-      // páginas), estilo videojuego — pedido por David (Fathom 18/06). Centrado.
-      '<span class="cmd-brain-center">'+brainBadgeHTML()+'</span>'+
-      streak+
+      // v3 (mockup David): barra limpia — fuera el badge Cerebro y la Racha del
+      // command bar (el Cerebro sigue accesible por su pestaña). Solo queda el
+      // estado de plan/créditos a la derecha. demoToggle es solo-demo (no va a prod).
       pillStatHTML()+
     '</div>';
   }
@@ -444,13 +444,23 @@
       if(window.posthog && window.posthog.capture) window.posthog.capture(evt, p);
     }catch(e){}
   }
+  /* Captura genérica de producto (fuera del onboarding) para el panel becama.
+     No-op si posthog no está cargado; adjunta plan+demo de base. */
+  function rsTrack(evt, props){
+    try{
+      var p={ plan:(S.realPlan||(S.user&&S.user.plan)||null), demo:isDemo() };
+      if(props) for(var k in props) p[k]=props[k];
+      if(window.posthog && window.posthog.capture) window.posthog.capture(evt, p);
+    }catch(e){}
+  }
   function onbView(){ if(!S.onb._viewed) S.onb._viewed={}; if(!S.onb._viewed[S.onb.step]){ S.onb._viewed[S.onb.step]=1; onbTrack("onb_step_viewed"); } }
   function onbGoto(step){ S.onb.step=step; S.onb.error=null; render(); }
   function onbNext(){ var i=onbIdx(); onbTrack("onb_step_completed"); if(i<ONB_STEPS.length-1) onbGoto(ONB_STEPS[i+1]); }
   function onbBack(){ var i=onbIdx(); if(i>0) onbGoto(ONB_STEPS[i-1]); }
 
   /* ── helpers de markup ── */
-  function onbEyebrow(t){ return '<div class="onb-eyebrow">'+IC.spark+' '+ESC(t)+'</div>'; }
+  // v3 (mockup David): eyebrow en mono azul, minúscula, con prefijo «› » (no spark+MAYÚS).
+  function onbEyebrow(t){ return '<div class="onb-eyebrow">› '+ESC(t)+'</div>'; }
   function onbErr(){ return S.onb.error?'<div class="onb-err" role="alert">'+ESC(S.onb.error)+'</div>':''; }
   function onbCardWrap(eyebrow,h,sub,body,wide){ return '<section class="onb-box'+(wide?' onb-box--wide':'')+'">'+eyebrow+'<h2 class="onb-h">'+h+'</h2>'+(sub?'<p class="onb-sub">'+sub+'</p>':'')+body+'</section>'; }
   function onbBackBtn(){ return onbIdx()>0&&S.onb.step!=="close"?'<button class="onb-back-btn" data-act="onb-back" aria-label="'+L("Atrás","Back")+'">'+IC.back+' '+L("Atrás","Back")+'</button>':''; }
@@ -464,21 +474,28 @@
   }
   // Paso 1 — handle (OBLIGATORIO).
   function onbHandleHTML(){
-    return onbCardWrap(onbEyebrow(L("Empecemos por ti","Let's start with you")),L("¿Cuál es tu cuenta?","What's your account?"),
-      L("Tu usuario de Instagram o TikTok. Leo tus propios reels para que tu primer guión suene a ti, no genérico.","Your Instagram or TikTok handle. I read your own reels so your first script sounds like you, not generic."),
+    // Chip de validación (mockup David): verde cuando el formato del handle es válido.
+    // Honesto: «cuenta válida» (formato OK), no «encontrada» (no verificamos en vivo).
+    var _hv=(S.onb.handle||"").replace(/^@+/,"");
+    var _ok=/^[a-zA-Z0-9._]{2,30}$/.test(_hv);
+    var okChip='<span class="onb-handle-ok'+(_ok?' on':'')+'">'+IC.check+' '+L("cuenta válida","valid handle")+'</span>';
+    return onbCardWrap(onbEyebrow(L("empecemos","let's start")),L("¿Cuál es tu Instagram?","What's your Instagram?"),
+      L("Lo leo para entender tu voz y de qué va lo tuyo. No publico nada por ti, tranquilo.","I read it to understand your voice and what you're about. I don't post anything for you, promise."),
       '<div class="onb-pform"><div class="onb-handle"><span class="onb-at">@</span>'+
-        '<input id="rsOnbHandle" class="onb-input" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="'+L("tu_usuario","your_handle")+'" value="'+ESC(S.onb.handle||"")+'" aria-label="'+L("Tu usuario de Instagram o TikTok","Your Instagram or TikTok handle")+'"></div></div>'+
+        '<input id="rsOnbHandle" class="onb-input" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="'+L("tu_usuario","your_handle")+'" value="'+ESC(S.onb.handle||"")+'" aria-label="'+L("Tu usuario de Instagram","Your Instagram handle")+'">'+okChip+'</div></div>'+
       onbErr()+
       '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-handle-next">'+IC.arr+' '+L("Continuar","Continue")+'</button>');
   }
   // Paso 2 — nicho (OBLIGATORIO): chips amplios + texto libre.
   function onbNicheHTML(){
     var _nc=nicheChips();
-    var chips=_nc.map(function(n){ var on=_norm(S.onb.niche)===_norm(n); return '<button class="onb-chip'+(on?" on":"")+'" data-act="onb-pick-niche" data-k="'+ESC(n)+'">'+ESC(n)+'</button>'; }).join("");
+    // v3 (mockup David): grid de icon-cards (icono = inicial del nicho) en vez de pills.
+    var chips=_nc.map(function(n){ var on=_norm(S.onb.niche)===_norm(n);
+      return '<button class="onb-ncard'+(on?" on":"")+'" data-act="onb-pick-niche" data-k="'+ESC(n)+'"><span class="onb-ncard-ic">'+ESC(n.charAt(0).toUpperCase())+'</span><span class="onb-ncard-l">'+ESC(n)+'</span></button>'; }).join("");
     var custom=(_nc.some(function(n){return _norm(n)===_norm(S.onb.niche);})||!S.onb.niche)?"":S.onb.niche;
-    return onbCardWrap(onbEyebrow(L("Tu terreno","Your turf")),L("¿De qué va tu contenido?","What's your content about?"),
-      L("Elige tu nicho o escríbelo. Con esto encuentro qué está petando ahí — y a quién deberías vigilar.","Pick your niche or type it. With this I find what's blowing up there — and who you should be watching."),
-      '<div class="onb-chips">'+chips+'</div>'+
+    return onbCardWrap(onbEyebrow(L("tu terreno","your turf")),L("¿De qué va tu contenido?","What's your content about?"),
+      L("Elige el que más se acerque. Afinamos en el siguiente paso.","Pick the closest one. We refine it in the next step."),
+      '<div class="onb-niche-grid">'+chips+'</div>'+
       '<input id="rsOnbNiche" class="onb-text" type="text" placeholder="'+L("…o escríbelo (ej: nutrición deportiva)","…or type it (e.g. sports nutrition)")+'" value="'+ESC(custom)+'" aria-label="'+L("Tu nicho","Your niche")+'">'+
       onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-niche-next">'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
@@ -487,8 +504,8 @@
   function onbSubnicheHTML(){
     var sel=(S.onb.subniches||[]).map(function(t){ return '<span class="onb-tag on" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+' <b>×</b></span>'; }).join("");
     var sugg=onbSubSuggest().slice(0,8).map(function(t){ return '<button class="onb-tag" data-act="onb-tag-toggle" data-k="'+ESC(t)+'">#'+ESC(t)+'</button>'; }).join("");
-    return onbCardWrap(onbEyebrow(L("Más concreto","Get specific")),L("¿Qué tratas dentro de "+(S.onb.niche||"lo tuyo")+"?","What do you cover in "+(S.onb.niche||"your niche")+"?"),
-      L("Cuanto más específico, mejor el match: <b>cosmética orgánica</b> es mejor que <b>cosmética</b>. Elige varias o añade las tuyas.","The more specific, the better the match: <b>organic skincare</b> beats <b>skincare</b>. Pick a few or add your own."),
+    return onbCardWrap(onbEyebrow(L("afinemos","refine it")),L("¿Qué tratas dentro de "+(S.onb.niche||"lo tuyo")+"?","What do you cover in "+(S.onb.niche||"your niche")+"?"),
+      L("Marca todo lo que toques. Cuanto más fino, mejor te leo el nicho.","The more specific, the better the match: <b>organic skincare</b> beats <b>skincare</b>. Pick a few or add your own."),
       '<div class="onb-tags" id="rsOnbTags">'+(sel||'<span class="onb-tags-ph">'+L("Tus etiquetas aparecerán aquí…","Your tags will show up here…")+'</span>')+'</div>'+
       '<div class="onb-tagadd"><span class="onb-hash">#</span><input id="rsOnbTagInput" class="onb-text onb-text--tag" type="text" placeholder="'+L("añade una etiqueta y Enter","add a tag and hit Enter")+'" aria-label="'+L("Añadir subnicho","Add subniche")+'"><button class="onb-tagadd-btn" data-act="onb-tag-add">'+IC.plus+'</button></div>'+
       (sugg?'<div class="onb-sugg-lbl">'+L("Sugerencias para tu nicho","Suggestions for your niche")+'</div><div class="onb-tags onb-tags--sugg">'+sugg+'</div>':'')+
@@ -525,9 +542,9 @@
     if(S.onb.valueLoading) cta='';
     else if((S.onb.valueReels||[]).length) cta='<span class="onb-hint" style="font-size:13px;opacity:.6;align-self:center">'+L("Toca un reel para robarlo y convertirlo en tu guion","Tap a reel to steal it and turn it into your script")+'</span>';
     else cta='<button class="btn btn-lg btn-primary onb-cta" data-act="onb-value-next">'+IC.arr+' '+L("Seguir","Continue")+'</button>';
-    return onbCardWrap('<div class="onb-eyebrow">'+IC.bolt+' '+ESC(subs||L("Tu subnicho","Your subniche"))+'</div>',
+    return onbCardWrap(onbEyebrow(L("inspirándome del éxito","learning from what works")),
       L("Esto es lo que explota en lo tuyo","This is what's blowing up in your space"),
-      L("Reels reales de creadores como tú que están explotando. Elige el que más te encaje — te lo convierto en guion tuyo al instante.","Real reels from creators like you that are blowing up. Pick the one that fits — I turn it into your script instantly."),
+      L("Ya estoy mirando a quién copiar bien. Mira el nivel que vas a poder robar:","I'm already scoping who to copy right. Look at the level you'll be able to steal:"),
       body+
       '<div class="onb-row">'+onbBackBtn()+cta+'</div>', true);
   }
@@ -548,7 +565,7 @@
     }
     var ready=!S.onb.ahaLoading && S.onb.ahaScript;
     var row = ready
-      ? '<div class="onb-row"><button class="btn btn-ghost" data-act="onb-value-reset">← '+L("Elegir otro","Pick another")+'</button><button class="btn btn-lg btn-primary onb-cta" data-act="onb-value-next">'+IC.arr+' '+L("Sigamos — guárdalo y a por más","Let's go — save it and grab more")+'</button></div>'
+      ? '<div class="onb-row"><button class="btn btn-ghost" data-act="onb-value-reset">← '+L("Elegir otro","Pick another")+'</button><button class="btn btn-lg btn-primary onb-cta" data-act="onb-value-next">'+IC.arr+' '+L("Sigamos","Let's go")+'</button></div>'
       : '';
     return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Tu primer guión","Your first script")+'</div>',
       L("Esto ya es tuyo. Tu primer guion, en 1 clic.","This is yours now. Your first script, in 1 click."),
@@ -575,9 +592,9 @@
     var nPick=(S.onb.competitors||[]).filter(function(c){return c.picked;}).length;
     // Cargando → SIN botón de avanzar (solo Atrás): no aparece antes que los resultados.
     var compCta=S.onb.compLoading ? ''
-      : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick+" y seguir","Follow "+nPick+" and continue")+'</button>';
-    return onbCardWrap(onbEyebrow(L("Tu radar","Your radar")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
-      L("Pre-elegí a 2 de tu subnicho. Seguiré sus reels que petan para que robes el primero en tu voz. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
+      : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick,"Follow "+nPick)+'</button>';
+    return onbCardWrap(onbEyebrow(L("a quién vigilamos","who to watch")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
+      L("Los que más explotan en tu nicho. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
       body+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+compCta+'</div>');
   }
@@ -585,27 +602,32 @@
   function onbGoalHTML(){
     var cards=ONB_GOALS.map(function(g){ var on=S.onb.goal===g.key; return '<button class="onb-goal'+(on?" on":"")+'" data-act="onb-pick-goal" data-k="'+g.key+'">'+
       '<span class="onb-goal-ic">'+(IC[g.ic]||IC.spark)+'</span><span class="onb-goal-l">'+ESC(L(g.label,g.label_en))+'</span><span class="onb-goal-d">'+ESC(L(g.desc,g.desc_en))+'</span></button>'; }).join("");
-    return onbCardWrap(onbEyebrow(L("El para qué","The why")),L("¿Qué buscas con esto?","What are you after?"),
-      L("Con esto ajusto el tono y la estructura de tus guiones — vender no se escribe como entretener.","With this I tune the tone and structure of your scripts — selling isn't written like entertaining."),
+    return onbCardWrap(onbEyebrow(L("para qué","what for")),L("¿Qué buscas con esto?","What are you after?"),
+      L("Ajusto el tono de tus guiones a tu objetivo. Solo uno.","With this I tune the tone and structure of your scripts — selling isn't written like entertaining."),
       '<div class="onb-goals">'+cards+'</div>'+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-goal-next"'+(S.onb.goal?'':' disabled')+'>'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
   }
-  // Paso 7 — CIERRE: Cerebro 50% + primer guión + camino a 100%.
+  // Paso 7 — CIERRE: Cerebro 35% + primer guión + camino a 100%.
+  // Brief David v3: el cierre NO afirma en pasado lo que aún es async (el scrape del
+  // perfil propio + competidores corre en segundo plano) → copy en presente/continuo.
+  // Paso 7 CIERRE (mockup David): centrado — anillo azul al 35% con «Cerebro · N1» +
+  // acento Syne «Manifestando viralidad» + título + sub corto + «Abrir mi primer guion».
   function onbCloseHTML(){
     var pct=35;
-    return onbCardWrap('<div class="onb-eyebrow">'+IC.check+' '+L("Listo","Ready")+'</div>',
-      L("Tu Cerebro ya sabe lo justo para empezar","Your Brain now knows just enough to start"),
-      L("Ya leí tu cuenta y a tus 2 competidores. Tu Cerebro es un <b>perfil de contexto</b> (no un clon total de tu voz todavía). Cada día, con <b>un ejercicio de 1 minuto</b>, subo un poco más — hasta sonar clavado a ti.","I've read your account and your 2 competitors. Your Brain is a <b>context profile</b> (not a full clone of your voice yet). Each day, with a <b>1-minute exercise</b>, it climbs a bit more — until it sounds just like you."),
-      '<div class="onb-brain"><div class="onb-brain-bar"><div class="onb-brain-fill" style="width:'+pct+'%"></div></div>'+
-        '<div class="onb-brain-row"><span class="onb-brain-k">'+IC.brain+' '+L("Cerebro","Brain")+'</span><span class="onb-brain-v">'+pct+'%</span></div></div>'+
-      '<ul class="onb-checklist">'+
-        '<li>'+IC.check+' '+L("Panel lleno con reels que petan en tu subnicho","Panel full of reels blowing up in your subniche")+'</li>'+
-        '<li>'+IC.check+' '+L("2 competidores en el radar, trayendo sus reels","2 competitors on your radar, bringing their reels")+'</li>'+
-        '<li>'+IC.check+' '+L("Tu primer guión, esperándote en el radar","Your first script, waiting on your radar")+'</li>'+
-      '</ul>'+
-      '<p class="onb-path">'+L("El resto se gana: <b>enséñame tu voz</b> con tus propios reels y subimos del 35% al 100%.","The rest is earned: <b>teach me your voice</b> with your own reels and we go from 35% to 100%.")+'</p>'+
+    return '<section class="onb-box onb-box--center">'+
+      '<div class="onb-close-ring"><div class="brain-ring">'+
+        '<svg width="150" height="150" viewBox="0 0 172 172" class="brain-ring-svg" aria-hidden="true">'+
+          '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
+          '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+Math.round(465*(1-pct/100))+'" class="brain-ring-prog"/>'+
+        '</svg>'+
+        '<div class="brain-ring-c"><span class="onb-ring-pct">'+pct+'%</span><span class="brain-ring-lvl">'+L("Cerebro · N1","Brain · N1")+'</span></div>'+
+      '</div></div>'+
+      '<div class="onb-close-accent">'+L("Manifestando viralidad","Manifesting virality")+'</div>'+
+      '<h2 class="onb-h">'+L("Tu Cerebro ya sabe lo justo para empezar","Your Brain now knows just enough to start")+'</h2>'+
+      '<p class="onb-sub">'+L("Cada guion que crees lo afina. Vamos con el primero — el resto es cuesta abajo.","Every script you make sharpens it. Let's do the first one — the rest is downhill.")+'</p>'+
       onbErr()+
-      '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-finish"'+(S.onb.busy?' disabled':'')+'>'+(S.onb.busy?'<span class="mini-spin"></span> '+L("Preparando…","Preparing…"):IC.bolt+' '+L("Entrar a mi radar","Enter my radar"))+'</button>');
+      '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-finish"'+(S.onb.busy?' disabled':'')+'>'+(S.onb.busy?'<span class="mini-spin"></span> '+L("Preparando…","Preparing…"):IC.bolt+' '+L("Abrir mi primer guion","Open my first script"))+'</button>'+
+    '</section>';
   }
   function onbStepHTML(){
     switch(S.onb.step){
@@ -624,8 +646,7 @@
     var dots=ONB_STEPS.map(function(s,n){ return '<span class="onbp-dot'+(n<=i?" on":"")+'"></span>'; }).join("");
     return '<div class="onb-screen"><div class="onb-screen-bg" aria-hidden="true"></div>'+
       '<div class="onb-screen-inner">'+
-        '<div class="onb-top"><span class="onb-logo">'+IC.bolt+' ReelScript</span>'+
-          (i>0&&S.onb.step!=="close"?'<button class="onb-skip-top" data-act="onb-skip">'+L("Saltar configuración","Skip setup")+'</button>':'')+'</div>'+
+        '<div class="onb-top"><span class="onb-logo">'+IC.bolt+' ReelScript</span></div>'+
         '<div class="onb-prog"><div class="onbp-dots">'+dots+'</div><span class="onbp-lbl">'+L("Paso","Step")+' '+(i+1)+' '+L("de","of")+' '+ONB_STEPS.length+'</span></div>'+
         onbStepHTML()+
       '</div></div>';
@@ -677,7 +698,7 @@
       done((r.ok&&r.d&&Array.isArray(r.d.reels))?r.d.reels:[]);
     });
   }
-  function onbValueNext(){ onbTrack("onb_step_completed",{value_reels:(S.onb.valueReels||[]).length}); onbGoto("competitors"); onbLoadComps(); }
+  function onbValueNext(){ onbTrack("onb_step_completed",{value_reels:(S.onb.valueReels||[]).length}); if(!(S.onb.competitors||[]).length) S.onb.compLoading=true; onbGoto("competitors"); onbLoadComps(); }
   // AHA: roba el reel i → genera el guion en su voz y lo muestra en el flujo.
   function onbValueSteal(i){
     var r=(S.onb.valueReels||[])[i]; if(!r) return;
@@ -884,8 +905,40 @@
     return '<details class="comp-manage"><summary>Tus competidores · '+t.length+'</summary><div class="comp-manage-list">'+rows+'</div></details>';
   }
 
+  // v3 (mockup David «llena mi semana»): fila degradada con icono azul + chispa
+  // naranja, título Clash, píldora «EN LOTE · 1 TOQUE» y CTA azul «Generar N guiones».
   function whaleHTML(count){
-    return '<div class="whale"><div class="wicon">'+IC.bolt+'</div><div class="wtext"><h4>Llena mi semana</h4><p>Convierte los '+count+' reels más explosivos en '+count+' guiones con tu voz, listos para grabar. De golpe.</p></div><button class="btn btn-md btn-secondary" data-act="fillweek">Hazlo</button></div>';
+    count=count||5;
+    return '<div class="whale">'+
+      '<div class="whale-l">'+
+        '<div class="whale-ic">'+IC.bolt+'</div>'+
+        '<div class="whale-tx">'+
+          '<div class="whale-h"><span class="whale-title">'+L("Llena mi semana","Fill my week")+'</span>'+
+            '<span class="whale-pill">'+L("EN LOTE · 1 TOQUE","BATCH · 1 TAP")+'</span></div>'+
+          '<p class="whale-sub">'+L("Cojo tus <b>"+count+" reels más explosivos</b> y te los devuelvo como <b>"+count+" guiones con tu voz</b>, listos para grabar. Sin ir uno a uno.","I grab your <b>"+count+" most explosive reels</b> and hand them back as <b>"+count+" scripts in your voice</b>, ready to record. No going one by one.")+'</p>'+
+        '</div>'+
+      '</div>'+
+      '<button class="btn btn-lg btn-primary" data-act="fillweek">'+IC.bolt+' '+L("Generar "+count+" guiones","Generate "+count+" scripts")+'</button>'+
+    '</div>';
+  }
+  /* v3 (mockup David «progreso / cerebro»): fila con icono cerebro azul, nivel +
+     contador «N/3 guiones para Nx», descripción y 3 segmentos de progreso, CTA
+     «Crear guion». Usa brainLevel() (señales reales) — no inventa el nivel. */
+  function radarCerebroRowHTML(){
+    var bl=brainLevel();
+    var g=Math.min(3,(bl.signals&&bl.signals.guiones)||0);
+    var nx=bl.next||bl.level;
+    var segs=''; for(var i=0;i<3;i++){ segs+='<span class="rcb-seg'+(i<g?' on':'')+'"></span>'; }
+    return '<div class="rcb">'+
+      '<div class="rcb-ic">'+IC.brain+'</div>'+
+      '<div class="rcb-body">'+
+        '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · nivel "+bl.level,"Your brain · level "+bl.level)+'</span>'+
+          '<span class="rcb-prog">'+g+'/3 '+L("guiones para N"+nx,"scripts to L"+nx)+'</span></div>'+
+        '<div class="rcb-desc">'+L("Cada guion que creas afina tu voz: el Cerebro clava mejor tu tono. Crea 3 para subir a <b>Nivel "+nx+"</b>.","Every script you make tunes your voice: the Brain nails your tone better. Make 3 to reach <b>Level "+nx+"</b>.")+'</div>'+
+        '<div class="rcb-bars">'+segs+'</div>'+
+      '</div>'+
+      '<button class="btn btn-md btn-secondary" data-act="tab" data-k="guiones">'+IC.plus+' '+L("Crear guion","Create script")+'</button>'+
+    '</div>';
   }
   function filtersHTML(){
     var base=[["explosion",IC.spark+' Explotando'],["recent","Recientes"],["fav",IC.starO+' Favoritos']];
@@ -899,6 +952,7 @@
     var bar='<div class="radar-addbar">'+
       '<button class="fchip ghost'+(S.addCompOpen?" on":"")+'" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
       '<button class="fchip ghost" data-act="add-reel">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
+      '<button class="fchip ghost" data-act="analyze-reel" title="'+L("Transcribe un reel suelto sin seguir a su autor","Transcribe a single reel without following its author")+'">'+IC.doc+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
       '<span style="flex:1"></span>'+
       '<button class="fchip ghost" data-act="refresh-radar" title="'+L("Busca lo nuevo de tus competidores","Check what\'s new from your competitors")+'">'+IC.repeat+' '+L("Actualizar radar","Refresh radar")+'</button>'+
     '</div>';
@@ -954,26 +1008,107 @@
       (sub?'<span class="rgal-sub">'+ESC(sub)+'</span>':'')+'</div>'+(moreHTML||'')+'</div>'+
       '<div class="rgal-track">'+cards+'</div></section>';
   }
+  /* Tarjeta de reel de competidor (mockup David «RADAR exploración»): thumb 9:16
+     arriba (badge mult verde + chispazo naranja + dur mono + play), body con
+     handle·time mono + título Clash + «Ver métricas»/robar. */
+  function competitorReelCardHTML(r, thumb){
+    var t=thumb||r.thumb;
+    var thumbInner=t?'<img src="'+ESC(t)+'" alt="" loading="lazy">':'<div class="crd-ph" style="background:'+_galGrad(r.id||r.creator.handle)+'">'+_icPlay+'</div>';
+    var mult=(r.explosionTxt!=null)?(r.explosionTxt+'×'):'';
+    var open=(S._galOpen===r.id);
+    return '<div class="crd'+(open?' crd--open':'')+'">'+
+      '<div class="crd-main">'+
+        '<div class="crd-thumb">'+thumbInner+
+          (mult?'<span class="crd-mult">'+IC.bolt+' '+ESC(mult)+'</span>':'')+
+          (r.dur?'<span class="crd-dur">'+ESC(r.dur)+'</span>':'')+
+          '<span class="crd-play">'+_icPlay+'</span>'+
+        '</div>'+
+        '<div class="crd-body">'+
+          '<span class="crd-meta">@'+ESC(r.creator.handle)+' · '+ESC(r.when)+'</span>'+
+          '<h3 class="crd-title">'+ESC(r.cap)+'</h3>'+
+          '<div class="crd-acts">'+
+            '<button class="crd-btn crd-metrics'+(open?' on':'')+'" data-act="gal-expand" data-id="'+ESC(r.id)+'">'+IC.eye+' '+(open?L("Ocultar","Hide"):L("Ver métricas","See metrics"))+'</button>'+
+            '<button class="crd-btn crd-steal" data-act="steal" data-id="'+ESC(r.id)+'" aria-label="'+L("Roba la idea","Steal the idea")+'">'+IC.bolt+'</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      (open?competitorPanelHTML(r):'')+
+    '</div>';
+  }
+  /* Panel expandible (mockup David «EXPANDIBLE · Ver métricas · transcripción»):
+     stats 2×2 (Explosión verde, Views, Likes, Comentarios) + transcripción + robar. */
+  function competitorPanelHTML(r){
+    var tx=(S._tx&&S._tx.id===r.id)?S._tx:{status:"idle"};
+    var txBody;
+    if(tx.status==="ok") txBody='<div class="crd-tx">'+ESC(tx.text)+'</div>';
+    else if(tx.status==="loading") txBody='<div class="crd-tx crd-tx--wait"><span class="rs-ldr"></span> '+L("Transcribiendo el audio…","Transcribing audio…")+'</div>';
+    else if(tx.status==="error") txBody='<div class="crd-tx crd-tx--wait">'+L("No se pudo transcribir.","Couldn't transcribe.")+' <button class="btn btn-sm btn-secondary" data-act="reel-tx" data-id="'+ESC(r.id)+'">'+L("Reintentar","Retry")+'</button></div>';
+    else txBody='<button class="btn btn-sm btn-secondary" data-act="reel-tx" data-id="'+ESC(r.id)+'">'+IC.doc+' '+L("Ver transcripción","See transcript")+'</button>';
+    var stat=function(k,v,green){ return '<div class="crd-stat"><div class="crd-stat-k">'+ESC(k)+'</div><div class="crd-stat-v'+(green?' g':'')+'">'+ESC(String(v))+'</div></div>'; };
+    return '<div class="crd-panel">'+
+      '<div class="crd-pgrid">'+
+        stat(L("Explosión","Explosion"), (r.explosionTxt!=null?r.explosionTxt+'×':'–'), true)+
+        stat(L("Views","Views"), r.views)+
+        stat(L("Likes","Likes"), r.likes)+
+        stat(L("Comentarios","Comments"), (r.comments!=null?r.comments:'–'))+
+      '</div>'+
+      '<div class="crd-txwrap"><span class="crd-tx-lbl">'+L("TRANSCRIPCIÓN · DETECTADA","TRANSCRIPT · DETECTED")+'</span>'+txBody+'</div>'+
+      '<button class="btn btn-md btn-primary crd-steal-full" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba la idea","Steal the idea")+'</button>'+
+    '</div>';
+  }
+  // v3 (mockup David · «Competidores en el radar» + galería): fila de chips por
+  // competidor (avatar+@handle+count, filtran la galería) + «Añadir», línea
+  // «Galería · X — pulsa Ver métricas…» + flechas, track de cards y empty state.
   function competitorGalleryHTML(){
-    var reels=feedReels();
+    if(!S.reels.length) return '';
     var imgs=_demoThumbs();
-    var n=imgs?(imgs.length+3):Math.min(12, reels.length);
-    if(!n) return '';
-    var cards="";
-    for(var i=0;i<n;i++){
-      var r=reels.length?reels[i%reels.length]:null;
-      cards+=galleryCardHTML({
-        id:(r?r.id:""), handle:(r?r.creator.handle:"creador"), cap:(r?r.cap:""),
-        thumb:(imgs?(i<imgs.length?imgs[i]:null):(r&&r.thumb)),
-        badge:(r&&r.explosionTxt!=null?r.explosionTxt+'×':''),
-        key:(r?(r.id||r.creator.handle):"c"+i), act:(r?"reel-detail":"")
-      });
+    // competidores derivados de los reels (estables, no dependen del filtro)
+    var byComp={}; S.reels.forEach(function(r){ var h=(r.creator&&r.creator.handle)||""; if(!h) return; if(!byComp[h]) byComp[h]={handle:h, n:0}; byComp[h].n++; });
+    var comps=Object.keys(byComp).map(function(h){ return byComp[h]; });
+    var active=S.galComp||null;
+    // chips COMPACTOS y uniformes (tamaño «Todos», sin avatar).
+    var chip=function(h,label,n,on){
+      return '<button class="rgal-chip'+(on?' on':'')+'" data-act="gal-comp" data-k="'+ESC(h)+'">'+ESC(label)+
+        (n!=null?'<span class="rgal-chip-n">'+n+'</span>':'')+'</button>';
+    };
+    // Solo 3-4 visibles; el resto en un desplegable con buscador. Si el activo está
+    // oculto, lo subo a la cabeza para que se vea seleccionado.
+    var MAXVIS=3;
+    var ordered=comps.slice();
+    if(active){ var ai=ordered.map(function(c){return c.handle;}).indexOf(active); if(ai>=MAXVIS){ var a=ordered.splice(ai,1)[0]; ordered.unshift(a); } }
+    var vis=ordered.slice(0,MAXVIS), hidden=ordered.slice(MAXVIS);
+    var chips=chip("",L("Todos","All"),S.reels.length,!active)+
+      vis.map(function(c){ return chip(c.handle,"@"+c.handle,c.n,active===c.handle); }).join("");
+    // desplegable con buscador para el resto (gente seguida que no cabe en la fila).
+    // VA FUERA de la tira con scroll (.rgal-comps tiene overflow → recortaría el menú).
+    var moreWrap="";
+    if(hidden.length){
+      var rows=comps.map(function(c){
+        return '<button class="gal-menu-row'+(active===c.handle?' on':'')+'" data-act="gal-comp" data-k="'+ESC(c.handle)+'" data-handle="'+ESC(c.handle.toLowerCase())+'">'+
+          '<span class="rgal-chip-av">'+ESC(initialsOf(c.handle))+'</span><span class="gal-menu-h">@'+ESC(c.handle)+'</span><span class="rgal-chip-n">'+c.n+'</span></button>';
+      }).join("");
+      var dd=S.galMenu?('<div class="gal-menu">'+
+        '<input class="gal-menu-search" type="text" autocomplete="off" spellcheck="false" placeholder="'+L("Buscar competidor…","Search competitor…")+'" oninput="try{window.RadarLoop.galSearch(this.value)}catch(e){}">'+
+        '<div class="gal-menu-list">'+rows+'</div></div>'):'';
+      moreWrap='<span class="rgal-more-wrap"><button class="rgal-chip rgal-morebtn'+(S.galMenu?' on':'')+'" data-act="gal-menu">+'+hidden.length+' '+IC.chev+'</button>'+dd+'</span>';
     }
+    // reels mostrados: feed (respeta filtro explosión/recientes/fav) + filtro de competidor
+    var reels=feedReels(); if(active) reels=reels.filter(function(r){ return (r.creator&&r.creator.handle)===active; });
+    var activeLabel=active?("@"+active):L("todos los competidores","all competitors");
     var arrows='<div class="rgal-arrows">'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
     '</div>';
-    return galleryHTML(L("Lo último de tu competencia","Latest from your rivals"), "", cards, arrows);
+    var body = reels.length
+      ? '<div class="rgal-track crd-track">'+reels.slice(0,12).map(function(r,i){ return competitorReelCardHTML(r, imgs?imgs[i%imgs.length]:null); }).join("")+'</div>'
+      : '<div class="rgal-empty"><span class="rgal-empty-h">'+L("Nada que robar aquí… todavía","Nothing to steal here… yet")+'</span><span class="rgal-empty-s">'+L("Este competidor no tiene reels explosivos esta semana.","This competitor has no explosive reels this week.")+'</span></div>';
+    return '<section class="rgal">'+
+      '<div class="rgal-comps-head"><span class="rgal-comps-t">'+L("Competidores en el radar","Competitors on the radar")+'</span>'+
+        '<div class="rgal-comps">'+chips+'</div>'+moreWrap+
+        '<button class="rgal-add" data-act="add-comp">'+IC.plus+' '+L("Añadir","Add")+'</button></div>'+
+      '<div class="rgal-galline-row"><div class="rgal-galline">'+L("Galería · ","Gallery · ")+'<b>'+ESC(activeLabel)+'</b> — '+L("pulsa <b>Ver métricas</b> para abrir transcripción y datos.","tap <b>See metrics</b> to open transcript and data.")+'</div>'+arrows+'</div>'+
+      body+
+    '</section>';
   }
   function communityGalleryHTML(){
     return '<section class="rgal"><div class="rgal-head"><div class="rgal-t">'+
@@ -1031,9 +1166,10 @@
      degrada a la card suelta de siempre. */
   function opportunityCarouselHTML(reels){
     if(!reels || !reels.length) return '';
-    if(reels.length===1) return opportunityHTML(reels[0],1);
+    var _th=_demoThumbs();
+    if(reels.length===1) return opportunityHTML(reels[0],1,_th?_th[0]:null);
     var slides=reels.map(function(r,i){
-      return '<div class="opp-slide" role="group" aria-label="Oportunidad '+(i+1)+' de '+reels.length+'">'+opportunityHTML(r,i+1)+'</div>';
+      return '<div class="opp-slide" role="group" aria-label="Oportunidad '+(i+1)+' de '+reels.length+'">'+opportunityHTML(r,i+1,_th?_th[i%_th.length]:null)+'</div>';
     }).join("");
     var dots=reels.map(function(r,i){
       return '<button class="opp-dot'+(i===0?" on":"")+'" data-act="opp-nav" data-k="'+i+'" aria-label="Ir a la oportunidad '+(i+1)+'"></button>';
@@ -1046,11 +1182,16 @@
     '</section>';
   }
 
-  /* card destacada — "tu oportunidad de hoy" (principio I: una respuesta) */
-  function opportunityHTML(r,idx){
+  /* card destacada — "tu oportunidad de hoy" (principio I: una respuesta).
+     v3 (mockup David «featured opportunity»): thumb limpio (foto/degradado + play
+     + «reel · handle» + dur), cuerpo (eyebrow azul · titular Clash · insight con
+     chispazo naranja · «Roba la idea» + estrella) y columna de stats 150px
+     (Explosión verde + barra · Views · Likes). Sin píldora «más explosivo». */
+  function opportunityHTML(r,idx,thumb){
     idx=idx||1;
     var mega=(r.explosion||0)>=5;
-    var thumbInner=r.thumb?'<img src="'+ESC(r.thumb)+'" alt="">':'<div class="play"></div>';
+    var t=thumb||r.thumb;
+    var thumbInner=t?'<img src="'+ESC(t)+'" alt="" loading="lazy">':'<div class="feat-ph" style="background:'+_galGrad(r.id||r.creator.handle)+'"></div>';
     var why = mega
       ? "Está reventando: "+ (r.explosionTxt!=null?r.explosionTxt:"")+"× lo normal de @"+r.creator.handle+". Si hay uno que robar hoy, es este."
       : "Por encima de la media de @"+r.creator.handle+". Buen punto de partida para hoy.";
@@ -1062,18 +1203,15 @@
         ? '<button class="feat-scarce out feat-scarce-btn" data-act="open-plans">'+IC.bolt+' '+L("Hechos tus 3 guiones de hoy — vuelve mañana o desbloquéalos","Today's 3 scripts done — come back tomorrow or unlock them")+' '+IC.arr+'</button>'
         : '<div class="feat-scarce">'+IC.bolt+' '+L("Te queda"+(_fl===1?"":"n")+" <b>"+_fl+"</b> guion"+(_fl===1?"":"es")+" hoy","<b>"+_fl+"</b> script"+(_fl===1?"":"s")+" left today")+'</div>');
     return '<article class="feature">'+
-      '<div class="feature-thumb"><div class="thumb">'+thumbInner+'<span class="thumb-tag">reel · '+ESC(r.creator.handle.slice(0,6))+'</span><span class="dur">'+ESC(r.dur)+'</span></div></div>'+
+      '<div class="feature-thumb"><div class="thumb">'+thumbInner+
+        '<span class="feat-play">'+_icPlay+'</span>'+
+        '<span class="thumb-tag">reel · @'+ESC(r.creator.handle)+'</span><span class="dur">'+ESC(r.dur)+'</span></div></div>'+
       '<div class="feature-main">'+
         '<div class="feature-eyebrow">Oportunidad #'+idx+' <span class="who">· @'+ESC(r.creator.handle)+' · '+ESC(r.when)+'</span></div>'+
-        // #1 core-loop (variar recompensa): cuando aparece un bombazo, la vuelta se
-        // siente especial (novedad genuina, no siempre igual). Solo si es excepcional.
-        (mega?'<div class="opp-mega">'+IC.spark+' '+L("El más explosivo de la semana","The week's biggest blow-up")+'</div>':'')+
         '<h2 class="feature-cap">'+ESC(r.cap)+'</h2>'+
-        (r.sum?'<p class="feature-sum">'+ESC(r.sum)+'</p>':'')+
         '<div class="feature-why">'+IC.spark+'<span>'+ESC(why)+'</span></div>'+
-        '<div class="feature-actions"><button class="btn btn-lg '+(idx===1?'btn-primary':'btn-secondary')+'" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' Roba la idea</button>'+
-          '<button class="iconbtn'+(S.favs[r.id]?" on":"")+'" data-act="fav" data-id="'+ESC(r.id)+'" title="Guardar">'+(S.favs[r.id]?IC.star:IC.starO)+'</button>'+
-          '<button class="iconbtn" data-act="reel-dismiss" data-id="'+ESC(r.id)+'" title="No me interesa — trae otro" aria-label="Descartar y traer otro">'+IC.x+'</button></div>'+
+        '<div class="feature-actions"><button class="btn btn-lg btn-primary" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' Roba la idea</button>'+
+          '<button class="iconbtn'+(S.favs[r.id]?" on":"")+'" data-act="fav" data-id="'+ESC(r.id)+'" title="Guardar">'+(S.favs[r.id]?IC.star:IC.starO)+'</button></div>'+
         scarce+
       '</div>'+
       '<div class="feature-data">'+
@@ -1226,6 +1364,61 @@
       '<div class="act-prog-steps">'+chips+'</div>'+
     '</div>';
   }
+  // Parse de views formateadas ("1,4 M" / "680 K" / "35432") → número, para sumar alcance.
+  function _parseViews(s){
+    if(typeof s==="number") return s;
+    var t=String(s||"").replace(/[, ]/g,"").toLowerCase();
+    var m=parseFloat(t)||0;
+    if(t.indexOf("m")>=0) return m*1e6; if(t.indexOf("k")>=0) return m*1e3; return m;
+  }
+  /* RADAR HERO v3 (mockup David «RADAR exploración»): eyebrow mono + título Clash
+     46px + sub + stats en línea + SCOPE animado (barrido cónico + blips). Sustituye
+     al phead + statbar viejos. Tokens del island (azul=brand-500, verde=success-fg). */
+  function radarScopeHTML(){
+    return '<div class="rdr-scope"><div class="rdr-face">'+
+      '<span class="rdr-ring r1"></span><span class="rdr-ring r2"></span><span class="rdr-ring r3"></span>'+
+      '<span class="rdr-axis x"></span><span class="rdr-axis y"></span>'+
+      '<span class="rdr-sweep"></span>'+
+      '<span class="rdr-blip g" style="top:32%;left:62%"></span><span class="rdr-ping" style="top:32%;left:62%"></span>'+
+      '<span class="rdr-blip o" style="top:60%;left:38%"></span>'+
+      '<span class="rdr-blip b" style="top:44%;left:28%"></span>'+
+      '<span class="rdr-blip n" style="top:70%;left:64%"></span>'+
+      '<span class="rdr-core"></span>'+
+    '</div></div>';
+  }
+  function radarHeroHTML(){
+    var st=S.stats||{}; var n=st.competitors||0;
+    var line = st.exploded_week>0
+      ? L("Mientras no mirabas, <b>"+st.exploded_week+" reel"+(st.exploded_week>1?"es":"")+" explotaron</b> en tu nicho. Esto es lo que merece tu próximo guion.","While you looked away, <b>"+st.exploded_week+" reel"+(st.exploded_week>1?"s":"")+" blew up</b> in your niche. This is what deserves your next script.")
+      : L("Tus <b>"+n+" rivales</b> publicaron "+(st.reels_week||0)+" reels esta semana. Esto es lo que merece tu próximo guion.","Your <b>"+n+" rivals</b> posted "+(st.reels_week||0)+" reels this week. This is what deserves your next script.");
+    // Stats del mockup David: «explotaron hoy» · «la mayor explosión» · «alcance
+    // robable · en directo» (los dos primeros en verde; el tercero primario + dot live).
+    var _reels=feedReels(), maxMult=0, reach=0;
+    _reels.forEach(function(r){ if((r.explosion||0)>maxMult) maxMult=r.explosion||0; reach+=_parseViews(r.views); });
+    var multTxt = maxMult>0 ? (maxMult>=10?Math.round(maxMult):(Math.round(maxMult*10)/10))+"×" : "–";
+    var reachTxt = reach>0 ? String(Math.round(reach)).replace(/\B(?=(\d{3})+(?!\d))/g," ") : _fmtK(st.reels_week||0);
+    var stats=[
+      {v:_fmtK(st.exploded_week||0), l:L("explotaron hoy","blew up today"), c:"var(--success-fg)", live:false},
+      {v:multTxt, l:L("la mayor explosión","biggest blow-up"), c:"var(--success-fg)", live:false},
+      {v:reachTxt, l:L("alcance robable · en directo","stealable reach · live"), c:"var(--text-primary)", live:true}
+    ];
+    var statsH=stats.map(function(s){
+      return '<div class="rdr-stat"><span class="rdr-stat-v" style="color:'+s.c+'">'+ESC(String(s.v))+'</span>'+
+        '<span class="rdr-stat-l">'+(s.live?'<span class="rdr-livedot"></span>':'')+ESC(s.l)+'</span></div>';
+    }).join("");
+    var cap = L("robando lo que explota en tu nicho","stealing what explodes in your niche");
+    return '<div class="rdr-hero">'+
+      '<div class="rdr-hero-l">'+
+        '<div class="rdr-eyebrow"><span class="rdr-eye-dot"></span>Radar · '+L("escaneando","scanning")+' '+n+' '+L("competidor"+(n===1?"":"es"),"competitor"+(n===1?"":"s"))+'</div>'+
+        '<h1 class="rdr-title">'+L("Señales de hoy","Today's signals")+'</h1>'+
+        '<p class="rdr-sub">'+line+'</p>'+
+        '<div class="rdr-stats">'+statsH+'</div>'+
+      '</div>'+
+      '<div class="rdr-hero-r">'+radarScopeHTML()+
+        '<div class="rdr-cap"><span class="rdr-cap-dot"></span><span class="rdr-cap-t">'+ESC(cap)+'</span></div>'+
+      '</div>'+
+    '</div>';
+  }
   function dashboardHTML(){
     var st=S.stats||{competitors:0,reels_week:0,exploded_week:0,stolen_today:0}; var b=brand();
     var sorted=feedReels();
@@ -1241,7 +1434,7 @@
 
     // B: vista «Reels de @X» — todos los reels del competidor, sin recorte.
     if(S.creatorFilter){
-      return '<div class="scroll"><div class="canvas">'+head+(isAgency()?brandTabsHTML():"")+creatorReelsHTML()+'</div></div>';
+      return '<div class="scroll"><div class="canvas">'+head+""+creatorReelsHTML()+'</div></div>';
     }
 
     if(sorted.length===0){
@@ -1251,7 +1444,7 @@
       if(showOnboarding()){
         return '<div class="scroll"><div class="canvas">'+head+onboardingHTML()+'</div></div>';
       }
-      return '<div class="scroll"><div class="canvas">'+head+(isAgency()?brandTabsHTML():"")+statbarHTML()+
+      return '<div class="scroll"><div class="canvas">'+head+""+statbarHTML()+
         radarAddBarHTML()+        // B1: añadir competidor SIEMPRE accesible, también con el radar vacío
         trackedManageHTML()+
         voiceOnboardCardHTML()+   // B6: en first-run sin reels, el banner de voz es lo primero que aporta
@@ -1263,28 +1456,27 @@
     // Fathom 18/06: el día enseña 2-3 oportunidades en carrusel (no una sola).
     var heroN=sorted.slice(0,Math.min(3,sorted.length)), rest=sorted.slice(heroN.length);
     var fillCount=Math.min(5,S.reels.length)||5;
-    var shown = S.feedExpanded ? rest : rest.slice(0,5);
-    var rows = shown.map(reelRowHTML).join("");   // A: card + detalle inline si está abierto
-    var moreToggle = (!S.feedExpanded && rest.length>5)
-      ? '<button class="see-all" data-act="expand-feed">'+IC.repeat+' Ver las '+rest.length+' oportunidades</button>'
-      : '';
 
+    // v3 — espina del mockup David (Layout A), de arriba abajo:
+    //   hero → oportunidad → competidores+galería → cerebro/progreso → llena mi
+    //   semana → más señales. Los banners promo (flash/seed/activación/voz/serie)
+    //   se DEMOTAN bajo la espina para no romper la jerarquía visual de David.
     return '<div class="scroll"><div class="canvas">'+
-      head+
-      (isAgency()?brandTabsHTML():"")+
-      flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro
-      statbarHTML()+
-      trackedManageHTML()+
-      activationProgressHTML()+   // endowed progress: «1/4 · Roba tu primera idea»
-      seedBannerHTML()+           // SPEC #3: aviso «esto petó en tu nicho» con seed
-      opportunityCarouselHTML(heroN)+
-      suggestedCompHTML()+      // sugerir competidores proactivamente (Fathom 18/06)
-      voiceOnboardCardHTML()+   // B6+T1: banner de voz BAJO la oportunidad — no empuja el hero bajo el fold
-      nextSeriesHTML("dash")+   // B1+T1: "tu próxima serie" con CTA secundario en el Dashboard
-      (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+
-      // Galerías de miniaturas (port de Leonard) en lugar de la lista "Más señales":
-      // los filtros (fchip) se conservan y filtran la galería vía feedReels().
-      (S.reels.length?(radarAddBarHTML()+filtersHTML()+competitorGalleryHTML()+communityGalleryHTML()):"")+
+      radarHeroHTML()+            // hero con scope animado + stats (sustituye phead+statbar)
+      ""+
+      opportunityCarouselHTML(heroN)+   // OPORTUNIDAD justo tras el hero (acción sobre el fold)
+      (S.reels.length?competitorGalleryHTML():"")+   // competidores (chips) + galería (mockup David)
+      radarCerebroRowHTML()+     // progreso/cerebro (nivel + barra + Crear guion)
+      (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+   // llena mi semana
+      // ── bloques bajo la espina (recortados por decisión del usuario) ──
+      flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro (condicional)
+      (S.reels.length?radarAddBarHTML():"")+   // añadir competidor/reel + actualizar  ← SE QUEDA
+      seedBannerHTML()+           // aviso «esto petó en tu nicho» (solo radar-seed, demo vacío)
+      suggestedCompHTML()+        // «Te lo sugiero · Nuevo en tu nicho»               ← SE QUEDA
+      (S.reels.length?communityGalleryHTML():"")+   // «Creaciones de la comunidad»    ← SE QUEDA
+      // QUITADOS (mockup David / petición usuario): trackedManageHTML (Tus competidores),
+      // activationProgressHTML (Activa tu cuenta), voiceOnboardCardHTML (Enséñame tu voz),
+      // nextSeriesHTML (Tu próxima serie), radarSignalsListHTML (Más señales).
     '</div></div>';
   }
 
@@ -1479,29 +1671,48 @@
       '<div class="perf-foot">'+IC.brain+' Esto <b>entrena tu Cerebro</b> (voz al '+voicePct+'%): cada semana analizo cómo traccionan tus reels y genero más en la línea de los que petan.</div>'+
     '</div>';
   }
+  /* v3 (mockup David «Guiones»): card en rejilla — badge de estado (Por grabar
+     azul / Cocinando naranja / Grabado verde) + mult verde + fuente, titular Clash
+     (el hook), nota «› gancho detectado», y CTA «Abrir guion» + secundario
+     (Marcar grabado / Duplicar). Los controles avanzados (ver guión, hooks,
+     vincular reel, perf, aprobar, descartar) se preservan en una fila compacta. */
   function guiCardHTML(g){
     var rec=g.status==="recorded";
-    var pill=rec?'<span class="gui-pill done">'+IC.check+' Grabado</span>':'<span class="gui-pill">Por grabar</span>';
-    // B3: aprobación (solo agencia/estudio): badge + toggle "listo para cliente".
+    var cooking=!!g._cooking;
     var apr=(g.approval==="approved");
-    var aprBadge=isMultiBrand()?('<span class="gui-pill '+(apr?'appr':'appr-pend')+'" title="'+(apr?'Aprobado · listo para cliente':'Pendiente de aprobar')+'">'+(apr?IC.check+' Aprobado':'Pendiente')+'</span>'):'';
+    // mult/fuente (cabecera derecha)
+    var mult=g.mult||g.fromMult||null;
+    var multTxt=mult?('<span class="guic-mult">'+ESC(String(mult).replace(/×\s*$/,""))+'×</span>'):'';
+    var src=g.from?('<span class="guic-src">'+ESC(g.from.charAt(0)==="@"?g.from:("@"+g.from))+'</span>'):'';
+    var metaR='<span class="guic-metaR">'+multTxt+src+'</span>';
+    var badge=cooking
+      ? '<span class="guic-badge cook">'+L("Cocinando…","Cooking…")+'</span>'
+      : rec
+        ? '<span class="guic-badge done">'+IC.check+' '+L("Grabado","Recorded")+'</span>'
+        : '<span class="guic-badge todo">'+L("Por grabar","To record")+'</span>';
+    // estado «cocinando»: esqueleto shimmer + «Cocinando el guion ···»
+    if(cooking){
+      return '<div class="guic-wrap"><div class="guic">'+
+        '<div class="guic-top">'+badge+metaR+'</div>'+
+        '<div class="guic-skel"><span class="gsk h20" style="width:88%"></span><span class="gsk" style="width:96%"></span><span class="gsk" style="width:70%"></span>'+
+          '<span class="guic-cooking">'+L("Cocinando el guion","Cooking the script")+'<span class="gdots"><i></i><i></i><i></i></span></span>'+
+        '</div></div></div>';
+    }
+    // controles avanzados preservados
     var nh=(g.hooks&&g.hooks.length)||0;
-    var meta=(g.from?'robado de '+ESC(g.from)+' · ':'')+'voz '+ESC(g.brand);
-    var pub;
+    var pub='';
     if(g.published && g.published.pending){
       pub='<span class="gui-pub pending" title="Vinculado · pendiente de análisis">'+IC.repeat+' reel vinculado · se analiza en el próximo refresco</span>';
     } else if(g.published){
       pub='<button class="gui-pub'+((g.published.vsMedian||0)>=3?" hot":"")+'" data-act="gui-perf" data-id="'+g.id+'" title="Ver rendimiento y retención">'+IC.chart+' '+fmtNum(g.published.views)+' views · <span class="gp-mult'+((g.published.vsMedian||1)>1?" up":"")+'">'+(g.published.vsMedian||1)+'×</span> tu media · ver →</button>';
-    } else if(g.status==="recorded"){
+    } else if(rec){
       pub='<button class="gui-link" data-act="gui-link-reel" data-id="'+g.id+'" title="Pega el link del reel publicado en Instagram para analizarlo y entrenar tu Cerebro">'+IC.repeat+' Vincular reel publicado</button>';
-    } else { pub=''; }
+    }
     var toggle=nh?'<button class="gui-hooks-toggle'+(g.expanded?" open":"")+'" data-act="gui-hooks" data-id="'+g.id+'">'+IC.hook+' '+nh+' hook'+(nh===1?"":"s")+' alternativo'+(nh===1?"":"s")+' '+IC.chev+'</button>':'';
-    // P0 (4): leer el guión entero sin salir de la lista. Mismo patrón que
-    // scriptBlockHTML (.sc-full/.script-body); estado propio g.bodyOpen — no
-    // pisa el toggle de hooks (g.expanded).
     var hasBody=!!((g.beats&&g.beats.length)||g.close||g.hook);
     var bodyOpen=!!g.bodyOpen;
     var bodyToggle=hasBody?'<button class="gui-hooks-toggle gui-body-toggle'+(bodyOpen?" open":"")+'" data-act="gui-body-toggle" data-id="'+g.id+'" aria-expanded="'+(bodyOpen?"true":"false")+'">'+IC.doc+' '+(bodyOpen?"Plegar guión":"Ver guión completo")+' '+IC.chev+'</button>':'';
+    var aprBtn=isMultiBrand()?'<button class="gui-hooks-toggle'+(apr?" open":"")+'" data-act="gui-approve" data-id="'+g.id+'" title="'+(apr?"Quitar aprobado":"Aprobar (listo para cliente)")+'">'+IC.check+' '+(apr?"Aprobado":"Aprobar")+'</button>':'';
     var beatsHtml=(g.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
     var bodyFull=(hasBody&&bodyOpen)?('<div class="sc-full gui-body">'+
         (g.hook?'<div class="gui-body-hook">'+ESC(g.hook)+'</div>':'')+
@@ -1514,49 +1725,230 @@
         '<button class="gui-hook-del" data-act="gui-del-hook" data-id="'+g.id+'" data-i="'+i+'" title="Quitar variante">'+IC.x+'</button>'+
       '</div>';
     }).join("")+'</div>':'';
-    return '<div class="gui-card-wrap">'+
-      '<div class="gui-card'+(rec?" is-rec":"")+'">'+
-        '<div class="ava bava">'+ESC(initialsOf(g.from||g.brand))+'</div>'+
-        '<div class="gui-main"><div class="gui-title">'+ESC(g.title)+'</div><div class="gui-meta">'+meta+'</div>'+pub+bodyToggle+toggle+'</div>'+
-        aprBadge+pill+
-        '<div class="gui-acts">'+
-          (isMultiBrand()?'<button class="iconbtn'+(apr?" on":"")+'" data-act="gui-approve" data-id="'+g.id+'" title="'+(apr?"Quitar aprobado":"Aprobar (listo para cliente)")+'" aria-label="'+(apr?"Quitar aprobado":"Aprobar")+'">'+IC.check+'</button>':'')+
-          '<button class="iconbtn" data-act="gui-record" data-id="'+g.id+'" title="Grabar (teleprompter)">'+IC.mic+'</button>'+
-          '<button class="iconbtn'+(rec?" on":"")+'" data-act="gui-toggle-rec" data-id="'+g.id+'" title="'+(rec?"Marcar por grabar":"Marcar grabado")+'">'+IC.check+'</button>'+
-          '<button class="iconbtn danger" data-act="gui-discard" data-id="'+g.id+'" title="Descartar">'+IC.x+'</button>'+
-        '</div>'+
+    // titular = hook/título; «gancho detectado» = la apertura (o 1er beat) que lo explica
+    var headline=g.title||g.hook||"Guión";
+    var gancho=(g.hook&&g.hook!==g.title)?g.hook:((g.beats&&g.beats[0])||g.sum||"");
+    // Petición usuario: en la card solo Aprobar (agencia) / Descartar; lo demás
+    // (rendimiento, ver guión completo, hooks alternativos) se accede desde el editor.
+    var moreRow='<div class="guic-more">'+aprBtn+
+        '<button class="gui-hooks-toggle guic-discard" data-act="gui-discard" data-id="'+g.id+'" title="Descartar">'+IC.x+' '+L("Descartar","Discard")+'</button>'+
+      '</div>';
+    return '<div class="guic-wrap"><div class="guic'+(rec?" is-rec":"")+'">'+
+      '<div class="guic-top">'+badge+metaR+'</div>'+
+      '<h3 class="guic-hook">'+ESC(headline)+'</h3>'+
+      (gancho?'<div class="guic-gancho"><span class="guic-gancho-l">'+L("› gancho detectado","› hook detected")+'</span><p>'+ESC(gancho)+'</p></div>':'')+
+      '<div class="guic-acts">'+
+        '<button class="btn btn-md btn-primary" data-act="gui-open" data-id="'+g.id+'">'+IC.edit+' '+L("Abrir guion","Open script")+'</button>'+
+        '<button class="btn btn-md btn-secondary" data-act="'+(rec?"gui-duplicate":"gui-toggle-rec")+'" data-id="'+g.id+'">'+(rec?L("Duplicar","Duplicate"):L("Marcar grabado","Mark recorded"))+'</button>'+
       '</div>'+
-      bodyFull+
-      hooksList+
-    '</div>';
+      moreRow+
+    '</div></div>';
   }
   function guionesHTML(){
     var all=S.guiones.filter(function(g){return g.status!=="discarded";});
     var filt=S.guiFilter||"all";
     var appr=S.guiApproval||"all";   // B3: filtro de aprobación (multi-marca)
-    var items=all.filter(function(g){ if(filt==="draft") return g.status==="draft"; if(filt==="recorded") return g.status==="recorded"; return true; })
+    // «Por grabar» agrupa borradores + cocinando (mockup David).
+    var isTodo=function(g){ return g.status!=="recorded"; };
+    var items=all.filter(function(g){ if(filt==="draft") return isTodo(g); if(filt==="recorded") return g.status==="recorded"; return true; })
                  .filter(function(g){ if(!isMultiBrand()||appr==="all") return true; var a=(g.approval==="approved"); return appr==="approved"?a:!a; });
-    var cAll=all.length, cDraft=all.filter(function(g){return g.status==="draft";}).length, cRec=all.filter(function(g){return g.status==="recorded";}).length;
-    var chips='<div class="filters">'+[["all","Todos",cAll],["draft","Por grabar",cDraft],["recorded","Grabados",cRec]].map(function(f){
-      return '<button class="fchip'+(filt===f[0]?" on":"")+'" data-act="gui-filter" data-k="'+f[0]+'">'+f[1]+' '+f[2]+'</button>';
+    var cAll=all.length, cDraft=all.filter(isTodo).length, cRec=all.filter(function(g){return g.status==="recorded";}).length;
+    var tabName=({all:L("Todos","All"),draft:L("Por grabar","To record"),recorded:L("Grabados","Recorded")})[filt]||L("Todos","All");
+    // cabecera v3: titular Clash + sub con contador + tabs a la derecha
+    var sub=cDraft>0
+      ? L("Lo que robaste, con tu voz. <b>"+cDraft+" por grabar</b> esperándote — deja de pensar y dale a grabar.","What you stole, in your voice. <b>"+cDraft+" to record</b> waiting — stop thinking and hit record.")
+      : L("Lo que robaste, con tu voz. Todo lo que generes aterriza aquí.","What you stole, in your voice. Everything you generate lands here.");
+    var tabs='<div class="guic-tabs">'+[["all",L("Todos","All"),cAll],["draft",L("Por grabar","To record"),cDraft],["recorded",L("Grabados","Recorded"),cRec]].map(function(f){
+      return '<button class="guic-tab'+(filt===f[0]?" on":"")+'" data-act="gui-filter" data-k="'+f[0]+'">'+f[1]+' <span class="guic-tab-c">'+f[2]+'</span></button>';
     }).join("")+'</div>';
-    // B3: para agencia/estudio, segunda fila de filtros por estado de aprobación.
-    if(isMultiBrand()){
-      var cPend=all.filter(function(g){return g.approval!=="approved";}).length, cAppr=all.filter(function(g){return g.approval==="approved";}).length;
-      chips+='<div class="filters">'+[["all","Todas",cAll],["pending","Pendientes",cPend],["approved","Aprobadas",cAppr]].map(function(f){
-        return '<button class="fchip'+(appr===f[0]?" on":"")+'" data-act="gui-approval-filter" data-k="'+f[0]+'">'+f[1]+' '+f[2]+'</button>';
-      }).join("")+'</div>';
-    }
-    var body=items.length===0
-      ? '<div class="rs-empty" style="margin-top:24px">'+(cAll===0
-          ? '<div class="rs-empty-title">Aún nada aquí. Roba tu primera señal.</div><div class="rs-empty-sub">Roba un reel en el <b>Radar</b> o apunta una idea — todo lo que generes aterriza aquí.</div>'
-          : 'Nada en este filtro.')+'</div>'
-      : '<div class="gui-list">'+items.map(guiCardHTML).join("")+'</div>';
-    return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Guiones · @"+(brand().handle||S.user.handle||""), "Tus guiones", "Todo lo que creas vive aquí. Ordena, descarta lo que no, y graba cuando quieras.")+
-      chips+body+
-      ideasZoneHTML()+          // T1: fábrica de ideas (idea→guiones→hooks) junto a los guiones
+    var header='<header class="guic-head"><div class="guic-head-l">'+
+      '<h1 class="h-title guic-h1">'+L("Tus guiones","Your scripts")+'</h1>'+
+      '<p class="h-sub guic-sub">'+sub+'</p></div>'+tabs+'</header>';
+    var grid=items.length===0
+      ? (cAll===0
+          ? '<div class="guic-empty"><span class="guic-empty-h">'+L("Aún nada aquí.","Nothing here yet.")+'</span><span class="guic-empty-s">'+L("Roba tu primera señal en el Radar y vuelve.","Steal your first signal in the Radar and come back.")+'</span><button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Ir al Radar","Go to Radar")+'</button></div>'
+          : '<div class="guic-empty"><span class="guic-empty-s">'+L("Nada en este filtro.","Nothing in this filter.")+'</span></div>')
+      : '<div class="guic-grid">'+items.map(guiCardHTML).join("")+'</div>';
+    var grupo='<div class="guic-group"><span class="guic-group-t">'+ESC(tabName)+'</span>'+grid+'</div>';
+    return '<div class="scroll"><div class="canvas guic-canvas">'+
+      header+
+      guiUndevelopedHTML()+     // «Sin desarrollar» — ideas en bruto (cards dashed)
+      grupo+
+      guiExplosionHTML()+       // «Explosión creativa» — 5 ideas × 3 hooks
     '</div></div>';
+  }
+  // v3 (mockup David) — «Sin desarrollar»: ideas en bruto apuntadas, como cards
+  // dashed con CTA «Desarrollar» (genera 5 guiones de esa idea). Reusa gen5scripts.
+  function guiUndevelopedHTML(){
+    var raw=(S.ideas||[]).filter(ideaBelongsToActiveBrand).filter(function(i){ return !ideaIsDeveloped(i); });
+    if(!raw.length) return '';
+    var cards=raw.map(function(idea){
+      var saving=!!idea._saving;
+      return '<div class="guiu-card">'+
+        '<span class="guiu-text">'+ESC(idea.text)+'</span>'+
+        (saving
+          ? '<span class="guiu-saving"><span class="rs-ldr"></span>'+L("Guardando…","Saving…")+'</span>'
+          : '<button class="btn btn-sm btn-secondary" data-act="gen5scripts" data-id="'+idea.id+'" title="'+L("Genera 5 guiones de esta idea ("+COST.scripts5+" créditos)","Generate 5 scripts from this idea ("+COST.scripts5+" credits)")+'">'+L("Desarrollar","Develop")+'</button>')+
+      '</div>';
+    }).join("");
+    return '<section class="guiu"><div class="guiu-head">'+
+      '<span class="guiu-ic">'+IC.bulb+'</span>'+
+      '<span class="guiu-t">'+L("Sin desarrollar","Undeveloped")+'</span>'+
+      '<span class="guiu-c">'+L("ideas en bruto que apuntaste · "+raw.length,"raw ideas you jotted · "+raw.length)+'</span>'+
+    '</div><div class="guiu-cards">'+cards+'</div></section>';
+  }
+  // v3 (mockup David) — «Explosión creativa»: CTA «Generar 5 ideas» + rejilla de
+  // las ideas ya desarrolladas (idea + hasta 3 hooks). Reusa gen5ideas/explosion.
+  function guiExplosionHTML(){
+    var dev=(S.ideas||[]).filter(ideaBelongsToActiveBrand).filter(ideaIsDeveloped).slice(0,3);
+    var grid=dev.length?('<div class="guix-grid">'+dev.map(function(idea){
+      var hooks=[];
+      (idea.scripts||[]).forEach(function(sc){ if(sc.hook && hooks.length<3) hooks.push(sc.hook); });
+      if(!hooks.length && idea.hooks) hooks=idea.hooks.slice(0,3);
+      var hl=hooks.map(function(h){ return '<div class="guix-hook">'+IC.arr+'<span>'+ESC(h)+'</span></div>'; }).join("");
+      return '<div class="guix-card"><span class="guix-idea">'+ESC(idea.text)+'</span><div class="guix-hooks">'+hl+'</div></div>';
+    }).join("")+'</div>'):'';
+    return '<section class="guix">'+
+      '<div class="guix-head"><div class="guix-head-l"><div class="guix-ic">'+IC.bolt+'</div>'+
+        '<div><div class="guix-h">'+L("Explosión creativa","Creative explosion")+'</div>'+
+        '<div class="guix-sub">'+L("Cinco ideas nuevas a partir de lo que explota. Cada una con tres ganchos listos.","Five fresh ideas from what's exploding. Each with three ready hooks.")+'</div></div></div>'+
+        '<button class="btn btn-lg btn-primary" data-act="gen5ideas">'+IC.bolt+' '+L("Generar 5 ideas","Generate 5 ideas")+'</button>'+
+      '</div>'+grid+
+    '</section>';
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     AJUSTES (mockup David) — página isla con 3 sub-pestañas: Perfil y voz ·
+     Plan y créditos · Afiliados. Datos reales donde existen (handle, plan,
+     créditos, tono, muletillas); facturas/afiliados son demo (sin backend).
+     ════════════════════════════════════════════════════════════════ */
+  var AJ_TONES=["Directo","Humor seco","Cercano","Sin rodeos","Provocador","Didáctico","Motivador","Técnico"];
+  function ajustesInit(){
+    if(S.setTab) return;
+    S.setTab="perfil";
+    var v=brainVoice(brand()); var sel={};
+    var baseTxt=(v.tono||"Directo, Cercano").toLowerCase();
+    // preselecciona un tono si su nombre aparece en la voz detectada (p.ej. «Directo
+    // y sin postureo» → marca «Directo»). Match por contención, no igualdad exacta.
+    AJ_TONES.forEach(function(t){ sel[t]=baseTxt.indexOf(t.toLowerCase())>=0; });
+    if(!Object.keys(sel).some(function(k){return sel[k];})){ sel["Directo"]=true; sel["Cercano"]=true; }
+    S.setTones=sel;
+    S.setPrefs={notif:true, semanal:true, beta:false};
+  }
+  function ajustesHTML(){
+    ajustesInit();
+    var b=brand();
+    var name=S.user.name||b.name||"Tu cuenta";
+    var handle=(b.handle||S.user.handle||"tu_cuenta").replace(/^@/,"");
+    var lv=brainLevel();
+    var tab=S.setTab||"perfil";
+    var subtabs=[["perfil",L("Perfil y voz","Profile & voice")],["plan",L("Plan y créditos","Plan & credits")],["afiliados",L("Afiliados","Affiliates")]];
+    var tabsH='<div class="aj-tabs">'+subtabs.map(function(t){
+      return '<button class="aj-tab'+(tab===t[0]?" on":"")+'" data-act="set-tab" data-k="'+t[0]+'">'+t[1]+'</button>';
+    }).join("")+'</div>';
+    var body="";
+    if(tab==="perfil") body=ajPerfilHTML(name,handle,lv);
+    else if(tab==="plan") body=ajPlanHTML();
+    else body=ajAfiliadosHTML();
+    return '<div class="scroll"><div class="canvas aj-canvas">'+
+      '<header class="aj-head"><h1 class="aj-h1">'+L("Ajustes","Settings")+'</h1>'+tabsH+'</header>'+
+      body+
+    '</div></div>';
+  }
+  function ajPerfilHTML(name,handle,lv){
+    var v=brainVoice(brand());
+    var reels=hasRealVoice()?(S.voice.source_count||0):(brand().reelsAnalyzed||47);
+    var tonos=AJ_TONES.map(function(t){ var on=!!S.setTones[t];
+      return '<button class="aj-tono'+(on?" on":"")+'" data-act="aj-tone" data-k="'+ESC(t)+'">'+(on?IC.check+' ':'')+ESC(t)+'</button>';
+    }).join("");
+    var frases=(v.frases&&v.frases.length)?v.frases.map(function(f){return '“'+ESC(f)+'”';}).join(", ") : "“que no te engañen”, “comenta X y te lo paso”";
+    var prefs=[
+      ["notif",L("Avísame cuando algo explote","Tell me when something blows up"),L("Notificación en cuanto un competidor reviente un reel","A ping the moment a competitor's reel blows up")],
+      ["semanal",L("Resumen semanal del radar","Weekly radar digest"),L("Cada lunes, lo que más explotó en tu nicho","Every Monday, what blew up most in your niche")],
+      ["beta",L("Funciones beta","Beta features"),L("Prueba lo nuevo antes que nadie (puede romperse)","Try the new stuff first (may break)")]
+    ].map(function(p,i){
+      var on=!!S.setPrefs[p[0]];
+      return '<div class="aj-pref'+(i>0?" bt":"")+'"><div><div class="aj-pref-l">'+p[1]+'</div><div class="aj-pref-s">'+p[2]+'</div></div>'+
+        '<button class="aj-toggle'+(on?" on":"")+'" data-act="set-pref" data-k="'+p[0]+'" role="switch" aria-checked="'+(on?"true":"false")+'"><span class="aj-knob"></span></button></div>';
+    }).join("");
+    return '<div class="aj-stack">'+
+      // identity
+      '<div class="aj-card aj-identity">'+
+        '<div class="aj-avatar">'+ESC(initialsOf(name))+'</div>'+
+        '<div class="aj-id"><div class="aj-id-name">'+ESC(name)+'</div><div class="aj-id-handle">@'+ESC(handle)+'</div></div>'+
+        '<span class="aj-lvl">'+IC.brain+' '+L("Cerebro · Nivel "+lv.level,"Brain · Level "+lv.level)+'</span>'+
+        '<button class="btn btn-md btn-secondary" data-act="ajustes-edit">'+L("Editar perfil","Edit profile")+'</button>'+
+      '</div>'+
+      // voz
+      '<div class="aj-card aj-voice">'+
+        '<div class="aj-voice-head"><div><div class="aj-card-t">'+L("Tu voz","Your voice")+'</div>'+
+          '<div class="aj-card-s">'+L("La saqué de tus reels. Cada guion sale con este tono — edítalo y se nota al instante.","I pulled it from your reels. Every script comes out in this tone — edit it and you'll notice instantly.")+'</div></div>'+
+          '<span class="aj-derived">'+L("› derivada de "+reels+" reels","› derived from "+reels+" reels")+'</span></div>'+
+        '<div class="aj-tonos">'+tonos+'</div>'+
+        '<div class="aj-mulet-wrap"><span class="aj-mulet-k">'+L("Muletillas y expresiones tuyas","Your catchphrases & expressions")+'</span><div class="aj-mulet">'+frases+'</div></div>'+
+        '<div class="aj-voice-foot"><div class="aj-slider-row"><span>'+L("Nivel de humor seco","Dry humor level")+'</span><div class="aj-slider"><div class="aj-slider-fill" style="width:68%"></div><div class="aj-slider-knob" style="left:68%"></div></div></div>'+
+          '<button class="btn btn-md btn-primary" data-act="ajustes-save-voice">'+L("Guardar voz","Save voice")+'</button></div>'+
+      '</div>'+
+      // preferencias
+      '<div class="aj-card aj-prefs">'+prefs+'</div>'+
+    '</div>';
+  }
+  function ajPlanHTML(){
+    var plan=(S.user.plan||"free"); var planName=plan==="free"?"Free":(plan==="agencia"?"Agencia":(plan==="creador"?"Creador":"Pro"));
+    var cr=S.user.credits||0; var capMonth=30; var pct=Math.max(2,Math.min(100,Math.round(cr/capMonth*100)));
+    var nGuiones=S.guiones.filter(function(g){return g.status!=="discarded";}).length;
+    var usage=[
+      [L("Guiones generados","Scripts generated"), String(nGuiones)],
+      [L("Reels analizados","Reels analyzed"), String(hasRealVoice()?(S.voice.source_count||0):(brand().reelsAnalyzed||0)).replace(/\B(?=(\d{3})+(?!\d))/g," ")],
+      [L("«Llena mi semana»","«Fill my week»"), "2"]
+    ].map(function(u){ return '<div class="aj-usage-row"><span>'+u[0]+'</span><span class="aj-usage-v">'+ESC(u[1])+'</span></div>'; }).join("");
+    var invoices=[["14 jun 2026","19,00€"],["14 may 2026","19,00€"],["14 abr 2026","19,00€"]].map(function(iv,i){
+      return '<div class="aj-inv'+(i>0?" bt":"")+'"><div class="aj-inv-l">'+IC.doc+' <span>'+iv[0]+'</span></div>'+
+        '<span class="aj-inv-amt">'+iv[1]+'</span><span class="aj-inv-paid">'+IC.check+' '+L("Pagada","Paid")+'</span>'+
+        '<button class="aj-inv-dl" data-act="aj-invoice">'+L("Descargar","Download")+'</button></div>';
+    }).join("");
+    return '<div class="aj-stack">'+
+      '<div class="aj-plan-grid">'+
+        '<div class="aj-card aj-plancard">'+
+          '<div class="aj-plan-top"><span class="aj-plan-badge">'+IC.spark+' '+L("PLAN ","PLAN ")+ESC(planName.toUpperCase())+'</span><span class="aj-plan-renew">'+L("renueva 14 jul","renews Jul 14")+'</span></div>'+
+          '<div class="aj-plan-price"><span class="aj-plan-n">19€</span><span class="aj-plan-per">/ '+L("mes","mo")+'</span></div>'+
+          '<div class="aj-plan-cred"><div class="aj-plan-cred-row"><span>'+L("Créditos del mes","Credits this month")+'</span><span class="aj-mono">'+cr+' / '+capMonth+'</span></div>'+
+            '<div class="aj-cred-bar"><div class="aj-cred-fill" style="width:'+pct+'%"></div></div>'+
+            '<span class="aj-cred-note">'+L("1 crédito = 1 guion completo con tu voz.","1 credit = 1 full script in your voice.")+'</span></div>'+
+          '<div class="aj-plan-cta"><button class="btn btn-md btn-primary" data-act="open-plans">'+L("Recargar créditos","Top up credits")+'</button>'+
+            '<button class="btn btn-md btn-secondary" data-act="open-plans">'+L("Cambiar plan","Change plan")+'</button></div>'+
+        '</div>'+
+        '<div class="aj-card aj-usage"><span class="aj-card-t">'+L("Este mes","This month")+'</span>'+usage+'</div>'+
+      '</div>'+
+      '<div class="aj-card aj-invoices">'+invoices+'</div>'+
+    '</div>';
+  }
+  function ajAfiliadosHTML(){
+    var kpis=[
+      [L("Comisión acumulada","Total commission"),"342€","var(--success-fg,#3FE0A0)",L("desde marzo","since March")],
+      [L("Referidos activos","Active referrals"),"11","var(--text-primary)",L("de 19 registrados","of 19 signed up")],
+      [L("Pendiente de pago","Pending payout"),"58€","var(--text-primary)",L("se abona el 1 de jul","paid out Jul 1")]
+    ].map(function(k){ return '<div class="aj-card aj-kpi"><span class="aj-kpi-l">'+k[0]+'</span><span class="aj-kpi-v" style="color:'+k[2]+'">'+k[1]+'</span><span class="aj-kpi-s">'+k[3]+'</span></div>'; }).join("");
+    var link="reelscript.app/r/"+((brand().handle||S.user.handle||"tu").replace(/^@/,"")).slice(0,10);
+    var refs=[
+      ["MA","@marcos.ai",L("hace 3 días","3 days ago"),L("Pro activo","Pro active"),"var(--success-fg,#3FE0A0)","+5,7€"],
+      ["LU","@lucia.crea",L("hace 1 sem","1 wk ago"),L("Pro activo","Pro active"),"var(--success-fg,#3FE0A0)","+5,7€"],
+      ["JU","@juanpe",L("hace 2 sem","2 wk ago"),L("Prueba","Trial"),"var(--text-tertiary)","—"],
+      ["SO","@sofiamkt",L("hace 3 sem","3 wk ago"),L("Pro activo","Pro active"),"var(--success-fg,#3FE0A0)","+5,7€"]
+    ].map(function(r,i){
+      return '<div class="aj-ref'+(i>0?" bt":"")+'"><div class="aj-ref-l"><span class="aj-ref-av">'+r[0]+'</span><div><div class="aj-ref-n">'+r[1]+'</div><div class="aj-ref-d">'+r[2]+'</div></div></div>'+
+        '<span class="aj-ref-st" style="color:'+r[4]+'">'+r[3]+'</span><span class="aj-ref-amt">'+r[5]+'</span></div>';
+    }).join("");
+    return '<div class="aj-stack">'+
+      '<div class="aj-kpis">'+kpis+'</div>'+
+      '<div class="aj-card aj-afflink">'+
+        '<div><div class="aj-card-t">'+L("Tu enlace de afiliado","Your affiliate link")+'</div>'+
+          '<div class="aj-card-s">'+L("Te llevas el <b>30%</b> recurrente de cada uno que entre por aquí.","You earn a recurring <b>30%</b> from everyone who joins through here.")+'</div></div>'+
+        '<div class="aj-afflink-r"><span class="aj-afflink-url">'+ESC(link)+'</span>'+
+          '<button class="btn btn-md btn-primary" data-act="copy" data-txt="'+ESC("https://"+link)+'">'+IC.doc+' '+L("Copiar","Copy")+'</button></div>'+
+      '</div>'+
+      '<div class="aj-card aj-refs">'+refs+'</div>'+
+    '</div>';
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -1711,32 +2103,153 @@
     return '<div class="rs-lock rs-lock--sm"><div class="rs-lock-inner" aria-hidden="true">'+inner+'</div>'+
       '<div class="rs-lock-over"><button class="btn btn-sm btn-primary" data-act="upsell" data-k="competitor">'+IC.bolt+' Métricas con Pro</button></div></div>';
   }
+  /* ── v3 (mockup David · Métricas): clon completo con 3 vistas (Resumen ·
+     Audiencia · Competidores), paywall Pro borroso en free, y conecta-IG.
+     Datos demo (como el mockup); en prod fable/Alberto los cablea a IG. ── */
+  function _mSpark(arr){ var max=Math.max.apply(null,arr),min=Math.min.apply(null,arr),n=arr.length;
+    return arr.map(function(v,i){ var x=(i/(n-1))*60; var y=21-((v-min)/((max-min)||1))*19; return x.toFixed(1)+","+y.toFixed(1); }).join(" "); }
+  function _mBars(arr){ var max=Math.max.apply(null,arr); return arr.map(function(v){ return Math.round(v/max*100)+"%"; }); }
   function metricsHTML(){
-    if(!S.igConnected) return connectIgHTML();
-    var m=S.metrics||{}; var b=brand();
-    var learned=(m.learned||[]).map(function(l){ return '<div class="learn-item">'+IC.check+'<span>'+ESC(l)+'</span></div>'; }).join("");
-    var top=m.top?('<div class="met-top">'+IC.spark+' <b>Top:</b> '+ESC(m.top.title)+' — '+ESC(m.top.views)+' views</div>'):"";
-    var hasVideos=metricVideos().length>0;
-    // Sub-vistas del mockup Métricas.dc.html: Resumen / Audiencia / Competidores.
-    var mv=S.metricView||"resumen";
-    function _mtab(k,es,en){ return '<button class="met-subtab'+(mv===k?" on":"")+'" data-act="metric-view" data-k="'+k+'"'+(mv===k?' aria-current="page"':'')+'>'+L(es,en)+'</button>'; }
-    var subnav='<div class="met-subnav" role="tablist">'+_mtab("resumen","Resumen","Overview")+_mtab("audiencia","Audiencia","Audience")+_mtab("competidores","Competidores","Competitors")+'</div>';
-    // El panel de datos es lo premium → borroso en free (el sub-nav queda FUERA del blur, navegable).
-    var resumen=hasVideos?(metricStatsHTML()+metricChartHTML()+metricGridHTML()):'<div class="rs-empty">Pulsa “Actualizar reels” para traer tus métricas.</div>';
-    var inner=mv==="audiencia"?metricAudienceHTML():(mv==="competidores"?metricCompeteHTML():resumen);
-    var panel=subnav+(isFree()?metricsLockHTML(inner):inner);
-    return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Métricas · @"+(b.handle||S.user.handle||""), "Métricas", "Tus reels al detalle — y lo que el sistema aprende de ellos para crear mejor.")+
-      '<div class="met-acct"><span class="met-acct-ig">'+IC.ig+' @'+ESC(b.handle||"tu_cuenta")+'</span>'+
-        '<button class="btn btn-sm btn-primary" data-act="metric-refresh">Actualizar reels</button>'+
-        '<span class="met-acct-info">'+ESC(m.analyses_left||"1/1")+' análisis restantes esta semana</span>'+
-        '<span style="flex:1"></span><button class="btn btn-sm btn-ghost" data-act="ig-disconnect">Desvincular</button></div>'+
-      '<div class="learn"><div class="learn-head">'+IC.brain+'<span>Lo que el sistema aprendió de ti</span></div>'+
-        '<div class="learn-list">'+(learned||'<div class="learn-item" style="opacity:.6">Publica un par de reels creados aquí y empezaré a ver patrones.</div>')+'</div>'+
-        '<div class="learn-foot">Esto afina tu voz (al '+(b.voice||40)+'%) y reordena tus oportunidades del Dashboard. El círculo se cierra.</div>'+
+    var b=brand();
+    var locked=isFree();
+    var view=S.metricView||"resumen";
+    function vtab(k,es,en){ return '<button class="mt-vtab'+(view===k?" on":"")+'" data-act="metric-view" data-k="'+k+'">'+L(es,en)+'</button>'; }
+    var inner = view==="audiencia" ? metAudienciaHTML() : (view==="competidores" ? metCompetidoresHTML() : metResumenHTML());
+    var paywall = locked ? ('<div class="mt-wall"><div class="mt-wall-card">'+
+        '<div class="mt-wall-ic">'+_icLock+'</div>'+
+        '<h2 class="mt-wall-h">'+L("Tus números, a un clic.","Your numbers, one click away.")+'</h2>'+
+        '<p class="mt-wall-p">'+L("Borrosos a propósito. Pasa a Pro y mira qué gancho, tema, hora y competidor te están moviendo de verdad.","Blurred on purpose. Go Pro and see which hook, topic, hour and competitor are actually moving you.")+'</p>'+
+        '<button class="btn btn-lg btn-primary" data-act="open-plans">'+IC.spark+' '+L("Desbloquéalos con Pro","Unlock with Pro")+'</button>'+
+        '<span class="mt-wall-note">'+L("› analizando tu nicho… sin que se enteren","› analyzing your niche… without them noticing")+'</span>'+
+      '</div></div>') : '';
+    return '<div class="scroll"><div class="canvas mt-canvas">'+
+      // header
+      '<header class="mt-head"><div><h1 class="mt-h1">'+L("Tus métricas","Your metrics")+'</h1>'+
+        '<p class="mt-sub">'+L("Todo lo que mueve tus reproducciones — y cómo vas contra tus competidores.","Everything that moves your plays — and how you stack up against competitors.")+'</p></div>'+
+        '<div class="mt-sync"><span class="mt-sync-dot"></span>@'+ESC(b.handle||S.user.handle||"tu_cuenta")+' · '+L("sincronizado hoy","synced today")+'</div></header>'+
+      // view tabs
+      '<div class="mt-vtabs">'+vtab("resumen","Resumen","Overview")+vtab("audiencia","Audiencia","Audience")+vtab("competidores","Competidores","Competitors")+'</div>'+
+      // analytics + paywall
+      '<div class="mt-area">'+
+        '<div class="mt-charts'+(locked?" locked":"")+'">'+inner+'</div>'+paywall+
       '</div>'+
-      top+panel+
+      // conecta IG
+      '<div class="mt-ig"><div class="mt-ig-l"><div class="mt-ig-ic">'+IC.ig+'</div>'+
+        '<div><div class="mt-ig-t">'+L("¿Otra cuenta? Conéctala.","Another account? Connect it.")+'</div>'+
+        '<div class="mt-ig-s">'+L("Enlaza tu Instagram y empiezo a leer qué te funciona a ti.","Link your Instagram and I'll start reading what works for you.")+'</div></div></div>'+
+        '<button class="btn btn-md btn-secondary" data-act="ig-connect">'+L("Conectar Instagram","Connect Instagram")+'</button></div>'+
     '</div></div>';
+  }
+  // Marco visual del mockup con estado honesto "próximamente" (sin inventar datos).
+  function _metPronto(es,en){
+    return '<div class="mt-pronto"><span class="mt-pronto-pill">'+IC.spark+' '+L("Próximamente","Coming soon")+'</span>'+
+      '<p class="mt-pronto-p">'+L(es,en)+'</p></div>';
+  }
+  function _durSec(d){ var p=String(d||"").split(":"); return p.length===2 ? ((+p[0])*60+(+p[1])||0) : (+p[0]||0); }
+  function metResumenHTML(){
+    // DATOS REALES de tus vídeos publicados (metricVideos ← /metrics/videos). Lo que el
+    // dato NO contiene (tendencia por fecha, audiencia IG, temas) → "próximamente" honesto,
+    // nunca datos inventados (directiva David: no subir demo-data a prod).
+    var V=metricVideos(); var hasV=V.length>0;
+    if(!hasV){
+      return '<div class="mt-stack"><div class="mt-card">'+
+        '<div class="mt-empty"><div class="mt-empty-ic">'+IC.chart+'</div>'+
+        '<h3 class="mt-empty-h">'+L("Aún no he leído tus reels","I haven't read your reels yet")+'</h3>'+
+        '<p class="mt-empty-p">'+L("Conecta tu Instagram (abajo) o pulsa «Actualizar reels» y aquí verás tus números REALES: reproducciones, interacción y tus reels que más rinden.","Connect Instagram (below) or hit «Refresh reels» and you'll see your REAL numbers here.")+'</p>'+
+        '<button class="btn btn-md btn-primary" data-act="metric-refresh">'+IC.repeat+' '+L("Actualizar reels","Refresh reels")+'</button></div></div></div>';
+    }
+    var _sum=function(f){ return V.reduce(function(a,v){ return a+(Number(v[f])||0); },0); };
+    var sv=_sum("views"), sl=_sum("likes"), sc=_sum("comments"), ss=_sum("shares"); var sInter=sl+sc+ss;
+    // KPIs REALES (sin sparkline/delta inventados — solo lo que sabemos de verdad).
+    var kpis=[["Reproducciones",fmtKM(sv)],["Interacciones",fmtKM(sInter)],["Me gusta",fmtKM(sl)],
+              ["Comentarios",fmtKM(sc)],["Compartidos",fmtKM(ss)],["Reels analizados",String(V.length)]];
+    var kpiH=kpis.map(function(k){
+      return '<div class="mt-kpi"><span class="mt-kpi-l">'+ESC(k[0])+'</span>'+
+        '<div class="mt-kpi-row"><span class="mt-kpi-v">'+ESC(k[1])+'</span></div></div>';
+    }).join("");
+    // Desglose de interacción REAL.
+    var eng=[["Me gusta",sl],["Compartidos",ss],["Comentarios",sc]];
+    var emax=Math.max.apply(null,eng.map(function(r){return r[1];}).concat([1]));
+    var engH=eng.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+r[0]+'</span><span class="mt-mono">'+fmtKM(r[1])+'</span></div><div class="mt-br-track"><i style="width:'+Math.round(r[1]/emax*100)+'%"></i></div></div>'; }).join("");
+    // Duración óptima REAL: agrupa tus vídeos por franja de duración y promedia repros.
+    var buckets=[["0–15s",0,15],["15–30s",15,30],["30–45s",30,45],["45–60s",45,60],["1–2m",60,120],["2m+",120,99999]];
+    var bAgg=buckets.map(function(b){ var vs=V.filter(function(v){ var s=_durSec(v.dur); return s>=b[1]&&s<b[2]; }); var avg=vs.length?Math.round(vs.reduce(function(a,v){return a+(v.views||0);},0)/vs.length):0; return {l:b[0],avg:avg,n:vs.length}; });
+    var bmax=Math.max.apply(null,bAgg.map(function(b){return b.avg;}).concat([1]));
+    var durH=bAgg.map(function(b){ var top=(b.avg===bmax&&b.avg>0); return '<div class="mt-dur"><span class="mt-dur-v">'+(b.n?fmtKM(b.avg):"–")+'</span><div class="mt-dur-bar'+(top?" top":"")+'" style="height:'+(bmax?Math.max(4,Math.round(b.avg/bmax*100)):4)+'%"></div><span class="mt-dur-l">'+b.l+'</span></div>'; }).join("");
+    // Top reels REALES.
+    var top=V.slice().sort(function(a,b){ return (b.views||0)-(a.views||0); }).slice(0,4);
+    var topH=top.map(function(v,i){ return '<div class="mt-top-row"><span class="mt-top-rank">'+(i+1)+'</span>'+
+      '<div class="mt-top-thumb">'+(v.dur?'<span class="mt-top-dur">'+ESC(v.dur)+'</span>':'')+'</div>'+
+      '<div class="mt-top-title">'+ESC(v.cap||v.from_guion||L("(sin título)","(untitled)"))+'</div>'+
+      '<div class="mt-top-stat"><div class="mt-mono">'+fmtKM(v.views||0)+'</div><div class="mt-top-k">repros</div></div>'+
+      '<div class="mt-top-stat"><div class="mt-mono">'+fmtKM((v.likes||0)+(v.comments||0))+'</div><div class="mt-top-k">interac.</div></div>'+
+      '<div class="mt-top-stat mt-top-mult"><div class="mt-mult">'+(v.vsMedian!=null?ESC(v.vsMedian)+"×":"–")+'</div><div class="mt-top-k">explota</div></div></div>'; }).join("");
+    return '<div class="mt-stack">'+
+      '<div class="mt-kpis">'+kpiH+'</div>'+
+      // tendencia por fecha: el dato de /metrics/videos no trae fecha → próximamente honesto
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Reproducciones · 14 días","Plays · 14 days")+'</span></div>'+_metPronto("La tendencia por día necesita la fecha de cada reel (insights de Instagram). En cuanto conecte ese dato, aquí verás la curva real.","Daily trend needs each reel's date (Instagram insights). Once connected, you'll see the real curve.")+'</div>'+
+      '<div class="mt-grid2">'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Desglose de interacción","Interaction breakdown")+'</span><span class="mt-card-meta">'+fmtKM(sInter)+' total</span></div><div class="mt-bars">'+engH+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Duración óptima","Optimal length")+'</span><span class="mt-card-meta">'+L("repros medias · tus reels","avg plays · your reels")+'</span></div><div class="mt-durs">'+durH+'</div></div>'+
+      '</div>'+
+      '<div class="mt-grid2">'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Ganchos que funcionan","Hooks that work")+'</span></div>'+_metPronto("Analizo qué tipo de hook retiene mejor cuando tenga el watch-time de cada reel (insights de Instagram).","I'll analyze which hook retains best once I have each reel's watch-time (Instagram insights).")+'</div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos para publicar","Best times to post")+'</span></div>'+_metPronto("El mapa de horas necesita la fecha/hora de publicación de cada reel. Llega con los insights de Instagram.","The hours heatmap needs each reel's publish time. Coming with Instagram insights.")+'</div>'+
+      '</div>'+
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels que más rinden","Your top-performing reels")+'</span><span class="mt-card-meta">'+V.length+' '+L("reels","reels")+'</span></div>'+topH+'</div>'+
+    '</div>';
+  }
+  function metAudienciaHTML(){
+    // Sin endpoint de audience-insights de IG → marco listo + "próximamente" honesto.
+    // NO inventamos edad/género/ubicaciones (directiva David).
+    var card=function(t){ return '<div class="mt-card"><span class="mt-card-t">'+t+'</span>'+_metPronto("Necesita los insights de audiencia de Instagram (Graph API). El marco está listo; en cuanto conectemos esa cuenta, estos datos serán reales.","Needs Instagram audience insights (Graph API). The frame is ready; once connected these will be real.")+'</div>'; };
+    return '<div class="mt-stack">'+
+      '<div class="mt-aud-hero">'+
+        '<div class="mt-aud-hero-ic">'+IC.spark+'</div>'+
+        '<div><h3 class="mt-aud-hero-h">'+L("Audiencia — en camino","Audience — on the way")+'</h3>'+
+        '<p class="mt-aud-hero-p">'+L("Crecimiento de seguidores, alcance por tipo, edad, género y ubicaciones salen de los insights de audiencia de Instagram. Aún no están conectados, así que no te enseño números inventados.","Follower growth, reach by type, age, gender and locations come from Instagram audience insights. Not connected yet, so I won't show you made-up numbers.")+'</p></div>'+
+      '</div>'+
+      '<div class="mt-grid-audtop">'+card(L("Crecimiento de seguidores","Follower growth"))+card(L("Alcance por tipo","Reach by type"))+'</div>'+
+      '<div class="mt-grid3">'+card(L("Edad","Age"))+card(L("Género","Gender"))+card(L("Top ubicaciones","Top locations"))+'</div>'+
+    '</div>';
+  }
+  function metCompetidoresHTML(){
+    // Tabla derivada de tus competidores REALES (S.tracked + sus reels en el radar).
+    // La "cuota de atención del nicho" necesita repros agregadas → próximamente honesto.
+    var b=brand();
+    var t=Array.isArray(S.tracked)?S.tracked:[];
+    var cols=[L("repros medias","avg plays"),L("interacción","engagement"),L("reels","reels")];
+    // Agrega por competidor desde S.reels (lo que hay en el radar).
+    function _agg(handle){ var rs=(S.reels||[]).filter(function(r){ return r.creator&&r.creator.handle===handle; });
+      if(!rs.length) return null;
+      var av=Math.round(rs.reduce(function(a,r){return a+(r.views||0);},0)/rs.length);
+      var en=rs.reduce(function(a,r){return a+(r.engagement||0);},0)/rs.length;
+      return {avg:av, eng:en, n:rs.length}; }
+    var meAgg=null; var mv=metricVideos(); if(mv.length){ meAgg={avg:Math.round(mv.reduce(function(a,v){return a+(v.views||0);},0)/mv.length), n:mv.length}; }
+    var rowsArr=[];
+    if(meAgg) rowsArr.push({ini:initialsOf(b.handle||"tu"),h:"@"+(b.handle||S.user.handle||"tu_cuenta"),tag:L("tú","you"),me:1,avg:meAgg.avg,eng:null,n:meAgg.n});
+    t.forEach(function(tt){ var h=(tt.creator&&tt.creator.ig_username)||tt.ig_username||""; if(!h) return; var a=_agg(h);
+      rowsArr.push({ini:initialsOf(h),h:"@"+h,tag:(a?(a.n+" "+L("reels","reels")):L("analizando…","analyzing…")),me:0,avg:a?a.avg:null,eng:a?a.eng:null,n:a?a.n:0}); });
+    var head='<div class="mt-comp-head"><span>'+L("cuenta","account")+'</span>'+cols.map(function(c){ return '<span>'+ESC(c)+'</span>'; }).join("")+'</div>';
+    var rows=rowsArr.length ? rowsArr.map(function(r){
+      return '<div class="mt-comp-row'+(r.me?" me":"")+'">'+
+        '<div class="mt-comp-acct"><span class="mt-comp-av">'+ESC(r.ini)+'</span><div><div class="mt-comp-n">'+ESC(r.h)+'</div><div class="mt-comp-tag'+(r.me?" me":"")+'">'+ESC(r.tag)+'</div></div></div>'+
+        '<span class="mt-comp-c">'+(r.avg!=null?fmtKM(r.avg):"–")+'</span>'+
+        '<span class="mt-comp-c">'+(r.eng!=null?(r.eng.toFixed(1)+"%"):"–")+'</span>'+
+        '<span class="mt-comp-c mt-mono">'+(r.n||0)+'</span></div>';
+    }).join("") : '';
+    var table = rowsArr.length
+      ? '<div class="mt-card mt-comp"><div class="mt-comp-table">'+head+rows+'</div></div>'
+      : '<div class="mt-card"><span class="mt-card-t">'+L("Tus competidores","Your competitors")+'</span>'+_metPronto("Sigue a algún competidor desde el Radar y aquí verás cómo vas contra ellos (repros medias, interacción).","Follow a competitor from the Radar and you'll see how you stack up here.")+'</div>';
+    return '<div class="mt-stack">'+table+
+      '<div class="mt-grid2">'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Cuota de atención del nicho","Niche share of voice")+'</span></div>'+_metPronto("La cuota de atención compara las repros totales del nicho — necesita el histórico agregado de cada competidor. En cuanto lo tenga, aquí va tu % real.","Share of voice compares total niche plays — needs each competitor's aggregated history. Real % coming once available.")+'</div>'+
+        '<div class="mt-card mt-opp"><span class="mt-opp-eye">'+L("› cómo usarlo","› how to use it")+'</span>'+
+          '<h3 class="mt-opp-h">'+L("Roba lo que les explota a ellos.","Steal what's exploding for them.")+'</h3>'+
+          '<p class="mt-opp-p">'+L("Sus reels que más rinden ya están en tu Radar, listos para robar en tu voz.","Their top reels are already in your Radar, ready to steal in your voice.")+'</p>'+
+          '<button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Ver sus reels en el Radar","See their reels in the Radar")+'</button></div>'+
+      '</div>'+
+    '</div>';
   }
   /* MÉTRICAS · Audiencia (mockup Métricas.dc.html). En prod los datos vienen de las
      audience-insights de IG; aquí, deterministas por handle (vía _lbHash) para que el
@@ -2114,29 +2627,39 @@
     }
     var items=rows.map(function(r,i){
       var g=r.growth, gtxt=(g>=0?'↑':'↓')+Math.abs(g)+'%';
-      var pos=String(i+1);
-      return '<div class="lb-row'+(r.you?' me':'')+'">'+
-        '<span class="lb-pos">'+pos+'</span>'+
-        '<span class="ava bava">'+ESC(initialsOf(r.handle))+'</span>'+
-        '<span class="lb-h">@'+ESC(r.handle)+(r.you?' <b>('+L("tú","you")+')</b>':'')+'</span>'+
-        '<span class="lb-f">'+_fmtK(r.followers)+'</span>'+
-        '<span class="lb-g '+(g>=0?'up':'down')+'">'+gtxt+'</span>'+
-        ((!r.you && !S.versus)?'<button class="lb-challenge" data-act="versus-start" data-id="'+ESC(r.handle)+'">'+IC.bolt+' '+L("Supéralo","Beat it")+'</button>':'<span class="lb-challenge-sp"></span>')+
+      return '<div class="rk-row'+(r.you?' me':'')+'">'+
+        '<span class="rk-pos'+(i<3?' top t'+(i+1):'')+'">'+(i+1)+'</span>'+
+        '<span class="rk-ava">'+ESC(initialsOf(r.handle))+'</span>'+
+        '<span class="rk-h">@'+ESC(r.handle)+(r.you?' <span class="rk-you">'+L("tú","you")+'</span>':'')+'</span>'+
+        '<span class="rk-val">'+_fmtK(r.followers)+' <span class="rk-unit">'+ESC(unit)+'</span></span>'+
+        '<span class="rk-g '+(g>=0?'up':'down')+'">'+gtxt+'</span>'+
+        ((!r.you && !S.versus)?'<button class="btn btn-sm btn-secondary rk-beat" data-act="versus-start" data-id="'+ESC(r.handle)+'">'+IC.bolt+' '+L("Supéralo","Beat it")+'</button>':'<span class="rk-beat-sp"></span>')+
       '</div>';
     }).join("");
-    return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Ranking · @"+(b.handle||S.user.handle||""), L("Ranking","Ranking"), L("Tu posición frente a tus competidores del nicho. Sube de puesto creando y publicando más.","Where you stand against your niche competitors. Climb by creating and publishing more."))+
+    var myRank=myIdx+1;
+    return '<div class="scroll"><div class="canvas rk-canvas">'+
+      // cabecera v3
+      '<header class="rk-head"><div class="rk-head-l">'+
+        '<div class="rk-eyebrow"><span class="rk-eye-dot"></span>'+L("tu posición en el nicho","your spot in the niche")+'</div>'+
+        '<h1 class="rk-h1">'+L("Ranking","Ranking")+'</h1>'+
+        '<p class="rk-sub">'+L("Tu posición frente a tus competidores. Sube de puesto creando y publicando más.","Where you stand vs your competitors. Climb by creating and publishing more.")+'</p></div>'+
+        '<div class="rk-sync"><span class="rk-sync-dot"></span>@'+ESC(b.handle||S.user.handle||"tu_cuenta")+'</div></header>'+
+      // hero: tu posición
+      '<div class="rk-hero">'+
+        '<div class="rk-rank"><span class="rk-rank-hash">#</span><span class="rk-rank-n">'+(myRank>0?myRank:"–")+'</span><span class="rk-rank-of">'+L("de "+rows.length,"of "+rows.length)+'</span></div>'+
+        '<div class="rk-hero-body">'+
+          '<div class="rk-hero-val">'+_fmtK(me.followers||0)+' <span class="rk-hero-unit">'+ESC(unit)+'</span></div>'+
+          goal+momentum+
+        '</div>'+
+      '</div>'+
       versusCardHTML()+
-      momentum+
-      goal+
       versusHintHTML()+
-      '<div class="leaderboard">'+items+'</div>'+
-      // #2 conectar el ranking con la acción del producto (el loop) — CTA primario.
-      '<div class="cluster cluster-sm" style="margin:16px 0 8px;gap:10px">'+
+      '<div class="rk-list">'+items+'</div>'+
+      '<div class="rk-cta">'+
         '<button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Roba y publica más para subir","Steal & publish more to climb")+'</button>'+
         '<button class="btn btn-md btn-secondary" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add a competitor")+'</button>'+
       '</div>'+
-      '<p class="lb-note">'+(lbIsViews()
+      '<p class="rk-note">'+(lbIsViews()
         ? L("El ranking va por <b>views medias por reel</b> (lo que de verdad scrapeamos). Conecta tu Instagram para ver tu posición.","Ranking is by <b>average views per reel</b> (what we actually scrape). Connect your Instagram to see your spot.")
         : L("Las cifras de competidores son estimaciones del nicho; tus métricas reales salen al conectar Instagram.","Competitor figures are niche estimates; your real metrics appear once you connect Instagram."))+'</p>'+
       communitySoonHTML()+
@@ -2534,6 +3057,143 @@
       '<div class="bt-prog">'+(gt.i+1)+' / '+gt.cards.length+'</div>'+
     '</div></div>';
   }
+  /* ── v3 (mockup David · Cerebro): espina limpia ───────────────────────
+     header (eyebrow glow + «Tu Cerebro» + sub), hero con anillo de progreso +
+     nodos cerebro animados + columna de stats, rejilla «Lo que ya sé de ti» |
+     «Niveles del Cerebro», y «Misiones para subir al Nivel N». Las features
+     densas (entrenar, tinder, asistentes, voz, métricas) van DEBAJO, intactas. */
+  function brainHeaderV3HTML(){
+    return '<header class="ce-head">'+
+      '<div class="ce-eyebrow"><span class="ce-eye-dot"></span>'+L("tu copiloto, entrenándose con cada guion","your copilot, training with every script")+'</div>'+
+      '<h1 class="ce-h1">'+L("Tu Cerebro","Your Brain")+'</h1>'+
+      '<p class="ce-sub">'+L("Aprende tu voz reel a reel. Cuanto más creas, más clava tu tono — y antes escribe solo.","It learns your voice reel by reel. The more you create, the better it nails your tone — and the sooner it writes on its own.")+'</p>'+
+    '</header>';
+  }
+  // Nodos del cerebro (SVG) — réplica del mockup: glifo + sinapsis animadas.
+  var _ceBrainSVG='<svg width="118" height="118" viewBox="0 0 120 120" fill="none" class="ce-brain-svg">'+
+    '<g class="ce-breathe">'+
+    '<path d="M60 22 C45 20 35 30 35 42 C25 45 25 60 33 64 C29 75 39 88 53 85 C57 93 70 93 75 85 C89 88 99 75 91 64 C99 59 97 44 86 43 C86 31 76 20 60 22 Z" fill="var(--brand-500)" opacity="0.07"/>'+
+    '<path d="M60 22 C45 20 35 30 35 42 C25 45 25 60 33 64 C29 75 39 88 53 85 C57 93 70 93 75 85 C89 88 99 75 91 64 C99 59 97 44 86 43 C86 31 76 20 60 22 Z" stroke="var(--brand-300,#6E92FF)" stroke-width="1" opacity="0.35"/>'+
+    '<circle class="ceN" cx="60" cy="58" r="5.5" fill="var(--brand-500)"/>'+
+    '<circle class="ceN" cx="56" cy="40" r="3.6" fill="var(--brand-300,#6E92FF)" style="animation-delay:.2s"/>'+
+    '<circle class="ceN" cx="40" cy="54" r="3.6" fill="var(--brand-300,#6E92FF)" style="animation-delay:.5s"/>'+
+    '<circle class="ceN" cx="76" cy="56" r="3.6" fill="var(--brand-300,#6E92FF)" style="animation-delay:.35s"/>'+
+    '<circle class="ceN" cx="58" cy="76" r="3.6" fill="var(--brand-300,#6E92FF)" style="animation-delay:.7s"/>'+
+    '<circle class="ceN" cx="44" cy="34" r="2.8" fill="var(--brand-300,#6E92FF)" style="animation-delay:.9s"/>'+
+    '<circle class="ceN" cx="72" cy="36" r="2.8" fill="var(--brand-300,#6E92FF)" style="animation-delay:1.1s"/>'+
+    '<circle class="ceN" cx="46" cy="72" r="2.8" fill="var(--brand-300,#6E92FF)" style="animation-delay:.6s"/>'+
+    '<circle class="ceN" cx="74" cy="74" r="2.8" fill="var(--brand-300,#6E92FF)" style="animation-delay:1.3s"/>'+
+    '</g></svg>';
+  function brainHeroV3HTML(lv, voicePct){
+    var b=brand();
+    var pct=brainProgress();
+    var leveled=pct>=100 || !lv.next;
+    var off=Math.round(465*(1-pct/100));
+    var kicker=leveled?L("Manifestando viralidad","Manifesting virality"):L("Vas afinando","Dialing it in");
+    var title=leveled
+      ? L("¡Tu Cerebro está a punto de subir de nivel!","Your Brain is about to level up!")
+      : L("Te falta poco para que escriba como tú sin pensar","Almost there — soon it writes like you without thinking");
+    var reels=hasRealVoice()?(S.voice.source_count||0):(b.reelsAnalyzed||0);
+    var reelsTxt=String(reels).replace(/\B(?=(\d{3})+(?!\d))/g," ");
+    var nGuiones=S.guiones.filter(function(g){return g.status!=="discarded";}).length;
+    var stats=[
+      [L("Reels analizados","Reels analyzed"), reelsTxt, "var(--text-primary)"],
+      [L("Guiones creados","Scripts created"), String(nGuiones), "var(--text-primary)"],
+      [L("Tu voz, clavada","Your voice, nailed"), voicePct+"%", "var(--success-fg,#3FE0A0)"],
+      [L("Racha","Streak"), (S.user.streak||0)+" "+L("días","days"), "var(--brand-500,#2F5BFF)"]
+    ];
+    var statsH=stats.map(function(s){ return '<div class="ce-stat"><span class="ce-stat-l">'+ESC(s[0])+'</span><span class="ce-stat-v" style="color:'+s[2]+'">'+ESC(s[1])+'</span></div>'; }).join("");
+    return '<div class="ce-hero-row">'+
+      '<div class="ce-hero">'+
+        '<div class="ce-ring">'+
+          '<div class="ce-ring-circle">'+
+            '<svg width="172" height="172" viewBox="0 0 172 172" class="ce-ring-svg" aria-hidden="true">'+
+              '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
+              '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+off+'" class="ce-ring-prog"/>'+
+            '</svg>'+
+            '<div class="ce-ring-c">'+_ceBrainSVG+'</div>'+
+            '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
+          '</div>'+
+          '<span class="ce-ring-lvl">'+L("NIVEL","LEVEL")+' <b>'+lv.level+'</b></span>'+
+        '</div>'+
+        '<div class="ce-hero-body">'+
+          '<div class="ce-kicker">'+ESC(kicker)+'</div>'+
+          '<div class="ce-hero-title">'+ESC(title)+'</div>'+
+          (lv.next?'<div class="ce-prog-row"><span>'+L("Progreso al Nivel "+lv.next,"Progress to Level "+lv.next)+'</span><span class="ce-prog-pct">'+pct+'%</span></div>':'')+
+          '<div class="ce-prog-bar"><div class="ce-prog-fill eco-fill" style="width:'+Math.max(4,pct)+'%"></div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="ce-stats">'+statsH+'</div>'+
+    '</div>';
+  }
+  function brainKnowHTML(v){
+    var reels=hasRealVoice()?(S.voice.source_count||0):(brand().reelsAnalyzed||47);
+    var tonos=(v.tono||"").split(/[,·]/).map(function(x){return x.trim();}).filter(Boolean);
+    if(!tonos.length) tonos=["Directo","Cercano"];
+    var pills=tonos.map(function(t){ return '<span class="ce-tono">'+ESC(t)+'</span>'; }).join("");
+    var frases=(v.frases&&v.frases.length)?v.frases.map(function(f){return '“'+ESC(f)+'”';}).join(", ")+"." : "—";
+    var gancho=(v.frases&&v.frases[0])?('“'+ESC(v.frases[0]).slice(0,16)+'…”'):'“Comenta X…”';
+    return '<div class="ce-card ce-know">'+
+      '<div class="ce-card-head"><span class="ce-card-t">'+L("Lo que ya sé de ti","What I already know about you")+'</span><span class="ce-card-meta">'+L("› de "+reels+" reels","› from "+reels+" reels")+'</span></div>'+
+      '<div class="ce-know-block"><span class="ce-know-k">'+L("Tu tono","Your tone")+'</span><div class="ce-tonos">'+pills+'</div></div>'+
+      '<div class="ce-know-block"><span class="ce-know-k">'+L("Tus muletillas","Your catchphrases")+'</span><p class="ce-mulet">'+frases+'</p></div>'+
+      '<div class="ce-know-foot">'+
+        '<div><div class="ce-foot-k">'+L("duración ideal","ideal length")+'</div><div class="ce-foot-v">'+ESC(v.duracion||"30–45 s")+'</div></div>'+
+        '<div><div class="ce-foot-k">'+L("gancho top","top hook")+'</div><div class="ce-foot-v">'+gancho+'</div></div>'+
+      '</div>'+
+    '</div>';
+  }
+  // Roadmap de niveles (nombres/desbloqueos de David); el nivel actual viene de brainLevel().
+  function brainLevelsHTML(lv){
+    var data=[
+      [1,L("Aprendiz","Apprentice"),L("Detección básica de señales","Basic signal detection")],
+      [2,L("Imitador","Imitator"),L("Tu voz aprendida · guiones con tu tono","Your voice learned · scripts in your tone")],
+      [3,L("Ladrón","Thief"),L("«Llena mi semana» · 5 guiones de golpe","«Fill my week» · 5 scripts at once")],
+      [4,L("Estratega","Strategist"),L("Más competidores en el radar · métricas Pro","More competitors on the radar · Pro metrics")],
+      [5,L("Viral","Viral"),L("Autopiloto · el Cerebro escribe solo","Autopilot · the Brain writes by itself")]
+    ];
+    var cur=lv.level||1;
+    var rows=data.map(function(d){
+      var n=d[0], isCur=n===cur, isPast=n<cur, isNext=n===cur+1;
+      var cls=isCur?" cur":(isPast?" past":"");
+      var tag=isPast?IC.check:(isCur?L("Aquí estás","You are here"):(isNext?L("Siguiente","Next"):""));
+      return '<div class="ce-lvl'+cls+'">'+
+        '<div class="ce-lvl-n">'+(isPast?IC.check:n)+'</div>'+
+        '<div class="ce-lvl-body"><div class="ce-lvl-name">'+ESC(d[1])+'</div><div class="ce-lvl-unlock">'+ESC(d[2])+'</div></div>'+
+        (tag?'<span class="ce-lvl-tag">'+tag+'</span>':'')+
+      '</div>';
+    }).join("");
+    return '<div class="ce-card ce-levels"><span class="ce-card-t">'+L("Niveles del Cerebro","Brain levels")+'</span><div class="ce-lvl-list">'+rows+'</div></div>';
+  }
+  function brainMissionsHTML(lv){
+    var s=brainSignals();
+    var nRec=S.guiones.filter(function(g){return g.status==="recorded";}).length;
+    var nx=lv.next||lv.level;
+    var data=[
+      [(s.guiones>=3), L("Crea 3 guiones con tu voz","Create 3 scripts in your voice"), L("+ afina tu tono","+ tunes your tone"), IC.edit, "tab","dashboard"],
+      [(nRec>=2), L("Graba 2 reels en teleprónter","Record 2 reels on teleprompter"), L("+ aprende tu ritmo","+ learns your pace"), IC.mic, "tab","guiones"],
+      [(s.comps>=1), L("Añade 1 competidor más","Add 1 more competitor"), L("+ amplía el radar","+ widens the radar"), IC.eye, "add-comp",""],
+      [(s.guiones>=1), L("Roba y remezcla 1 viral","Steal & remix 1 viral"), L("+ desbloquea estilos","+ unlocks styles"), IC.repeat, "tab","dashboard"]
+    ];
+    var done=data.filter(function(m){return m[0];}).length;
+    var cards=data.map(function(m){
+      var dn=m[0];
+      var btn=dn
+        ? '<button class="btn btn-sm btn-secondary ce-mission-done" disabled>'+IC.check+' '+L("Hecho","Done")+'</button>'
+        : '<button class="btn btn-sm btn-primary" data-act="'+m[4]+'"'+(m[5]?' data-k="'+m[5]+'"':'')+'>'+L("Empezar","Start")+'</button>';
+      return '<div class="ce-mission'+(dn?' done':'')+'">'+
+        '<div class="ce-mission-ic">'+m[3]+'</div>'+
+        '<div class="ce-mission-body"><div class="ce-mission-l">'+ESC(m[1])+'</div><div class="ce-mission-r">'+ESC(m[2])+'</div></div>'+
+        btn+
+      '</div>';
+    }).join("");
+    return '<div class="ce-card ce-missions">'+
+      '<div class="ce-missions-head"><div><span class="ce-card-t">'+L("Misiones para subir al Nivel "+nx,"Missions to reach Level "+nx)+'</span>'+
+        '<div class="ce-missions-sub">'+L("Cada misión entrena tu Cerebro y llena el anillo.","Each mission trains your Brain and fills the ring.")+'</div></div>'+
+        '<span class="ce-missions-count">'+done+' / '+data.length+' '+L("completadas","completed")+'</span></div>'+
+      '<div class="ce-missions-grid">'+cards+'</div>'+
+    '</div>';
+  }
   function brainHTML(){
     var b=brand();
     var v=brainVoice(b);
@@ -2582,92 +3242,18 @@
         : '<div class="rs-empty" style="padding:20px">Aún no sigues a nadie. Añade competidores en el Dashboard.</div>';
     }
 
-    return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Cerebro · @"+(b.handle||S.user.handle||""), "Tu Cerebro", "Aprende tu voz reel a reel. Cuanto más creas, más clava tu tono — y antes escribe solo.")+
-      // hero: ANILLO circular (brainProgress%) + nivel + voz (mockup Cerebro.dc.html).
-      // El 3D se conserva oculto (la lógica de ensureBrain3D sigue, sin saturar el render).
-      '<div class="brain-hero">'+
-        '<div class="brain-ring">'+
-          '<svg width="158" height="158" viewBox="0 0 172 172" class="brain-ring-svg" aria-hidden="true">'+
-            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--surface-overlay)" stroke-width="13"/>'+
-            '<circle cx="86" cy="86" r="74" fill="none" stroke="var(--brand-500)" stroke-width="13" stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="'+Math.round(465*(1-brainProgress()/100))+'" class="brain-ring-prog"/>'+
-          '</svg>'+
-          '<div class="brain-ring-c">'+IC.brain+'<span class="brain-ring-lvl">NIVEL <b>'+lv.level+'</b></span></div>'+
-        '</div>'+
-        '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
-        '<div class="brain-hero-body">'+
-          '<div class="brain-kicker">'+ESC(ecoLevelName(lv.level))+(lv.level>=4?' · '+IC.star+' Pro':'')+'</div>'+
-          '<div class="brain-voiceline">Te conozco al <b>'+brainProgress()+'%</b></div>'+
-          (lv.next?'<div class="brain-prog-row"><span>Progreso al Nivel '+lv.next+'</span><span class="brain-prog-pct">'+brainProgress()+'%</span></div>':'')+
-          '<div class="eco-bar" style="margin:6px 0 8px"><div class="eco-fill" style="width:'+Math.max(4,brainProgress())+'%"></div></div>'+
-          // B2: umbrales VISIBLES del siguiente nivel (checklist ✓/○) + UNA acción primaria
-          // (la primera carencia). B4: el beneficio es real — voz y ganadores entran en el prompt.
-          (lv.next
-            ? '<div class="brain-next">'+(lv.missing.length===1?'Te falta <b>1 paso</b>':'Te faltan <b>'+lv.missing.length+' pasos</b>')+' para el <b>Nivel '+lv.next+' · '+ESC(ecoLevelName(lv.next))+'</b>.</div>'+
-              '<div class="brain-reqs">'+lv.reqs.map(function(r){
-                return '<span class="brain-req'+(r.ok?' ok':'')+'">'+(r.ok?IC.check:'<span class="brain-req-o">○</span>')+' '+ESC(r.label)+'</span>';
-              }).join('')+'</div>'+
-              (lv.nextAction
-                ? '<button class="btn btn-md btn-primary" style="margin-top:12px" data-act="'+ESC(lv.nextAction.cta.act)+'"'+(lv.nextAction.cta.k?' data-k="'+ESC(lv.nextAction.cta.k)+'"':'')+'>'+ESC(lv.nextAction.cta.t)+'</button>'
-                : '')+
-              // Fathom 18/06: el nivel sube SOLO con el auto-scrape (2×/sem); el botón
-              // de arriba solo lo adelanta. Se enseña cuando el salto depende de publicar.
-              (lv.next>=4 ? '<div class="brain-autonote">'+IC.spark+' Analizo tu perfil <b>2×/semana</b> sin que hagas nada — cuando publicas, tu nivel sube en el siguiente análisis. ¿Con prisa? Fuérzalo arriba.</div>' : '')
-            : '<div class="brain-next">Nivel máximo: creo con tu voz, tus rivales y tus datos. Guiones casi sin retoques.</div>')+
-          '<div class="brain-why">A más nivel, menos retoques: tu voz y tus reels ganadores entran en el prompt de cada «Roba la idea».</div>'+
-        '</div>'+
-      '</div>'+
-      // Entrenar (inversión): valora hooks → afina tu gusto + alimenta el cerebro 3D.
-      brainTrainHTML()+
-      // Tinder de TUS guiones (Fathom 18/06, David): swipe sobre lo que ya creaste →
-      // refina la voz y entrena el Cerebro. Solo aparece con >=3 guiones propios.
-      guionTinderHTML()+
-      // Forzar re-scrape del propio perfil (Fathom 18/06): adelanta el análisis auto
-      // 2×/sem a cambio de créditos. Siempre disponible (publicaste → sube ya de nivel).
-      '<div class="brain-section-t">'+L("Sube de nivel ya","Level up now")+'</div>'+
-      '<div class="bt-load" style="justify-content:space-between;gap:14px;margin-bottom:20px">'+
-        '<span>'+L("¿Publicaste algo nuevo? Re-analizo tu perfil ahora y tu nivel sube en cuanto detecte tus reels — sin esperar al análisis automático (2×/semana).","Published something new? I re-scan your profile now and your level rises as soon as I detect your reels — no waiting for the automatic scan (2×/week).")+'</span>'+
-        '<button class="btn btn-sm btn-secondary" style="flex-shrink:0" data-act="force-scrape">'+IC.spark+' '+L("Re-analizar mi perfil · 10 cr","Re-scan my profile · 10 cr")+'</button>'+
-      '</div>'+
-      // Analizar un reel suelto (sin añadirlo como competidor) — atajo al panel Analizar.
-      '<div class="brain-section-t">'+L("Analiza un reel suelto","Analyze a one-off reel")+'</div>'+
-      '<div class="bt-load" style="justify-content:space-between;gap:14px;margin-bottom:20px">'+
-        '<span>'+L("¿Viste un reel que te llamó? Pégalo y lo transcribo — sin añadirlo a tu radar.","Saw a reel that caught your eye? Paste it and I'll transcribe it — without adding it to your radar.")+'</span>'+
-        '<button class="btn btn-sm btn-secondary" style="flex-shrink:0" data-act="legacy" data-k="transc">'+IC.mic+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
-      '</div>'+
-      // A1: selector de TONO preset (personalidad cuando aún no hay voz personal)
-      toneSelectorHTML()+
-      // CAPTURA del moat (si aún no hay voz) o EVIDENCIA real (si ya aprendió)
-      (hasRealVoice() ? voiceEvidenceHTML() : voiceCaptureHTML())+
-      // fuentes del conocimiento
-      '<div class="brain-section-t">De qué me alimento</div>'+
-      '<div class="brain-sources">'+sources+'</div>'+
-      // lo que sé de tu voz
-      '<div class="brain-section-t">Lo que sé de tu voz</div>'+
-      '<div class="brain-voice">'+
-        '<div class="voice-row"><span class="voice-k">Tono</span><span class="voice-val">'+ESC(v.tono)+'</span></div>'+
-        '<div class="voice-row"><span class="voice-k">Tus frases</span><span class="voice-val">'+frases+'</span></div>'+
-        '<div class="voice-row"><span class="voice-k">Estructura</span><span class="voice-val">'+ESC(v.estructura)+'</span></div>'+
-        '<div class="voice-row"><span class="voice-k">Duración</span><span class="voice-val">'+ESC(v.duracion)+'</span></div>'+
-        '<div class="voice-row"><span class="voice-k">Evito</span><span class="voice-val">'+ESC(v.evita)+'</span></div>'+
-      '</div>'+
-      // T2: tus asistentes — estilos propios para guionizar, LISTADOS inline
-      // (visibilidad del estado, reconocer>recordar). Reusa los CRUD globales
-      // (openAssistantModal/editAssistant/deleteAssistant + el modal existente).
-      // «Gestionar» abre el panel legacy completo (reparentado, data-act=legacy).
-      '<div class="brain-section-t">Tus asistentes'+(nAsst?' <span class="brain-tag">'+nAsst+'</span>':'')+'</div>'+
-      brainAsstListHTML(nAsst)+
-      '<div class="cluster cluster-sm" style="margin:12px 0 18px;gap:10px">'+
-        '<button class="btn btn-md btn-secondary" onclick="openAssistantModal()">'+IC.bulb+' Nuevo asistente</button>'+
-        '<button class="btn btn-md btn-ghost" data-act="legacy" data-k="assistants">'+IC.gear+' Gestionar</button>'+
-      '</div>'+
-      // lo que funciona (métricas)
-      '<div class="brain-section-t">Lo que funciona en tu cuenta'+(learned.length?' <span class="brain-tag">de tus métricas</span>':'')+'</div>'+
-      '<div class="learn" style="margin-bottom:18px"><div class="learn-list">'+learnList+'</div></div>'+
-      nextSeriesHTML("brain")+   // B1: la sugerencia de próxima serie, justo bajo lo que funciona (aquí SÍ primaria — T1)
-      // de quién aprendo
-      '<div class="brain-section-t">De quién aprendo</div>'+
-      '<div class="brain-comps">'+compList+'</div>'+
+    return '<div class="scroll"><div class="canvas ce-canvas">'+
+      // ── espina limpia (mockup David) ──
+      brainHeaderV3HTML()+
+      brainHeroV3HTML(lv, voicePct)+
+      '<div class="ce-grid">'+brainKnowHTML(v)+brainLevelsHTML(lv)+'</div>'+
+      brainMissionsHTML(lv)+
+      // v3 (mockup David): el Cerebro queda SOLO con la espina (header + anillo +
+      // «Lo que ya sé de ti» + niveles + misiones). Las features densas anteriores
+      // (entrenar, tinder, re-analizar, analizar reel, tono, voz, fuentes,
+      // asistentes, métricas, próxima serie, competidores) se han RETIRADO de esta
+      // pantalla por decisión del usuario — sus funciones siguen definidas/usables
+      // desde otros puntos, pero ya no se pintan aquí.
     '</div></div>';
   }
 
@@ -2790,6 +3376,116 @@
         '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
       '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+conveyorHTML()+'</div>';
   }
+  /* v3 (mockup David · «Editor de guion»): overlay a pantalla completa con barra
+     propia (‹ Guiones · /editor · estado guardado · Copiar · Marcar grabado) y dos
+     columnas — documento editable (badge+fuente+mult, hook H1, barra IA, bloques
+     Gancho/Desarrollo/CTA, pie con duración + teleprónter) y rail derecho (reel
+     fuente, transcripción, variantes de gancho, Regenerar / Roba como un artista).
+     Edición inline persistida vía window.RadarLoop.editSave (onblur). */
+  function _wordCount(txt){ return (String(txt||"").trim().match(/\S+/g)||[]).length; }
+  function scriptEditorHTML(){
+    var g=(S.activeGuionId && guionById(S.activeGuionId))||null;
+    var r=S.reel||{};
+    var s=g?{hook:g.hook||"",beats:g.beats||[],close:g.close||""}:((r.script)||{hook:"",beats:[],close:""});
+    var gid=g?g.id:"";
+    var title=(g&&g.title)||s.hook||L("Tu guión","Your script");
+    var handle=(g&&g.from)?String(g.from).replace(/^@/,""):((r.creator&&r.creator.handle)||"");
+    var mult=(g&&(g.mult||g.fromMult))||r.explosionTxt||null;
+    var multTxt=mult?(String(mult).replace(/×\s*$/,"")+"×"):"";
+    var when=r.when||(g&&g.when)||"";
+    var rec=!!(g&&g.status==="recorded");
+    // bloques editables (contenteditable → editSave onblur)
+    var develop=(s.beats||[]).join("\n");
+    var blocks=[
+      [L("Gancho · primeros 3 s","Hook · first 3 s"),"hook",s.hook],
+      [L("Desarrollo","Body"),"develop",develop],
+      [L("CTA · cierre","CTA · close"),"close",s.close]
+    ];
+    var blocksH=blocks.map(function(b){
+      return '<div class="ed-block">'+
+        '<div class="ed-block-head"><span class="ed-block-k">'+ESC(b[0])+'</span>'+
+          '<button class="ed-rewrite" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.repeat+' '+L("Reescribir","Rewrite")+'</button></div>'+
+        '<p class="ed-block-body" contenteditable="true" spellcheck="false"'+(gid?' onblur="try{window.RadarLoop.editSave(\''+ESC(gid)+'\',\''+b[1]+'\',this.innerText)}catch(e){}"':'')+'>'+ESC(b[2]||"")+'</p>'+
+      '</div>';
+    }).join("");
+    // barra IA
+    var ai=[["Acortar",IC.arrL],["Más gancho",IC.spark],["Cambiar tono",IC.layers],["Más ejemplos",IC.plus]];
+    var aiH=ai.map(function(a){ return '<button class="ed-ai" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+a[1]+' '+L(a[0],a[0])+'</button>'; }).join("");
+    // rail · fuente
+    var th=_demoThumbs(); var thumb=(th&&th.length)?th[0]:null;
+    var thumbInner=thumb?'<img src="'+ESC(thumb)+'" alt="" loading="lazy">':'<div class="ed-src-ph" style="background:'+_galGrad(gid||handle||"src")+'"></div>';
+    var srcPanel = handle ? ('<div class="ed-rail-block">'+
+      '<span class="ed-rail-k">'+L("› fuente","› source")+'</span>'+
+      '<div class="ed-src">'+
+        '<div class="ed-src-thumb">'+thumbInner+
+          (multTxt?'<span class="ed-src-mult">'+IC.bolt+' '+ESC(multTxt)+'</span>':'')+
+          '<span class="ed-src-play">'+_icPlay+'</span>'+
+          (r.dur?'<span class="ed-src-dur">'+ESC(r.dur)+'</span>':'')+
+        '</div>'+
+        '<div class="ed-src-info"><span class="ed-src-meta">@'+ESC(handle)+(when?' · '+ESC(when):'')+'</span>'+
+          '<div class="ed-src-stats">'+
+            (r.views?'<div><div class="ed-src-v">'+ESC(r.views)+'</div><div class="ed-src-l">views</div></div>':'')+
+            (r.likes?'<div><div class="ed-src-v">'+ESC(r.likes)+'</div><div class="ed-src-l">likes</div></div>':'')+
+          '</div>'+
+          (r.id?'<button class="btn btn-sm btn-secondary" data-act="reel-original" data-id="'+ESC(r.id)+'">'+L("Ver original","View original")+'</button>':'')+
+        '</div>'+
+      '</div>'+
+    '</div>') : '';
+    // rail · transcripción
+    var txText=(S._tx&&S._tx.status==="ok"&&S._tx.text)?S._tx.text:(develop||"");
+    var txPanel = txText ? ('<div class="ed-rail-block"><span class="ed-rail-k">'+L("› transcripción detectada","› transcript detected")+'</span>'+
+      '<div class="ed-tx">'+ESC(txText)+'</div></div>') : '';
+    // rail · variantes de gancho
+    var variants=[]; variants.push(s.hook);
+    if(g&&g.hooks) g.hooks.forEach(function(h){ if(h&&variants.indexOf(h)<0) variants.push(h); });
+    variants=variants.filter(Boolean);
+    var varH=variants.map(function(h,i){
+      var sel=(i===0);
+      return '<button class="ed-var'+(sel?' on':'')+'"'+(gid&&i>0?' data-act="ed-usehook" data-id="'+ESC(gid)+'" data-i="'+(i-1)+'"':'')+'>'+
+        '<span class="ed-var-dot"></span><span class="ed-var-t">'+ESC(h)+'</span></button>';
+    }).join("");
+    var varPanel = variants.length ? ('<div class="ed-rail-block"><div class="ed-rail-head"><span class="ed-rail-title">'+L("Variantes de gancho","Hook variants")+'</span><span class="ed-rail-tag">'+L("tu voz","your voice")+'</span></div>'+varH+'</div>') : '';
+    var nWords=_wordCount(s.hook)+_wordCount(develop)+_wordCount(s.close);
+    var secs=Math.max(1,Math.round(nWords/2.5));
+    var recBtn=rec
+      ? '<button class="btn btn-md ed-rec-on" data-act="gui-toggle-rec" data-id="'+ESC(gid)+'">'+IC.check+' '+L("Grabado","Recorded")+'</button>'
+      : '<button class="btn btn-md btn-primary" data-act="'+(gid?'gui-toggle-rec':'record')+'"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.mic+' '+L("Marcar grabado","Mark recorded")+'</button>';
+    var copyTxt=[title,s.hook].concat(s.beats||[],[s.close]).filter(Boolean).join("\n\n");
+    return '<div class="overlay ed-overlay" role="dialog" aria-modal="true" aria-label="'+L("Editor de guion","Script editor")+'">'+
+      '<div class="ed-bar">'+
+        '<div class="ed-bar-l">'+
+          '<button class="ed-back" data-act="ed-close">'+IC.back+' '+L("Guiones","Scripts")+'</button>'+
+          '<span class="ed-crumb">/ '+L("editor","editor")+'</span>'+
+          '<span class="ed-save"><span class="ed-save-dot"></span>'+L("guardado","saved")+'</span>'+
+        '</div>'+
+        '<div class="ed-bar-r">'+
+          '<button class="btn btn-md btn-secondary" data-act="copy" data-txt="'+ESC(copyTxt)+'">'+IC.doc+' '+L("Copiar","Copy")+'</button>'+
+          recBtn+
+        '</div>'+
+      '</div>'+
+      '<div class="ed-body">'+
+        '<div class="ed-doc">'+
+          '<div class="ed-meta">'+
+            '<span class="ed-badge'+(rec?' done':'')+'">'+(rec?IC.check+' '+L("Grabado","Recorded"):L("Por grabar","To record"))+'</span>'+
+            (handle?'<span class="ed-from">'+IC.repeat+' '+L("Robado de","Stolen from")+' <b>@'+ESC(handle)+'</b></span>':'')+
+            (multTxt?'<span class="ed-mult">'+ESC(multTxt)+'</span>':'')+
+          '</div>'+
+          '<h1 class="ed-hook" contenteditable="true" spellcheck="false"'+(gid?' onblur="try{window.RadarLoop.editSave(\''+ESC(gid)+'\',\'title\',this.innerText)}catch(e){}"':'')+'>'+ESC(title)+'</h1>'+
+          '<div class="ed-aitools">'+aiH+'</div>'+
+          blocksH+
+          '<div class="ed-doc-foot"><span class="ed-count">~'+secs+' s '+L("al hablar","spoken")+' · '+nWords+' '+L("palabras","words")+'</span>'+
+            '<button class="btn btn-md btn-secondary" data-act="chain" data-k="record">'+IC.mic+' '+L("Modo teleprónter","Teleprompter mode")+'</button></div>'+
+        '</div>'+
+        '<div class="ed-rail">'+
+          srcPanel+txPanel+varPanel+
+          '<div class="ed-rail-cta">'+
+            '<button class="btn btn-lg btn-primary" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.bolt+' '+L("Regenerar guion","Regenerate script")+'</button>'+
+            '<button class="btn btn-md btn-secondary" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.repeat+' '+L("Roba como un artista","Steal like an artist")+'</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
   function formatResultHTML(kind){
     var r=S.reel,s=r.script||{hook:"",beats:[],close:""};
     var meta={hooks:["5 hooks, listos para elegir","Tu mismo guión empieza de 5 formas. Cambia el primero y cambia todo."],carousel:["Tu carrusel, slide a slide","Desliza para ver las tarjetas. La idea del reel, ahora también en feed."],linkedin:["Tu post de LinkedIn","Mismo ángulo, registro profesional. Otro público, cero esfuerzo extra."],x:["Tu hilo de X","El guión partido en tuits que encadenan. Copia y publica."],serie:["Tu serie de 3 está lista","Tres días de contenido que se sostienen entre sí. La semana resuelta."]}[kind]||["Listo",""];
@@ -2815,6 +3511,18 @@
      onSubmit(v) recibe el valor ya validado. */
   function sheetHTML(){
     var sh=S.sheet; if(!sh) return '';
+    // Modo solo-lectura: sin input, solo extraHTML (p.ej. mostrar una transcripción)
+    // + un primario que cierra y un secundario opcional.
+    if(sh.readonly){
+      var innerR='<div class="sheet-body">'+
+        (sh.extraHTML||'')+
+        '<div class="sheet-actions">'+
+          (sh.secondaryLabel?'<button class="btn btn-md btn-secondary" data-act="sheet-secondary">'+ESC(sh.secondaryLabel)+'</button>':'')+
+          '<button class="btn btn-md btn-primary" data-act="sheet-close">'+ESC(sh.submitLabel||"Cerrar")+'</button>'+
+        '</div>'+
+      '</div>';
+      return overlayShellHTML(innerR, sh.title||"", "sheet-close", true, "sheet");
+    }
     var field = sh.multiline
       ? '<textarea class="field-textarea" id="rsSheetInput" rows="5" placeholder="'+ESC(sh.placeholder||"")+'">'+ESC(sh.initial||"")+'</textarea>'
       : '<input class="field-input" id="rsSheetInput" type="text" placeholder="'+ESC(sh.placeholder||"")+'" value="'+ESC(sh.initial||"")+'">';
@@ -2840,6 +3548,7 @@
     S.sheet={ title:opts.title, label:opts.label, placeholder:opts.placeholder, helper:opts.helper,
       multiline:!!opts.multiline, initial:opts.initial||"", submitLabel:opts.submitLabel,
       secondaryLabel:opts.secondaryLabel||null, extraHTML:opts.extraHTML||null,
+      readonly:!!opts.readonly,
       _validate:opts.validate||null, _readExtra:opts.readExtra||null,
       _onSubmit:opts.onSubmit||null, _onSecondary:opts.onSecondary||null, error:null };
     render();
@@ -2859,33 +3568,94 @@
   }
   function submitSheet(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSubmit); }
   function submitSheetSecondary(){ var sh=S.sheet; if(sh) _resolveSheet(sh._onSecondary); }
+  /* Feedback (menú de cuenta): reportar bug o pedir mejora. Aviso de recompensa en
+     créditos si el bug es real. En prod → POST /api/feedback (fable lo cablea);
+     en demo solo confirma con toast. Reusa el promptSheet (textarea + tipo). */
+  function openFeedback(){
+    S.acctMenu=false; S._fbImage=null;
+    promptSheet({
+      title: L("Enviar feedback","Send feedback"),
+      label: L("¿Qué falla o qué te gustaría?","What's broken or what would you like?"),
+      multiline: true,
+      placeholder: L("Describe el bug (con los pasos para reproducirlo) o la mejora que pides…","Describe the bug (with steps to reproduce) or the improvement you want…"),
+      helper: L("Cuanto más detalle, mejor podemos ayudarte.","The more detail, the better we can help."),
+      extraHTML:
+        '<div class="fb-reward">'+IC.spark+'<span>'+L("Si reportas un <b>bug real</b> y lo confirmamos, te <b>recompensamos con créditos</b>.","If you report a <b>real bug</b> and we confirm it, you get <b>credits as a reward</b>.")+'</span></div>'+
+        '<div class="field"><label class="field-label" for="rsFbType">'+L("Tipo","Type")+'</label>'+
+          '<select id="rsFbType" class="field-input"><option value="bug">'+L("Bug","Bug")+'</option><option value="idea">'+L("Idea o mejora","Idea or improvement")+'</option></select></div>'+
+        '<div class="field"><label class="field-label">'+L("Adjuntar captura (opcional)","Attach a screenshot (optional)")+'</label>'+
+          '<div class="fb-attach"><label class="fb-attach-btn">'+IC.plus+' '+L("Elegir imagen","Choose image")+
+            '<input type="file" id="rsFbImg" accept="image/*" onchange="try{window.RadarLoop.fbImage(this)}catch(e){}" hidden></label>'+
+            '<span class="fb-attach-name" id="rsFbImgName"></span></div>'+
+          '<div class="fb-attach-prev" id="rsFbImgPrev"></div></div>',
+      readExtra: function(){ var s=document.getElementById("rsFbType"); return {type:(s?s.value:"bug"), image:S._fbImage||null}; },
+      submitLabel: L("Enviar","Send"),
+      validate: function(v){ if(!v||v.trim().length<8) return L("Cuéntanos un poco más (mínimo 8 caracteres).","Tell us a bit more (min 8 characters)."); return null; },
+      onSubmit: function(v, extra){ submitFeedback(v, extra); }
+    });
+  }
+  function submitFeedback(text, extra){
+    var type=(extra&&extra.type)||"bug", image=(extra&&extra.image)||null;
+    if(!isDemo()){ try{ apiPost("/api/feedback",{type:type, text:text, page:S.tab, plan:S.user.plan, image_b64:image}); }catch(e){} }
+    try{ if(window.posthog) window.posthog.capture("feedback_submitted",{type:type, has_image:!!image}); }catch(e){}
+    S._fbImage=null;
+    showToast(type==="bug"
+      ? L("¡Gracias! Si confirmamos el bug, te llegan créditos de regalo.","Thanks! If we confirm the bug, credits land in your account.")
+      : L("¡Gracias por la idea! Las leemos todas.","Thanks for the idea! We read them all."));
+  }
   var _tpPlay='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
   var _tpPause='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>';
+  var _icMirror='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7 4 12l4 5"/><path d="m16 7 4 5-4 5"/></svg>';
+  var _icLock='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
   function _tpMMSS(ms){ var t=Math.floor(ms/1000),m=Math.floor(t/60),x=t%60; return (m<10?'0':'')+m+':'+(x<10?'0':'')+x; }
   function teleprompterHTML(){
     var r=S.reel||{creator:{handle:""},script:{hook:"",beats:[],close:""}};
     var s=r.script||{hook:"",beats:[],close:""};
     if(!S.tp) S.tp={ playing:false, speed:3, fontPx:34, mirror:false, recording:false, ms:0, countdown:0 };
     var tp=S.tp;
-    var body='<p class="hook">'+ESC(s.hook)+'</p>'+(s.beats||[]).map(function(b){return '<p>'+ESC(b)+'</p>';}).join("")+(s.close?'<p>'+ESC(s.close)+'</p>':"");
-    var rec = tp.recording ? '<span class="tp-rec"><span class="tp-rec-dot"></span>REC <b id="rsTpTimer">'+_tpMMSS(tp.ms)+'</b></span>' : '';
+    // v3 (mockup David): bloques con kicker (Gancho · 0–3 s / Desarrollo / CTA · cierre)
+    // en mono azul + cuerpo Clash. Desarrollo conserva los beats como párrafos.
+    var devBeats=(s.beats||[]).map(function(b){return '<p class="tp-p">'+ESC(b)+'</p>';}).join("");
+    var blocks='';
+    if(s.hook) blocks+='<div class="tp-block"><span class="tp-block-k">'+L("Gancho · 0–3 s","Hook · 0–3 s")+'</span><p class="tp-p">'+ESC(s.hook)+'</p></div>';
+    if(devBeats) blocks+='<div class="tp-block"><span class="tp-block-k">'+L("Desarrollo","Body")+'</span>'+devBeats+'</div>';
+    if(s.close) blocks+='<div class="tp-block"><span class="tp-block-k">'+L("CTA · cierre","CTA · close")+'</span><p class="tp-p">'+ESC(s.close)+'</p></div>';
+    var title=s.hook||((r.creator&&r.creator.handle)?'@'+r.creator.handle:L("tu guion","your script"));
     var cd = tp.countdown>0 ? '<div class="tp-cd"><span>'+tp.countdown+'</span></div>' : '';
     return '<div class="overlay prompter" role="dialog" aria-modal="true" aria-label="Teleprompter">'+
-      '<div class="obar"><button class="back" data-act="tp-back" aria-label="Volver">'+IC.back+'</button>'+
-        '<span class="otitle">Teleprónter</span>'+
-        '<span class="tp-srctitle">'+ESC(s.hook||((r.creator&&r.creator.handle)?'@'+r.creator.handle:'tu guion'))+'</span>'+
-        '<span style="flex:1"></span>'+rec+'</div>'+
-      '<div class="tp-scroll" id="rsTpScroll"><div class="tp-guide"></div><div class="tp-text'+(tp.mirror?' mirror':'')+'" id="rsTpText" style="font-size:'+tp.fontPx+'px">'+body+'</div></div>'+
-      cd+
-      '<div class="tp-bar">'+
-        '<button class="tp-ctl'+(tp.playing?' on':'')+'" data-act="tp-play" aria-label="'+(tp.playing?'Pausa':'Play')+'">'+(tp.playing?_tpPause:_tpPlay)+'</button>'+
-        '<button class="tp-ctl" data-act="tp-restart" aria-label="Reiniciar">'+IC.repeat+'</button>'+
-        '<div class="tp-grp"><span class="tp-grp-l">Velocidad</span><button class="tp-mini" data-act="tp-speed" data-k="down" aria-label="Menos velocidad">−</button><span class="tp-grp-v">×'+tp.speed+'</span><button class="tp-mini" data-act="tp-speed" data-k="up" aria-label="Más velocidad">+</button></div>'+
-        '<div class="tp-grp"><span class="tp-grp-l">Texto</span><button class="tp-mini" data-act="tp-font" data-k="down" aria-label="Texto más pequeño">A−</button><button class="tp-mini" data-act="tp-font" data-k="up" aria-label="Texto más grande">A+</button></div>'+
-        '<button class="tp-ctl'+(tp.mirror?' on':'')+'" data-act="tp-mirror" aria-label="Espejo">'+IC.repeat+'</button>'+
-        '<span style="flex:1"></span>'+
-        '<button class="btn btn-lg '+(tp.recording?'tp-stop':'btn-primary')+'" data-act="tp-record">'+(tp.recording?'Detener':IC.mic+' Grabar')+'</button>'+
-        '<button class="btn btn-lg tp-done" data-act="recorded">'+IC.check+' Ya lo grabé</button>'+
+      // top bar
+      '<div class="tp-top">'+
+        '<div class="tp-top-l">'+
+          '<button class="tp-editback" data-act="tp-back">'+IC.back+' '+L("Editor","Editor")+'</button>'+
+          '<span class="tp-title">'+ESC(title)+'</span>'+
+        '</div>'+
+        '<div class="tp-top-r">'+
+          '<span class="tp-pill'+(tp.recording?' rec':'')+'"><span class="tp-pill-dot"></span>'+(tp.recording?'REC':L("en pausa","paused"))+'</span>'+
+          '<span class="tp-timer" id="rsTpTimer">'+_tpMMSS(tp.ms)+'</span>'+
+        '</div>'+
+      '</div>'+
+      // stage
+      '<div class="tp-stage">'+
+        '<div class="tp-band"></div><div class="tp-marker">'+_tpPlay+'</div>'+
+        '<div class="tp-fade top"></div><div class="tp-fade bot"></div>'+
+        '<div class="tp-scroll" id="rsTpScroll"><div class="tp-text'+(tp.mirror?' mirror':'')+'" id="rsTpText" style="font-size:'+tp.fontPx+'px">'+blocks+'</div></div>'+
+        cd+
+      '</div>'+
+      // controls
+      '<div class="tp-controls">'+
+        '<div class="tp-c-l">'+
+          '<button class="tp-ctl'+(tp.playing?' on':'')+'" data-act="tp-play" aria-label="'+(tp.playing?'Pausa':'Play')+'">'+(tp.playing?_tpPause:_tpPlay)+'</button>'+
+          '<button class="tp-ctl" data-act="tp-restart" aria-label="Reiniciar">'+IC.repeat+'</button>'+
+        '</div>'+
+        '<div class="tp-c-mid">'+
+          '<div class="tp-grp"><span class="tp-grp-l">'+L("Velocidad","Speed")+'</span><button class="tp-mini" data-act="tp-speed" data-k="down" aria-label="Menos velocidad">−</button><span class="tp-grp-v">×'+tp.speed+'</span><button class="tp-mini" data-act="tp-speed" data-k="up" aria-label="Más velocidad">+</button></div>'+
+          '<div class="tp-grp"><span class="tp-grp-l">'+L("Texto","Text")+'</span><button class="tp-mini" data-act="tp-font" data-k="down" aria-label="Texto más pequeño">A</button><span class="tp-grp-v">'+tp.fontPx+'</span><button class="tp-mini tp-mini-lg" data-act="tp-font" data-k="up" aria-label="Texto más grande">A</button></div>'+
+          '<button class="tp-mirror'+(tp.mirror?' on':'')+'" data-act="tp-mirror" aria-label="Espejo">'+_icMirror+' '+L("Espejo","Mirror")+'</button>'+
+        '</div>'+
+        '<div class="tp-c-r">'+
+          '<button class="tp-recbtn'+(tp.recording?' on':'')+'" data-act="tp-record">'+(tp.recording?'<span class="tp-recbtn-sq"></span>'+L("Detener","Stop"):'<span class="tp-recbtn-ci"></span>'+L("Grabar","Record"))+'</button>'+
+          '<button class="btn btn-md tp-done" data-act="recorded">'+IC.check+' '+L("Ya lo grabé","Done recording")+'</button>'+
+        '</div>'+
       '</div></div>';
   }
   // Auto-scroll + timer del teleprónter (manipulan el DOM directo → no re-render por tick).
@@ -2956,6 +3726,13 @@
       onbView();   // PostHog: 1 evento "viewed" por paso
       var _of=document.getElementById("rsOnbHandle")||document.getElementById("rsOnbNiche")||document.getElementById("rsOnbTagInput");
       if(_of && document.activeElement!==_of){ try{ _of.focus(); }catch(e){} }
+      // Chip «cuenta válida» reactivo al teclear (sin re-render): toggle directo en DOM.
+      var _hi=document.getElementById("rsOnbHandle");
+      if(_hi){ _hi.addEventListener("input", function(){
+        var v=this.value.replace(/^@+/,""); var ok=/^[a-zA-Z0-9._]{2,30}$/.test(v);
+        var box=this.closest(".onb-handle"); var chip=box&&box.querySelector(".onb-handle-ok");
+        if(chip) chip.classList.toggle("on", ok);
+      }); }
       return;
     }
     var html='';
@@ -2966,10 +3743,12 @@
     else if(S.tab==="metrics") html+=metricsHTML();
     else if(S.tab==="leaderboard") html+=leaderboardPageHTML();
     else if(S.tab==="brain") html+=brainHTML();
+    else if(S.tab==="settings") html+=ajustesHTML();   // v3: Ajustes como página isla (mockup David)
     else if(S.tab==="team") html+=teamHTML();
     html+='</div>';  // /.work
     if(S.view==="gen") html+=overlayShellHTML(generatingHTML(S.genKind),"Trabajando…","close-feed",true);
-    else if(S.view==="script") html+=overlayShellHTML(scriptRevealHTML(),"Tu guión, en tu voz","close-feed",true);
+    else if(S.view==="script") html+=overlayShellHTML(scriptRevealHTML(),"Tu guión, en tu voz","close-feed",true);   // reveal «aha» tras robar
+    else if(S.view==="editor") html+=scriptEditorHTML();   // v3: editor completo (mockup David), desde «Abrir guion»
     else if(S.view==="result") html+=overlayShellHTML(formatResultHTML(S.resultKind),"Listo","back-script",false);
     else if(S.view==="perf") html+=overlayShellHTML(guiPerfHTML(),"Rendimiento del guion","close-feed",true);
     else if(S.view==="prompter") html+=teleprompterHTML();
@@ -2979,7 +3758,15 @@
     // Teleprónter: preservar la posición de scroll a través del re-render (los toggles
     // de play/velocidad/texto re-pintan; sin esto el scroll saltaría a 0).
     var _tpScroll=null; if(S.view==="prompter"){ var _tpe=document.getElementById("rsTpScroll"); if(_tpe) _tpScroll=_tpe.scrollTop; }
+    // Preservar el scroll del contenedor principal entre repintados (filtros, fav,
+    // expandir, chips… repintan toda la isla y, sin esto, saltaría arriba del todo).
+    // Solo se restaura si sigues en la MISMA pantalla (misma pestaña/vista); al
+    // cambiar de tab o abrir un overlay sí empieza arriba, que es lo esperado.
+    var _scKey=S.tab+"|"+(S.view||"feed")+"|"+(S.creatorFilter?S.creatorFilter.id:"");
+    var _scTop=null; var _scEl=document.querySelector("#radarRoot .work .scroll"); if(_scEl) _scTop=_scEl.scrollTop;
     view.innerHTML=html;
+    if(_scTop!=null && S._scKey===_scKey){ var _scEl2=document.querySelector("#radarRoot .work .scroll"); if(_scEl2){ _scEl2.style.scrollBehavior="auto"; _scEl2.scrollTop=_scTop; _scEl2.style.scrollBehavior=""; } }
+    S._scKey=_scKey;
     if(_tpScroll!=null){ var _tpe2=document.getElementById("rsTpScroll"); if(_tpe2) _tpe2.scrollTop=_tpScroll; }
     // T4: el error persistente sobrevive a los re-render mutando el nodo estable.
     var errN=document.getElementById("rsErr"),errM=document.getElementById("rsErrMsg");
@@ -3063,6 +3850,7 @@
      ════════════════════════════════════════════════════════════════ */
   function switchTab(t){
     if(S.legacy) _exitLegacy();   // salir de Analizar/Configuración al cambiar de tab
+    if(t==="metrics" && S.tab!=="metrics") rsTrack("metrics_viewed", {});   // panel: vista de Métricas
     S.tab=t; S.brandMenu=false; S.view="feed";
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: estados de la feed no sobreviven al cambio de tab
     // Vistas de marca (no macro/equipo) refrescan stats+feed de la marca activa.
@@ -3278,6 +4066,29 @@
   // Una card + su detalle inline si está abierto (se usa en feed y en vista de competidor).
   function reelRowHTML(r){
     return reelCardHTML(r)+(S.detailReelId===r.id?reelDetailHTML(r):'');
+  }
+  /* v3 (mockup David «Más señales · N»): lista de las señales restantes (las que no
+     son la oportunidad destacada) con cabecera + toggle «Ver las N oportunidades».
+     Reusa reelCardHTML (fila .row con explosión verde, fav y «Roba la idea»). */
+  function radarSignalsListHTML(rest){
+    if(!rest || !rest.length) return '';
+    var shown = S.feedExpanded ? rest : rest.slice(0,5);
+    var rows = shown.map(reelRowHTML).join("");
+    var moreToggle = (!S.feedExpanded && rest.length>5)
+      ? '<div class="signals-more"><button class="see-all" data-act="expand-feed">'+IC.repeat+' '+L("Ver las "+rest.length+" oportunidades","See all "+rest.length+" opportunities")+'</button></div>'
+      : '';
+    // v3 (mockup David): cabecera «Más señales · N» + pestañas Explotando/Recientes/
+    // Favoritos (S.filter) + «Añadir competidor» dashed.
+    var f=S.filter||"explosion";
+    var tab=function(k,label,icon){ return '<button class="sig-tab'+(f===k?" on":"")+'" data-act="filter" data-k="'+k+'">'+(icon||"")+label+'</button>'; };
+    var tabs='<div class="sig-tabs">'+
+      tab("explosion",L("Explotando","Exploding"),IC.spark+' ')+
+      tab("recent",L("Recientes","Recent"),"")+
+      tab("fav",L("Favoritos","Favorites"),IC.starO+' ')+
+      '<button class="rgal-add" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+    '</div>';
+    return '<section class="signals"><div class="signals-head"><span class="signals-t">'+L("Más señales · "+rest.length,"More signals · "+rest.length)+'</span>'+tabs+'</div>'+
+      '<div class="signals-list">'+rows+'</div>'+moreToggle+'</section>';
   }
   function loadReelTranscript(id){
     var r=reelById(id); if(!r) return;
@@ -3548,6 +4359,7 @@
   // Prod: persiste el estado de grabación del guion (PATCH /scripts/<id>). La isla
   // usa draft|recorded|discarded; el backend pending|recorded|discarded (draft→pending).
   function persistRecStatus(g){
+    if(g && g.status==="recorded") rsTrack("script_recorded", {script_id:(g&&g._sid)||null});   // panel: guion grabado
     if(isDemo() || !g || !g._sid) return;
     var rs=(g.status==="recorded")?"recorded":(g.status==="discarded"?"discarded":"pending");
     apiPatch("/scripts/"+encodeURIComponent(g._sid), {recording_status:rs});
@@ -3882,6 +4694,60 @@
         if(isDemo()){ showToast("Reel en cola. Lo añadimos a tu ecosistema en unos segundos."); bumpEco(0,1); return; }
         analyzeAndFollow(v.trim());
       }
+    });
+  }
+  /* «Analizar un reel» (reubicación de la antigua página Analizar): transcribe un
+     reel suelto y MUESTRA el texto, SIN seguir al autor. Seguirlo es opcional
+     (botón secundario). Reusa /transcribe + poll /task (cero endpoints nuevos). */
+  var DEMO_REEL_TRANSCRIPT = "Si haces reels y no creces, no es por el algoritmo: es por el primer segundo. "+
+    "Mira esto. Los 3 ganchos que más retienen en tu nicho ahora mismo empiezan con una pregunta incómoda, "+
+    "un dato que rompe una creencia, o una promesa concreta con número. Coge cualquiera de los tres, ponle "+
+    "tu caso real detrás, y cierra pidiendo guardar el vídeo. Eso es todo. Guárdatelo y pruébalo en tu próximo reel.";
+  function analyzeReelOnly(){
+    promptSheet({
+      title:"Analizar un reel",
+      label:"URL del reel",
+      placeholder:"https://www.instagram.com/reel/…",
+      helper:isDemo()
+        ? "Pega la URL de un reel (Instagram/TikTok) y te muestro su transcripción. No sigue a su autor."
+        : "Transcribo el reel y te muestro el texto, sin seguir a su autor. Cuenta como 1 análisis.",
+      submitLabel:isDemo()?"Analizar":"Analizar · 1 análisis",
+      validate:function(v){ if(!/^https?:\/\/\S+\.\S+/i.test(v.trim())) return "Pega una URL válida (empieza por http)."; },
+      onSubmit:function(v){
+        if(isDemo()){ return showReelTranscript(DEMO_REEL_TRANSCRIPT, "nick_saraev"); }
+        analyzeReelGetText(v.trim());
+      }
+    });
+  }
+  function analyzeReelGetText(url){
+    showToast("Analizando el reel…");
+    apiPost("/transcribe",{url:url}).then(function(res){
+      if(!res.ok){ return showError((res.d&&res.d.error)||"No pude analizar el reel. Revisa el link."); }
+      var taskId=res.d&&res.d.task_id;
+      if(!taskId) return showError("No pude encolar el análisis. Inténtalo de nuevo.");
+      var tries=0;
+      (function poll(){
+        apiGet("/task/"+encodeURIComponent(taskId)).then(function(r){
+          var d=r.d||{};
+          if(d.state==="success"){ return showReelTranscript((d.text||"").trim(), d.username||null); }
+          if(d.state==="error") return showError(d.error||"El análisis falló. No se ha gastado tu análisis.");
+          if(++tries>48) return showError("El análisis está tardando demasiado. Inténtalo de nuevo en un rato.");
+          setTimeout(poll, 2500);
+        });
+      })();
+    });
+  }
+  function showReelTranscript(text, username){
+    if(!text){ return showToast("La transcripción salió vacía. Prueba con otro reel."); }
+    var box='<div class="field-label" style="margin-bottom:8px">'+L("Transcripción","Transcript")+'</div>'+
+      '<div class="analyze-tx">'+ESC(text)+'</div>';
+    promptSheet({
+      readonly:true,
+      title:L("Reel analizado","Reel analyzed"),
+      extraHTML:box,
+      submitLabel:L("Cerrar","Close"),
+      secondaryLabel: username?(L("Seguir a @","Follow @")+username):null,
+      onSecondary: username?function(){ _followAuthor(username); }:null
     });
   }
   /* A · «Añadir reel» REAL — encadena flujos que ya existen (cero endpoints nuevos):
@@ -4233,6 +5099,7 @@
       if(S.acctMenu){ e.preventDefault(); S.acctMenu=false; return render(); }
       if(S.brandMenu){ e.preventDefault(); S.brandMenu=false; return render(); }
       if(S.communityInfo){ e.preventDefault(); S.communityInfo=false; return render(); }
+      if(S.galMenu){ e.preventDefault(); S.galMenu=false; return render(); }
       if(S.view && S.view!=="feed"){
         e.preventDefault();
         if(S.view==="result"){ S.view="script"; return render(); }
@@ -4285,6 +5152,7 @@
     if(act==="acct-toggle"){ S.acctMenu=!S.acctMenu; S.brandMenu=false; return render(); }
     if(act==="acct-close"){ S.acctMenu=false; return render(); }
     if(act==="acct-settings"){ S.acctMenu=false; return openLegacy("settings"); }
+    if(act==="acct-feedback"){ return openFeedback(); }
     if(act==="acct-logout"){ S.acctMenu=false;
       // Reusa el logout real de la chrome (POST /auth/logout + reset tracking + redirect).
       if(typeof window.logout==="function") return window.logout();
@@ -4376,6 +5244,7 @@
         oppAvg=_lbHash(opp+"avg",40000,160000); mine=_lbHash((S.user.handle||"me")+"best",50000,190000);
       }
       S.versus={ opp:opp, youHandle:(brand().handle||S.user.handle||"tu_cuenta"), oppAvg:oppAvg, mine:mine };
+      rsTrack("versus_started", {opp:opp, mine:mine, opp_avg:oppAvg, beating:(mine>=oppAvg)});   // panel
       showToast(L("Objetivo fijado: supera la media de @"+opp+".","Goal set: beat @"+opp+"'s average."));
       return render();
     }
@@ -4388,7 +5257,7 @@
       showToast(L("¡Hecho! Te avisaremos en cuanto la comunidad esté lista.","Done! We'll let you know when the community is ready."));
       return render();
     }
-    if(act==="community-info"){ S.communityInfo=true; return render(); }   // abre mini-modal Comunidad
+    if(act==="community-info"){ rsTrack("community_info_opened", {from:"radar"}); S.communityInfo=true; return render(); }   // abre mini-modal Comunidad
     if(act==="ci-close"){ S.communityInfo=false; return render(); }
     if(act==="ci-stop") return;   // clic DENTRO del modal no lo cierra
     if(act==="rgal-scroll"){
@@ -4396,8 +5265,12 @@
       if(_tr){ var _dir=(btn.getAttribute("data-dir")==="next")?1:-1; _tr.scrollBy({left:_dir*Math.round(_tr.clientWidth*0.82), behavior:"smooth"}); }
       return;
     }
+    if(act==="gal-expand"){ S._galOpen=(S._galOpen===id)?null:id; return render(); }   // expand inline de la galería (mockup David)
+    if(act==="gal-comp"){ S.galComp=(k&&S.galComp!==k)?k:null; S._galOpen=null; S.galMenu=false; return render(); }   // filtro por competidor (chips «Competidores en el radar»)
+    if(act==="gal-menu"){ S.galMenu=!S.galMenu; return render(); }   // desplegable «+N» de competidores que no caben
     if(act==="expand-feed"){ S.feedExpanded=true; return render(); }
     if(act==="add-reel") return addReelManual();
+    if(act==="analyze-reel") return analyzeReelOnly();
     // growth-2: onboarding de activación
     // onboarding v2 (7 pasos)
     if(act==="onb-handle-next") return onbHandleNext();
@@ -4532,6 +5405,18 @@
       return;
     }
     if(act==="gui-record"){ var g=guionById(id); if(g){ S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; S.view="prompter"; render(); } return; }
+    if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.reel={id:go.from,creator:{handle:(go.from||"").replace(/^@/,"")},script:{hook:go.hook,beats:go.beats,close:go.close},dur:"",views:"",likes:"",when:go.when||""}; S.view="editor"; render(); } return; }   // v3 «Abrir guion» → editor (vista propia)
+    if(act==="ed-close"){ S.view="feed"; S.tab="guiones"; S.activeGuionId=null; return render(); }   // v3 editor → vuelve a Guiones
+    // v3 Ajustes (página isla)
+    if(act==="set-tab"){ S.setTab=k; return render(); }
+    if(act==="aj-tone"){ ajustesInit(); S.setTones[k]=!S.setTones[k]; return render(); }   // Ajustes (set-tone colisionaba con el selector de tono del Cerebro)
+    if(act==="set-pref"){ ajustesInit(); S.setPrefs[k]=!S.setPrefs[k]; return render(); }
+    if(act==="ajustes-edit"){ return openLegacy("settings"); }   // perfil/cuenta real → ajustes legacy
+    if(act==="ajustes-save-voice"){ showToast(L("Voz guardada — tus próximos guiones salen con este tono.","Voice saved — your next scripts come out in this tone.")); return; }
+    if(act==="aj-invoice"){ showToast(L("Descarga de facturas disponible en producción.","Invoice download available in production.")); return; }
+    if(act==="noop"){ return; }
+    if(act==="ed-usehook"){ var eg=guionById(id); var ei=parseInt(btn.getAttribute("data-i"),10); if(eg&&eg.hooks&&eg.hooks[ei]!=null){ var prev=eg.hook; eg.hook=eg.hooks[ei]; eg.hooks[ei]=prev; if(eg.title===prev) eg.title=eg.hook; } return render(); }   // v3: elegir variante de gancho
+    if(act==="gui-duplicate"){ var gd=guionById(id); if(gd){ var nid=addGuion({title:gd.title,hook:gd.hook,beats:(gd.beats||[]).slice(),close:gd.close,hooks:(gd.hooks||[]).slice(),from:gd.from,type:gd.type}); var ng=guionById(nid); if(ng){ ng.mult=gd.mult||gd.fromMult; } render(); showToast(L("Guion duplicado — listo para retocar.","Script duplicated — ready to tweak.")); } return; }
     if(act==="gui-toggle-rec"){ var g2=guionById(id); if(g2){ g2.status=(g2.status==="recorded")?"draft":"recorded"; if(g2.status==="recorded"&&S.stats) S.stats.stolen_today+=1; render(); showToast(g2.status==="recorded"?"Marcado como grabado.":"Vuelto a borrador."); persistRecStatus(g2); } return; }
     if(act==="gui-discard"){ var g3=guionById(id); if(g3){ g3.status="discarded"; S._lastDiscarded=id; render(); showToast("Descartado.","Deshacer","undo-discard"); persistRecStatus(g3); } return; }   // T9: descartar siempre con vuelta atrás
     if(act==="undo-discard"){ var gU=S._lastDiscarded?guionById(S._lastDiscarded):null; S._lastDiscarded=null; if(gU){ gU.status="draft"; persistRecStatus(gU); render(); showToast("Recuperado — vuelve a «Por grabar»."); } return; }
@@ -4760,6 +5645,45 @@
     },
     // T2: puente para que el CRUD legacy de asistentes (modal en index.html)
     // repinte la isla tras crear/editar/borrar. Seguro si la isla no está montada.
-    refresh:function(){ try{ render(); }catch(e){} }
+    refresh:function(){ try{ render(); }catch(e){} },
+    // v3 editor: persiste la edición inline (contenteditable onblur) sin re-render
+    // — preserva el cursor. Campos: title · hook · develop(→beats) · close.
+    editSave:function(gid,field,value){
+      var g=guionById(gid); if(!g) return;
+      value=(value==null?"":String(value)).replace(/ /g," ").trim();
+      if(field==="title") g.title=value;
+      else if(field==="hook") g.hook=value;
+      else if(field==="close") g.close=value;
+      else if(field==="develop") g.beats=value?value.split(/\n+/).map(function(x){return x.trim();}).filter(Boolean):[];
+    },
+    // v3 buscador del desplegable de competidores: filtra filas en DOM (sin re-render → no pierde foco)
+    galSearch:function(val){
+      var q=(val||"").toLowerCase().replace(/^@+/,"");
+      var rows=document.querySelectorAll("#radarRoot .gal-menu-row");
+      for(var i=0;i<rows.length;i++){ var h=rows[i].getAttribute("data-handle")||""; rows[i].style.display=(h.indexOf(q)>=0)?"":"none"; }
+    },
+    // Feedback: lee la imagen adjunta, la REESCALA/comprime en canvas (máx 1280px,
+    // JPEG .8) → dataURL en S._fbImage; muestra nombre + miniatura. Sin re-render.
+    fbImage:function(input){
+      var f=input&&input.files&&input.files[0];
+      var nm=document.getElementById("rsFbImgName"), pv=document.getElementById("rsFbImgPrev");
+      if(!f || !/^image\//.test(f.type||"")){ S._fbImage=null; if(nm)nm.textContent=""; if(pv)pv.innerHTML=""; return; }
+      var rd=new FileReader();
+      rd.onload=function(){
+        var img=new Image();
+        img.onload=function(){
+          var max=1280, w=img.width||1, h=img.height||1;
+          if(w>max||h>max){ var s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+          try{ var c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); S._fbImage=c.toDataURL("image/jpeg",0.8); }
+          catch(e){ S._fbImage=rd.result; }
+          if(nm) nm.textContent=f.name;
+          if(pv) pv.innerHTML='<img src="'+S._fbImage+'" alt=""><button type="button" class="fb-attach-x" onclick="try{window.RadarLoop.fbClear()}catch(e){}">'+'×'+'</button>';
+        };
+        img.onerror=function(){ S._fbImage=null; };
+        img.src=rd.result;
+      };
+      rd.readAsDataURL(f);
+    },
+    fbClear:function(){ S._fbImage=null; var nm=document.getElementById("rsFbImgName"), pv=document.getElementById("rsFbImgPrev"), inp=document.getElementById("rsFbImg"); if(nm)nm.textContent=""; if(pv)pv.innerHTML=""; if(inp)inp.value=""; }
   };
 })();

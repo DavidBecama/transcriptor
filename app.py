@@ -1041,6 +1041,15 @@ def credits_available(profile: dict) -> int:
     return monthly_rem + topup
 
 
+def _plan_mrr_cents(plan: str) -> int:
+    """MRR mensual del plan en céntimos. Lo adjuntamos a subscription_upgraded para
+    que el panel (becama-panel) pueda sumar el MRR de expansión por upgrade."""
+    try:
+        return int((PLANS.get(plan, {}).get("price_month_eur") or 0) * 100)
+    except Exception:
+        return 0
+
+
 # ── Free MENSUAL (reverse-trial) ─────────────────────────────────────────────
 # Tras el trial, el free resetea cada mes. Reusamos free_lifetime_uses (guiones)
 # y free_analysis_uses (análisis) como contadores del mes en curso; el boundary
@@ -1195,7 +1204,8 @@ def _on_signup_complete(user_id, lang):
             updates["lang"] = lang or "es"
         # reverse-trial: 7 días de Pro al registrarse (solo si no se fijó ya —
         # idempotente, no se extiende en re-llamadas).
-        if not existing.get("trial_ends_at"):
+        started_trial = not existing.get("trial_ends_at")
+        if started_trial:
             updates["trial_ends_at"] = (
                 datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)
             ).isoformat()
@@ -1211,6 +1221,9 @@ def _on_signup_complete(user_id, lang):
             logger.warning("send_email_now dispatch failed user=%s err=%s", user_id, e)
         # 4) growth-1: evento de funnel «registro» (server-side, fiable)
         track_event("user_registered", user_id, {"lang": lang or "es"})
+        # panel: inicio del reverse-trial (solo la 1ª vez que se fija el trial).
+        if started_trial:
+            track_event("trial_started", user_id, {"plan": "pro", "trial_days": TRIAL_DAYS})
     except Exception as e:
         # NUNCA romper el signup por errores en el flujo de email.
         logger.warning("_on_signup_complete failed user=%s err=%s", user_id, e)
@@ -1787,6 +1800,49 @@ def delete_transcription(tid: int):
     return jsonify({"ok": True})
 
 
+# ── Feedback (menú de cuenta): reportar bug / pedir mejora ────────────────────
+# Recompensa: si el bug es real, se abonan créditos al confirmarlo (flujo manual
+# por ahora; ver TODO). La imagen viaja como dataURL base64 (igual que thumbnail_b64).
+@app.route("/api/feedback", methods=["POST"])
+@require_auth
+def submit_feedback():
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    ftype = str(body.get("type") or "bug")[:20]
+    text = str(body.get("text") or "").strip()[:4000]
+    page = str(body.get("page") or "")[:60]
+    plan = str(body.get("plan") or "")[:30]
+    image_b64 = body.get("image_b64") or None
+    if not text:
+        return jsonify({"ok": False, "error": "empty"}), 400
+    # Cap de imagen (~3.5 MB de base64); si se pasa, se descarta para no reventar la fila.
+    if image_b64 and (not isinstance(image_b64, str) or len(image_b64) > 3_600_000):
+        image_b64 = None
+    # 1) PostHog — siempre (el feedback queda consultable aunque la tabla no exista aún).
+    try:
+        track_event("feedback_submitted", uid, {
+            "type": ftype, "page": page, "plan": plan,
+            "length": len(text), "has_image": bool(image_b64),
+        })
+    except Exception:
+        pass
+    # 2) Persistencia best-effort en la tabla `feedback` (si existe). TODO(fable):
+    #    crear tabla `feedback` (user_id, type, text, page, plan, image_b64, status,
+    #    created_at) + flujo de revisión y abono de créditos al confirmar el bug.
+    try:
+        db.table("feedback").insert({
+            "user_id": uid, "type": ftype, "text": text,
+            "page": page, "plan": plan, "image_b64": image_b64, "status": "new",
+        }).execute()
+    except Exception as e:  # tabla ausente u otro fallo de persistencia → no rompe el envío
+        try:
+            app.logger.warning("feedback insert skipped: %s", e)
+        except Exception:
+            pass
+    return jsonify({"ok": True})
+
+
 # ── v0.14.7: refresh métricas Apify ──────────────────────────────────────────
 
 _metrics_refresh_cooldown: dict = {}  # (uid, tid) -> ts (last refresh)
@@ -2050,6 +2106,7 @@ def stripe_webhook():
             # growth-1: evento de funnel «upgrade» (conversión free→pago).
             track_event("subscription_upgraded", user_id, {
                 "plan": plan, "price_id": price_id,
+                "amount_cents": _plan_mrr_cents(plan),
             })
         else:
             # ── Recarga de créditos (topup) ──────────────────────────
@@ -2409,7 +2466,7 @@ def paddle_webhook():
                     logger.warning("[paddle] cols paddle_* ausentes (¿migración?), set solo plan", exc_info=True)
                     db.table("profiles").update(upd).eq("id", uid).execute()
                 grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
-                track_event("subscription_upgraded", uid, {"plan": plan, "price_id": price_id, "provider": "paddle"})
+                track_event("subscription_upgraded", uid, {"plan": plan, "price_id": price_id, "provider": "paddle", "amount_cents": _plan_mrr_cents(plan)})
             elif status in ("paused", "canceled"):
                 db.table("profiles").update({"plan": "free"}).eq("id", uid).execute()
 
@@ -2600,7 +2657,7 @@ def whop_webhook():
                     _upd["stripe_subscription_id"] = _mid
                 db.table("profiles").update(_upd).eq("id", uid).execute()
                 grant_monthly_allowance(uid, plan)   # créditos mensuales + limpia trial (plan!=free)
-                track_event("subscription_upgraded", uid, {"plan": plan, "plan_id": plan_id, "provider": "whop"})
+                track_event("subscription_upgraded", uid, {"plan": plan, "plan_id": plan_id, "provider": "whop", "amount_cents": _plan_mrr_cents(plan)})
 
         elif action == "membership_deactivated":   # baja / fin de acceso → free
             if mapped and mapped["plan"] == "brand_addon":
@@ -8552,11 +8609,18 @@ def post_tracked_creator():
     # activación quedó completado (handle → competencia en el radar). Señal de
     # funnel server-side fiable; `source` distingue el onboarding del alta suelta.
     try:
-        if count_active_tracked(user["id"], scope="global") == 1:
+        _total_tracked = count_active_tracked(user["id"], scope="global")
+        if _total_tracked == 1:
             track_event("onboarding_completed", user["id"], {
                 "source": (body.get("source") or "manual"),
                 "first_creator": ig_username,
             })
+        # panel: cada alta de competidor (no solo la 1ª) → tile «competidores añadidos».
+        track_event("competitor_added", user["id"], {
+            "source": (body.get("source") or "manual"),
+            "creator": ig_username,
+            "total": _total_tracked,
+        })
     except Exception:
         pass
 
@@ -10537,6 +10601,109 @@ def api_admin_update_user(user_id: str):
         return jsonify({"ok": True, "user": updated.data})
     except Exception as e:
         logger.error(f"api_admin_update_user({user_id}): {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Feedback: revisión + recompensa en créditos ─────────────────────────────
+# Recompensa por defecto al APROBAR (el admin puede sobreescribir con body.credits):
+#   bug confirmado = 25 cr · idea implementada = 10 cr. 1 crédito = COST_CENTS de saldo.
+FEEDBACK_REWARD = {"bug": 25, "idea": 10}
+_FEEDBACK_LIST_COLS = ("id,user_id,type,text,page,plan,status,credits_awarded,"
+                       "admin_note,resolved_at,created_at")
+
+
+@app.route("/admin/api/feedback", methods=["GET"])
+@admin_required
+def api_admin_feedback_list():
+    """Cola de feedback. ?status=new|confirmed|implemented|rejected|all (def: new).
+    No devuelve image_b64 (pesa); usar el detalle para verla."""
+    status = (request.args.get("status", "new") or "new").strip().lower()
+    try:
+        limit = min(max(1, int(request.args.get("limit", 50))), 200)
+    except (TypeError, ValueError):
+        limit = 50
+    try:
+        q = (db.table("feedback").select(_FEEDBACK_LIST_COLS)
+               .order("created_at", desc=True).limit(limit))
+        if status != "all":
+            q = q.eq("status", status)
+        rows = q.execute().data or []
+        return jsonify({"feedback": rows, "count": len(rows)})
+    except Exception as e:
+        logger.error(f"api_admin_feedback_list: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/admin/api/feedback/<fid>", methods=["GET"])
+@admin_required
+def api_admin_feedback_detail(fid: str):
+    """Detalle completo de un feedback (incluye image_b64 para revisarlo)."""
+    try:
+        row = (db.table("feedback").select("*").eq("id", fid).single().execute())
+        return jsonify({"feedback": row.data})
+    except Exception as e:
+        logger.error(f"api_admin_feedback_detail({fid}): {e}")
+        return jsonify({"error": "not_found"}), 404
+
+
+@app.route("/admin/api/feedback/<fid>/resolve", methods=["POST"])
+@admin_required
+def api_admin_feedback_resolve(fid: str):
+    """Resuelve un feedback. body.status ∈ confirmed|implemented|rejected.
+    Al aprobar (confirmed/implemented) abona créditos al autor sumando a
+    profiles.credits_cents (default por tipo; override con body.credits).
+    IDEMPOTENTE: si ya se abonó (credits_awarded>0) no vuelve a pagar."""
+    admin = current_user()
+    body = request.get_json(silent=True) or {}
+    new_status = str(body.get("status") or "").strip().lower()
+    if new_status not in ("confirmed", "implemented", "rejected"):
+        return jsonify({"ok": False, "error": "bad_status"}), 400
+    note = (str(body.get("note") or "").strip()[:1000]) or None
+    try:
+        fb = (db.table("feedback")
+                .select("id,user_id,type,status,credits_awarded")
+                .eq("id", fid).single().execute()).data
+        if not fb:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+
+        # Cuántos créditos abonar (solo si se aprueba). Override explícito o default por tipo.
+        award = 0
+        if new_status in ("confirmed", "implemented"):
+            if body.get("credits") is not None:
+                try:
+                    award = max(0, int(body["credits"]))
+                except (TypeError, ValueError):
+                    award = 0
+            else:
+                award = FEEDBACK_REWARD.get(fb.get("type") or "bug", 0)
+
+        # Abona una sola vez (idempotencia: no si ya hay créditos abonados).
+        granted = 0
+        if award and (fb.get("credits_awarded") or 0) == 0:
+            prof = (db.table("profiles").select("credits_cents")
+                      .eq("id", fb["user_id"]).single().execute())
+            current = (prof.data or {}).get("credits_cents", 0) or 0
+            db.table("profiles").update(
+                {"credits_cents": current + award * COST_CENTS}
+            ).eq("id", fb["user_id"]).execute()
+            granted = award
+
+        db.table("feedback").update({
+            "status": new_status,
+            "credits_awarded": (fb.get("credits_awarded") or 0) + granted,
+            "admin_note": note,
+            "resolved_by": admin["id"],
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", fid).execute()
+
+        try:
+            track_event("feedback_resolved", admin["id"],
+                        {"feedback_id": fid, "status": new_status, "credits": granted})
+        except Exception:
+            pass
+        return jsonify({"ok": True, "status": new_status, "credits_granted": granted})
+    except Exception as e:
+        logger.error(f"api_admin_feedback_resolve({fid}): {e}")
         return jsonify({"error": str(e)}), 500
 
 
