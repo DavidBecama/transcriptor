@@ -360,7 +360,9 @@
     ]
   }
   </script>
-  <link rel="icon" type="image/png" href="/static/img/branding/apple-touch-icon.png">
+  <link rel="icon" href="/static/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/img/branding/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/img/branding/favicon-16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/img/branding/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11063,7 +11065,8 @@
     .rs.app { display:grid; grid-template-columns:64px 1fr; overflow:hidden; position:relative; }
     /* ── RAIL lateral ── */
     .rs .rail { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 0; background:var(--surface-base); border-right:1px solid var(--border-subtle); z-index:8; height:100%; }
-    .rs .rail-logo { width:32px; height:32px; margin-bottom:10px; border-radius:8px; display:block; }
+    .rs .rail-logo { width:32px; height:32px; margin-bottom:10px; display:block; background:url("/static/img/branding/isotipo-white-128.png") center/contain no-repeat; }
+    .rs[data-theme="light"] .rail-logo { background-image:url("/static/img/branding/isotipo-color-128.png"); }
     .rs .rail-btn { position:relative; width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--text-tertiary); cursor:pointer; transition:color .14s var(--ease), background .14s var(--ease); }
     .rs .rail-btn:hover { color:var(--text-secondary); background:var(--surface-raised); }
     .rs .rail-btn.on { color:var(--text-primary); background:var(--surface-overlay); }
@@ -27632,6 +27635,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=74"></script>
+<script src="/static/js/radar-loop.js?v=75"></script>
 </body>
 </html>
