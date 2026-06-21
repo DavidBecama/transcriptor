@@ -1191,9 +1191,12 @@
 
     /* v0.14.36 — Fade-in al cambiar de panel workspace. Aplica al panel cuando
        profTab() lo activa: opacity 0→1 + translateY(4px→0) en 200ms. */
+    /* OJO: nada de transform aquí. Un transform en el contenedor del workspace
+       (#profPanelIdeas.panel-fade-in) crea un containing-block que rompe el
+       position:fixed del rail inferior → hueco negro bajo la barra en móvil. Solo opacidad. */
     @keyframes panelFadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
     .panel-fade-in { animation: panelFadeIn 200ms ease-out; }
 
@@ -11541,10 +11544,14 @@
     /* responsive: rail → barra inferior */
     @media (max-width:760px){
       .rs.app { grid-template-columns:1fr; }
-      .rs .rail { position:fixed; top:auto; bottom:0; left:0; right:0; height:auto; width:100%; flex-direction:row; justify-content:center; align-items:center; gap:4px; border-right:none; border-top:1px solid var(--border-default); padding:8px 0; z-index:40; }
+      .rs .rail { position:fixed; top:auto; bottom:0; left:0; right:0; height:auto; width:100%; flex-direction:row; justify-content:center; align-items:center; gap:8px; border-right:none; border-top:1px solid var(--border-default); padding:11px 0; z-index:40; }
+      /* barra inferior y sus iconos más grandes en móvil (target táctil cómodo) */
+      .rs .rail-btn { width:52px; height:52px; }
+      .rs .rail-btn svg { width:25px; height:25px; }
+      .rs .rail-acct { width:48px; height:48px; }
       /* el rail es barra inferior fija (~62px) → deja hueco para que el último
          contenido no quede tapado al hacer scroll hasta abajo. */
-      .rs .scroll { padding-bottom:72px; }
+      .rs .scroll { padding-bottom:84px; }
       /* Ranking: las píldoras "Te faltan…/Subiendo…" eran inline-flex → el texto y
          los <b> se repartían en una fila sin wrap y se cortaban. En móvil que fluyan
          como texto normal (bloque) con el icono inline. + hero más compacto. */
