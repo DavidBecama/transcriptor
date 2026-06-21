@@ -2053,32 +2053,155 @@
     return '<div class="rs-lock rs-lock--sm"><div class="rs-lock-inner" aria-hidden="true">'+inner+'</div>'+
       '<div class="rs-lock-over"><button class="btn btn-sm btn-primary" data-act="upsell" data-k="competitor">'+IC.bolt+' Métricas con Pro</button></div></div>';
   }
+  /* ── v3 (mockup David · Métricas): clon completo con 3 vistas (Resumen ·
+     Audiencia · Competidores), paywall Pro borroso en free, y conecta-IG.
+     Datos demo (como el mockup); en prod fable/Alberto los cablea a IG. ── */
+  function _mSpark(arr){ var max=Math.max.apply(null,arr),min=Math.min.apply(null,arr),n=arr.length;
+    return arr.map(function(v,i){ var x=(i/(n-1))*60; var y=21-((v-min)/((max-min)||1))*19; return x.toFixed(1)+","+y.toFixed(1); }).join(" "); }
+  function _mBars(arr){ var max=Math.max.apply(null,arr); return arr.map(function(v){ return Math.round(v/max*100)+"%"; }); }
   function metricsHTML(){
-    if(!S.igConnected) return connectIgHTML();
-    var m=S.metrics||{}; var b=brand();
-    var learned=(m.learned||[]).map(function(l){ return '<div class="learn-item">'+IC.check+'<span>'+ESC(l)+'</span></div>'; }).join("");
-    var top=m.top?('<div class="met-top">'+IC.spark+' <b>Top:</b> '+ESC(m.top.title)+' — '+ESC(m.top.views)+' views</div>'):"";
-    var hasVideos=metricVideos().length>0;
-    // Sub-vistas del mockup Métricas.dc.html: Resumen / Audiencia / Competidores.
-    var mv=S.metricView||"resumen";
-    function _mtab(k,es,en){ return '<button class="met-subtab'+(mv===k?" on":"")+'" data-act="metric-view" data-k="'+k+'"'+(mv===k?' aria-current="page"':'')+'>'+L(es,en)+'</button>'; }
-    var subnav='<div class="met-subnav" role="tablist">'+_mtab("resumen","Resumen","Overview")+_mtab("audiencia","Audiencia","Audience")+_mtab("competidores","Competidores","Competitors")+'</div>';
-    // El panel de datos es lo premium → borroso en free (el sub-nav queda FUERA del blur, navegable).
-    var resumen=hasVideos?(metricStatsHTML()+metricChartHTML()+metricGridHTML()):'<div class="rs-empty">Pulsa “Actualizar reels” para traer tus métricas.</div>';
-    var inner=mv==="audiencia"?metricAudienceHTML():(mv==="competidores"?metricCompeteHTML():resumen);
-    var panel=subnav+(isFree()?metricsLockHTML(inner):inner);
-    return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Métricas · @"+(b.handle||S.user.handle||""), "Métricas", "Tus reels al detalle — y lo que el sistema aprende de ellos para crear mejor.")+
-      '<div class="met-acct"><span class="met-acct-ig">'+IC.ig+' @'+ESC(b.handle||"tu_cuenta")+'</span>'+
-        '<button class="btn btn-sm btn-primary" data-act="metric-refresh">Actualizar reels</button>'+
-        '<span class="met-acct-info">'+ESC(m.analyses_left||"1/1")+' análisis restantes esta semana</span>'+
-        '<span style="flex:1"></span><button class="btn btn-sm btn-ghost" data-act="ig-disconnect">Desvincular</button></div>'+
-      '<div class="learn"><div class="learn-head">'+IC.brain+'<span>Lo que el sistema aprendió de ti</span></div>'+
-        '<div class="learn-list">'+(learned||'<div class="learn-item" style="opacity:.6">Publica un par de reels creados aquí y empezaré a ver patrones.</div>')+'</div>'+
-        '<div class="learn-foot">Esto afina tu voz (al '+(b.voice||40)+'%) y reordena tus oportunidades del Dashboard. El círculo se cierra.</div>'+
+    var b=brand();
+    var locked=isFree();
+    var view=S.metricView||"resumen";
+    function vtab(k,es,en){ return '<button class="mt-vtab'+(view===k?" on":"")+'" data-act="metric-view" data-k="'+k+'">'+L(es,en)+'</button>'; }
+    var inner = view==="audiencia" ? metAudienciaHTML() : (view==="competidores" ? metCompetidoresHTML() : metResumenHTML());
+    var paywall = locked ? ('<div class="mt-wall"><div class="mt-wall-card">'+
+        '<div class="mt-wall-ic">'+_icLock+'</div>'+
+        '<h2 class="mt-wall-h">'+L("Tus números, a un clic.","Your numbers, one click away.")+'</h2>'+
+        '<p class="mt-wall-p">'+L("Borrosos a propósito. Pasa a Pro y mira qué gancho, tema, hora y competidor te están moviendo de verdad.","Blurred on purpose. Go Pro and see which hook, topic, hour and competitor are actually moving you.")+'</p>'+
+        '<button class="btn btn-lg btn-primary" data-act="open-plans">'+IC.spark+' '+L("Desbloquéalos con Pro","Unlock with Pro")+'</button>'+
+        '<span class="mt-wall-note">'+L("› analizando tu nicho… sin que se enteren","› analyzing your niche… without them noticing")+'</span>'+
+      '</div></div>') : '';
+    return '<div class="scroll"><div class="canvas mt-canvas">'+
+      // header
+      '<header class="mt-head"><div><h1 class="mt-h1">'+L("Tus métricas","Your metrics")+'</h1>'+
+        '<p class="mt-sub">'+L("Todo lo que mueve tus reproducciones — y cómo vas contra tus competidores.","Everything that moves your plays — and how you stack up against competitors.")+'</p></div>'+
+        '<div class="mt-sync"><span class="mt-sync-dot"></span>@'+ESC(b.handle||S.user.handle||"tu_cuenta")+' · '+L("sincronizado hoy","synced today")+'</div></header>'+
+      // view tabs
+      '<div class="mt-vtabs">'+vtab("resumen","Resumen","Overview")+vtab("audiencia","Audiencia","Audience")+vtab("competidores","Competidores","Competitors")+'</div>'+
+      // analytics + paywall
+      '<div class="mt-area">'+
+        '<div class="mt-charts'+(locked?" locked":"")+'">'+inner+'</div>'+paywall+
       '</div>'+
-      top+panel+
+      // conecta IG
+      '<div class="mt-ig"><div class="mt-ig-l"><div class="mt-ig-ic">'+IC.ig+'</div>'+
+        '<div><div class="mt-ig-t">'+L("¿Otra cuenta? Conéctala.","Another account? Connect it.")+'</div>'+
+        '<div class="mt-ig-s">'+L("Enlaza tu Instagram y empiezo a leer qué te funciona a ti.","Link your Instagram and I'll start reading what works for you.")+'</div></div></div>'+
+        '<button class="btn btn-md btn-secondary" data-act="ig-connect">'+L("Conectar Instagram","Connect Instagram")+'</button></div>'+
     '</div></div>';
+  }
+  function metResumenHTML(){
+    var kpis=[
+      ["Reproducciones","1,02 M","+52%",[12,18,15,22,26,24,31,29,36,40,38,46,52,58]],
+      ["Alcance","214 K","+38%",[20,22,21,26,25,30,28,33,31,36,40,38,44,48]],
+      ["Interacciones","48 K","+29%",[10,14,13,16,18,17,20,22,21,25,27,26,30,33]],
+      ["Visitas al perfil","37 K","+19%",[8,9,11,10,13,12,15,14,16,18,17,20,22,24]],
+      ["Me gusta","31 K","+24%",[14,16,15,18,20,19,22,24,23,27,29,28,31,34]],
+      ["Comentarios","4,7 K","+61%",[6,7,9,8,11,13,12,16,18,17,22,26,30,34]],
+      ["Guardados","9,1 K","+44%",[9,10,12,11,14,16,15,19,18,22,24,28,30,34]],
+      ["Nuevos seguidores","+2 480","+18%",[18,16,19,17,20,22,21,24,23,26,28,27,30,33]]
+    ];
+    var kpiH=kpis.map(function(k){
+      return '<div class="mt-kpi"><span class="mt-kpi-l">'+ESC(k[0])+'</span>'+
+        '<div class="mt-kpi-row"><span class="mt-kpi-v">'+ESC(k[1])+'</span>'+
+          '<svg class="mt-kpi-spark" width="58" height="22" viewBox="0 0 60 22" preserveAspectRatio="none"><polyline points="'+_mSpark(k[3])+'" fill="none" stroke="var(--brand-300,#6E92FF)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+        '<span class="mt-kpi-d">▲ '+ESC(k[2])+'</span></div>';
+    }).join("");
+    var trend=[42,55,48,61,58,73,67,71,64,82,78,88,79,92]; var th=_mBars(trend);
+    var tlabels=["","","","","5","","","","","10","","","","14"];
+    var trendBars=trend.map(function(v,i){ return '<div class="mt-tb"><div class="mt-tb-fill" style="height:'+th[i]+'"></div><span class="mt-tb-l">'+tlabels[i]+'</span></div>'; }).join("");
+    var eng=[["Me gusta","31 K",31],["Guardados","9,1 K",9.1],["Compartidos","6,3 K",6.3],["Comentarios","4,7 K",4.7]]; var emax=31;
+    var engH=eng.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+r[0]+'</span><span class="mt-mono">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+Math.round(r[2]/emax*100)+'%"></i></div></div>'; }).join("");
+    var hooks=[["“Comenta X y te mando…”","82%"],["“Acaba de pasar…”","74%"],["“Nadie te cuenta que…”","61%"],["“3 cosas que…”","44%"]];
+    var hooksH=hooks.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+ESC(r[0])+'</span><span class="mt-mono">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+r[1]+'"></i></div></div>'; }).join("");
+    var temas=[["Agentes / automatización","9.4×","92%"],["Montar un SaaS","6.1×","70%"],["Herramientas IA gratis","4.3×","52%"],["Mentalidad / dinero","2.2×","30%"]];
+    var temasH=temas.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+ESC(r[0])+'</span><span class="mt-mult">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+r[2]+'"></i></div></div>'; }).join("");
+    var dur=[["0–15s","21 K","34%",0],["15–30s","58 K","68%",0],["30–45s","92 K","100%",1],["45–60s","71 K","80%",0],["1–2m","33 K","44%",0],["2m+","12 K","20%",0]];
+    var durH=dur.map(function(d){ return '<div class="mt-dur"><span class="mt-dur-v">'+d[1]+'</span><div class="mt-dur-bar'+(d[3]?" top":"")+'" style="height:'+d[2]+'"></div><span class="mt-dur-l">'+d[0]+'</span></div>'; }).join("");
+    // heatmap 6×7
+    var hm=[[.1,.15,.2,.15,.25,.1,.08],[.3,.35,.4,.38,.5,.2,.15],[.5,.55,.6,.58,.65,.35,.3],[.7,.75,.85,.8,.95,.55,.5],[.6,.7,.78,.82,1,.7,.65],[.4,.5,.55,.6,.7,.85,.8]];
+    var cols=["L","M","X","J","V","S","D"], rowL=["6–9h","9–12h","12–15h","15–18h","18–21h","21–24h"];
+    var peakV=0,pr=0,pc=0; hm.forEach(function(r,ri){ r.forEach(function(v,ci){ if(v>peakV){peakV=v;pr=ri;pc=ci;} }); });
+    var colsH='<div class="mt-hm-cols">'+cols.map(function(c){ return '<span>'+c+'</span>'; }).join("")+'</div>';
+    var rowsH=hm.map(function(r,ri){ return '<div class="mt-hm-row">'+r.map(function(v,ci){
+      var peak=(ri===pr&&ci===pc); return '<div class="mt-hm-cell'+(peak?" peak":"")+'" style="background:rgba(110,146,255,'+(0.08+v*0.78).toFixed(2)+')">'+(peak?"★":"")+'</div>';
+    }).join("")+'</div>'; }).join("");
+    var rowLabH='<div class="mt-hm-rowl">'+rowL.map(function(rl){ return '<span>'+rl+'</span>'; }).join("")+'</div>';
+    var top=[["1","1:09","Comenta “Secretario” y te mando el manual desde 0","182 K","14 K","12×"],["2","0:45","Claude no basta para montar un SaaS que escale","94 K","7,1 K","11×"],["3","0:29","Anthropic ha soltado Fable 5 y cambia el juego","71 K","5,3 K","7.6×"],["4","1:27","Comenta “Claude” y te paso el setup completo","48 K","3,8 K","5.4×"]];
+    var topH=top.map(function(r){ return '<div class="mt-top-row"><span class="mt-top-rank">'+r[0]+'</span>'+
+      '<div class="mt-top-thumb"><span class="mt-top-dur">'+r[1]+'</span></div>'+
+      '<div class="mt-top-title">'+ESC(r[2])+'</div>'+
+      '<div class="mt-top-stat"><div class="mt-mono">'+r[3]+'</div><div class="mt-top-k">repros</div></div>'+
+      '<div class="mt-top-stat"><div class="mt-mono">'+r[4]+'</div><div class="mt-top-k">interac.</div></div>'+
+      '<div class="mt-top-stat mt-top-mult"><div class="mt-mult">'+r[5]+'</div><div class="mt-top-k">explota</div></div></div>'; }).join("");
+    return '<div class="mt-stack">'+
+      '<div class="mt-kpis">'+kpiH+'</div>'+
+      '<div class="mt-card"><div class="mt-card-head"><div class="mt-card-tt"><span class="mt-card-t">'+L("Reproducciones","Plays")+'</span><span class="mt-card-meta">'+L("últimos 14 días · 1,02 M","last 14 days · 1.02 M")+'</span></div></div>'+
+        '<div class="mt-trend">'+trendBars+'</div></div>'+
+      '<div class="mt-grid2">'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Desglose de interacción","Interaction breakdown")+'</span><span class="mt-card-meta">48 K total</span></div><div class="mt-bars">'+engH+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Ganchos que funcionan","Hooks that work")+'</span><span class="mt-card-meta">'+L("retención media","avg retention")+'</span></div><div class="mt-bars">'+hooksH+'</div></div>'+
+      '</div>'+
+      '<div class="mt-grid2">'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Temas que explotan","Topics that explode")+'</span><span class="mt-card-meta">'+L("escala log","log scale")+'</span></div><div class="mt-bars">'+temasH+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Duración óptima","Optimal length")+'</span><span class="mt-card-meta">'+L("repros medias","avg plays")+'</span></div><div class="mt-durs">'+durH+'</div></div>'+
+      '</div>'+
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos para publicar","Best times to post")+'</span><span class="mt-card-meta">'+L("interacción por franja","engagement by slot")+'</span></div>'+
+        '<div class="mt-hm">'+rowLabH+'<div class="mt-hm-grid">'+colsH+rowsH+'</div></div></div>'+
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels que más rinden","Your top-performing reels")+'</span><span class="mt-card-meta">30 '+L("días","days")+'</span></div>'+topH+'</div>'+
+    '</div>';
+  }
+  function metAudienciaHTML(){
+    var fol=[6,9,7,12,10,15,13,18,16,22,20,26,24,30]; var fh=_mBars(fol);
+    var folBars=fol.map(function(v,i){ return '<div class="mt-fb"><div class="mt-fb-fill" style="height:'+fh[i]+'"></div></div>'; }).join("");
+    var ed=[["18–24","28%","67%"],["25–34","42%","100%"],["35–44","19%","45%"],["45+","11%","26%"]];
+    var edH=ed.map(function(e){ return '<div class="mt-br"><div class="mt-br-top"><span>'+e[0]+'</span><span class="mt-mono">'+e[1]+'</span></div><div class="mt-br-track"><i style="width:'+e[2]+'"></i></div></div>'; }).join("");
+    var ub=[["España","54%","100%"],["México","14%","26%"],["Argentina","9%","17%"],["Colombia","7%","13%"],["Otros","16%","30%"]];
+    var ubH=ub.map(function(u){ return '<div class="mt-br"><div class="mt-br-top"><span>'+u[0]+'</span><span class="mt-mono">'+u[1]+'</span></div><div class="mt-br-track"><i style="width:'+u[2]+'"></i></div></div>'; }).join("");
+    return '<div class="mt-stack">'+
+      '<div class="mt-grid-audtop">'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Crecimiento de seguidores","Follower growth")+'</span><span class="mt-up">▲ +2 480</span></div><div class="mt-fgrowth">'+folBars+'</div></div>'+
+        '<div class="mt-card"><span class="mt-card-t">'+L("Alcance por tipo","Reach by type")+'</span>'+
+          '<div class="mt-br"><div class="mt-br-top"><span>'+L("No seguidores","Non-followers")+'</span><span class="mt-mono">62%</span></div><div class="mt-br-track"><i style="width:62%"></i></div></div>'+
+          '<div class="mt-br"><div class="mt-br-top"><span>'+L("Seguidores","Followers")+'</span><span class="mt-mono">38%</span></div><div class="mt-br-track"><i class="alt" style="width:38%"></i></div></div>'+
+          '<div class="mt-note">'+L("Llegas más a gente nueva que a tu propia base. <b>Bien:</b> estás creciendo, no reciclando.","You reach more new people than your own base. <b>Good:</b> you're growing, not recycling.")+'</div></div>'+
+      '</div>'+
+      '<div class="mt-grid3">'+
+        '<div class="mt-card"><span class="mt-card-t">'+L("Edad","Age")+'</span><div class="mt-bars">'+edH+'</div></div>'+
+        '<div class="mt-card"><span class="mt-card-t">'+L("Género","Gender")+'</span>'+
+          '<div class="mt-gender"><div style="width:63%"></div><div class="alt" style="width:37%"></div></div>'+
+          '<div class="mt-gender-leg"><span><i></i>'+L("Hombres 63%","Men 63%")+'</span><span><i class="alt"></i>'+L("Mujeres 37%","Women 37%")+'</span></div>'+
+          '<div class="mt-note">'+L("Tu audiencia es mayoritariamente <b>hombres de 25–34</b>. Habla para ellos.","Your audience is mostly <b>men 25–34</b>. Talk to them.")+'</div></div>'+
+        '<div class="mt-card"><span class="mt-card-t">'+L("Top ubicaciones","Top locations")+'</span><div class="mt-bars">'+ubH+'</div></div>'+
+      '</div>'+
+    '</div>';
+  }
+  function metCompetidoresHTML(){
+    var cols=[L("seguidores","followers"),L("repros medias","avg plays"),L("interacción","engagement"),L("explota","explodes")];
+    var comp=[
+      ["DA","@davidmiragito10","tú",1,"18,4 K","42 K","7,2%","1 de 4"],
+      ["NI","@nicoazero","líder del nicho",0,"112 K","88 K","9,1%","1 de 3"],
+      ["LA","@laura_kpi","al alza",0,"34 K","27 K","5,8%","1 de 5"],
+      ["VI","@victor_abarca","irregular",0,"9,7 K","12 K","4,3%","1 de 7"]
+    ];
+    var head='<div class="mt-comp-head"><span>cuenta</span>'+cols.map(function(c){ return '<span>'+ESC(c)+'</span>'; }).join("")+'</div>';
+    var rows=comp.map(function(r){ var me=r[3];
+      return '<div class="mt-comp-row'+(me?" me":"")+'">'+
+        '<div class="mt-comp-acct"><span class="mt-comp-av">'+r[0]+'</span><div><div class="mt-comp-n">'+ESC(r[1])+'</div><div class="mt-comp-tag'+(me?" me":"")+'">'+ESC(r[2])+'</div></div></div>'+
+        '<span class="mt-comp-c">'+r[4]+'</span><span class="mt-comp-c">'+r[5]+'</span><span class="mt-comp-c">'+r[6]+'</span><span class="mt-comp-c mt-mult">'+r[7]+'</span></div>';
+    }).join("");
+    var sv=[["@nicoazero","2,4 M","100%",0],["@laura_kpi","1,1 M","46%",0],["Tú · @davidmiragito10","1,02 M","42%",1],["@victor_abarca","0,4 M","17%",0]];
+    var svH=sv.map(function(s){ return '<div class="mt-br"><div class="mt-br-top"><span'+(s[3]?' style="color:var(--brand-500,#2F5BFF)"':'')+'>'+ESC(s[0])+'</span><span class="mt-mono">'+s[1]+'</span></div><div class="mt-br-track"><i'+(s[3]?'':' class="dim"')+' style="width:'+s[2]+'"></i></div></div>'; }).join("");
+    return '<div class="mt-stack">'+
+      '<div class="mt-card mt-comp"><div class="mt-comp-table">'+head+rows+'</div></div>'+
+      '<div class="mt-grid2">'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Cuota de atención del nicho","Niche share of voice")+'</span><span class="mt-card-meta">'+L("repros · 30 días","plays · 30 days")+'</span></div><div class="mt-bars">'+svH+'</div></div>'+
+        '<div class="mt-card mt-opp"><span class="mt-opp-eye">'+L("› hueco detectado","› gap detected")+'</span>'+
+          '<h3 class="mt-opp-h">'+L("@nicoazero publica 6×/semana. Tú, 5. Pero tu interacción por reel es mayor.","@nicoazero posts 6×/week. You, 5. But your engagement per reel is higher.")+'</h3>'+
+          '<p class="mt-opp-p">'+L("Mismo esfuerzo, más retorno: te falta volumen, no calidad. Roba un tema más esta semana.","Same effort, more return: you need volume, not quality. Steal one more topic this week.")+'</p>'+
+          '<button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Ver sus reels en el Radar","See their reels in the Radar")+'</button></div>'+
+      '</div>'+
+    '</div>';
   }
   /* MÉTRICAS · Audiencia (mockup Métricas.dc.html). En prod los datos vienen de las
      audience-insights de IG; aquí, deterministas por handle (vía _lbHash) para que el
@@ -3421,6 +3544,7 @@
   var _tpPlay='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
   var _tpPause='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>';
   var _icMirror='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7 4 12l4 5"/><path d="m16 7 4 5-4 5"/></svg>';
+  var _icLock='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
   function _tpMMSS(ms){ var t=Math.floor(ms/1000),m=Math.floor(t/60),x=t%60; return (m<10?'0':'')+m+':'+(x<10?'0':'')+x; }
   function teleprompterHTML(){
     var r=S.reel||{creator:{handle:""},script:{hook:"",beats:[],close:""}};
