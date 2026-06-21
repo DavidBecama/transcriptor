@@ -95,7 +95,8 @@
     chat:'<svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M21 12a8 8 0 01-11.5 7.2L4 20l.9-5.2A8 8 0 1121 12z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
     users:'<svg viewBox="0 0 24 24" fill="none" width="18" height="18"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 20a5.5 5.5 0 0111 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M16 6.2a3 3 0 010 5.6M20.5 19.5a5 5 0 00-3.2-4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
     gear:'<svg viewBox="0 0 24 24" fill="none" width="18" height="18"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2V19a2 2 0 11-4 0v-.1a1.7 1.7 0 00-2.9-1.2l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.7 1.7 0 004.6 13H4.5a2 2 0 110-4h.1a1.7 1.7 0 001.2-2.9l-.1-.1a2 2 0 112.8-2.8l.1.1A1.7 1.7 0 0011 4.6V4.5a2 2 0 114 0v.1a1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1A1.7 1.7 0 0019.4 11h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.6 1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
-    logout:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    logout:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    edit:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M4 13.5V19a1 1 0 0 0 1 1h5.5M15 5l4 4-9 9H6v-4z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
 
   // Spinner CSS inyectado una vez.
@@ -1623,29 +1624,48 @@
       '<div class="perf-foot">'+IC.brain+' Esto <b>entrena tu Cerebro</b> (voz al '+voicePct+'%): cada semana analizo cómo traccionan tus reels y genero más en la línea de los que petan.</div>'+
     '</div>';
   }
+  /* v3 (mockup David «Guiones»): card en rejilla — badge de estado (Por grabar
+     azul / Cocinando naranja / Grabado verde) + mult verde + fuente, titular Clash
+     (el hook), nota «› gancho detectado», y CTA «Abrir guion» + secundario
+     (Marcar grabado / Duplicar). Los controles avanzados (ver guión, hooks,
+     vincular reel, perf, aprobar, descartar) se preservan en una fila compacta. */
   function guiCardHTML(g){
     var rec=g.status==="recorded";
-    var pill=rec?'<span class="gui-pill done">'+IC.check+' Grabado</span>':'<span class="gui-pill">Por grabar</span>';
-    // B3: aprobación (solo agencia/estudio): badge + toggle "listo para cliente".
+    var cooking=!!g._cooking;
     var apr=(g.approval==="approved");
-    var aprBadge=isMultiBrand()?('<span class="gui-pill '+(apr?'appr':'appr-pend')+'" title="'+(apr?'Aprobado · listo para cliente':'Pendiente de aprobar')+'">'+(apr?IC.check+' Aprobado':'Pendiente')+'</span>'):'';
+    // mult/fuente (cabecera derecha)
+    var mult=g.mult||g.fromMult||null;
+    var multTxt=mult?('<span class="guic-mult">'+ESC(String(mult).replace(/×\s*$/,""))+'×</span>'):'';
+    var src=g.from?('<span class="guic-src">'+ESC(g.from.charAt(0)==="@"?g.from:("@"+g.from))+'</span>'):'';
+    var metaR='<span class="guic-metaR">'+multTxt+src+'</span>';
+    var badge=cooking
+      ? '<span class="guic-badge cook">'+L("Cocinando…","Cooking…")+'</span>'
+      : rec
+        ? '<span class="guic-badge done">'+IC.check+' '+L("Grabado","Recorded")+'</span>'
+        : '<span class="guic-badge todo">'+L("Por grabar","To record")+'</span>';
+    // estado «cocinando»: esqueleto shimmer + «Cocinando el guion ···»
+    if(cooking){
+      return '<div class="guic-wrap"><div class="guic">'+
+        '<div class="guic-top">'+badge+metaR+'</div>'+
+        '<div class="guic-skel"><span class="gsk h20" style="width:88%"></span><span class="gsk" style="width:96%"></span><span class="gsk" style="width:70%"></span>'+
+          '<span class="guic-cooking">'+L("Cocinando el guion","Cooking the script")+'<span class="gdots"><i></i><i></i><i></i></span></span>'+
+        '</div></div></div>';
+    }
+    // controles avanzados preservados
     var nh=(g.hooks&&g.hooks.length)||0;
-    var meta=(g.from?'robado de '+ESC(g.from)+' · ':'')+'voz '+ESC(g.brand);
-    var pub;
+    var pub='';
     if(g.published && g.published.pending){
       pub='<span class="gui-pub pending" title="Vinculado · pendiente de análisis">'+IC.repeat+' reel vinculado · se analiza en el próximo refresco</span>';
     } else if(g.published){
       pub='<button class="gui-pub'+((g.published.vsMedian||0)>=3?" hot":"")+'" data-act="gui-perf" data-id="'+g.id+'" title="Ver rendimiento y retención">'+IC.chart+' '+fmtNum(g.published.views)+' views · <span class="gp-mult'+((g.published.vsMedian||1)>1?" up":"")+'">'+(g.published.vsMedian||1)+'×</span> tu media · ver →</button>';
-    } else if(g.status==="recorded"){
+    } else if(rec){
       pub='<button class="gui-link" data-act="gui-link-reel" data-id="'+g.id+'" title="Pega el link del reel publicado en Instagram para analizarlo y entrenar tu Cerebro">'+IC.repeat+' Vincular reel publicado</button>';
-    } else { pub=''; }
+    }
     var toggle=nh?'<button class="gui-hooks-toggle'+(g.expanded?" open":"")+'" data-act="gui-hooks" data-id="'+g.id+'">'+IC.hook+' '+nh+' hook'+(nh===1?"":"s")+' alternativo'+(nh===1?"":"s")+' '+IC.chev+'</button>':'';
-    // P0 (4): leer el guión entero sin salir de la lista. Mismo patrón que
-    // scriptBlockHTML (.sc-full/.script-body); estado propio g.bodyOpen — no
-    // pisa el toggle de hooks (g.expanded).
     var hasBody=!!((g.beats&&g.beats.length)||g.close||g.hook);
     var bodyOpen=!!g.bodyOpen;
     var bodyToggle=hasBody?'<button class="gui-hooks-toggle gui-body-toggle'+(bodyOpen?" open":"")+'" data-act="gui-body-toggle" data-id="'+g.id+'" aria-expanded="'+(bodyOpen?"true":"false")+'">'+IC.doc+' '+(bodyOpen?"Plegar guión":"Ver guión completo")+' '+IC.chev+'</button>':'';
+    var aprBtn=isMultiBrand()?'<button class="gui-hooks-toggle'+(apr?" open":"")+'" data-act="gui-approve" data-id="'+g.id+'" title="'+(apr?"Quitar aprobado":"Aprobar (listo para cliente)")+'">'+IC.check+' '+(apr?"Aprobado":"Aprobar")+'</button>':'';
     var beatsHtml=(g.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
     var bodyFull=(hasBody&&bodyOpen)?('<div class="sc-full gui-body">'+
         (g.hook?'<div class="gui-body-hook">'+ESC(g.hook)+'</div>':'')+
@@ -1658,49 +1678,102 @@
         '<button class="gui-hook-del" data-act="gui-del-hook" data-id="'+g.id+'" data-i="'+i+'" title="Quitar variante">'+IC.x+'</button>'+
       '</div>';
     }).join("")+'</div>':'';
-    return '<div class="gui-card-wrap">'+
-      '<div class="gui-card'+(rec?" is-rec":"")+'">'+
-        '<div class="ava bava">'+ESC(initialsOf(g.from||g.brand))+'</div>'+
-        '<div class="gui-main"><div class="gui-title">'+ESC(g.title)+'</div><div class="gui-meta">'+meta+'</div>'+pub+bodyToggle+toggle+'</div>'+
-        aprBadge+pill+
-        '<div class="gui-acts">'+
-          (isMultiBrand()?'<button class="iconbtn'+(apr?" on":"")+'" data-act="gui-approve" data-id="'+g.id+'" title="'+(apr?"Quitar aprobado":"Aprobar (listo para cliente)")+'" aria-label="'+(apr?"Quitar aprobado":"Aprobar")+'">'+IC.check+'</button>':'')+
-          '<button class="iconbtn" data-act="gui-record" data-id="'+g.id+'" title="Grabar (teleprompter)">'+IC.mic+'</button>'+
-          '<button class="iconbtn'+(rec?" on":"")+'" data-act="gui-toggle-rec" data-id="'+g.id+'" title="'+(rec?"Marcar por grabar":"Marcar grabado")+'">'+IC.check+'</button>'+
-          '<button class="iconbtn danger" data-act="gui-discard" data-id="'+g.id+'" title="Descartar">'+IC.x+'</button>'+
-        '</div>'+
+    // titular = hook/título; «gancho detectado» = la apertura (o 1er beat) que lo explica
+    var headline=g.title||g.hook||"Guión";
+    var gancho=(g.hook&&g.hook!==g.title)?g.hook:((g.beats&&g.beats[0])||g.sum||"");
+    var moreRow=(aprBtn||pub||bodyToggle||toggle)?('<div class="guic-more">'+aprBtn+pub+bodyToggle+toggle+
+        '<button class="gui-hooks-toggle guic-discard" data-act="gui-discard" data-id="'+g.id+'" title="Descartar">'+IC.x+' '+L("Descartar","Discard")+'</button>'+
+      '</div>'):'';
+    return '<div class="guic-wrap"><div class="guic'+(rec?" is-rec":"")+'">'+
+      '<div class="guic-top">'+badge+metaR+'</div>'+
+      '<h3 class="guic-hook">'+ESC(headline)+'</h3>'+
+      (gancho?'<div class="guic-gancho"><span class="guic-gancho-l">'+L("› gancho detectado","› hook detected")+'</span><p>'+ESC(gancho)+'</p></div>':'')+
+      '<div class="guic-acts">'+
+        '<button class="btn btn-md btn-primary" data-act="gui-open" data-id="'+g.id+'">'+IC.edit+' '+L("Abrir guion","Open script")+'</button>'+
+        '<button class="btn btn-md btn-secondary" data-act="'+(rec?"gui-duplicate":"gui-toggle-rec")+'" data-id="'+g.id+'">'+(rec?L("Duplicar","Duplicate"):L("Marcar grabado","Mark recorded"))+'</button>'+
       '</div>'+
-      bodyFull+
-      hooksList+
-    '</div>';
+      moreRow+
+      bodyFull+hooksList+
+    '</div></div>';
   }
   function guionesHTML(){
     var all=S.guiones.filter(function(g){return g.status!=="discarded";});
     var filt=S.guiFilter||"all";
     var appr=S.guiApproval||"all";   // B3: filtro de aprobación (multi-marca)
-    var items=all.filter(function(g){ if(filt==="draft") return g.status==="draft"; if(filt==="recorded") return g.status==="recorded"; return true; })
+    // «Por grabar» agrupa borradores + cocinando (mockup David).
+    var isTodo=function(g){ return g.status!=="recorded"; };
+    var items=all.filter(function(g){ if(filt==="draft") return isTodo(g); if(filt==="recorded") return g.status==="recorded"; return true; })
                  .filter(function(g){ if(!isMultiBrand()||appr==="all") return true; var a=(g.approval==="approved"); return appr==="approved"?a:!a; });
-    var cAll=all.length, cDraft=all.filter(function(g){return g.status==="draft";}).length, cRec=all.filter(function(g){return g.status==="recorded";}).length;
-    var chips='<div class="filters">'+[["all","Todos",cAll],["draft","Por grabar",cDraft],["recorded","Grabados",cRec]].map(function(f){
-      return '<button class="fchip'+(filt===f[0]?" on":"")+'" data-act="gui-filter" data-k="'+f[0]+'">'+f[1]+' '+f[2]+'</button>';
+    var cAll=all.length, cDraft=all.filter(isTodo).length, cRec=all.filter(function(g){return g.status==="recorded";}).length;
+    var tabName=({all:L("Todos","All"),draft:L("Por grabar","To record"),recorded:L("Grabados","Recorded")})[filt]||L("Todos","All");
+    // cabecera v3: titular Clash + sub con contador + tabs a la derecha
+    var sub=cDraft>0
+      ? L("Lo que robaste, con tu voz. <b>"+cDraft+" por grabar</b> esperándote — deja de pensar y dale a grabar.","What you stole, in your voice. <b>"+cDraft+" to record</b> waiting — stop thinking and hit record.")
+      : L("Lo que robaste, con tu voz. Todo lo que generes aterriza aquí.","What you stole, in your voice. Everything you generate lands here.");
+    var tabs='<div class="guic-tabs">'+[["all",L("Todos","All"),cAll],["draft",L("Por grabar","To record"),cDraft],["recorded",L("Grabados","Recorded"),cRec]].map(function(f){
+      return '<button class="guic-tab'+(filt===f[0]?" on":"")+'" data-act="gui-filter" data-k="'+f[0]+'">'+f[1]+' <span class="guic-tab-c">'+f[2]+'</span></button>';
     }).join("")+'</div>';
-    // B3: para agencia/estudio, segunda fila de filtros por estado de aprobación.
+    var header='<header class="guic-head"><div class="guic-head-l">'+
+      '<h1 class="h-title guic-h1">'+L("Tus guiones","Your scripts")+'</h1>'+
+      '<p class="h-sub guic-sub">'+sub+'</p></div>'+tabs+'</header>';
+    // B3: agencia/estudio → segunda fila de filtros de aprobación.
     if(isMultiBrand()){
       var cPend=all.filter(function(g){return g.approval!=="approved";}).length, cAppr=all.filter(function(g){return g.approval==="approved";}).length;
-      chips+='<div class="filters">'+[["all","Todas",cAll],["pending","Pendientes",cPend],["approved","Aprobadas",cAppr]].map(function(f){
+      header+='<div class="filters" style="margin-top:-10px">'+[["all","Todas",cAll],["pending","Pendientes",cPend],["approved","Aprobadas",cAppr]].map(function(f){
         return '<button class="fchip'+(appr===f[0]?" on":"")+'" data-act="gui-approval-filter" data-k="'+f[0]+'">'+f[1]+' '+f[2]+'</button>';
       }).join("")+'</div>';
     }
-    var body=items.length===0
-      ? '<div class="rs-empty" style="margin-top:24px">'+(cAll===0
-          ? '<div class="rs-empty-title">Aún nada aquí. Roba tu primera señal.</div><div class="rs-empty-sub">Roba un reel en el <b>Radar</b> o apunta una idea — todo lo que generes aterriza aquí.</div>'
-          : 'Nada en este filtro.')+'</div>'
-      : '<div class="gui-list">'+items.map(guiCardHTML).join("")+'</div>';
-    return '<div class="scroll"><div class="canvas">'+
-      pheadHTML("Guiones · @"+(brand().handle||S.user.handle||""), "Tus guiones", "Todo lo que creas vive aquí. Ordena, descarta lo que no, y graba cuando quieras.")+
-      chips+body+
-      ideasZoneHTML()+          // T1: fábrica de ideas (idea→guiones→hooks) junto a los guiones
+    var grid=items.length===0
+      ? (cAll===0
+          ? '<div class="guic-empty"><span class="guic-empty-h">'+L("Aún nada aquí.","Nothing here yet.")+'</span><span class="guic-empty-s">'+L("Roba tu primera señal en el Radar y vuelve.","Steal your first signal in the Radar and come back.")+'</span><button class="btn btn-md btn-primary" data-act="tab" data-k="dashboard">'+IC.bolt+' '+L("Ir al Radar","Go to Radar")+'</button></div>'
+          : '<div class="guic-empty"><span class="guic-empty-s">'+L("Nada en este filtro.","Nothing in this filter.")+'</span></div>')
+      : '<div class="guic-grid">'+items.map(guiCardHTML).join("")+'</div>';
+    var grupo='<div class="guic-group"><span class="guic-group-t">'+ESC(tabName)+'</span>'+grid+'</div>';
+    return '<div class="scroll"><div class="canvas guic-canvas">'+
+      header+
+      guiUndevelopedHTML()+     // «Sin desarrollar» — ideas en bruto (cards dashed)
+      grupo+
+      guiExplosionHTML()+       // «Explosión creativa» — 5 ideas × 3 hooks
     '</div></div>';
+  }
+  // v3 (mockup David) — «Sin desarrollar»: ideas en bruto apuntadas, como cards
+  // dashed con CTA «Desarrollar» (genera 5 guiones de esa idea). Reusa gen5scripts.
+  function guiUndevelopedHTML(){
+    var raw=(S.ideas||[]).filter(ideaBelongsToActiveBrand).filter(function(i){ return !ideaIsDeveloped(i); });
+    if(!raw.length) return '';
+    var cards=raw.map(function(idea){
+      var saving=!!idea._saving;
+      return '<div class="guiu-card">'+
+        '<span class="guiu-text">'+ESC(idea.text)+'</span>'+
+        (saving
+          ? '<span class="guiu-saving"><span class="rs-ldr"></span>'+L("Guardando…","Saving…")+'</span>'
+          : '<button class="btn btn-sm btn-secondary" data-act="gen5scripts" data-id="'+idea.id+'" title="'+L("Genera 5 guiones de esta idea ("+COST.scripts5+" créditos)","Generate 5 scripts from this idea ("+COST.scripts5+" credits)")+'">'+L("Desarrollar","Develop")+'</button>')+
+      '</div>';
+    }).join("");
+    return '<section class="guiu"><div class="guiu-head">'+
+      '<span class="guiu-ic">'+IC.bulb+'</span>'+
+      '<span class="guiu-t">'+L("Sin desarrollar","Undeveloped")+'</span>'+
+      '<span class="guiu-c">'+L("ideas en bruto que apuntaste · "+raw.length,"raw ideas you jotted · "+raw.length)+'</span>'+
+    '</div><div class="guiu-cards">'+cards+'</div></section>';
+  }
+  // v3 (mockup David) — «Explosión creativa»: CTA «Generar 5 ideas» + rejilla de
+  // las ideas ya desarrolladas (idea + hasta 3 hooks). Reusa gen5ideas/explosion.
+  function guiExplosionHTML(){
+    var dev=(S.ideas||[]).filter(ideaBelongsToActiveBrand).filter(ideaIsDeveloped).slice(0,3);
+    var grid=dev.length?('<div class="guix-grid">'+dev.map(function(idea){
+      var hooks=[];
+      (idea.scripts||[]).forEach(function(sc){ if(sc.hook && hooks.length<3) hooks.push(sc.hook); });
+      if(!hooks.length && idea.hooks) hooks=idea.hooks.slice(0,3);
+      var hl=hooks.map(function(h){ return '<div class="guix-hook">'+IC.arr+'<span>'+ESC(h)+'</span></div>'; }).join("");
+      return '<div class="guix-card"><span class="guix-idea">'+ESC(idea.text)+'</span><div class="guix-hooks">'+hl+'</div></div>';
+    }).join("")+'</div>'):'';
+    return '<section class="guix">'+
+      '<div class="guix-head"><div class="guix-head-l"><div class="guix-ic">'+IC.bolt+'</div>'+
+        '<div><div class="guix-h">'+L("Explosión creativa","Creative explosion")+'</div>'+
+        '<div class="guix-sub">'+L("Cinco ideas nuevas a partir de lo que explota. Cada una con tres ganchos listos.","Five fresh ideas from what's exploding. Each with three ready hooks.")+'</div></div></div>'+
+        '<button class="btn btn-lg btn-primary" data-act="gen5ideas">'+IC.bolt+' '+L("Generar 5 ideas","Generate 5 ideas")+'</button>'+
+      '</div>'+grid+
+    '</section>';
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -4697,6 +4770,8 @@
       return;
     }
     if(act==="gui-record"){ var g=guionById(id); if(g){ S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; S.view="prompter"; render(); } return; }
+    if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.view="script"; render(); } return; }   // v3 «Abrir guion» → editor
+    if(act==="gui-duplicate"){ var gd=guionById(id); if(gd){ var nid=addGuion({title:gd.title,hook:gd.hook,beats:(gd.beats||[]).slice(),close:gd.close,hooks:(gd.hooks||[]).slice(),from:gd.from,type:gd.type}); var ng=guionById(nid); if(ng){ ng.mult=gd.mult||gd.fromMult; } render(); showToast(L("Guion duplicado — listo para retocar.","Script duplicated — ready to tweak.")); } return; }
     if(act==="gui-toggle-rec"){ var g2=guionById(id); if(g2){ g2.status=(g2.status==="recorded")?"draft":"recorded"; if(g2.status==="recorded"&&S.stats) S.stats.stolen_today+=1; render(); showToast(g2.status==="recorded"?"Marcado como grabado.":"Vuelto a borrador."); persistRecStatus(g2); } return; }
     if(act==="gui-discard"){ var g3=guionById(id); if(g3){ g3.status="discarded"; S._lastDiscarded=id; render(); showToast("Descartado.","Deshacer","undo-discard"); persistRecStatus(g3); } return; }   // T9: descartar siempre con vuelta atrás
     if(act==="undo-discard"){ var gU=S._lastDiscarded?guionById(S._lastDiscarded):null; S._lastDiscarded=null; if(gU){ gU.status="draft"; persistRecStatus(gU); render(); showToast("Recuperado — vuelve a «Por grabar»."); } return; }
