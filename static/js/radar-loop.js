@@ -343,9 +343,9 @@
       return '<div class="spark pill-stat trial" id="rsSpark" title="Prueba Pro — '+cr+' crédito'+(cr===1?'':'s')+' · '+d+' día'+(d===1?'':'s')+' restantes" data-act="tab" data-k="brain" role="button" tabindex="0">'+IC.spark+'<span class="num">Pro</span> · '+cr+' cr</div>';
     }
     if(S.user.plan==="free" && !S.user.credits){
-      return '<div class="spark pill-stat credits" id="rsSpark" title="Guiones gratis este mes">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.freeLeft+'</b></span> este mes</div>';
+      return '<div class="spark pill-stat credits" id="rsSpark" title="Guiones gratis este mes — ver planes" data-act="credits-pill" role="button" tabindex="0">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.freeLeft+'</b></span> este mes</div>';
     }
-    return '<div class="spark pill-stat credits" id="rsSpark" title="Créditos disponibles">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.credits+'</b></span> créditos</div>';
+    return '<div class="spark pill-stat credits" id="rsSpark" title="Créditos disponibles — ver planes" data-act="credits-pill" role="button" tabindex="0">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.credits+'</b></span> créditos</div>';
   }
 
   // Cabecera Signal reutilizable (eyebrow mono + h-title Space Grotesk + sub).
@@ -5378,6 +5378,8 @@
     if(act==="comp-add-submit") return submitAddComp();
     if(act==="refresh-radar") return refreshRadar();
     if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
+    // Pill de créditos del topbar → abre el modal de planes/upgrade (camino de cobro).
+    if(act==="credits-pill"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("credits_pill"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
     // C1: Ajustes → Plan. "Cambiar plan" abre el modal de PLANES (checkout Whop), "Recargar
     // créditos" abre el modal de TOPUPS (openTopup, no openTopupModal que no existe).
     if(act==="change-plan"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("settings_plan"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
