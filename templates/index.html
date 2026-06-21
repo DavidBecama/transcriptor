@@ -11516,7 +11516,10 @@
     /* responsive: rail → barra inferior */
     @media (max-width:760px){
       .rs.app { grid-template-columns:1fr; }
-      .rs .rail { position:fixed; bottom:0; left:0; right:0; height:auto; width:100%; flex-direction:row; justify-content:center; border-right:none; border-top:1px solid var(--border-default); padding:8px 0; z-index:40; }
+      .rs .rail { position:fixed; top:auto; bottom:0; left:0; right:0; height:auto; width:100%; flex-direction:row; justify-content:center; align-items:center; gap:4px; border-right:none; border-top:1px solid var(--border-default); padding:8px 0; z-index:40; }
+      /* el rail es barra inferior fija (~62px) → deja hueco para que el último
+         contenido no quede tapado al hacer scroll hasta abajo. */
+      .rs .scroll { padding-bottom:72px; }
       .rs .rail-logo, .rs .rail-spacer, .rs .rail-ava { display:none; }
       .rs .rs-acct-menu { left:8px; right:8px; bottom:72px; min-width:0; }   /* sobre la barra inferior */
       .rs .rail-btn.on::before { left:11px; right:11px; top:auto; bottom:-8px; width:auto; height:3px; border-radius:3px 3px 0 0; }
