@@ -12011,7 +12011,18 @@
     .theme-seg-opt svg { width:16px; height:16px; }
 
     /* ── AJUSTES · secciones nuevas (mockup Ajustes.dc.html) ── */
-    #profPanelSettings .set-btn { flex:none; }
+    /* v3 fix (pre-publi): los botones de Ajustes llevan btn-3d* (que es SOLO sombra)
+       sin clase base ni relleno → el navegador los pintaba como botón nativo (fondo
+       gris, borde outset). Les damos base + relleno aquí, scoped al panel, sin tocar
+       el resto de la app. Los ghost intencionales (con background:transparent inline)
+       quedan intactos: el estilo inline gana sobre estos selectores. */
+    #profPanelSettings .btn-3d { display:inline-flex; align-items:center; justify-content:center;
+      gap:8px; border:1px solid var(--border-default); border-radius:10px; font-weight:600;
+      font-size:.85rem; line-height:1; cursor:pointer; box-sizing:border-box; }
+    #profPanelSettings .btn-3d-primary { background:var(--brand-600); color:#fff; border-color:var(--brand-600); }
+    #profPanelSettings .btn-3d-secondary { background:var(--surface-raised); color:var(--text-primary); }
+    #profPanelSettings .btn-3d-danger { background:#dc2626; color:#fff; border-color:#dc2626; }
+    #profPanelSettings .set-btn { flex:none; height:38px; padding:0 16px; }
     #profPanelSettings .mono { font-family:var(--font-mono); }
     /* Perfil y voz */
     #profPanelSettings .set-identity { display:flex; align-items:center; gap:20px; padding:22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; margin-bottom:16px; flex-wrap:wrap; }
