@@ -1896,7 +1896,7 @@
           '<span class="aj-derived">'+L("› derivada de "+reels+" reels","› derived from "+reels+" reels")+'</span></div>'+
         '<div class="aj-tonos">'+tonos+'</div>'+
         '<div class="aj-mulet-wrap"><span class="aj-mulet-k">'+L("Muletillas y expresiones tuyas","Your catchphrases & expressions")+'</span><div class="aj-mulet">'+frases+'</div></div>'+
-        '<div class="aj-voice-foot"><div class="aj-slider-row"><span>'+L("Nivel de humor seco","Dry humor level")+'</span><div class="aj-slider"><div class="aj-slider-fill" style="width:68%"></div><div class="aj-slider-knob" style="left:68%"></div></div></div>'+
+        '<div class="aj-voice-foot">'+
           '<button class="btn btn-md btn-primary" data-act="ajustes-save-voice">'+L("Guardar voz","Save voice")+'</button></div>'+
       '</div>'+
       // preferencias
