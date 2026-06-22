@@ -10,6 +10,7 @@ Emails completos solo a DEBUG (deshabilitado en prod).
 """
 
 import os
+import sys
 import json
 import logging
 import secrets
@@ -19,6 +20,12 @@ import requests
 from supabase import create_client
 
 logger = logging.getLogger(__name__)
+
+# gevent (app.py hace monkey.patch_all()) + requests/urllib3 sobre SSL puede superar
+# el límite de recursión por defecto (1000) en el handshake → RecursionError
+# INTERMITENTE al mandar por Resend (unos emails salían, otros no). Subir el límite es
+# el fix documentado de ese bug; el envío además reintenta (ver _send_via_resend).
+sys.setrecursionlimit(max(sys.getrecursionlimit(), 10000))
 
 # ── Config ────────────────────────────────────────────────────────────────
 
@@ -362,32 +369,39 @@ TEMPLATES = {
 # ── Resend HTTP ───────────────────────────────────────────────────────────
 
 def _send_via_resend(to_email, subject, html, text):
-    """Envía vía Resend HTTP API. Devuelve (resend_id, error_str)."""
+    """Envía vía Resend HTTP API. Devuelve (resend_id, error_str).
+
+    Reintenta hasta 3 veces ante excepción de red/SSL (el RecursionError de
+    gevent+SSL es intermitente: la 2ª llamada suele reusar conexión sin re-handshake).
+    Un 4xx de Resend NO se reintenta (error real del payload/cuenta)."""
     if not RESEND_API_KEY:
         return None, "RESEND_API_KEY not configured"
-    try:
-        r = requests.post(
-            RESEND_API_URL,
-            headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": EMAIL_FROM,
-                "to": [to_email],
-                "subject": subject,
-                "html": html,
-                "text": text,
-                "reply_to": EMAIL_REPLY_TO,
-            },
-            timeout=15,
-        )
-        if r.status_code >= 400:
-            return None, f"resend_http_{r.status_code}: {r.text[:200]}"
-        data = r.json()
-        return data.get("id"), None
-    except Exception as e:
-        return None, f"resend_exception: {type(e).__name__}"
+    last_err = None
+    for _attempt in range(3):
+        try:
+            r = requests.post(
+                RESEND_API_URL,
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": EMAIL_FROM,
+                    "to": [to_email],
+                    "subject": subject,
+                    "html": html,
+                    "text": text,
+                    "reply_to": EMAIL_REPLY_TO,
+                },
+                timeout=15,
+            )
+            if r.status_code >= 400:
+                return None, f"resend_http_{r.status_code}: {r.text[:200]}"
+            return r.json().get("id"), None
+        except Exception as e:
+            last_err = type(e).__name__
+            continue
+    return None, f"resend_exception: {last_err}"
 
 
 # ── Decision logic ───────────────────────────────────────────────────────
