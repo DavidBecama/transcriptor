@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import time
 import logging
 import tempfile
@@ -1222,111 +1223,160 @@ def scrape_user_profiles():
     return {"queued": queued, "candidates": cand}
 
 
+def _gate_creators_groq(cands: list, niche_ctx: str) -> list:
+    """GATE de relevancia barato (Groq). De una lista de candidatos (relatedProfiles)
+    deja solo los CREADORES de contenido personales, del nicho y en español — quita
+    MARCAS (Xiaomi, Samsung...) y cuentas de otra región/idioma (LatAm, portugués,
+    catalán, inglés...). cands: [{"u":username,"name":full_name}]. Devuelve [usernames].
+    Best-effort: si Groq falla → devuelve TODOS (no bloquea el onboarding); si Groq
+    responde y no salva ninguno → devuelve [] (deja que el fallback hashtag entre)."""
+    GROQ = os.environ.get("GROQ_API_KEY", "")
+    if not cands:
+        return []
+    if not GROQ:
+        return [c["u"] for c in cands]
+    prompt = (
+        "Eres un filtro para una app de creadores españoles. NICHO del cliente: " + (niche_ctx or "general") + ".\n"
+        "Te doy cuentas de Instagram sugeridas. Para CADA una decide si es buen COMPETIDOR:\n"
+        "- keep=true SOLO si es un CREADOR DE CONTENIDO PERSONAL (una persona/canal), del nicho, "
+        "y en ESPAÑOL (España o español neutro).\n"
+        "- keep=false si es una MARCA/fabricante/tienda (Xiaomi, Samsung, Honor, Ray-Ban...), "
+        "o de otra región/idioma claramente (Ecuador, Colombia, México, Brasil/portugués, "
+        "catalán, inglés, Asia...), o fuera del nicho.\n"
+        "Devuelve SOLO json: {\"r\":[{\"u\":username,\"keep\":bool}]}.\n\n"
+        "CUENTAS:\n" + json.dumps(cands, ensure_ascii=False))
+    try:
+        gr = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": "Bearer " + GROQ},
+            json={"model": os.environ.get("GROQ_GATE_MODEL", "llama-3.3-70b-versatile"),
+                  "temperature": 0, "response_format": {"type": "json_object"},
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=60)
+        gr.raise_for_status()
+        out = json.loads(gr.json()["choices"][0]["message"]["content"])
+        return [x["u"] for x in (out.get("r") or []) if x.get("keep") and x.get("u")]
+    except Exception as e:
+        logger.warning("[discover] groq gate failed (paso todos): %s", e)
+        return [c["u"] for c in cands]
+
+
 @celery_app.task(name="tasks.discover_niche_creators")
 def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
-                                 limit_tags: int = 2, follow_top: int = 5) -> dict:
-    """DESCUBRIMIENTO DE NICHO (onboarding): busca los HASHTAGS de los subnichos en Apify,
-    identifica CREADORES reales del nicho (por engagement), los AUTO-SIGUE para el usuario
-    (→ el radar los muestra), mete sus vídeos del hashtag YA y encola el scrape de sus
-    reels reales. Best-effort: si Apify falla, no rompe nada (radar cae a seed/competidores).
-    OJO: los posts de hashtag son MAYORÍA imágenes — NO filtramos a vídeo para descubrir el
-    creador (el bug v0.25.15); los vídeos sí se guardan como reels, el resto via scrape."""
+                                 follow_top: int = 6) -> dict:
+    """DESCUBRIMIENTO DE NICHO (onboarding) v2 — SEED = la propia cuenta del usuario.
+    Scrapea el perfil del usuario, coge los `relatedProfiles` que sugiere Instagram
+    (mismo nicho + idioma, según el grafo de IG), los pasa por un GATE LLM barato (Groq)
+    que quita MARCAS y cuentas de otra región/idioma, AUTO-SIGUE los ~6 creadores limpios
+    (→ el radar los muestra) y encola el scrape de sus reels reales. Si el seed no da
+    suficientes creadores limpios, completa por HASHTAG (fallback). Best-effort: si algo
+    falla, no rompe el onboarding (el radar cae a seed/competidores)."""
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     APIFY_TOKEN = os.environ.get("APIFY_TOKEN", "")
     if not APIFY_TOKEN:
         return {"status": "no_apify"}
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    tags = []
-    for s in (subniches or [])[:limit_tags]:
-        t = re.sub(r"[^a-z0-9áéíóúñ]", "", (s or "").strip().lower())
-        if t and t not in tags:
-            tags.append(t)
-    if not tags:
-        return {"status": "no_tags"}
-    actor_url = (f"https://api.apify.com/v2/acts/apify~instagram-scraper"
-                 f"/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024")
-    # 1. Recolectar creadores del nicho (score = engagement) desde TODOS los posts.
-    score: dict = {}   # uname -> {posts, eng, tag}
-    vids: dict = {}    # uname -> [items de vídeo]
-    for tag in tags:
-        try:
-            payload = {"directUrls": [f"https://www.instagram.com/explore/tags/{tag}/"],
-                       "resultsType": "posts", "resultsLimit": 40, "addParentData": False}
-            logger.info("[discover] Apify hashtag #%s", tag)
-            resp = requests.post(actor_url, json=payload, timeout=SCRAPE_TIMEOUT_SEC)
-            if resp.status_code >= 400:
-                logger.warning("[discover] apify %s #%s: %s", resp.status_code, tag, (resp.text or "")[:200])
-                continue
-            items = resp.json() or []
-        except Exception as e:
-            logger.warning("[discover] apify #%s failed: %s", tag, e)
-            continue
-        for it in items:
-            uname = (it.get("ownerUsername") or "").strip().lstrip("@").lower()
-            if not uname or not re.match(r"^[a-z0-9._]{1,30}$", uname):
-                continue
-            sc = score.setdefault(uname, {"posts": 0, "eng": 0, "tag": tag})
-            sc["posts"] += 1
-            sc["eng"] += int(it.get("likesCount") or 0) + int(it.get("commentsCount") or 0)
-            if (it.get("type") or "").lower() == "video":
-                vids.setdefault(uname, []).append(it)
-    if not score:
-        return {"status": "no_creators", "tags": tags}
-    # 2. Top creadores por engagement → upsert + auto-follow + sus vídeos + scrape async.
-    top = sorted(score.items(), key=lambda kv: -(kv[1]["eng"]))[:follow_top]
+    # 0. Handle del usuario (lo puso en el paso 1 del onboarding) = SEED.
+    seed_handle = ""
+    try:
+        pr = (db.table("ig_profiles").select("ig_username")
+                .eq("user_id", user_id).limit(1).execute()).data or []
+        seed_handle = ((pr[0].get("ig_username") if pr else "") or "").strip().lstrip("@").lower()
+    except Exception as e:
+        logger.warning("[discover] no ig_profile for user %s: %s", user_id, e)
+    niche_ctx = ", ".join([x for x in ([niche] + list(subniches or [])) if x]) or (niche or "")
+
+    keep_unames: list = []
+    # 1. SEED: relatedProfiles del propio usuario (1 a 1 con reintento si viene vacío).
+    if seed_handle:
+        seed_actor = (f"https://api.apify.com/v2/acts/apify~instagram-scraper"
+                      f"/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=512")
+        rel = []
+        for attempt in range(2):
+            try:
+                resp = requests.post(seed_actor, json={
+                    "directUrls": [f"https://www.instagram.com/{seed_handle}/"],
+                    "resultsType": "details", "resultsLimit": 1}, timeout=SCRAPE_TIMEOUT_SEC)
+                if resp.status_code >= 400:
+                    logger.warning("[discover] apify seed %s: %s", resp.status_code, (resp.text or "")[:160])
+                    continue
+                items = resp.json() or []
+                rel = (items[0].get("relatedProfiles") or []) if items else []
+                if rel:
+                    break
+            except Exception as e:
+                logger.warning("[discover] seed scrape attempt %d failed: %s", attempt, e)
+        cands = []
+        seen = set()
+        for rp in rel:
+            u = (rp.get("username") or "").strip().lstrip("@").lower()
+            if u and u != seed_handle and u not in seen and re.match(r"^[a-z0-9._]{1,30}$", u):
+                seen.add(u)
+                cands.append({"u": u, "name": rp.get("full_name") or ""})
+        if cands:
+            keep_unames = _gate_creators_groq(cands, niche_ctx)[:follow_top]
+            logger.info("[discover] seed=@%s related=%d gate_keep=%d", seed_handle, len(cands), len(keep_unames))
+
+    # 2. FALLBACK: si el seed da <3 creadores limpios, completar por HASHTAG.
+    if len(keep_unames) < 3:
+        tags = []
+        for s in (subniches or [])[:2]:
+            t = re.sub(r"[^a-z0-9áéíóúñ]", "", (s or "").strip().lower())
+            if t and t not in tags:
+                tags.append(t)
+        htag_actor = (f"https://api.apify.com/v2/acts/apify~instagram-scraper"
+                      f"/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024")
+        hscore: dict = {}
+        for tag in tags:
+            try:
+                logger.info("[discover] fallback hashtag #%s", tag)
+                resp = requests.post(htag_actor, json={
+                    "directUrls": [f"https://www.instagram.com/explore/tags/{tag}/"],
+                    "resultsType": "posts", "resultsLimit": 40, "addParentData": False},
+                    timeout=SCRAPE_TIMEOUT_SEC)
+                if resp.status_code >= 400:
+                    continue
+                for it in (resp.json() or []):
+                    uname = (it.get("ownerUsername") or "").strip().lstrip("@").lower()
+                    if not uname or not re.match(r"^[a-z0-9._]{1,30}$", uname):
+                        continue
+                    sc = hscore.setdefault(uname, {"posts": 0, "eng": 0})
+                    sc["posts"] += 1
+                    sc["eng"] += int(it.get("likesCount") or 0) + int(it.get("commentsCount") or 0)
+            except Exception as e:
+                logger.warning("[discover] fallback hashtag #%s failed: %s", tag, e)
+        for uname, _ in sorted(hscore.items(), key=lambda kv: (-kv[1]["posts"], -kv[1]["eng"])):
+            if len(keep_unames) >= follow_top:
+                break
+            if uname not in keep_unames and uname != seed_handle:
+                keep_unames.append(uname)
+
+    if not keep_unames:
+        return {"status": "no_creators", "seed": seed_handle}
+
+    # 3. Auto-seguir (idempotente) + encolar scrape de reels para cada creador limpio.
     followed = 0
     scraped = 0
-    for uname, sc in top:
+    for uname in keep_unames:
         try:
             ins = db.table("creators_global").upsert(
                 {"ig_username": uname}, on_conflict="ig_username").execute()
             row = (ins.data or [None])[0]
             if not row:
-                row = (db.table("creators_global").select("id, subniches")
+                row = (db.table("creators_global").select("id")
                          .eq("ig_username", uname).single().execute()).data
             cid = row["id"]
-            cur = set(row.get("subniches") or [])
-            if sc["tag"] not in cur:
-                cur.add(sc["tag"])
-                db.table("creators_global").update({"subniches": list(cur)}).eq("id", cid).execute()
-            # Vídeos del hashtag → reels YA (algo inmediato mientras llega el scrape).
-            rrows = []
-            for it in (vids.get(uname) or []):
-                shc = it.get("shortCode") or it.get("id")
-                if not shc:
-                    continue
-                du = it.get("displayUrl")
-                rrows.append({
-                    "creator_id": cid, "ig_reel_id": shc,
-                    "caption": (it.get("caption") or "")[:2000],
-                    "views": it.get("videoPlayCount") or it.get("videoViewCount") or 0,
-                    "likes": it.get("likesCount") or 0, "comments": it.get("commentsCount") or 0,
-                    "posted_at": it.get("timestamp"), "thumb_url": du,
-                    "thumb_b64": _download_thumbnail_b64(du), "video_url": it.get("videoUrl"),
-                    "video_duration_sec": it.get("videoDuration"),
-                    "fetched_at": datetime.now(timezone.utc).isoformat(),
-                })
-            if rrows:
-                try:
-                    db.table("creator_reels_global").upsert(rrows, on_conflict="creator_id,ig_reel_id").execute()
-                except Exception:
-                    logger.warning("[discover] reel upsert @%s failed", uname)
-            # AUTO-SEGUIR para el usuario (idempotente) → el radar lo muestra.
             if user_id:
-                try:
-                    ex = (db.table("user_tracked_creators").select("id, archived_at")
-                            .eq("user_id", user_id).eq("creator_id", cid).limit(1).execute()).data or []
-                    if ex:
-                        if ex[0].get("archived_at"):
-                            db.table("user_tracked_creators").update({"archived_at": None}).eq("id", ex[0]["id"]).execute()
-                    else:
-                        db.table("user_tracked_creators").insert(
-                            {"user_id": user_id, "creator_id": cid, "project_id": None}).execute()
-                    followed += 1
-                except Exception as e:
-                    logger.warning("[discover] follow @%s failed: %s", uname, e)
-            # Scrape async de sus reels reales (vídeos) → más reels del creador.
+                ex = (db.table("user_tracked_creators").select("id, archived_at")
+                        .eq("user_id", user_id).eq("creator_id", cid).limit(1).execute()).data or []
+                if ex:
+                    if ex[0].get("archived_at"):
+                        db.table("user_tracked_creators").update({"archived_at": None}).eq("id", ex[0]["id"]).execute()
+                else:
+                    db.table("user_tracked_creators").insert(
+                        {"user_id": user_id, "creator_id": cid, "project_id": None}).execute()
+                followed += 1
             try:
                 scrape_creator_task.delay(cid)
                 scraped += 1
@@ -1334,8 +1384,8 @@ def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
                 pass
         except Exception as e:
             logger.warning("[discover] creator @%s failed: %s", uname, e)
-    logger.info("[discover] tags=%s top=%d followed=%d scraped=%d", tags, len(top), followed, scraped)
-    return {"status": "ok", "creators": len(top), "followed": followed, "scraped": scraped, "tags": tags}
+    logger.info("[discover] seed=@%s followed=%d scraped=%d", seed_handle, followed, scraped)
+    return {"status": "ok", "seed": seed_handle, "followed": followed, "scraped": scraped}
 
 
 @celery_app.task(name="tasks.send_train_hooks_nudges")
