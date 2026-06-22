@@ -413,7 +413,7 @@
      contenido ingerido + el objetivo (STYLE_PROMPTS/PRESET_TONES intactos en
      backend + selector en Cerebro). Pantalla dedicada que oculta el radar vacío.
      Demo-funcional vía ?onb=1. ════════════════════════════════════════════════ */
-  var ONB_STEPS=["handle","niche","subniche","value","competitors","goal","close"];
+  var ONB_STEPS=["handle","niche","subniche","competitors","goal","close"];   // «value» (aha) retirado: el guion no quedaba en sitio claro; tras el onboarding se buscan los reels del nicho
   function nicheChips(){ return rsLang()==="en"
     ? ["Fitness","Finance","Marketing","Cooking","Fashion","Beauty","Travel","Tech","Education","Real estate","Health","Business"]
     : ["Fitness","Finanzas","Marketing","Cocina","Moda","Belleza","Viajes","Tecnología","Educación","Inmobiliaria","Salud","Negocios"]; }
@@ -654,7 +654,6 @@
     switch(S.onb.step){
       case "niche": return onbNicheHTML();
       case "subniche": return onbSubnicheHTML();
-      case "value": return onbValueHTML();
       case "competitors": return onbCompsHTML();
       case "goal": return onbGoalHTML();
       case "close": return onbCloseHTML();
@@ -723,7 +722,8 @@
   }
   function onbSubNext(){
     if(!(S.onb.subniches||[]).length){ S.onb.error=L("Elige al menos una etiqueta — es la clave del match.","Pick at least one tag — it's the key to the match."); return render(); }
-    onbTrack("onb_step_completed"); onbGoto("value"); onbLoadValue();
+    // «value» retirado → directo a competidores (sub → competidores → goal → close).
+    onbTrack("onb_step_completed"); if(!(S.onb.competitors||[]).length) S.onb.compLoading=true; onbGoto("competitors"); onbLoadComps();
   }
   // Reels reciclados del subnicho (recycling library). Demo siembra local.
   function onbLoadValue(){
