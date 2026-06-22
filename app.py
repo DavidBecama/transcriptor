@@ -8125,7 +8125,7 @@ def niche_trending_reels():
             cids = list(uname.keys())
             if cids:
                 rr = (db.table("creator_reels_global")
-                      .select("id,creator_id,caption,views,thumb_b64")
+                      .select("id,creator_id,caption,views,thumb_b64,thumb_url")
                       .in_("creator_id", cids).eq("is_archived", False)
                       .order("views", desc=True).limit(20).execute())
                 rows = rr.data or []
@@ -8138,6 +8138,8 @@ def niche_trending_reels():
                         "id": r["id"], "handle": uname.get(r["creator_id"], ""),
                         "caption": (r.get("caption") or "").strip()[:90],
                         "views": _fmt_views(v), "mult": mult,
+                        # el front pinta la miniatura; sin esto salían azules (placeholder).
+                        "thumb_b64": r.get("thumb_b64"), "thumb_url": r.get("thumb_url"),
                         "tag": "explota" if mult >= 2.5 else ("subiendo" if mult >= 1.5 else "constante"),
                     })
     except Exception:
