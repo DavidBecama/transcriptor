@@ -679,7 +679,24 @@
     var inp=document.getElementById("rsOnbHandle");
     var h=(inp?inp.value:S.onb.handle||"").trim().replace(/^@+/,"").toLowerCase();
     if(!/^[a-z0-9._]{1,30}$/.test(h)){ S.onb.error=L("Escribe tu usuario sin @ (letras, números, punto y guion bajo).","Type your handle without @ (letters, numbers, dot and underscore)."); S.onb.handle=h; return render(); }
-    S.onb.handle=h; onbNext();
+    S.onb.handle=h;
+    // #5: conectar IG + lanzar el scrape del perfil propio YA (paso 1), en segundo
+    // plano, para que al acabar el onboarding + house tour el user tenga sus métricas.
+    // Una sola vez por onboarding (volver/avanzar no re-dispara).
+    if(!isDemo() && !S.onb._igConnected){ S.onb._igConnected=true; onbConnectIG(h); }
+    onbNext();
+  }
+  // Conecta el Instagram del usuario y lanza el análisis de su perfil en SEGUNDO PLANO.
+  // Reusa /metrics/ig-profile + /metrics/analyze (el camino real de métricas). 409 al
+  // conectar = ya estaba vinculado → igualmente lanzamos el análisis. Fire-and-forget:
+  // no bloquea el onboarding ni muestra errores (si falla, el user lo conecta luego).
+  function onbConnectIG(h){
+    if(isDemo() || !h) return;
+    var pid=_pidOf(S.brandId);
+    var post=function(url,body){ return fetch(url,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}); };
+    post("/metrics/ig-profile", pid?{username:h,project_id:pid}:{username:h})
+      .then(function(){ post("/metrics/analyze", pid?{project_id:pid}:{}).catch(function(){}); })
+      .catch(function(){});
   }
   function onbPickNiche(n){
     var ni=document.getElementById("rsOnbNiche"); if(ni) ni.value="";
@@ -948,15 +965,15 @@
      «Crear guion». Usa brainLevel() (señales reales) — no inventa el nivel. */
   function radarCerebroRowHTML(){
     var bl=brainLevel();
-    var g=Math.min(3,(bl.signals&&bl.signals.guiones)||0);
+    var g=Math.min(4,(bl.signals&&bl.signals.guiones)||0);
     var nx=bl.next||bl.level;
-    var segs=''; for(var i=0;i<3;i++){ segs+='<span class="rcb-seg'+(i<g?' on':'')+'"></span>'; }
+    var segs=''; for(var i=0;i<4;i++){ segs+='<span class="rcb-seg'+(i<g?' on':'')+'"></span>'; }
     return '<div class="rcb">'+
       '<div class="rcb-ic">'+IC.brain+'</div>'+
       '<div class="rcb-body">'+
         '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · nivel "+bl.level,"Your brain · level "+bl.level)+'</span>'+
-          '<span class="rcb-prog">'+g+'/3 '+L("guiones para N"+nx,"scripts to L"+nx)+'</span></div>'+
-        '<div class="rcb-desc">'+L("Cada guion que creas afina tu voz: el Cerebro clava mejor tu tono. Crea 3 para subir a <b>Nivel "+nx+"</b>.","Every script you make tunes your voice: the Brain nails your tone better. Make 3 to reach <b>Level "+nx+"</b>.")+'</div>'+
+          '<span class="rcb-prog">'+g+'/4 '+L("guiones para N"+nx,"scripts to L"+nx)+'</span></div>'+
+        '<div class="rcb-desc">'+L("Cada guion que creas afina tu voz: el Cerebro clava mejor tu tono. Crea 4 para subir a <b>Nivel "+nx+"</b>.","Every script you make tunes your voice: the Brain nails your tone better. Make 4 to reach <b>Level "+nx+"</b>.")+'</div>'+
         '<div class="rcb-bars">'+segs+'</div>'+
       '</div>'+
       '<button class="btn btn-md btn-secondary" data-act="tab" data-k="guiones">'+IC.plus+' '+L("Crear guion","Create script")+'</button>'+
@@ -2463,7 +2480,7 @@
     var REQS={
       2:[ {ok:s.voice>0,    label:"Entrena tu voz",                                   cta:{t:"Entrenar mi voz", act:"voice-focus"}},
           {ok:s.comps>=1,   label:"Sigue a 1 competidor",                             cta:{t:"Añadir competidor", act:"add-comp"}} ],
-      3:[ {ok:s.guiones>=3, label:"Crea 3 guiones ("+Math.min(3,s.guiones)+"/3)",     cta:{t:"Robar un guion del radar", act:"tab", k:"dashboard"}},
+      3:[ {ok:s.guiones>=4, label:"Crea 4 guiones ("+Math.min(4,s.guiones)+"/4)",     cta:{t:"Robar un guion del radar", act:"tab", k:"dashboard"}},
           {ok:s.voice>=50,  label:"Voz al 50% (vas al "+s.voice+"%)",                 cta:{t:"Refinar mi voz", act:"voice-refine"}} ],
       4:[ {ok:s.pub>=1,     label:"Publica en Instagram — lo detecto al analizar tu perfil",  cta:{t:"Analizar mi perfil ahora · 10 cr", act:"force-scrape"}} ],
       5:[ {ok:s.pub>=5,     label:"5 publicados con métricas ("+Math.min(5,s.pub)+"/5)", cta:{t:"Vincular mis reels", act:"tab", k:"metrics"}},
