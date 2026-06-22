@@ -4281,7 +4281,14 @@
           else showError("No pude terminar tu guion. Inténtalo de nuevo.");   // persistente (T4): el usuario está en otra vista
           return;
         }
-        S.view="feed"; render(); if(err==="trial_daily_limit") showDailyLimit(); else showPaywall(err); return;
+        // Solo los errores de CRÉDITO/cuota abren el muro de planes. Un fallo de
+        // servidor/LLM (p.ej. OpenRouter 402, timeout, 5xx) NO es "te faltan créditos"
+        // ni un upsell — sería absurdo para un usuario de pago. Mensaje honesto + reintento.
+        S.view="feed"; render();
+        if(err==="trial_daily_limit") showDailyLimit();
+        else if(err==="free_limit_reached"||err==="no_credits") showPaywall(err);
+        else showError(L("No pude generar tu guion ahora mismo. Reinténtalo en un momento.","Couldn't generate your script right now. Try again in a moment."));
+        return;
       }
       // El guión generado se guarda SIEMPRE en Guiones (draft). No se pierde nada.
       var s=r.script||{}; var gidNew=addGuion({title:s.hook, hook:s.hook, beats:s.beats, close:s.close, from:"@"+r.creator.handle, type:"guión"});
