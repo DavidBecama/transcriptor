@@ -8153,20 +8153,24 @@ def niche_trending_reels():
 @require_auth
 @limiter.limit("6 per hour")
 def onboarding_discover_niche():
-    """Dispara EN BACKGROUND el descubrimiento de creadores del nicho (Apify hashtag)
-    al poner los tags en el onboarding → cuando el user llega al radar, la pool ya tiene
-    reels ACERTADOS de su nicho. Fire-and-forget (202); si Apify falla, el radar cae al
-    seed/competidores. NO cobra créditos (es activación)."""
+    """Dispara EN BACKGROUND el descubrimiento de creadores del nicho. SEED = una cuenta
+    referente que el user añade a mano en el onboarding → scrapeamos sus relatedProfiles
+    (grafo de IG) + gate Groq → competidores+reels acertados. Si no hay seed, el backend
+    cae a hashtag. Fire-and-forget (202). NO cobra créditos (es activación)."""
+    user = current_user()
     body = request.get_json(silent=True) or {}
     niche = (body.get("niche") or "").strip()[:80]
     subs = [t for t in (_norm_tag(s) for s in (body.get("subniches") or [])) if t][:5]
-    if not subs:
-        return jsonify({"ok": False, "error": "no_subniches"}), 200
+    seed = (body.get("seed") or "").strip().lstrip("@").lower()
+    if not re.match(r"^[a-z0-9._]{2,30}$", seed):
+        seed = ""
+    if not subs and not seed:
+        return jsonify({"ok": False, "error": "no_input"}), 200
     try:
         from tasks import discover_niche_creators_task  # noqa: E402
-        discover_niche_creators_task.delay(user["id"], niche, subs)
+        discover_niche_creators_task.delay(user["id"], niche, subs, seed)
     except Exception:
-        logger.warning("onboarding_discover_niche: enqueue failed")
+        logger.warning("onboarding_discover_niche: enqueue failed", exc_info=True)
         return jsonify({"ok": False, "error": "enqueue_failed"}), 200
     return jsonify({"ok": True}), 202
 
