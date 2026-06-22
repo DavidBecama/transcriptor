@@ -385,7 +385,10 @@
       '<div class="eco-foot">Tu voz al <b>'+pct+'%</b>. Cuanto más creas, más se afina — cada guión sale más tuyo.</div>'+
     '</div>';
   }
-  function ecoLevelName(l){ return ({1:"Calentando",2:"Cogiendo forma",3:"En racha",4:"Afinado",5:"Imparable"})[l||1]||"Calentando"; }
+  // Nombres de nivel del Cerebro (de David) — FUENTE ÚNICA: la usan el badge/hero/
+  // Ajustes/toast y la tarjeta «Niveles del Cerebro» (brainLevelsHTML), para que un
+  // mismo nivel no salga con dos nombres distintos. i18n vía L().
+  function ecoLevelName(l){ return ({1:L("Aprendiz","Apprentice"),2:L("Imitador","Imitator"),3:L("Ladrón","Thief"),4:L("Estratega","Strategist"),5:L("Viral","Viral")})[l||1]||L("Aprendiz","Apprentice"); }
   // #6 conversión (vanidad + aversión a perder progreso): el nivel del Cerebro como
   // ESTATUS visible en el header del Radar, no solo dentro de la pestaña Cerebro.
   function brainBadgeHTML(){
@@ -3280,12 +3283,13 @@
   }
   // Roadmap de niveles (nombres/desbloqueos de David); el nivel actual viene de brainLevel().
   function brainLevelsHTML(lv){
+    // Nombres en ecoLevelName (fuente única); aquí solo las descripciones de desbloqueo.
     var data=[
-      [1,L("Aprendiz","Apprentice"),L("Detección básica de señales","Basic signal detection")],
-      [2,L("Imitador","Imitator"),L("Tu voz aprendida · guiones con tu tono","Your voice learned · scripts in your tone")],
-      [3,L("Ladrón","Thief"),L("«Llena mi semana» · 5 guiones de golpe","«Fill my week» · 5 scripts at once")],
-      [4,L("Estratega","Strategist"),L("Más competidores en el radar · métricas Pro","More competitors on the radar · Pro metrics")],
-      [5,L("Viral","Viral"),L("Autopiloto · el Cerebro escribe solo","Autopilot · the Brain writes by itself")]
+      [1,L("Detección básica de señales","Basic signal detection")],
+      [2,L("Tu voz aprendida · guiones con tu tono","Your voice learned · scripts in your tone")],
+      [3,L("«Llena mi semana» · 5 guiones de golpe","«Fill my week» · 5 scripts at once")],
+      [4,L("Más competidores en el radar · métricas Pro","More competitors on the radar · Pro metrics")],
+      [5,L("Autopiloto · el Cerebro escribe solo","Autopilot · the Brain writes by itself")]
     ];
     var cur=lv.level||1;
     var rows=data.map(function(d){
@@ -3294,7 +3298,7 @@
       var tag=isPast?IC.check:(isCur?L("Aquí estás","You are here"):(isNext?L("Siguiente","Next"):""));
       return '<div class="ce-lvl'+cls+'">'+
         '<div class="ce-lvl-n">'+(isPast?IC.check:n)+'</div>'+
-        '<div class="ce-lvl-body"><div class="ce-lvl-name">'+ESC(d[1])+'</div><div class="ce-lvl-unlock">'+ESC(d[2])+'</div></div>'+
+        '<div class="ce-lvl-body"><div class="ce-lvl-name">'+ESC(ecoLevelName(n))+'</div><div class="ce-lvl-unlock">'+ESC(d[1])+'</div></div>'+
         (tag?'<span class="ce-lvl-tag">'+tag+'</span>':'')+
       '</div>';
     }).join("");
