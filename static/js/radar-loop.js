@@ -3030,9 +3030,24 @@
      no puedes hacer más). Demo: localStorage. Real: S.user.brainProgress del backend
      (+ POST /api/brain/exercise-done) — pendiente de migración. */
   function _todayStr(){ return new Date().toISOString().slice(0,10); }
+  // Progreso CONTINUO hacia el siguiente nivel (0-1), con crédito parcial para los
+  // requisitos contables (guiones/publicados/voz) → el % se mueve con CADA acción.
+  function _brainWithin(lv){
+    if(!lv.next) return 0;   // Nivel máximo (5) → su banda ya vale 100%.
+    var s=lv.signals||{}, n=lv.next, p;
+    if(n===2)      p=[ s.voice>0?1:0, Math.min(1,(s.comps||0)/1) ];                 // voz iniciada + 1 competidor
+    else if(n===3) p=[ Math.min(1,(s.guiones||0)/4), Math.min(1,(s.voice||0)/50) ]; // 4 guiones + voz 50%
+    else if(n===4) p=[ Math.min(1,(s.pub||0)/1) ];                                  // 1 publicado
+    else           p=[ Math.min(1,(s.pub||0)/5), Math.min(1,(s.voice||0)/75) ];     // 5 publicados + voz 75%
+    return p.reduce(function(a,b){return a+b;},0)/p.length;
+  }
   function brainProgress(){
     if(isDemo()){ try{ var v=localStorage.getItem("rs_brain_progress"); return v!=null?parseInt(v,10):35; }catch(e){ return 35; } }
-    return (S.user.brainProgress!=null) ? S.user.brainProgress : (hasRealVoice()?Math.max(35,Math.min(100,S.voice.confidence||0)):35);
+    // PROD: el % sale de los NIVELES + acciones (no de un contador suelto). Sube con
+    // voz/competidores/guiones/publicados y llega a 100 en Nivel 5. N1→0 N2→25 N3→50
+    // N4→75 N5→100, rellenando dentro de cada nivel según _brainWithin.
+    var lv=brainLevel();
+    return Math.max(0,Math.min(100, Math.round(((lv.level-1) + _brainWithin(lv)) / 4 * 100)));
   }
   function brainExDoneToday(){
     if(isDemo()){ try{ return localStorage.getItem("rs_brain_ex_date")===_todayStr(); }catch(e){ return false; } }
@@ -3044,11 +3059,20 @@
   }
   function _brainCompleteExercise(){
     if(brainExDoneToday()) return;
-    var day=_todayStr(), gain=3+_lbHash(day+"g",0,4), np=Math.min(95, brainProgress()+gain);  // +3..6 determinista
-    if(isDemo()){ try{ localStorage.setItem("rs_brain_progress",String(np)); localStorage.setItem("rs_brain_ex_date",day); localStorage.setItem("rs_brain_ex_gain",String(gain)); }catch(e){} }
-    else { S.user.brainProgress=np; S.user.brainExDate=day; S.user.brainLastGain=gain; try{ apiPost('/api/brain/exercise-done',{}); }catch(e){} }
+    var day=_todayStr();
+    if(isDemo()){
+      var gain=3+_lbHash(day+"g",0,4);  // +3..6 (teatro demo: % por localStorage)
+      try{ localStorage.setItem("rs_brain_progress",String(Math.min(95,brainProgress()+gain))); localStorage.setItem("rs_brain_ex_date",day); localStorage.setItem("rs_brain_ex_gain",String(gain)); }catch(e){}
+      try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
+      return showToast(L("+"+gain+"% · Cerebro entrenado hoy. Vuelve mañana para subir más.","+"+gain+"% · Brain trained today. Come back tomorrow for more."));
+    }
+    // PROD: el ejercicio entrena tu VOZ → sube confidence (input del nivel → del %).
+    var vg=2+_lbHash(day+"v",0,2);  // +2..3 determinista
+    if(S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+vg); }
+    S.user.brainExDate=day; S.user.brainLastGain=vg;
+    try{ apiPost('/api/brain/exercise-done',{}); }catch(e){}
     try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
-    showToast(L("+"+gain+"% · Cerebro entrenado hoy. Vuelve mañana para subir más.","+"+gain+"% · Brain trained today. Come back tomorrow for more."));
+    showToast(L("+"+vg+"% a tu voz · Cerebro entrenado hoy. Vuelve mañana para subir más.","+"+vg+"% to your voice · Brain trained today. Come back tomorrow."));
   }
   function brainTrainMode(){
     // El DÍA decide (alterna hooks/guiones); el usuario no elige (1 ejercicio/día).
