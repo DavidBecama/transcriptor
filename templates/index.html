@@ -11585,6 +11585,44 @@
       .rs .row { grid-template-columns:48px 1fr auto; } .rs .row-thumb, .rs .row-when { display:none; }
     }
 
+    /* ══ Pulido móvil ≤520px (titulares/cifras a escala + hero Cerebro apilado) ══
+       Va al final a propósito: misma especificidad que las reglas base → gana por
+       orden de cascada en pantallas pequeñas. Desktop (>520px) intacto. */
+    @media (max-width:520px){
+      /* 1 · TIPOGRAFÍA: titulares Clash y cifras grandes dejan el tamaño desktop */
+      .rs .rdr-title   { font-size:clamp(24px,7.2vw,30px); }
+      .rs .h-title     { font-size:clamp(23px,6.6vw,28px); }
+      .rs .feature-cap { font-size:clamp(20px,5.6vw,24px); }
+      .rs .rdr-stat-v  { font-size:clamp(22px,6.4vw,28px); }
+      .rs .stat-v      { font-size:clamp(20px,6vw,26px); }
+      .rs .ce-stat-v   { font-size:clamp(18px,5vw,21px); }
+      .rs .ce-hero-title { font-size:clamp(19px,5.2vw,22px); }
+      .rs .mt-wall-h   { font-size:clamp(20px,5.6vw,24px); }
+      .rs .ig-connect-h { font-size:clamp(21px,6vw,25px); }
+
+      /* 2 · CEREBRO hero: apilar (anillo arriba, texto a ancho completo) */
+      .rs .ce-hero-row { gap:14px; }
+      .rs .ce-hero { flex-direction:column; align-items:center; text-align:center; min-width:0; gap:16px; padding:22px 18px; }
+      .rs .ce-ring { align-self:center; }
+      .rs .ce-hero-body { width:100%; min-width:0; align-items:center; }
+      .rs .ce-prog-row, .rs .ce-prog-bar { width:100%; }
+      .rs .ce-stats { width:100%; min-width:0; }
+
+      /* 3 · MÉTRICAS: el CTA "Conectar Instagram"/paywall no se sale de su card */
+      .rs .mt-wall { padding:32px 14px; }
+      .rs .mt-wall-card { max-width:none; width:100%; padding:26px 18px; }
+      .rs .mt-wall-card .btn { width:100%; max-width:100%; white-space:normal; }
+      .rs .ig-connect { max-width:none; padding:24px 16px; margin:24px auto; }
+      .rs .ig-connect .btn { width:100%; max-width:100%; white-space:normal; }
+      .rs .mt-ig { flex-direction:column; align-items:stretch; gap:14px; }
+      .rs .mt-ig-l { width:100%; }
+      .rs .mt-ig .btn { width:100%; }
+
+      /* 4 · barrido: paddings + sin tooltip hover del rail (inútil en táctil y se salía) */
+      .rs .canvas { padding:20px 14px 100px; }
+      .rs .rail-btn .tip { display:none; }
+    }
+
     /* ══ takeover demo: la isla ocupa todo el workspace y oculta la chrome vieja ══ */
     /* CLAVE: el layout es grid 260px 1fr. Al ocultar la sidebar, el main caía en
        la columna de 260px → colapsamos el grid a una sola columna. */
