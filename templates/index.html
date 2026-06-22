@@ -3319,6 +3319,22 @@
       .upgrade-cards-grid { grid-template-columns: 1fr; }
       .upgrade-card .price-features { columns: 1; }
     }
+    /* #5 oferta MÁS notoria: badge «2 meses gratis» destacado en verde. */
+    .billing-toggle-save { background: var(--success-bg, rgba(63,224,160,.16)); color: var(--success-fg, #3FE0A0);
+      font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: .72rem; margin-left: 7px; letter-spacing: .01em; }
+    /* #5 comparativa en tabla vertical (features × planes) bajo las cards. */
+    .upgrade-compare { margin-top: 22px; }
+    .ucmp-title { font-weight: 700; font-size: 1rem; margin: 0 0 12px; color: var(--text); }
+    .ucmp-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .ucmp-table th, .ucmp-table td { padding: 11px 12px; text-align: center; border-bottom: 1px solid var(--border); }
+    .ucmp-table thead th { font-weight: 700; color: var(--text); font-size: .92rem; border-bottom: 2px solid var(--border); }
+    .ucmp-table td.ucmp-feat, .ucmp-table th.ucmp-feat { text-align: left; color: var(--text2); font-weight: 500; }
+    .ucmp-table .ucmp-on { background: var(--brand-50, rgba(47,91,255,.08)); }
+    .ucmp-table thead th.ucmp-on { color: var(--brand); border-bottom-color: var(--brand); }
+    .ucmp-table tbody tr:last-child td { border-bottom: none; }
+    .ucmp-yes { color: var(--success-fg, #3FE0A0); font-weight: 700; }
+    .ucmp-no { color: var(--text3); }
+    @media (max-width: 700px) { .ucmp-table th, .ucmp-table td { padding: 9px 6px; font-size: .82rem; } }
     /* Settings: billing card */
     .settings-billing-row {
       display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -9661,6 +9677,22 @@
     .rs .whale .whale-sub b { color:var(--text-primary); font-weight:600; }
     .rs .whale > .btn { flex:none; }
     /* v3 mockup David — fila «progreso / cerebro» */
+    /* #8 PROACTIVIDAD — «Tu siguiente paso» (HAZ ESTO AHORA): tarjeta destacada con
+       acento de marca, para que el usuario perdido sepa QUÉ hacer ya. */
+    .rs .dns { display:flex; align-items:center; gap:18px; padding:20px 22px; margin:16px 0 18px; border-radius:20px;
+      background:linear-gradient(120deg, rgba(47,91,255,.16), rgba(47,91,255,.05) 60%), var(--surface-raised);
+      border:1px solid rgba(79,124,255,.42); box-shadow:0 8px 30px rgba(47,91,255,.14); }
+    .rs .dns-ic { width:52px; height:52px; border-radius:15px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); box-shadow:0 0 0 6px rgba(47,91,255,.12); }
+    .rs .dns-ic svg { width:24px; height:24px; color:#fff; }
+    .rs .dns-body { flex:1; min-width:0; }
+    .rs .dns-eyebrow { display:inline-block; font-family:var(--font-mono); font-size:10px; letter-spacing:.14em; font-weight:700; color:var(--brand-300,#6E92FF); margin-bottom:5px; }
+    .rs .dns-t { font-family:var(--font-display); font-weight:700; font-size:20px; color:var(--text-primary); line-height:1.15; }
+    .rs .dns-b { font-size:14px; color:var(--text-secondary); margin-top:4px; line-height:1.45; }
+    .rs .dns-cta { flex-shrink:0; }
+    .rs--mobile .dns { flex-wrap:wrap; }
+    .rs--mobile .dns-body { flex:1 1 calc(100% - 70px); }
+    .rs--mobile .dns-cta { flex:1 1 100%; margin-top:4px; }
     .rs .rcb { display:flex; align-items:center; gap:18px; padding:22px 24px; margin:18px 0 22px; min-height:116px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:20px; }
     .rs .rcb .rcb-ic { width:54px; height:54px; border-radius:15px; background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
     .rs .rcb .rcb-ic svg { width:24px; height:24px; color:#fff; }
@@ -11084,6 +11116,26 @@
       100% { transform:scale(1); box-shadow:0 8px 26px rgba(79,124,255,.32); }
     }
     @media (prefers-reduced-motion: reduce){ .rs .brain-orb.lvlup { animation:none; } }
+    /* #2/#7: pulso de «festín» al alimentar el Cerebro (crece + vibra). */
+    .rs .brain-orb.feast { animation:rsFeast 1.15s var(--ease-out); }
+    @keyframes rsFeast {
+      0%{transform:scale(1)} 12%{transform:scale(1.22) rotate(-3deg)} 24%{transform:scale(1.14) rotate(3deg)}
+      40%{transform:scale(1.26) rotate(-2deg)} 60%{transform:scale(1.16) rotate(2deg)}
+      80%{transform:scale(1.22)} 100%{transform:scale(1)}
+    }
+    @media (prefers-reduced-motion: reduce){ .rs .brain-orb.feast { animation:none; } }
+    /* #2/#7: card «Alimenta tu Cerebro» — input + botón grande, acento de marca. */
+    .rs .feedme { margin:18px 0 22px; padding:22px 24px; border-radius:20px;
+      background:linear-gradient(135deg, rgba(47,91,255,.18), rgba(111,147,255,.06) 65%), var(--surface-raised);
+      border:1px solid rgba(79,124,255,.4); box-shadow:0 10px 34px rgba(47,91,255,.16); }
+    .rs .feedme-eyebrow { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:10px; letter-spacing:.14em; font-weight:700; color:var(--brand-300,#6E92FF); }
+    .rs .feedme-eyebrow svg { width:13px; height:13px; }
+    .rs .feedme-t { font-family:var(--font-display); font-weight:700; font-size:21px; color:var(--text-primary); margin-top:7px; line-height:1.15; }
+    .rs .feedme-d { font-size:14px; color:var(--text-secondary); margin-top:5px; line-height:1.5; }
+    .rs .feedme-input { width:100%; margin-top:14px; padding:13px 15px; border-radius:13px; resize:vertical; min-height:54px;
+      background:var(--surface-sunken); border:1px solid var(--border-default); color:var(--text-primary); font-size:15px; font-family:inherit; line-height:1.45; }
+    .rs .feedme-input:focus { outline:none; border-color:var(--brand-500,#2F5BFF); box-shadow:0 0 0 3px rgba(47,91,255,.18); }
+    .rs .feedme-cta { width:100%; margin-top:13px; }
     .rs .brain-sources { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
     .rs--mobile .brain-sources { grid-template-columns:repeat(2,1fr); }
     .rs .brain-src { position:relative; padding:16px 14px; border:1px solid var(--border-default); border-radius:14px; background:var(--surface-raised); overflow:hidden; }
@@ -15296,6 +15348,7 @@
       </button>
     </div>
     <div class="upgrade-cards-grid" id="upgradeCardsGrid"></div>
+    <div class="upgrade-compare" id="upgradeCompare"></div>
   </div>
 </div>
 
@@ -25533,9 +25586,9 @@ function renderUpgradeCards() {
   const lang = currentLang;
 
   // Show only plans strictly above the user's current tier.
-  // #5 conversión: ANCLAJE — el más caro primero. Tras ver Agencia (129€), Creador
-  // (29€ · "Más elegido") aterriza como una ganga. Orden caro→barato.
-  const plans = ["agency","estudio","creator"].filter(p => PLAN_RANK[p] > PLAN_RANK[plan]);
+  // Feedback David: ordenado de MENOS a MÁS (barato→caro), con el del medio destacado
+  // («Más elegido») y la comparativa en tabla debajo.
+  const plans = ["creator","estudio","agency"].filter(p => PLAN_RANK[p] > PLAN_RANK[plan]);
 
   grid.innerHTML = plans.map(p => {
     const m = PLAN_META[p];
@@ -25564,6 +25617,35 @@ function renderUpgradeCards() {
         <button class="btn-plan" onclick="subscribePlanFromCard('${p}')">${lang === "es" ? "Cambiar a este plan" : "Switch to this plan"}</button>
       </div>`;
   }).join("");
+
+  // #5: comparativa en tabla (vertical) debajo de las cards.
+  const cmp = document.getElementById("upgradeCompare");
+  if (cmp) cmp.innerHTML = upgradeCompareHTML(plans, lang);
+}
+
+// #5 Feedback David: tabla comparativa vertical (features × planes) bajo las cards.
+function upgradeCompareHTML(plans, lang) {
+  if (!plans || plans.length < 2) return "";   // sin comparación con un solo plan
+  const es = lang === "es";
+  const rows = [
+    { es: "Créditos / mes",            en: "Credits / mo",            v: { creator: "200", estudio: "400", agency: "800" } },
+    { es: "Marcas",                    en: "Brands",                  v: { creator: "1",   estudio: "3",   agency: "10" } },
+    { es: "Cerebro propio por marca",  en: "Own brain per brand",     v: { creator: true,  estudio: true,  agency: true } },
+    { es: "Métricas de Instagram",     en: "Instagram metrics",       v: { creator: true,  estudio: true,  agency: true } },
+    { es: "Teleprompter + grabación",  en: "Teleprompter + recording",v: { creator: true,  estudio: true,  agency: true } },
+    { es: "Prioridad",                 en: "Priority",                v: { creator: false, estudio: true,  agency: true } },
+    { es: "Asientos de equipo",        en: "Team seats",              v: { creator: "1",   estudio: "1",   agency: "∞" } },
+    { es: "Informe white-label (PDF)", en: "White-label report (PDF)",v: { creator: false, estudio: false, agency: true } },
+    { es: "Soporte",                   en: "Support",                 v: { creator: "Email", estudio: "Email", agency: "Email + chat" } },
+  ];
+  const cell = (val) => (val === true) ? '<span class="ucmp-yes">✓</span>'
+    : (val === false) ? '<span class="ucmp-no">–</span>' : `<b>${val}</b>`;
+  const head = `<tr><th class="ucmp-feat"></th>` + plans.map(p =>
+    `<th${PLAN_META[p].featured ? ' class="ucmp-on"' : ''}>${PLAN_META[p].label}</th>`).join("") + `</tr>`;
+  const body = rows.map(r => `<tr><td class="ucmp-feat">${es ? r.es : r.en}</td>` +
+    plans.map(p => `<td${PLAN_META[p].featured ? ' class="ucmp-on"' : ''}>${cell(r.v[p])}</td>`).join("") + `</tr>`).join("");
+  return `<div class="ucmp-title">${es ? "Compara los planes" : "Compare plans"}</div>` +
+    `<table class="ucmp-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
 // growth-4: cancel-flow con RETENCIÓN. En vez de un confirm seco, ofrecemos
@@ -26176,6 +26258,13 @@ function positionTooltip(el) {
   const maxLeft = window.innerWidth - tt.offsetWidth - 16;
   if (left > maxLeft) left = maxLeft;
   if (left < 16) left = 16;
+
+  // Clamp VERTICAL dentro del viewport: si el tooltip se colocaba arriba del target
+  // y no cabía, su top se iba NEGATIVO y se cortaba por arriba (lo que reportó David).
+  const minTop = window.scrollY + 16;
+  const maxTop = window.scrollY + window.innerHeight - tt.offsetHeight - 16;
+  if (top < minTop) top = minTop;
+  if (maxTop > minTop && top > maxTop) top = maxTop;
 
   tt.style.top = top + "px";
   tt.style.left = left + "px";
@@ -27846,6 +27935,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=90"></script>
+<script src="/static/js/radar-loop.js?v=91"></script>
 </body>
 </html>
