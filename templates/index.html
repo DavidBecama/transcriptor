@@ -3292,22 +3292,25 @@
     .nav-upgrade-btn:active { transform: translateY(0); }
     /* Upgrade modal — layout horizontal y compacto: planes lado a lado, features en 2 columnas */
     /* .modal.upgrade-modal (2 clases) para ganar a .modal{max-width:420px}, definido después en el fuente */
-    .modal.upgrade-modal { max-width: 900px; width: 96vw; max-height: calc(100vh - 40px); overflow-y: auto; }
+    .modal.upgrade-modal { max-width: 1000px; width: 96vw; max-height: calc(100vh - 40px); overflow-y: auto; }
     .upgrade-modal h2 { text-align: center; }
     .upgrade-modal > p { text-align: center; color: var(--text2); }
     /* Eslogan de marca unificado (Fathom 18/06) — mismo de la landing. */
     .upgrade-modal .upgrade-slogan { text-align: center; font-weight: 700; letter-spacing: .01em; color: var(--brand-500); margin: 2px 0 -2px; font-size: .92rem; }
     .upgrade-modal .billing-toggle { display: flex; justify-content: center; margin: 8px auto 18px; width: max-content; }
-    .upgrade-cards-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px;
-      align-items: stretch;
-    }
-    /* Tarjeta más ancha y menos vertical dentro del modal (override solo aquí, no toca el landing) */
-    .upgrade-card { padding: 22px 22px 20px; }
+    /* #5 (feedback David): planes lado a lado en columnas según nº de planes (3 si free,
+       2 si creator…), ordenados barato→caro. La clase cards-N la pone renderUpgradeCards. */
+    .upgrade-cards-grid { display: grid; gap: 16px; align-items: stretch;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .upgrade-cards-grid.cards-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .upgrade-cards-grid.cards-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 680px; margin: 0 auto; }
+    .upgrade-cards-grid.cards-1 { grid-template-columns: minmax(0, 380px); justify-content: center; }
+    /* Tarjeta compacta dentro del modal (override solo aquí, no toca el landing) */
+    .upgrade-card { padding: 22px 20px 20px; }
     .upgrade-card .price-icon { margin-bottom: 4px; }
     .upgrade-card .price-ideal { min-height: 0; margin-bottom: 8px; }
-    /* Features en 2 columnas → corta la altura ~a la mitad */
-    .upgrade-card .price-features { margin: 6px 0 16px; columns: 2; column-gap: 22px; }
+    /* Con 3 columnas las cards son estrechas → features en 1 columna (legibilidad). */
+    .upgrade-card .price-features { margin: 6px 0 16px; columns: 1; }
     .upgrade-card .price-features li { break-inside: avoid; margin-bottom: 3px; }
     .upgrade-card.is-current { opacity: .7; filter: saturate(.7); }
     .upgrade-card.is-current .price-icon { background: var(--surf2); }
@@ -3315,13 +3318,15 @@
       background: transparent; border: 1px solid var(--brand); color: var(--brand);
       opacity: .9; box-shadow: none;
     }
-    @media (max-width: 700px) {
-      .upgrade-cards-grid { grid-template-columns: 1fr; }
-      .upgrade-card .price-features { columns: 1; }
+    @media (max-width: 760px) {
+      .upgrade-cards-grid, .upgrade-cards-grid.cards-3, .upgrade-cards-grid.cards-2,
+      .upgrade-cards-grid.cards-1 { grid-template-columns: 1fr; max-width: 420px; margin: 0 auto; }
     }
-    /* #5 oferta MÁS notoria: badge «2 meses gratis» destacado en verde. */
-    .billing-toggle-save { background: var(--success-bg, rgba(63,224,160,.16)); color: var(--success-fg, #3FE0A0);
-      font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: .72rem; margin-left: 7px; letter-spacing: .01em; }
+    /* #5 oferta MÁS notoria: badge «2 meses gratis» destacado en verde + glow + pulso. */
+    .billing-toggle-save { background: var(--success-fg, #3FE0A0); color: #06281c;
+      font-weight: 800; padding: 3px 11px; border-radius: 999px; font-size: .76rem; margin-left: 8px;
+      letter-spacing: .01em; box-shadow: 0 0 0 0 rgba(63,224,160,.5); animation: ucmpOfferPulse 2.2s ease-out infinite; }
+    @keyframes ucmpOfferPulse { 0% { box-shadow: 0 0 0 0 rgba(63,224,160,.45); } 70% { box-shadow: 0 0 0 8px rgba(63,224,160,0); } 100% { box-shadow: 0 0 0 0 rgba(63,224,160,0); } }
     /* #5 comparativa en tabla vertical (features × planes) bajo las cards. */
     .upgrade-compare { margin-top: 22px; }
     .ucmp-title { font-weight: 700; font-size: 1rem; margin: 0 0 12px; color: var(--text); }
@@ -25671,6 +25676,8 @@ function renderUpgradeCards() {
   // Feedback David: ordenado de MENOS a MÁS (barato→caro), con el del medio destacado
   // («Más elegido») y la comparativa en tabla debajo.
   const plans = ["creator","estudio","agency"].filter(p => PLAN_RANK[p] > PLAN_RANK[plan]);
+  // #5: nº de columnas = nº de planes (3 lado a lado si free) — clase para el CSS.
+  grid.className = "upgrade-cards-grid cards-" + Math.min(3, plans.length || 1);
 
   grid.innerHTML = plans.map(p => {
     const m = PLAN_META[p];
