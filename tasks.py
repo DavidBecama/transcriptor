@@ -1222,6 +1222,97 @@ def scrape_user_profiles():
     return {"queued": queued, "candidates": cand}
 
 
+@celery_app.task(name="tasks.discover_niche_creators")
+def discover_niche_creators_task(niche: str, subniches: list, limit_tags: int = 3) -> dict:
+    """DESCUBRIMIENTO DE NICHO (onboarding): busca los HASHTAGS de los subnichos en
+    Apify → puebla creators_global (tageados con el subnicho) + creator_reels_global,
+    para que el radar muestre reels ACERTADOS del nicho del usuario. Disparado al poner
+    los tags (corre en 2º plano durante el resto del onboarding). Best-effort: si Apify
+    falla, no rompe nada (el radar cae al seed / a los competidores elegidos)."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    APIFY_TOKEN = os.environ.get("APIFY_TOKEN", "")
+    if not APIFY_TOKEN:
+        return {"status": "no_apify"}
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    tags = []
+    for s in (subniches or [])[:limit_tags]:
+        t = re.sub(r"[^a-z0-9áéíóúñ]", "", (s or "").strip().lower())
+        if t and t not in tags:
+            tags.append(t)
+    if not tags:
+        return {"status": "no_tags"}
+    actor_url = (f"https://api.apify.com/v2/acts/apify~instagram-scraper"
+                 f"/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024")
+    creators_done = 0
+    reels_done = 0
+    for tag in tags:
+        try:
+            payload = {
+                "directUrls": [f"https://www.instagram.com/explore/tags/{tag}/"],
+                "resultsType": "posts", "resultsLimit": 24, "addParentData": False,
+            }
+            logger.info("[discover] Apify hashtag #%s", tag)
+            resp = requests.post(actor_url, json=payload, timeout=SCRAPE_TIMEOUT_SEC)
+            if resp.status_code >= 400:
+                logger.warning("[discover] apify %s for #%s: %s", resp.status_code, tag, (resp.text or "")[:200])
+                continue
+            items = resp.json() or []
+        except Exception as e:
+            logger.warning("[discover] apify call failed #%s: %s", tag, e)
+            continue
+        # Agrupar reels (solo vídeos) por creador.
+        by_creator: dict = {}
+        for it in items:
+            if (it.get("type") or "").lower() != "video":
+                continue
+            uname = (it.get("ownerUsername") or "").strip().lstrip("@").lower()
+            if not uname or not re.match(r"^[a-z0-9._]{1,30}$", uname):
+                continue
+            by_creator.setdefault(uname, []).append(it)
+        for uname, its in by_creator.items():
+            try:
+                ins = db.table("creators_global").upsert(
+                    {"ig_username": uname}, on_conflict="ig_username").execute()
+                row = (ins.data or [None])[0]
+                if not row:
+                    row = (db.table("creators_global").select("id, subniches")
+                             .eq("ig_username", uname).single().execute()).data
+                cid = row["id"]
+                cur_subs = set(row.get("subniches") or [])
+                if tag not in cur_subs:
+                    cur_subs.add(tag)
+                    db.table("creators_global").update(
+                        {"subniches": list(cur_subs)}).eq("id", cid).execute()
+                rrows = []
+                for it in its:
+                    sc = it.get("shortCode") or it.get("id")
+                    if not sc:
+                        continue
+                    du = it.get("displayUrl")
+                    rrows.append({
+                        "creator_id": cid, "ig_reel_id": sc,
+                        "caption": (it.get("caption") or "")[:2000],
+                        "views": it.get("videoPlayCount") or it.get("videoViewCount") or 0,
+                        "likes": it.get("likesCount") or 0,
+                        "comments": it.get("commentsCount") or 0,
+                        "posted_at": it.get("timestamp"),
+                        "thumb_url": du, "thumb_b64": _download_thumbnail_b64(du),
+                        "video_url": it.get("videoUrl"),
+                        "video_duration_sec": it.get("videoDuration"),
+                        "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    })
+                if rrows:
+                    db.table("creator_reels_global").upsert(
+                        rrows, on_conflict="creator_id,ig_reel_id").execute()
+                    reels_done += len(rrows)
+                creators_done += 1
+            except Exception as e:
+                logger.warning("[discover] creator @%s failed: %s", uname, e)
+    logger.info("[discover] tags=%s creators=%d reels=%d", tags, creators_done, reels_done)
+    return {"status": "ok", "creators": creators_done, "reels": reels_done, "tags": tags}
+
+
 @celery_app.task(name="tasks.send_train_hooks_nudges")
 def send_train_hooks_nudges():
     """Beat DIARIO (Fathom 18/06): alerta "tu ejercicio del Cerebro está listo" a usuarios

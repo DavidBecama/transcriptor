@@ -722,6 +722,9 @@
   }
   function onbSubNext(){
     if(!(S.onb.subniches||[]).length){ S.onb.error=L("Elige al menos una etiqueta — es la clave del match.","Pick at least one tag — it's the key to the match."); return render(); }
+    // Dispara EN 2º PLANO el descubrimiento de reels del nicho (Apify hashtag) → al
+    // llegar al radar la pool ya tiene reels acertados. Una sola vez por onboarding.
+    if(!isDemo() && !S.onb._discoverFired){ S.onb._discoverFired=true; try{ apiPost("/api/onboarding/discover-niche",{niche:S.onb.niche, subniches:S.onb.subniches||[]}); }catch(e){} }
     // «value» retirado → directo a competidores (sub → competidores → goal → close).
     onbTrack("onb_step_completed"); if(!(S.onb.competitors||[]).length) S.onb.compLoading=true; onbGoto("competitors"); onbLoadComps();
   }
