@@ -136,6 +136,7 @@
     ideas:[], guiones:[], activeGuionId:null, guiFilter:"all", _fillGuionIds:[],
     igConnected:false, metrics:null, metricSort:"recent", metricChart:"views",
     analyses:null, analyzeLoading:false, analyzeStep:"", analyzeErr:null, analyzeUrl:"",   // página «Analizar reel»
+    analyzeDetailId:null, analyzeStealing:false,   // ficha de detalle + robar guion
     tab:"dashboard",                    // dashboard | guiones | metrics | leaderboard | brain | settings | analizar
     view:"feed",                        // feed(overlay off) | gen | script | result | prompter | fillweek
     reel:null, genKind:"script", resultKind:"hooks", done:{},
@@ -5170,6 +5171,7 @@
     '</article>';
   }
   function analizarHTML(){
+    if(S.analyzeDetailId){ var ad=_anzFind(S.analyzeDetailId); if(ad) return analyzeDetailHTML(ad); S.analyzeDetailId=null; }
     var loading=!!S.analyzeLoading, list=S.analyses;
     var form='<div class="anz-form">'+
       '<input id="rsAnalyzeUrl" class="anz-input" type="text" autocomplete="off" spellcheck="false" placeholder="'+L("Pega la URL de un reel (Instagram / TikTok)","Paste a reel URL (Instagram / TikTok)")+'" value="'+ESC(S.analyzeUrl||"")+'"'+(loading?' disabled':'')+'>'+
@@ -5228,7 +5230,75 @@
       })();
     });
   }
-  function analyzeView(id){ var a=_anzFind(id); if(a) showReelTranscript(a.text||"", a.author_username||null); }
+  // Ficha de detalle: portada + TODAS las métricas a un lado, transcripción al otro,
+  // y «Robar guion» (→ /transcriptions/<id>/to-script, persiste en `scripts` = Guiones).
+  function analyzeDetailHTML(a){
+    var au=a.author_username?("@"+String(a.author_username).replace(/^@+/,"")):L("autor desconocido","unknown author");
+    var thumb=a.thumbnail_b64
+      ? '<img class="anzd-thumb-img" src="'+ESC(a.thumbnail_b64)+'" alt="" loading="lazy">'
+      : '<span class="anzd-thumb-ph">'+IC.doc+'</span>';
+    var stat=function(ic,v,lbl){ return (v!=null&&v!=="")?'<div class="anzd-stat"><span class="anzd-stat-ic">'+ic+'</span><span class="anzd-stat-v">'+_anzNum(v)+'</span><span class="anzd-stat-l">'+lbl+'</span></div>':''; };
+    var stats=[stat(IC.eye,a.views,L("views","views")),stat(IC.heart,a.likes,L("likes","likes")),
+               stat(IC.chat,a.comments,L("coment.","comments")),stat(IC.repeat,a.shares,L("shares","shares"))].join("");
+    if(!stats.trim()) stats='<div class="anzd-nostat">'+L("Sin métricas guardadas para este reel.","No metrics saved for this reel.")+'</div>';
+    var stealing=!!S.analyzeStealing;
+    var link=a.url?'<a class="anzd-link" href="'+ESC(a.url)+'" target="_blank" rel="noopener noreferrer">'+L("Ver original en "+(a.platform||"Instagram"),"View original on "+(a.platform||"Instagram"))+'</a>':'';
+    return '<div class="scroll"><div class="canvas anzd-canvas">'+
+      '<header class="anzd-head">'+
+        '<button class="anzd-back" data-act="analyze-back" aria-label="'+L("Volver","Back")+'">'+IC.back+'</button>'+
+        '<span class="anzd-head-t">'+L("Reel analizado","Analyzed reel")+'</span></header>'+
+      '<div class="anzd-grid">'+
+        '<aside class="anzd-side">'+
+          '<div class="anzd-thumb">'+thumb+'<span class="anzd-plat">'+ESC(a.platform||"reel")+'</span></div>'+
+          '<div class="anzd-author">'+ESC(au)+'</div>'+
+          '<div class="anzd-date">'+_anzDate(a.created_at)+'</div>'+
+          '<div class="anzd-stats">'+stats+'</div>'+
+          link+
+        '</aside>'+
+        '<section class="anzd-main">'+
+          '<div class="anzd-acts">'+
+            '<button class="btn btn-md btn-primary" data-act="analyze-steal" data-id="'+ESC(a.id)+'"'+(stealing?' disabled':'')+'>'+(stealing?'<span class="rs-ldr"></span> '+L("Robando…","Stealing…"):IC.bolt+' '+L("Robar guion","Steal script"))+'</button>'+
+            (a.author_username?'<button class="btn btn-md btn-secondary" data-act="analyze-follow" data-h="'+ESC(String(a.author_username).replace(/^@+/,""))+'">'+L("Seguir","Follow")+'</button>':'')+
+            '<button class="btn btn-md btn-ghost" data-act="analyze-copy" data-id="'+ESC(a.id)+'">'+L("Copiar","Copy")+'</button>'+
+            '<button class="btn btn-md btn-ghost anz-del" data-act="analyze-del" data-id="'+ESC(a.id)+'">'+L("Borrar","Delete")+'</button>'+
+          '</div>'+
+          '<div class="anzd-txlabel">'+L("Transcripción","Transcript")+'</div>'+
+          '<div class="anzd-tx">'+(a.text?ESC(a.text):'<i>'+L("(sin transcripción)","(no transcript)")+'</i>')+'</div>'+
+        '</section>'+
+      '</div>'+
+    '</div></div>';
+  }
+  function analyzeView(id){ S.analyzeDetailId=id; S.analyzeStealing=false; render(); }
+  function analyzeBack(){ S.analyzeDetailId=null; render(); }
+  function analyzeSteal(id){
+    var a=_anzFind(id); if(!a) return;
+    if(S.analyzeStealing) return;
+    if(isDemo()){
+      S.analyzeStealing=true; render();
+      setTimeout(function(){
+        S.analyzeStealing=false;
+        var ns=makeScript((a.text||"").slice(0,80)||"Guión");
+        addGuion({title:ns.hook, hook:ns.hook, beats:ns.beats, close:ns.close, from:a.author_username?("@"+a.author_username):null, type:"guión"});
+        render(); showToast(L("Guion robado y guardado en Guiones.","Script stolen and saved to Scripts."));
+      }, 1500);
+      return;
+    }
+    S.analyzeStealing=true; render();
+    apiPost("/transcriptions/"+encodeURIComponent(id)+"/to-script",{}).then(function(r){
+      S.analyzeStealing=false;
+      if(!r.ok || !r.d || !r.d.script){
+        if(r.d && (r.d.error==="no_credits"||r.d.error==="free_limit_reached")) { render(); return showPaywall(r.d.error); }
+        render(); return showError((r.d&&r.d.message)||(r.d&&r.d.error)||L("No pude generar el guion ahora mismo. Reinténtalo.","Couldn't generate the script right now. Try again."));
+      }
+      var p=scriptToParts(r.d.script);
+      var gidNew=addGuion({title:p.hook, hook:p.hook, beats:p.beats, close:p.close, from:a.author_username?("@"+a.author_username):null, type:"guión"});
+      if(r.d.script_id){ var g=guionById(gidNew); if(g) g._sid=r.d.script_id; }
+      refreshCredits().then(function(){ flashSpark(0); });
+      render();
+      showToast(L("Guion robado y guardado en Guiones.","Script stolen and saved to Scripts."),L("Ver en Guiones","See in Scripts"),"go-guiones");
+    });
+  }
+  function _anzGoGuiones(){ S.analyzeDetailId=null; switchTab("guiones"); }
   function analyzeCopy(id){ var a=_anzFind(id); if(!a) return; try{ if(navigator.clipboard) navigator.clipboard.writeText(a.text||""); }catch(e){} showToast(L("Transcripción copiada.","Transcript copied.")); }
   function analyzeDelete(id){
     if(!_anzFind(id)) return;
@@ -5780,6 +5850,9 @@
     if(act==="analyze-copy") return analyzeCopy(btn.getAttribute("data-id"));
     if(act==="analyze-del") return analyzeDelete(btn.getAttribute("data-id"));
     if(act==="analyze-follow") return _followAuthor(btn.getAttribute("data-h"));
+    if(act==="analyze-back") return analyzeBack();
+    if(act==="analyze-steal") return analyzeSteal(btn.getAttribute("data-id"));
+    if(act==="go-guiones") return _anzGoGuiones();
     // growth-2: onboarding de activación
     // onboarding v2 (7 pasos)
     if(act==="onb-handle-next") return onbHandleNext();

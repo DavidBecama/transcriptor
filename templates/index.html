@@ -9830,6 +9830,39 @@
     .rs--mobile .anz-grid { grid-template-columns:1fr; }
     .rs--mobile .anz-form { flex-direction:column; }
     .rs--mobile .anz-go { width:100%; }
+    /* ── Ficha de detalle de un análisis (portada + métricas + transcripción + robar) ── */
+    .rs .anzd-canvas { max-width:920px; }
+    .rs .anzd-head { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .rs .anzd-back { width:40px; height:40px; flex:0 0 40px; border-radius:50%; cursor:pointer;
+      border:1px solid var(--border-subtle); background:var(--surface-overlay); color:var(--text-secondary);
+      display:flex; align-items:center; justify-content:center; }
+    .rs .anzd-back:hover { color:var(--text-primary); border-color:var(--accent); }
+    .rs .anzd-head-t { font-weight:700; font-size:16px; color:var(--text-primary); }
+    .rs .anzd-grid { display:grid; grid-template-columns:260px 1fr; gap:22px; align-items:start; }
+    .rs .anzd-thumb { position:relative; width:100%; aspect-ratio:9/13; max-height:380px; border-radius:14px;
+      overflow:hidden; background:var(--surface-sunken); display:flex; align-items:center; justify-content:center; margin-bottom:12px; }
+    .rs .anzd-thumb-img { width:100%; height:100%; object-fit:cover; }
+    .rs .anzd-thumb-ph { color:var(--text-tertiary); opacity:.4; transform:scale(2.2); }
+    .rs .anzd-plat { position:absolute; left:8px; bottom:8px; font-size:9px; text-transform:uppercase; letter-spacing:.04em;
+      background:rgba(0,0,0,.6); color:#fff; padding:2px 6px; border-radius:5px; }
+    .rs .anzd-author { font-weight:700; font-size:16px; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rs .anzd-date { font-size:12px; color:var(--text-tertiary); margin-bottom:14px; }
+    .rs .anzd-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+    .rs .anzd-stat { display:flex; flex-direction:column; gap:1px; padding:10px 12px;
+      background:var(--surface-overlay); border:1px solid var(--border-subtle); border-radius:12px; }
+    .rs .anzd-stat-ic { color:var(--text-tertiary); }
+    .rs .anzd-stat-v { font-size:18px; font-weight:700; color:var(--text-primary); line-height:1.2; }
+    .rs .anzd-stat-l { font-size:10.5px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.04em; }
+    .rs .anzd-nostat { font-size:12px; color:var(--text-tertiary); margin-bottom:12px; }
+    .rs .anzd-link { display:inline-block; font-size:13px; color:var(--accent); text-decoration:none; }
+    .rs .anzd-link:hover { text-decoration:underline; }
+    .rs .anzd-main { min-width:0; }
+    .rs .anzd-acts { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .rs .anzd-txlabel { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); margin-bottom:8px; }
+    .rs .anzd-tx { white-space:pre-wrap; line-height:1.62; font-size:14.5px; color:var(--text-secondary);
+      background:var(--surface-overlay); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px; }
+    .rs--mobile .anzd-grid { grid-template-columns:1fr; }
+    .rs--mobile .anzd-thumb { max-width:220px; margin-left:auto; margin-right:auto; }
     .rs--mobile .sheet-body { padding:20px 16px; max-width:100%; }
     /* móvil: los botones de acción (nowrap) forzaban el ancho del sheet > viewport y lo
        descuadraban (anclado a la derecha, cortado por la izquierda). Que envuelvan. */
@@ -27984,6 +28017,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=99"></script>
+<script src="/static/js/radar-loop.js?v=100"></script>
 </body>
 </html>
