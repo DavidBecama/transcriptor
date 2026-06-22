@@ -6053,7 +6053,7 @@
      CARGA DE DATOS
      ════════════════════════════════════════════════════════════════ */
   function setDevice(){ S.device=window.matchMedia("(max-width:720px)").matches?"mobile":"desktop"; }
-  function skeletonHTML(){ return railHTML()+'<div class="work">'+cmdHTML()+'<div class="scroll"><div class="canvas"><div class="statbar"><div class="stat"></div><div class="stat"></div><div class="stat"></div><div class="stat"></div></div><div class="rs-skel" style="height:200px;margin-bottom:14px"></div><div class="rs-skel"></div><div class="rs-skel"></div></div></div></div>'; }
+  function skeletonHTML(){ return railHTML()+'<div class="work">'+cmdHTML()+'<div class="scroll"><div class="canvas"><div class="rs-boot"><span class="rs-boot-spin" aria-hidden="true"></span><span class="rs-boot-t">'+L("Cargando…","Loading…")+'</span></div><div class="statbar"><div class="stat"></div><div class="stat"></div><div class="stat"></div><div class="stat"></div></div><div class="rs-skel" style="height:200px;margin-bottom:14px"></div><div class="rs-skel"></div><div class="rs-skel"></div></div></div></div>'; }
 
   // DEMO MVP: siembra guiones (con HOOKS agrupados + métricas de publicación) y un
   // perfil de métricas con reels VINCULADOS a sus guiones — para ver el loop completo.
