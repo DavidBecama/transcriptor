@@ -8326,30 +8326,38 @@ def community_interest():
 @require_auth
 @limiter.limit("30 per hour")
 def brain_exercise_done():
-    """Ejercicio diario del Cerebro completado (Fathom 18/06) → +3-6% al %, 1 vez/día.
-    Idempotente por día: si ya lo hizo hoy, no vuelve a sumar. El % arranca en 35
-    (lo siembra onboarding_complete)."""
+    """Ejercicio diario del Cerebro completado → +2-3% a la VOZ (confidence), 1 vez/día.
+    El % del Cerebro es ahora NIVEL-DRIVEN (frontend: nivel + acciones); el ejercicio
+    entrena la voz, que es input del nivel → así el ejercicio mueve el %. Idempotente
+    por día (brain_exercise_date). Cap de confidence en 92 (<95 hard cap)."""
     user = current_user()
     uid = user["id"]
     profile = get_profile(uid)
     today = datetime.now(timezone.utc).date().isoformat()
     if str(profile.get("brain_exercise_date") or "") == today:
         return jsonify({"ok": True, "already": True,
-                        "brain_progress": profile.get("brain_progress") or 35,
-                        "brain_last_gain": profile.get("brain_last_gain") or 0}), 200
-    cur = profile.get("brain_progress")
-    cur = 35 if cur is None else cur
-    gain = 3 + (abs(hash(uid + today)) % 4)   # 3-6, se computa una vez y se persiste
-    newp = min(95, cur + gain)
+                        "voice_gain": profile.get("brain_last_gain") or 0}), 200
+    gain = 2 + (abs(hash(uid + today)) % 2)   # +2..3, determinista y persistido
+    new_conf = None
+    try:
+        vr = (db.table("voice_profiles").select("confidence")
+                .eq("user_id", uid).eq("brand_id", "").limit(1).execute())
+        if vr.data:
+            cur = int(vr.data[0].get("confidence") or 0)
+            new_conf = min(92, cur + gain)
+            (db.table("voice_profiles").update({"confidence": new_conf})
+               .eq("user_id", uid).eq("brand_id", "").execute())
+    except Exception:
+        logger.warning("brain_exercise_done: voice bump failed uid=%s", uid)
     try:
         db.table("profiles").update({
-            "brain_progress": newp, "brain_exercise_date": today, "brain_last_gain": gain,
+            "brain_exercise_date": today, "brain_last_gain": gain,
         }).eq("id", uid).execute()
     except Exception:
-        logger.exception("brain_exercise_done: update failed uid=%s", uid)
+        logger.exception("brain_exercise_done: profile update failed uid=%s", uid)
         return jsonify({"error": "internal"}), 500
-    track_event("brain_exercise_done", uid, {"gain": gain, "progress": newp})
-    return jsonify({"ok": True, "brain_progress": newp, "brain_last_gain": gain}), 200
+    track_event("brain_exercise_done", uid, {"voice_gain": gain, "confidence": new_conf})
+    return jsonify({"ok": True, "voice_gain": gain, "confidence": new_conf}), 200
 
 
 @app.route("/api/brain/rescrape", methods=["POST"])
