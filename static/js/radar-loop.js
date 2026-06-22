@@ -413,7 +413,7 @@
      contenido ingerido + el objetivo (STYLE_PROMPTS/PRESET_TONES intactos en
      backend + selector en Cerebro). Pantalla dedicada que oculta el radar vacío.
      Demo-funcional vía ?onb=1. ════════════════════════════════════════════════ */
-  var ONB_STEPS=["handle","niche","subniche","competitors","goal","close"];   // «value» (aha) retirado: el guion no quedaba en sitio claro; tras el onboarding se buscan los reels del nicho
+  var ONB_STEPS=["handle","niche","subniche","goal","close"];   // «value» y «competitors» retirados: el descubrimiento de nicho AUTO-SIGUE a los creadores acertados (elegir a mano sugería vacío y metía gente fuera de nicho)
   function nicheChips(){ return rsLang()==="en"
     ? ["Fitness","Finance","Marketing","Cooking","Fashion","Beauty","Travel","Tech","Education","Real estate","Health","Business"]
     : ["Fitness","Finanzas","Marketing","Cocina","Moda","Belleza","Viajes","Tecnología","Educación","Inmobiliaria","Salud","Negocios"]; }
@@ -654,7 +654,6 @@
     switch(S.onb.step){
       case "niche": return onbNicheHTML();
       case "subniche": return onbSubnicheHTML();
-      case "competitors": return onbCompsHTML();
       case "goal": return onbGoalHTML();
       case "close": return onbCloseHTML();
       default: return onbHandleHTML();
@@ -725,8 +724,9 @@
     // Dispara EN 2º PLANO el descubrimiento de reels del nicho (Apify hashtag) → al
     // llegar al radar la pool ya tiene reels acertados. Una sola vez por onboarding.
     if(!isDemo() && !S.onb._discoverFired){ S.onb._discoverFired=true; try{ apiPost("/api/onboarding/discover-niche",{niche:S.onb.niche, subniches:S.onb.subniches||[]}); }catch(e){} }
-    // «value» retirado → directo a competidores (sub → competidores → goal → close).
-    onbTrack("onb_step_completed"); if(!(S.onb.competitors||[]).length) S.onb.compLoading=true; onbGoto("competitors"); onbLoadComps();
+    // «value» y «competitors» retirados → directo a goal (sub → goal → close). El
+    // descubrimiento de nicho auto-sigue a los creadores; competidores extra = en el radar.
+    onbTrack("onb_step_completed"); onbGoto("goal");
   }
   // Reels reciclados del subnicho (recycling library). Demo siembra local.
   function onbLoadValue(){
@@ -812,18 +812,19 @@
     '</div></div></div>';
   }
   function onbWaitForNiche(){
-    var t0=Date.now(), MAX=80000;   // ~80s tope (5 creadores × scrape en paralelo)
+    var t0=Date.now(), HARD=68000;   // tope duro: nunca se atasca (descubrimiento+scrape)
     (function loop(){
       if(!S._onbWaiting) return;
-      // listo = ya hay reels REALES de los creadores seguidos (no el seed) o se agotó el tiempo.
+      var el=Date.now()-t0;
+      // listo = ya hay reels REALES de los creadores del nicho (no el seed de la pool vieja).
       var ready=((S.reels||[]).length>0 && !S.radarSeed);
-      if(ready || (Date.now()-t0)>MAX){
+      if(ready || el>HARD){
         S._onbWaiting=false; render(); onbStartTour();
-        if(!ready) showToast(L("Tu radar se sigue llenando con reels de tu nicho — pulsa «Actualizar radar» en un momento.","Your radar is still filling with niche reels — hit «Refresh radar» in a moment."));
+        if(!ready) showToast(L("Tu radar se está llenando con reels de tu nicho — pulsa «Actualizar radar» en un momento.","Your radar is filling with niche reels — hit «Refresh radar» in a moment."));
         return;
       }
       if(typeof loadBrandData==="function"){ try{ loadBrandData(); }catch(e){} }
-      setTimeout(loop, 5000);
+      setTimeout(loop, 4000);
     })();
   }
   // CIERRE: ingiere (prod) → Cerebro ~50% + 1er guión; demo simula y siembra panel.
