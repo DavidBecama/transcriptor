@@ -301,12 +301,13 @@
     var _tro='<svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M6 4h12v4a6 6 0 11-12 0V4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M6 6H4v1a3 3 0 003 3M18 6h2v1a3 3 0 01-3 3M9.5 14h5M12 14v3.5M8.5 20h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     // B3: mismo rail para todos (sin Portfolio). El Radar es la pantalla principal;
     // las marcas se cambian con el switcher de la command bar, no con una pantalla aparte.
-    var navTabs = [["dashboard",IC.grid,"Radar"],["guiones",IC.doc,"Guiones"],["metrics",IC.chart,"Métricas"],["leaderboard",_tro,"Ranking"],["brain",IC.brain,"Cerebro"]];
+    var _ana='<svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.6-3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+    var navTabs = [["dashboard",IC.grid,"Radar"],["guiones",IC.doc,"Guiones"],["metrics",IC.chart,"Métricas"],["leaderboard",_tro,"Ranking"],["brain",IC.brain,"Cerebro"],["analizar",_ana,"Analizar"]];
     return '<nav class="rail">'+
       '<span class="rail-logo" role="img" aria-label="Reelscript"></span>'+   // logo R (theme-aware vía CSS: blanca en oscuro, azul en claro)
       navTabs.map(function(t){return '<button class="rail-btn'+(S.tab===t[0]&&!S.legacy?" on":"")+'" data-act="tab" data-k="'+t[0]+'" data-tour="tab-'+t[0]+'">'+t[1]+'<span class="tip">'+t[2]+'</span></button>';}).join("")+
-      // «Analizar» (transcribir un reel suelto) ya NO vive en el rail: se reubicó al
-      // Radar como acción «Analizar un reel» (junto a «Añadir reel»).
+      // «Analizar» = página nativa (historial persistido); también accesible desde el
+      // botón «Analizar un reel» del Radar.
       '<button class="rail-btn'+(S.tab==="settings"&&!S.legacy?" on":"")+'" data-act="tab" data-k="settings" aria-label="Ajustes">'+IC.gear+'<span class="tip">Ajustes</span></button>'+
       // El spacer empuja el botón de cuenta al fondo del rail.
       '<span class="rail-spacer"></span>'+
@@ -316,7 +317,7 @@
     acctMenuHTML();
   }
   function cmdHTML(){
-    var tabName=({dashboard:"RADAR",ideas:"IDEAS",guiones:"GUIONES",metrics:"MÉTRICAS",leaderboard:"RANKING",brain:"CEREBRO",team:"EQUIPO",settings:"AJUSTES"})[S.tab]||"";
+    var tabName=({dashboard:"RADAR",ideas:"IDEAS",guiones:"GUIONES",metrics:"MÉTRICAS",leaderboard:"RANKING",brain:"CEREBRO",analizar:"ANALIZAR",team:"EQUIPO",settings:"AJUSTES"})[S.tab]||"";
     var crumb;
     crumb='<span class="crumb">/ '+tabName+'</span>';   // B3: sin portfolio/"Todas las marcas"
     var demoToggle=isDemo()?'<div class="demo-plan" title="Solo demo: cambia de plan"><span class="dp-k">DEMO</span>'+
