@@ -1191,9 +1191,12 @@
 
     /* v0.14.36 — Fade-in al cambiar de panel workspace. Aplica al panel cuando
        profTab() lo activa: opacity 0→1 + translateY(4px→0) en 200ms. */
+    /* OJO: nada de transform aquí. Un transform en el contenedor del workspace
+       (#profPanelIdeas.panel-fade-in) crea un containing-block que rompe el
+       position:fixed del rail inferior → hueco negro bajo la barra en móvil. Solo opacidad. */
     @keyframes panelFadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
     .panel-fade-in { animation: panelFadeIn 200ms ease-out; }
 
@@ -8956,7 +8959,8 @@
     }
     .tour-step-count { font-size: .72rem; color: var(--text3); margin-bottom: 6px; font-weight: 500; letter-spacing: .3px; }
     .tour-text { margin-bottom: 18px; font-weight: 300; }
-    .tour-btns { display: flex; align-items: center; gap: 8px; }
+    .tour-btns { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .tour-btn-skip { margin-right: auto; }   /* «Saltar» a la izquierda; Atrás/Siguiente a la derecha */
     .tour-btn {
       padding: 10px 16px; border-radius: var(--rsm); font-size: .85rem;
       font-weight: 600; cursor: pointer; border: none; transition: all .2s;
@@ -8972,7 +8976,7 @@
     }
     .tour-btn-next:hover { transform: translateY(-1px); box-shadow: 0 5px 0 #22357c, 0 2px 10px rgba(79,124,255,.3); }
     .tour-btn-next:active { transform: translateY(3px); box-shadow: 0 1px 0 #22357c; }
-    .tour-progress { display: flex; gap: 6px; margin-right: auto; }
+    .tour-progress { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
     .tour-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: rgba(255,255,255,.1); transition: all .2s;
@@ -9670,7 +9674,11 @@
     .rs .rcb .rcb-seg { width:48px; height:6px; border-radius:999px; background:var(--surface-sunken); }
     .rs .rcb .rcb-seg.on { background:linear-gradient(90deg, var(--brand-500,#2F5BFF), var(--success-fg,#3FE0A0)); }
     .rs .rcb > .btn { flex:none; }
-    .rs--mobile .rcb { flex-wrap:wrap; }
+    /* móvil: el bloque «Tu cerebro · nivel» apila — el texto deja de apretarse y el
+       botón «Crear guion» pasa a ancho completo abajo. */
+    .rs--mobile .rcb { flex-wrap:wrap; row-gap:14px; }
+    .rs--mobile .rcb .rcb-body { flex:1 1 calc(100% - 72px); }
+    .rs--mobile .rcb > .btn { flex:1 1 100%; justify-content:center; }
     .rs--mobile .whale { flex-direction:column; align-items:flex-start; }
     /* v3 mockup David — «Más señales · N» */
     .rs .signals { margin:22px 0 8px; }
@@ -9683,6 +9691,10 @@
     /* filters */
     .rs .filters { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
     .rs .radar-addbar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+    /* móvil: rejilla 2×2 limpia (el spacer flex:1 empujaba «Actualizar radar» a la derecha) */
+    .rs--mobile .radar-addbar { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .rs--mobile .radar-addbar > span { display:none; }
+    .rs--mobile .radar-addbar .fchip { width:100%; justify-content:center; }
     .rs .fchip { display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 14px; border-radius:99px; border:1px solid var(--border-default); background:transparent; font-size:13px; font-weight:600; color:var(--text-secondary); cursor:pointer; transition: all .15s var(--ease); }
     .rs .fchip:hover { color:var(--text-primary); border-color:var(--border-strong); }
     .rs .fchip.on { background:var(--surface-overlay); color:var(--text-primary); border-color:var(--border-strong); box-shadow:inset 2px 0 0 var(--brand-500); }
@@ -9711,7 +9723,7 @@
     /* overlays — B2: NO cubren el rail (inset left:64px, como #rs-legacy) → la barra
        lateral sigue clicable con un overlay abierto (gen/guion) dentro de un proyecto;
        al pulsar el rail, switchTab cierra el overlay. */
-    .rs .overlay { position:absolute; inset:0 0 0 64px; z-index:30; background:var(--surface-base); display:flex; flex-direction:column; animation: rsSheetUp .42s var(--ease-out); }
+    .rs .overlay { position:absolute; inset:0 0 0 64px; z-index:30; background:var(--surface-base); display:flex; flex-direction:column; align-items:stretch; animation: rsSheetUp .42s var(--ease-out); }
     @keyframes rsSheetUp { from{ transform:translateY(24px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
     .rs .overlay .obar { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border-subtle); flex-shrink:0; }
     .rs .overlay .obar .back { width:38px; height:38px; border-radius:99px; border:1px solid var(--border-default); background:transparent; color:var(--text-primary); display:flex; align-items:center; justify-content:center; cursor:pointer; }
@@ -9727,7 +9739,11 @@
     .rs .analyze-tx { max-height:46vh; overflow-y:auto; white-space:pre-wrap; line-height:1.55;
       font-size:14px; color:var(--text-secondary); background:var(--surface-overlay);
       border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px; }
-    .rs--mobile .sheet-body { padding:20px 16px; }
+    .rs--mobile .sheet-body { padding:20px 16px; max-width:100%; }
+    /* móvil: los botones de acción (nowrap) forzaban el ancho del sheet > viewport y lo
+       descuadraban (anclado a la derecha, cortado por la izquierda). Que envuelvan. */
+    .rs--mobile .sheet-actions { flex-wrap:wrap; }
+    .rs .overlay .oscroll { overflow-x:hidden; }
     /* generating */
     .rs .gen { height:100%; min-height:460px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:40px; text-align:center; }
     .rs .gen .orb { width:74px; height:74px; border-radius:99px; background:conic-gradient(from 0deg, var(--brand-500), #6f93ff, var(--brand-400), var(--brand-500)); animation: rsSpin 1.1s linear infinite; position:relative; }
@@ -10033,6 +10049,13 @@
     .rs[data-theme="light"] .onb-vcard-x { color:var(--brand-700); }
     .rs .onb-vcard-cap { font-size:13.5px; line-height:1.4; color:var(--text-primary); }
     .rs .onb-vcard-meta { display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--text-tertiary); margin-top:auto; }
+    /* Miniatura del reel en la 1ª sugerencia del onboarding (imagen real del subnicho
+       o gradiente+play de fallback) + badge de multiplicador superpuesto. */
+    .rs .onb-vcard-thumb { position:relative; width:100%; height:104px; border-radius:10px; overflow:hidden; background:var(--surface-raised); }
+    .rs .onb-vcard-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .onb-vcard-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.9); }
+    .rs .onb-vcard-thumb .onb-vcard-x { position:absolute; top:7px; right:7px; padding:3px 8px; border-radius:999px; background:rgba(8,10,20,.78); color:#fff; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); font-size:11.5px; }
+    .rs .onb-vcard-thumb .onb-vcard-x svg { color:#ffd24a; }
     /* competidores: filas */
     .rs .onb-card-row { display:flex; align-items:center; gap:13px; width:100%; text-align:left; padding:13px 15px; border:1.5px solid var(--border-default); border-radius:14px; background:var(--surface-base); cursor:pointer; transition:border-color .15s ease, background .15s ease; min-height:64px; }
     .rs .onb-card-row:hover { border-color:var(--border-strong); }
@@ -10333,7 +10356,10 @@
     .rs .ce-know-k { font-size:13px; font-weight:600; color:var(--text-tertiary); }
     .rs .ce-tonos { display:flex; flex-wrap:wrap; gap:8px; }
     .rs .ce-tono { padding:8px 13px; border-radius:99px; background:var(--brand-50, rgba(47,91,255,.16)); color:var(--brand-500,#2F5BFF); font-weight:600; font-size:13px; }
-    .rs .ce-mulet { font-size:14.5px; line-height:1.6; color:var(--text-secondary); margin:0; }
+    /* Muletillas como chips (antes era un run de texto con comas y comillas dobles) */
+    .rs .ce-mulet { display:flex; flex-wrap:wrap; gap:8px; margin:0; }
+    .rs .ce-mulet-chip { display:inline-flex; align-items:center; padding:7px 13px; border-radius:99px; background:var(--surface-overlay); border:1px solid var(--border-default); color:var(--text-secondary); font-size:13.5px; line-height:1.3; }
+    .rs .ce-mulet-empty { color:var(--text-tertiary); }
     .rs .ce-know-foot { display:flex; gap:18px; padding-top:14px; border-top:1px solid var(--border-subtle); }
     .rs .ce-foot-k { font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); margin-bottom:3px; }
     .rs .ce-foot-v { font-family:var(--font-display); font-weight:700; font-size:18px; color:var(--text-primary); }
@@ -10430,7 +10456,11 @@
     .rs .ed-var-t { flex:1; line-height:1.4; }
     .rs .ed-rail-cta { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
     .rs .ed-rail-cta .btn { width:100%; justify-content:center; }
-    .rs--mobile .ed-body { flex-direction:column; } .rs--mobile .ed-doc { border-right:none; border-bottom:1px solid var(--border-default); } .rs--mobile .ed-rail { width:100%; }
+    /* móvil: el editor scrollea como un bloque (antes .ed-body era overflow:hidden y el
+       rail/variantes de abajo quedaba cortado sin poder hacer scroll). */
+    .rs--mobile .ed-body { flex-direction:column; overflow-y:auto; }
+    .rs--mobile .ed-doc { border-right:none; border-bottom:1px solid var(--border-default); overflow:visible; flex:none; }
+    .rs--mobile .ed-rail { width:100%; flex:none; }
     /* ── v3 mockup David · Ajustes ─────────────────────────────────────── */
     .rs .aj-canvas { display:flex; flex-direction:column; gap:26px; }
     .rs .aj-head { display:flex; flex-direction:column; gap:18px; }
@@ -10463,6 +10493,15 @@
     .rs .aj-mulet-k { font-size:13px; font-weight:600; color:var(--text-tertiary); }
     .rs .aj-mulet { padding:16px; background:var(--surface-overlay); border:1px solid var(--border-default); border-radius:13px; font-size:15px; line-height:1.6; color:var(--text-secondary); }
     .rs .aj-voice-foot { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-top:4px; flex-wrap:wrap; }
+    /* móvil: tarjeta de identidad — el badge «Cerebro · Nivel» solapaba el nombre en
+       pantallas estrechas → fuera en móvil; la fila puede envolver. */
+    .rs--mobile .aj-identity { flex-wrap:wrap; row-gap:14px; }
+    .rs--mobile .aj-identity .aj-lvl { display:none; }
+    .rs--mobile .aj-identity .btn { flex:1 1 100%; justify-content:center; }   /* botón a su propia fila → el nombre no se corta */
+    /* móvil: bloque «Tu voz» — la cabecera apilaba mal (la descripción quedaba apretada
+       en media columna por la «derivada de N reels» a la derecha). Apilar. */
+    .rs--mobile .aj-voice-head { flex-direction:column; gap:6px; }
+    .rs--mobile .aj-derived { margin-top:0; }
     .rs .aj-slider-row { display:flex; align-items:center; gap:12px; font-size:14.5px; color:var(--text-primary); }
     .rs .aj-slider { position:relative; width:200px; height:8px; border-radius:99px; background:var(--surface-overlay); }
     .rs .aj-slider-fill { position:absolute; left:0; top:0; height:100%; border-radius:99px; background:linear-gradient(90deg, var(--brand-500,#2F5BFF), var(--brand-300,#6E92FF)); }
@@ -11168,6 +11207,9 @@
     .rs .cmd-idea .cmd-idea-bulb svg { width:16px; height:16px; }
     .rs .cmd .spark.pill-stat { display:inline-flex; align-items:center; gap:7px; height:34px; padding:0 12px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:8px; font-size:13px; color:var(--text-secondary); white-space:nowrap; }
     .rs .cmd .spark.pill-stat svg { width:15px; height:15px; color:var(--brand-500); }
+    /* Pills clicables (prueba → Cerebro, créditos → planes): afordancia de clic */
+    .rs .cmd .spark.pill-stat[data-act] { cursor:pointer; transition:border-color .15s, background .15s; }
+    .rs .cmd .spark.pill-stat[data-act]:hover { border-color:var(--brand-500); background:var(--surface-overlay); }
     .rs .cmd .spark .num { font-family:var(--font-mono); color:var(--text-primary); font-weight:500; }
     /* ── CANVAS ── */
     .rs .canvas { max-width:1180px; margin:0 auto; padding:34px 26px 120px; width:100%; }
@@ -11344,6 +11386,7 @@
     .rs .sugg-why { font-size:13px; color:var(--text-secondary); margin-top:3px; line-height:1.4; }
     .rs .sugg-actions { display:flex; gap:8px; flex-shrink:0; }
     .rs--mobile .sugg-comp { flex-wrap:wrap; } .rs--mobile .sugg-actions { width:100%; }
+    .rs--mobile .sugg-actions .btn-primary { flex:1; justify-content:center; }   /* «Añadir» prominente, «Ahora no» compacto */
     /* La miniatura 9:16 escala/recorta DENTRO de su columna (object-fit:cover en .thumb img),
        nunca estira la card: la altura la fija el cuerpo compacto, capada a max-height (.feature). */
     .rs .feature-thumb { position:relative; overflow:hidden; } .rs .feature-thumb .thumb { width:100%; height:100%; min-height:0; border:none; border-radius:0; border-right:1px solid var(--border-default); background:linear-gradient(160deg, var(--surface-sunken), var(--surface-raised)); }
@@ -11513,7 +11556,20 @@
     /* responsive: rail → barra inferior */
     @media (max-width:760px){
       .rs.app { grid-template-columns:1fr; }
-      .rs .rail { position:fixed; bottom:0; left:0; right:0; height:auto; width:100%; flex-direction:row; justify-content:center; border-right:none; border-top:1px solid var(--border-default); padding:8px 0; z-index:40; }
+      .rs .rail { position:fixed; top:auto; bottom:0; left:0; right:0; height:auto; width:100%; flex-direction:row; justify-content:center; align-items:center; gap:8px; border-right:none; border-top:1px solid var(--border-default); padding:11px 0; z-index:40; }
+      /* barra inferior y sus iconos más grandes en móvil (target táctil cómodo) */
+      .rs .rail-btn { width:52px; height:52px; }
+      .rs .rail-btn svg { width:25px; height:25px; }
+      .rs .rail-acct { width:48px; height:48px; }
+      /* el rail es barra inferior fija (~62px) → deja hueco para que el último
+         contenido no quede tapado al hacer scroll hasta abajo. */
+      .rs .scroll { padding-bottom:84px; }
+      /* Ranking: las píldoras "Te faltan…/Subiendo…" eran inline-flex → el texto y
+         los <b> se repartían en una fila sin wrap y se cortaban. En móvil que fluyan
+         como texto normal (bloque) con el icono inline. + hero más compacto. */
+      .rs .rk-hero { padding:20px; gap:16px; }
+      .rs .rk-hero .lb-goal, .rs .rk-hero .lb-momentum { display:block; }
+      .rs .rk-hero .lb-goal svg, .rs .rk-hero .lb-momentum svg { display:inline; vertical-align:-2px; margin-right:6px; }
       .rs .rail-logo, .rs .rail-spacer, .rs .rail-ava { display:none; }
       .rs .rs-acct-menu { left:8px; right:8px; bottom:72px; min-width:0; }   /* sobre la barra inferior */
       .rs .rail-btn.on::before { left:11px; right:11px; top:auto; bottom:-8px; width:auto; height:3px; border-radius:3px 3px 0 0; }
@@ -11823,6 +11879,11 @@
     .rs .rgal { margin:8px 0 26px; display:flex; flex-direction:column; gap:16px; }
     /* v3 mockup David — «Competidores en el radar» (chips) + línea de galería + empty */
     .rs .rgal-comps-head { display:flex; align-items:center; gap:14px; flex-wrap:nowrap; }
+    /* móvil: la tira de chips por-competidor desbordaba/se cortaba → dejamos solo el
+       desplegable «+N» (selector) + «Añadir». La cabecera puede envolver. */
+    .rs--mobile .rgal-comps-head { flex-wrap:wrap; gap:10px; }
+    .rs--mobile .rgal-comps-head .rgal-comps { display:none; }   /* +especificidad: gana al base .rs .rgal-comps */
+    .rs--mobile .rgal-comps-head .rgal-add { margin-left:auto; }
     .rs .rgal-comps-t { font-size:13px; font-weight:600; color:var(--text-tertiary); flex:none; white-space:nowrap; }
     /* tira de chips con scroll horizontal (caben 20+ competidores sin romper la fila) */
     .rs .rgal-comps { flex:1; min-width:0; display:flex; align-items:center; gap:9px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; padding-bottom:2px; }
@@ -11923,6 +11984,10 @@
     .rs .rgal-soon-pill { display:inline-flex; align-items:center; gap:7px; font-size:13.5px; font-weight:700; color:var(--brand-400); }
     .rs .rgal-soon-pill svg { width:16px; height:16px; }
     .rs .rgal-soon .rgal-more { margin-left:auto; }
+    /* móvil: los 3 textos (Próximamente · Más información · Avísame) se apilan
+       alineados a la izquierda en vez de quedar descuadrados a la derecha. */
+    .rs--mobile .rgal-soon { flex-direction:column; align-items:flex-start; gap:10px; }
+    .rs--mobile .rgal-soon .rgal-more { margin-left:0; }
     [data-theme="light"] .rs .rgal-soon-pill, .rs[data-theme="light"] .rgal-soon-pill { color:var(--brand-600); }
     [data-theme="light"] .rs .rgal-more:hover, .rs[data-theme="light"] .rgal-more:hover { color:var(--brand-600); }
     @media (max-width:720px){ .rs .gcard { flex-basis:168px; } }
@@ -11998,6 +12063,11 @@
       --brand-400:#4A74FF; --brand-500:#2348E6; --brand-600:#2348E6; --brand-700:#1A37B8; --brand-800:#142B8F; --brand-900:#0F2070;
       --success:#0E8A5A; --success-bg:rgba(14,138,90,.10); --success-fg:#0A6B45; --success-border:rgba(14,138,90,.28);
     }
+    /* La página Configuración (panel legacy reparentado en la isla) ocupaba TODO el
+       ancho del host → se veía estirada. La capamos y centramos como la isla
+       (.canvas, max-width 1180px) para igualar el ancho de la pestaña Ajustes. */
+    #profPanelSettings { max-width:1180px; margin:0 auto; padding-left:26px; padding-right:26px; box-sizing:border-box; }
+    @media (max-width:760px){ #profPanelSettings { padding-left:16px; padding-right:16px; } }
     /* Titular en Clash; eyebrow en mono (telemetría); tab activo azul v3 */
     #profPanelSettings .heading-1 { font-family: var(--font-display); letter-spacing:-.02em; }
     #profPanelSettings .panel-header .eyebrow { font-family: var(--font-mono); }
@@ -12008,7 +12078,18 @@
     .theme-seg-opt svg { width:16px; height:16px; }
 
     /* ── AJUSTES · secciones nuevas (mockup Ajustes.dc.html) ── */
-    #profPanelSettings .set-btn { flex:none; }
+    /* v3 fix (pre-publi): los botones de Ajustes llevan btn-3d* (que es SOLO sombra)
+       sin clase base ni relleno → el navegador los pintaba como botón nativo (fondo
+       gris, borde outset). Les damos base + relleno aquí, scoped al panel, sin tocar
+       el resto de la app. Los ghost intencionales (con background:transparent inline)
+       quedan intactos: el estilo inline gana sobre estos selectores. */
+    #profPanelSettings .btn-3d { display:inline-flex; align-items:center; justify-content:center;
+      gap:8px; border:1px solid var(--border-default); border-radius:10px; font-weight:600;
+      font-size:.85rem; line-height:1; cursor:pointer; box-sizing:border-box; }
+    #profPanelSettings .btn-3d-primary { background:var(--brand-600); color:#fff; border-color:var(--brand-600); }
+    #profPanelSettings .btn-3d-secondary { background:var(--surface-raised); color:var(--text-primary); }
+    #profPanelSettings .btn-3d-danger { background:#dc2626; color:#fff; border-color:#dc2626; }
+    #profPanelSettings .set-btn { flex:none; height:38px; padding:0 16px; }
     #profPanelSettings .mono { font-family:var(--font-mono); }
     /* Perfil y voz */
     #profPanelSettings .set-identity { display:flex; align-items:center; gap:20px; padding:22px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; margin-bottom:16px; flex-wrap:wrap; }
@@ -12449,7 +12530,7 @@
       <option value="de">DE</option>
       <option value="it">IT</option>
     </select>
-    <button id="btnTranscribe" onclick="doTranscribe()">Transcribir</button>
+    <button id="btnTranscribe" class="btn btn-md btn-primary" onclick="doTranscribe()">Transcribir</button>
     <div id="haveScriptRow"></div>
     <div class="inline-loading" id="inlineLoading">
       <div class="loading-msg" id="loadingMsg"></div>
@@ -15146,7 +15227,7 @@
     <button class="modal-x" onclick="closeModal('upgradeOverlay')">✕</button>
     <p class="upgrade-slogan" data-i18n-es="Roba lo que funciona." data-i18n-en="Steal what works.">Roba lo que funciona.</p>
     <h2 data-i18n-es="Mejorar plan" data-i18n-en="Upgrade plan">Mejorar plan</h2>
-    <p data-i18n-es="Elige el plan que mejor se adapte. Cancela cuando quieras." data-i18n-en="Pick the plan that fits. Cancel anytime.">Elige el plan que mejor se adapte. Cancela cuando quieras.</p>
+    <p class="upgrade-sub" data-i18n-es="Elige el plan que mejor se adapte. Cancela cuando quieras." data-i18n-en="Pick the plan that fits. Cancel anytime.">Elige el plan que mejor se adapte. Cancela cuando quieras.</p>
     <div class="billing-toggle" data-host="upgradeOverlay" style="margin:8px auto 18px">
       <button type="button" class="billing-toggle-opt" data-cycle="month" onclick="setBillingCycle('month','upgradeOverlay')" data-i18n-es="Mensual" data-i18n-en="Monthly">Mensual</button>
       <button type="button" class="billing-toggle-opt on" data-cycle="year" onclick="setBillingCycle('year','upgradeOverlay')">
@@ -19037,7 +19118,10 @@ function fillSettingsPlan() {
   _setText("setUseSteals", used || "0");
   _setText("setUseLeft", avail!=null ? avail : "—");
   const grid = document.getElementById("setPlansGrid");
-  if (grid) grid.innerHTML = SETTINGS_PLANS.map(p => `
+  // El "Trial" es un estado transitorio (3 días Pro), no un plan elegible → fuera de la
+  // rejilla. El tag del plan actual (fillSettingsPlan) sí lo conserva para no romper a
+  // quien esté en trial.
+  if (grid) grid.innerHTML = SETTINGS_PLANS.filter(p => p.key !== "trial" || cur === "trial").map(p => `
     <div class="plan-card${p.key===cur?" is-current":(p.featured?" featured":"")}">
       <div class="plan-card-name">${p.name}${p.featured?' <span style="color:var(--brand-400)">★</span>':""}</div>
       <div class="plan-card-price">${p.price}${p.price!=="0€"?'<small> /mes</small>':""}</div>
@@ -25355,7 +25439,10 @@ function openUpgradeModal(source) {
   try {
     var um = document.querySelector(".upgrade-modal");
     if (um) {
-      var uh = um.querySelector("h2"), up = um.querySelector("p");
+      // OJO: el 1er <p> del modal es .upgrade-slogan ("Roba lo que funciona.");
+      // el subtítulo es .upgrade-sub. Antes se cogía el slogan por error → se
+      // sobreescribía el eyebrow y quedaba duplicado con el subtítulo.
+      var uh = um.querySelector("h2"), up = um.querySelector(".upgrade-sub");
       var fromLimit = /free_limit|hazlo_mio|steal|guion|script/i.test(source || "");
       if (uh && up) {
         if (fromLimit) {
@@ -25915,8 +26002,8 @@ function renderTourStep() {
     <div class="tour-handle"></div>
     <div class="tour-step-count">${_TOUR_EN ? "Step" : "Paso"} ${tourStep + 1} ${_TOUR_EN ? "of" : "de"} ${TOUR_STEPS.length}</div>
     <div class="tour-text">${step.text}</div>
+    <div class="tour-progress">${dots}</div>
     <div class="tour-btns">
-      <div class="tour-progress">${dots}</div>
       ${skipBtn}${prevBtn}${nextBtn}
     </div>
   `;
@@ -27677,6 +27764,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=77"></script>
+<script src="/static/js/radar-loop.js?v=82"></script>
 </body>
 </html>

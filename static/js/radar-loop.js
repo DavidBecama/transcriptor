@@ -343,9 +343,9 @@
       return '<div class="spark pill-stat trial" id="rsSpark" title="Prueba Pro — '+cr+' crédito'+(cr===1?'':'s')+' · '+d+' día'+(d===1?'':'s')+' restantes" data-act="tab" data-k="brain" role="button" tabindex="0">'+IC.spark+'<span class="num">Pro</span> · '+cr+' cr</div>';
     }
     if(S.user.plan==="free" && !S.user.credits){
-      return '<div class="spark pill-stat credits" id="rsSpark" title="Guiones gratis este mes">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.freeLeft+'</b></span> este mes</div>';
+      return '<div class="spark pill-stat credits" id="rsSpark" title="Guiones gratis este mes — ver planes" data-act="credits-pill" role="button" tabindex="0">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.freeLeft+'</b></span> este mes</div>';
     }
-    return '<div class="spark pill-stat credits" id="rsSpark" title="Créditos disponibles">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.credits+'</b></span> créditos</div>';
+    return '<div class="spark pill-stat credits" id="rsSpark" title="Créditos disponibles — ver planes" data-act="credits-pill" role="button" tabindex="0">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.credits+'</b></span> créditos</div>';
   }
 
   // Cabecera Signal reutilizable (eyebrow mono + h-title Space Grotesk + sub).
@@ -529,8 +529,14 @@
       body='<div class="onb-value-load"><span class="mini-spin" style="width:22px;height:22px;border-width:3px"></span> '+L("Radar en marcha — rastreando lo que petó en tu subnicho. En segundos lo tendrás en tu panel. Sigue y te espera ahí.","Radar running — tracking what blew up in your subniche. You'll have it in seconds. Keep going, it'll be waiting in your panel.")+'</div>';
     } else {
       var cards=(S.onb.valueReels||[]).map(function(r,i){
+        // Miniatura real del reel (thumb del subnicho); si no hay, gradiente + play.
+        var th=r.thumb||r.thumbnail_b64||r.thumbnail_url||null;
+        var thumbInner=th
+          ? '<img src="'+ESC(th)+'" alt="" loading="lazy">'
+          : '<div class="onb-vcard-ph" style="background:'+_galGrad(r.handle||String(i))+'">'+_icPlay+'</div>';
         return '<div class="onb-vcard onb-vcard--pick" data-act="onb-value-steal" data-i="'+i+'" role="button" tabindex="0" style="cursor:pointer">'+
-          '<div class="onb-vcard-top"><span class="ava bava">'+ESC(initialsOf(r.handle))+'</span><span class="onb-vcard-h">@'+ESC(r.handle)+'</span><span class="onb-vcard-x">'+IC.bolt+' '+ESC(r.mult)+'×</span></div>'+
+          '<div class="onb-vcard-thumb">'+thumbInner+'<span class="onb-vcard-x">'+IC.bolt+' '+ESC(r.mult)+'×</span></div>'+
+          '<div class="onb-vcard-top"><span class="ava bava">'+ESC(initialsOf(r.handle))+'</span><span class="onb-vcard-h">@'+ESC(r.handle)+'</span></div>'+
           '<div class="onb-vcard-cap">'+ESC(r.caption)+'</div>'+
           '<div class="onb-vcard-meta">'+IC.eye+' '+ESC(r.views)+' · '+ESC(r.tag)+'</div>'+
           '<div class="onb-vcard-steal" style="margin-top:10px;font-size:13px;font-weight:700;color:var(--rs-accent,#4f7cff);display:flex;align-items:center;gap:6px">'+IC.bolt+' '+L("Robar este","Steal this")+'</div>'+
@@ -791,11 +797,12 @@
   /* ── datos demo (para que el flujo sea clicable sin backend) ── */
   function onbDemoValueReels(){
     var subs=(S.onb.subniches||[]); var s=function(i){ return subs[i%Math.max(1,subs.length)]||S.onb.niche||"tu nicho"; };
+    var th=_demoThumbs()||[]; var pic=function(i){ return th.length?th[i%th.length]:null; };
     return [
-      {handle:"nicho_top1", mult:"5.8", views:"1,4 M", tag:"explota", caption:"El error de "+s(0)+" que todos cometen (y cómo evitarlo)"},
-      {handle:"creador_ref", mult:"3.2", views:"680 K", tag:"explota", caption:"Probé "+s(1)+" durante 30 días — esto pasó"},
-      {handle:"viral_"+_norm(s(0)).slice(0,5), mult:"2.6", views:"420 K", tag:"subiendo", caption:"3 trucos de "+s(0)+" que nadie te cuenta"},
-      {handle:"top_"+_norm(S.onb.niche||"nicho").slice(0,4), mult:"2.1", views:"310 K", tag:"subiendo", caption:"Por qué tu "+s(0)+" no funciona"}
+      {handle:"nicho_top1", mult:"5.8", views:"1,4 M", tag:"explota", caption:"El error de "+s(0)+" que todos cometen (y cómo evitarlo)", thumb:pic(0)},
+      {handle:"creador_ref", mult:"3.2", views:"680 K", tag:"explota", caption:"Probé "+s(1)+" durante 30 días — esto pasó", thumb:pic(1)},
+      {handle:"viral_"+_norm(s(0)).slice(0,5), mult:"2.6", views:"420 K", tag:"subiendo", caption:"3 trucos de "+s(0)+" que nadie te cuenta", thumb:pic(2)},
+      {handle:"top_"+_norm(S.onb.niche||"nicho").slice(0,4), mult:"2.1", views:"310 K", tag:"subiendo", caption:"Por qué tu "+s(0)+" no funciona", thumb:pic(3)}
     ];
   }
   function onbDemoComps(){
@@ -1889,7 +1896,7 @@
           '<span class="aj-derived">'+L("› derivada de "+reels+" reels","› derived from "+reels+" reels")+'</span></div>'+
         '<div class="aj-tonos">'+tonos+'</div>'+
         '<div class="aj-mulet-wrap"><span class="aj-mulet-k">'+L("Muletillas y expresiones tuyas","Your catchphrases & expressions")+'</span><div class="aj-mulet">'+frases+'</div></div>'+
-        '<div class="aj-voice-foot"><div class="aj-slider-row"><span>'+L("Nivel de humor seco","Dry humor level")+'</span><div class="aj-slider"><div class="aj-slider-fill" style="width:68%"></div><div class="aj-slider-knob" style="left:68%"></div></div></div>'+
+        '<div class="aj-voice-foot">'+
           '<button class="btn btn-md btn-primary" data-act="ajustes-save-voice">'+L("Guardar voz","Save voice")+'</button></div>'+
       '</div>'+
       // preferencias
@@ -2450,7 +2457,7 @@
     if(vp && vp.has_profile){
       return {
         tono: vp.tone||"",
-        frases: (vp.phrases||[]).map(function(p){ return '"'+p+'"'; }),
+        frases: (vp.phrases||[]).map(function(p){ return String(p).replace(/^[\s"'“”]+|[\s"'“”]+$/g,''); }),
         estructura: vp.structure||"",
         duracion: vp.avg_duration ? ("~"+vp.avg_duration+"s objetivo") : "",
         evita: vp.avoid||""
@@ -2463,7 +2470,7 @@
     }
     return {
       tono:"Directo y sin postureo. Cuentas las cosas como a un colega en un audio de WhatsApp.",
-      frases:['"te lo cuento porque a mí…"','"paso uno… paso dos…"','"guárdate esto"','"y no, no es lo que crees"'],
+      frases:['te lo cuento porque a mí…','paso uno… paso dos…','guárdate esto','y no, no es lo que crees'],
       estructura:"Hook directo (sin 'hola') → 3 pasos concretos → CTA de guardar/comentar.",
       duracion:"30–45s es tu punto dulce: ahí retienes el doble.",
       evita:"Nada de 'en el panorama actual', 'es fundamental', ni motivacional vacío."
@@ -2919,6 +2926,11 @@
     // Durante el house tour NO montamos el 3D: su build bloquea el hilo y lagea la
     // transición a Cerebro. Queda el orb; se monta al abrir Cerebro de verdad (post-tour).
     var ov=document.querySelector('.tour-overlay'); if(ov && getComputedStyle(ov).display!=='none') return;
+    // v3: el orbe 3D vive OCULTO (el anillo del Cerebro es CSS/SVG; el stage está
+    // display:none). Si el stage no es visible (oculto o sin área), NO cargamos
+    // Three.js ni montamos el loop WebGL: rendería a un canvas invisible y satura la
+    // GPU/CPU sin beneficio (causa del "Cerebro pillado"). Si ya corría, lo paramos.
+    if(stage.offsetParent===null || stage.clientWidth===0 || stage.clientHeight===0){ pauseBrain3D(); return; }
     if(!brain3dEligible()){ _brain3dState=3; return; }
     if(_brain3dState===2){ if(window.RSBrain){ window.RSBrain.mount(stage, currentBrainState()); window.RSBrain.update(currentBrainState()); window.RSBrain.setOnAbsorb(onBrainAbsorb); } if(S._sigSeen==null) brainEmitSignals(); return; }
     if(_brain3dState===1) return;
@@ -3201,12 +3213,16 @@
     var tonos=(v.tono||"").split(/[,·]/).map(function(x){return x.trim();}).filter(Boolean);
     if(!tonos.length) tonos=["Directo","Cercano"];
     var pills=tonos.map(function(t){ return '<span class="ce-tono">'+ESC(t)+'</span>'; }).join("");
-    var frases=(v.frases&&v.frases.length)?v.frases.map(function(f){return '“'+ESC(f)+'”';}).join(", ")+"." : "—";
-    var gancho=(v.frases&&v.frases[0])?('“'+ESC(v.frases[0]).slice(0,16)+'…”'):'“Comenta X…”';
+    // Muletillas como chips (no un run de comas con comillas dobles → mucho más legible).
+    var frases=(v.frases&&v.frases.length)
+      ? v.frases.map(function(f){ return '<span class="ce-mulet-chip">'+ESC(f)+'</span>'; }).join("")
+      : '<span class="ce-mulet-empty">—</span>';
+    var _g0=(v.frases&&v.frases[0])?ESC(v.frases[0]):"";
+    var gancho=_g0 ? ('“'+(_g0.length>22?_g0.slice(0,22).replace(/\s+\S*$/,'')+'…':_g0)+'”') : '“Comenta X…”';
     return '<div class="ce-card ce-know">'+
       '<div class="ce-card-head"><span class="ce-card-t">'+L("Lo que ya sé de ti","What I already know about you")+'</span><span class="ce-card-meta">'+L("› de "+reels+" reels","› from "+reels+" reels")+'</span></div>'+
       '<div class="ce-know-block"><span class="ce-know-k">'+L("Tu tono","Your tone")+'</span><div class="ce-tonos">'+pills+'</div></div>'+
-      '<div class="ce-know-block"><span class="ce-know-k">'+L("Tus muletillas","Your catchphrases")+'</span><p class="ce-mulet">'+frases+'</p></div>'+
+      '<div class="ce-know-block"><span class="ce-know-k">'+L("Tus muletillas","Your catchphrases")+'</span><div class="ce-mulet">'+frases+'</div></div>'+
       '<div class="ce-know-foot">'+
         '<div><div class="ce-foot-k">'+L("duración ideal","ideal length")+'</div><div class="ce-foot-v">'+ESC(v.duracion||"30–45 s")+'</div></div>'+
         '<div><div class="ce-foot-k">'+L("gancho top","top hook")+'</div><div class="ce-foot-v">'+gancho+'</div></div>'+
@@ -5373,6 +5389,8 @@
     if(act==="comp-add-submit") return submitAddComp();
     if(act==="refresh-radar") return refreshRadar();
     if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
+    // Pill de créditos del topbar → abre el modal de planes/upgrade (camino de cobro).
+    if(act==="credits-pill"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("credits_pill"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
     // C1: Ajustes → Plan. "Cambiar plan" abre el modal de PLANES (checkout Whop), "Recargar
     // créditos" abre el modal de TOPUPS (openTopup, no openTopupModal que no existe).
     if(act==="change-plan"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("settings_plan"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
