@@ -27,16 +27,23 @@ Durante la mañana, **generar guion fallaba** (`transcribe_error`) y **las métr
 ## Reset de cuenta a «nueva» (por si lo necesitas)
 Reseteé `leonard@becamaconsulting.com` varias veces para QA del onboarding/tour. Cómo: con el service_role key, DELETE por `user_id` en `ig_videos`(antes)+`ig_profiles`, `user_tracked_creators`, `scripts`, `ideas`, `voice_profiles`, `brain_ratings`, `user_favorite_reels`; + PATCH `profiles` `{onboarding_v2_done:false, niche:null, goal:null, subniches:[], brain_progress:35, brain_exercise_date:null}` (ojo: `subniches` es NOT NULL → usar `[]`). El onboarding solo reaparece si `onb_v2_done=false` **Y** 0 competidores **Y** 0 reels (`showOnboarding()`). Conservé plan/créditos/admin.
 
-## ⏭️ PENDIENTE / TODO
-**Nuevo (pedido por Leo):**
-1. **Volver a añadir la página «Analizar un reel»** para que los reels analizados **se guarden allí** (hoy hay un atajo suelto, pero no una página donde queden persistidos).
-2. **Rate limit de Apify** — mirarlo. **Propuesta: varias cuentas de Apify** y repartir las peticiones (rotación) para que no se caiga por exceso (fue lo que tumbó guiones+métricas esta mañana).
-3. **QA end-to-end: conectar Instagram y que se muestren las métricas** (verificar el flujo completo en real tras los fixes de hoy).
+## ⏭️ PENDIENTE — lo llevamos NOSOTROS (Leo), salvo la infra de David
 
-**De antes:**
-4. **Nivel 5 / «Autopiloto»** — el roadmap promete «Viral · Autopiloto · el Cerebro escribe solo» pero **no hay autopiloto real**, es solo copy. Decidir: construir algo o cambiar el texto para no prometer de más.
-5. **House tour en MÓVIL** — no barrido en móvil físico; revisar spotlight/posicionamiento/scroll por paso (`?tour=1`).
-6. **Encargo de Leo (Ranking):** «cuota de atención del nicho» (hoy "Próximamente") — necesita histórico agregado completo por competidor vía Apify.
+### Nosotros (Leo)
+1. **Página «Analizar un reel»** — volver a añadirla para que los reels analizados **se guarden allí** (hoy hay un atajo suelto, no una página donde queden persistidos).
+2. **Emails de alerta** — revisar que se **mandan** de verdad + **crear el HTML de cada alerta**.
+3. **Cerebro al 100%** — que el % **llegue bien a 100** con sus niveles (hoy el ejercicio diario topa en **95** —`min(95,…)`— y el máximo es **Nivel 5**); **qué hacer pasado el 100% → lo vemos luego** (hoy «Autopiloto» es solo copy, no existe nada).
+4. **Onboarding → «guiones (1/4)»** — que tras el onboarding el bloque del Cerebro muestre **1/4** (hoy «1/3»; el aha ya cuenta como 1 desde v0.25.6 → falta poner el target en **4**).
+5. **Conectar Instagram en la 1ª pantalla del onboarding** — así, al acabar el house tour, el user **ya tiene sus métricas** (el scrape de su perfil corre desde el principio).
+6. **QA end-to-end** — conectar IG y que se muestren las métricas (flujo completo en real tras los fixes de hoy).
+7. **House tour en MÓVIL** — revisar spotlight/posición/scroll por paso (`?tour=1`).
+8. **Ranking → «cuota de atención del nicho»** — hoy "Próximamente"; necesita histórico agregado por competidor (Apify).
+
+### David (infra/billing)
+- **Rate limit de Apify** → **varias cuentas de Apify** + rotación de peticiones para que no se caiga por exceso (fue lo que tumbó guiones+métricas esta mañana).
+- **Confirmar** si recargaste Apify/Groq o fue temporal.
+- **Re-enganchar `prod`** en el VPS (detached HEAD tras los deploys, mismo commit `8786ea5`).
+- **Fragilidad del deploy** (ver «Notas de deploy»).
 
 ## Notas de deploy (fragilidad observada)
 - `deploy.yml` hace `docker compose down` **antes** de `up -d --build` → cualquier fallo de build = **downtime garantizado**. Hoy un fallo transitorio de Docker Hub (`auth.docker.io/token 404`) tumbó la app unos minutos; lo arreglé con un re-run. **Recomendación:** construir antes de bajar (o un solo `up -d --build` sin `down` previo).
