@@ -3071,7 +3071,11 @@ _JSON_SCRIPT_SCHEMA = (
     '"hook": "el MEJOR de 3 hooks — 1 línea del tirón que para el scroll", '
     '"alt_hooks": ["2º hook con un DEVICE DISTINTO al del hook", "3er hook con OTRO device distinto"], '
     '"body": ["frase 1 del guión", "frase 2", "..."], '
-    '"closing": "DOS cierres separados por  /  (variante 1 / variante 2; p.ej. un comment-CTA y un cierre suave)"}. '
+    '"closing": "DOS cierres separados por  /  (variante 1 / variante 2; p.ej. un comment-CTA y un cierre suave)", '
+    # Ítem 10: formato de grabación CLASIFICADO del reel original (por su transcript/
+    # caption/duración) — exactamente UNO de estos valores, en minúscula, sin más texto.
+    '"recording_format": "uno EXACTO de: selfie | pizarra | podcast | escritorio | broll-vo '
+    '(el formato con el que está grabado el reel original y con el que este guion rendiría)"}. '
     'Reglas de salida: los 3 hooks (hook + los 2 de alt_hooks) usan 3 devices DISTINTOS. '
     'body = frase a frase (cada elemento del array es UNA frase, se renderiza con ▸). '
     'Sin markdown, sin ```json, sin texto antes ni después. Solo el JSON.'
@@ -3406,6 +3410,9 @@ def _parse_ai_json(raw: str, style: str) -> dict:
         if not isinstance(data["body"], list):
             data["body"] = [str(data["body"])]
         data.setdefault("closing", "")
+        # Ítem 10: normaliza recording_format al set fijo (o None si no clasifica).
+        _fmt = str(data.get("recording_format") or "").strip().lower()
+        data["recording_format"] = _fmt if _fmt in ("selfie", "pizarra", "podcast", "escritorio", "broll-vo") else None
 
     return data
 
@@ -7837,12 +7844,15 @@ def resend_webhook():
 # creator_reels_global) deduplicada entre users. user_tracked_creators es
 # privado por user; project_id solo lo usa Agency.
 
+# Límites POR MARCA (David, jun 2026): Basic(creator) 5 · Content Creator(estudio) 12 ·
+# Agency 15 por marca. base_slots_global = per_brand × nº marcas del plan (techo global);
+# per_project_slots = el límite POR marca que enforcea el gate cuando hay project_id.
 TRACKED_CREATORS_LIMITS = {
-    "free":    {"enabled": True,  "base_slots_global": 1,  "per_project_slots": None, "requires_project": False},
-    "pro":     {"enabled": True,  "base_slots_global": 1,  "per_project_slots": None, "requires_project": False},
-    "creator": {"enabled": True,  "base_slots_global": 5,  "per_project_slots": None, "requires_project": False},
-    "estudio": {"enabled": True,  "base_slots_global": 15, "per_project_slots": None, "requires_project": False},
-    "agency":  {"enabled": True,  "base_slots_global": 20, "per_project_slots": 10,    "requires_project": True},
+    "free":    {"enabled": True,  "base_slots_global": 1,   "per_project_slots": None, "requires_project": False},
+    "pro":     {"enabled": True,  "base_slots_global": 1,   "per_project_slots": None, "requires_project": False},
+    "creator": {"enabled": True,  "base_slots_global": 5,   "per_project_slots": 5,    "requires_project": False},  # Basic · 1 marca × 5
+    "estudio": {"enabled": True,  "base_slots_global": 36,  "per_project_slots": 12,   "requires_project": False},  # Content Creator · 3 marcas × 12
+    "agency":  {"enabled": True,  "base_slots_global": 150, "per_project_slots": 15,   "requires_project": True},   # Agency · 10 marcas × 15
 }
 
 
@@ -8655,7 +8665,9 @@ def post_tracked_creator():
             return jsonify({"error": "tc.error.plan_limit_reached", "limit": cap_global}), 403
         charge_competitor = True
 
-    if plan == "agency":
+    # Límite POR MARCA: aplica a cualquier plan con per_project_slots cuando se añade a
+    # una marca concreta (project_id). Sin project_id (marca por defecto) → solo el global.
+    if limits.get("per_project_slots") is not None and project_id:
         active_in_project = count_active_tracked(user["id"], project_id=project_id, scope="project")
         if active_in_project >= limits["per_project_slots"]:
             return jsonify({"error": "tc.error.project_limit_reached", "limit": limits["per_project_slots"]}), 403
@@ -8842,6 +8854,16 @@ def get_tracked_creators():
         },
         "usage": {
             "active_global": count_active_tracked(user["id"], scope="global"),
+            # Contador POR MARCA (UI): si la request trae project_id y el plan tiene
+            # límite por marca, devolvemos uso/límite de ESA marca; si no, el global.
+            "active_in_project": (count_active_tracked(user["id"], project_id=project_id, scope="project")
+                                  if project_id else None),
+            "per_brand_used": (count_active_tracked(user["id"], project_id=project_id, scope="project")
+                               if (project_id and limits["per_project_slots"] is not None)
+                               else count_active_tracked(user["id"], scope="global")),
+            "per_brand_limit": (limits["per_project_slots"]
+                                if (project_id and limits["per_project_slots"] is not None)
+                                else limits["base_slots_global"] + extra_slots),
         }
     })
 
@@ -9314,6 +9336,7 @@ def generate_script_from_competitor_reel(reel_id: str):
 
         # Flatten + título (mismo patrón que transcription_to_script).
         llm_title = ""
+        rec_fmt = result.get("recording_format") if isinstance(result, dict) else None  # ítem 10
         if isinstance(result, dict) and result.get("title"):
             llm_title = str(result["title"]).strip()[:80]
         if isinstance(result, dict) and "hook" in result:
@@ -9357,24 +9380,36 @@ def generate_script_from_competitor_reel(reel_id: str):
         except Exception as e:
             logger.warning("generate_script: pre-insert dup check failed user=%s err=%s", uid, e)
 
+        _script_row = {
+            "user_id":                uid,
+            "transcription_id":       None,
+            "idea_id":                None,
+            "title":                  script_title,
+            "script":                 result,
+            "project_id":             None,
+            "from_competitor_reel_id": reel["id"],
+            "from_competitor_username": ig_username,
+            "assistant_name":         _resolve_assistant_name(
+                {"assistant_id": assistant_id, "style": style_label}, uid, db
+            ),
+            "recording_format":       rec_fmt,   # ítem 10
+        }
         try:
-            ins = db.table("scripts").insert({
-                "user_id":                uid,
-                "transcription_id":       None,
-                "idea_id":                None,
-                "title":                  script_title,
-                "script":                 result,
-                "project_id":             None,
-                "from_competitor_reel_id": reel["id"],
-                "from_competitor_username": ig_username,
-                "assistant_name":         _resolve_assistant_name(
-                    {"assistant_id": assistant_id, "style": style_label}, uid, db
-                ),
-            }).execute()
+            ins = db.table("scripts").insert(_script_row).execute()
             if ins.data:
                 script_id = ins.data[0].get("id")
         except Exception as e:
-            logger.error("generate_script: scripts insert failed user=%s err=%s", uid, e, exc_info=True)
+            # Degradación segura: columna recording_format aún sin migrar → reintenta sin ella.
+            if "recording_format" in str(e).lower():
+                _script_row.pop("recording_format", None)
+                try:
+                    ins = db.table("scripts").insert(_script_row).execute()
+                    if ins.data:
+                        script_id = ins.data[0].get("id")
+                except Exception as e2:
+                    logger.error("generate_script: scripts insert (no-fmt) failed user=%s err=%s", uid, e2, exc_info=True)
+            else:
+                logger.error("generate_script: scripts insert failed user=%s err=%s", uid, e, exc_info=True)
             # No refundamos: el LLM funcionó, el user tiene el script en la response.
 
         try:
@@ -9396,6 +9431,7 @@ def generate_script_from_competitor_reel(reel_id: str):
             "script": result,
             "title": script_title,
             "from_competitor_username": ig_username,
+            "recording_format": rec_fmt,   # ítem 10: formato sugerido para grabarlo
         }), 200
 
     # ── Flow asíncrono ─────────────────────────────────────────────────
@@ -10211,11 +10247,27 @@ def get_tracked_creators_reels():
     # 6. Baselines por creador → índice de explosión en cada reel.
     baselines = _creator_view_baselines(creator_ids) if creator_ids else {}
 
+    def _attach_shares(reels):
+        # ítem 6: los compartidos viven en una columna nueva (creator_reels_global.shares).
+        # Best-effort: si la columna aún no está migrada, el except deja shares=None y el
+        # feed sigue funcionando (la UI muestra "–").
+        ids = [r.get("id") for r in reels if r.get("id")]
+        if not ids:
+            return
+        try:
+            sr = db.table("creator_reels_global").select("id, shares").in_("id", ids).execute()
+            sm = {x["id"]: x.get("shares") for x in (sr.data or [])}
+            for r in reels:
+                r["shares"] = sm.get(r.get("id"))
+        except Exception:
+            pass
+
     def _annotate(reels):
         for r in reels:
             r["is_favorite"] = r["id"] in fav_ids
             r["explosion_score"] = _explosion_score(
                 r.get("views"), baselines.get(r.get("creator_id")))
+        _attach_shares(reels)
         return reels
 
     # 7a. Orden por explosión: ventana amplia + sort/paginación en Python
