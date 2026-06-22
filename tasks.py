@@ -1263,28 +1263,24 @@ def _gate_creators_groq(cands: list, niche_ctx: str) -> list:
 
 @celery_app.task(name="tasks.discover_niche_creators")
 def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
-                                 follow_top: int = 6) -> dict:
-    """DESCUBRIMIENTO DE NICHO (onboarding) v2 — SEED = la propia cuenta del usuario.
-    Scrapea el perfil del usuario, coge los `relatedProfiles` que sugiere Instagram
-    (mismo nicho + idioma, según el grafo de IG), los pasa por un GATE LLM barato (Groq)
-    que quita MARCAS y cuentas de otra región/idioma, AUTO-SIGUE los ~6 creadores limpios
-    (→ el radar los muestra) y encola el scrape de sus reels reales. Si el seed no da
-    suficientes creadores limpios, completa por HASHTAG (fallback). Best-effort: si algo
-    falla, no rompe el onboarding (el radar cae a seed/competidores)."""
+                                 seed_handle: str = "", follow_top: int = 6) -> dict:
+    """DESCUBRIMIENTO DE NICHO (onboarding) v2 — SEED = una cuenta referente que el USER
+    AÑADE A MANO en el onboarding (no su propia cuenta; la suya se scrapea solo para
+    métricas). Scrapea los `relatedProfiles` del seed (mismo nicho + idioma del grafo de
+    IG), los pasa por un GATE LLM barato (Groq) que quita MARCAS y cuentas de otra
+    región/idioma, AUTO-SIGUE los ~6 creadores limpios (→ el radar los muestra) y encola
+    el scrape de sus reels reales. Si no hay seed o da <3 creadores limpios, completa por
+    HASHTAG (fallback). Best-effort: si algo falla, no rompe el onboarding."""
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     APIFY_TOKEN = os.environ.get("APIFY_TOKEN", "")
     if not APIFY_TOKEN:
         return {"status": "no_apify"}
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    # 0. Handle del usuario (lo puso en el paso 1 del onboarding) = SEED.
-    seed_handle = ""
-    try:
-        pr = (db.table("ig_profiles").select("ig_username")
-                .eq("user_id", user_id).limit(1).execute()).data or []
-        seed_handle = ((pr[0].get("ig_username") if pr else "") or "").strip().lstrip("@").lower()
-    except Exception as e:
-        logger.warning("[discover] no ig_profile for user %s: %s", user_id, e)
+    # 0. SEED = cuenta del nicho que el user añadió a mano (validada de nuevo aquí).
+    seed_handle = (seed_handle or "").strip().lstrip("@").lower()
+    if not re.match(r"^[a-z0-9._]{2,30}$", seed_handle):
+        seed_handle = ""
     niche_ctx = ", ".join([x for x in ([niche] + list(subniches or [])) if x]) or (niche or "")
 
     keep_unames: list = []

@@ -413,7 +413,7 @@
      contenido ingerido + el objetivo (STYLE_PROMPTS/PRESET_TONES intactos en
      backend + selector en Cerebro). Pantalla dedicada que oculta el radar vacío.
      Demo-funcional vía ?onb=1. ════════════════════════════════════════════════ */
-  var ONB_STEPS=["handle","niche","subniche","goal","close"];   // «value» y «competitors» retirados: el descubrimiento de nicho AUTO-SIGUE a los creadores acertados (elegir a mano sugería vacío y metía gente fuera de nicho)
+  var ONB_STEPS=["handle","niche","subniche","seed","goal","close"];   // «seed» = el user añade UNA cuenta de su nicho a mano → scrapeamos sus relatedProfiles (grafo de IG) para sacar competidores+reels acertados. La cuenta PROPIA (handle) se scrapea solo para métricas. («value» y «competitors» viejos retirados.)
   function nicheChips(){ return rsLang()==="en"
     ? ["Fitness","Finance","Marketing","Cooking","Fashion","Beauty","Travel","Tech","Education","Real estate","Health","Business"]
     : ["Fitness","Finanzas","Marketing","Cocina","Moda","Belleza","Viajes","Tecnología","Educación","Inmobiliaria","Salud","Negocios"]; }
@@ -525,6 +525,22 @@
       (sugg?'<div class="onb-sugg-lbl">'+L("Sugerencias para tu nicho","Suggestions for your niche")+'</div><div class="onb-tags onb-tags--sugg">'+sugg+'</div>':'')+
       onbErr()+
       '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-sub-next">'+IC.arr+' '+L("Continuar","Continue")+'</button></div>');
+  }
+  // Paso 4 — SEED de nicho: el user añade A MANO una cuenta referente de su nicho.
+  // Scrapeamos sus relatedProfiles (grafo de IG) → competidores + reels acertados
+  // (mucho mejor que el hashtag). El gate Groq del backend limpia marcas/otra región.
+  function onbSeedHTML(){
+    var _sv=(S.onb.seed||"").replace(/^@+/,"");
+    var _ok=/^[a-zA-Z0-9._]{2,30}$/.test(_sv);
+    var okChip='<span class="onb-handle-ok'+(_ok?' on':'')+'">'+IC.check+' '+L("cuenta válida","valid handle")+'</span>';
+    return onbCardWrap(onbEyebrow(L("tu competencia","your competition")),
+      L("¿Quién lo está petando en tu nicho?","Who's killing it in your niche?"),
+      L("Dame UNA cuenta referente de lo tuyo. A partir de ella encuentro a tus competidores y los reels que de verdad te interesan.","Give me ONE reference account in your niche. From it I find your competitors and the reels that actually matter to you."),
+      '<div class="onb-pform"><div class="onb-handle"><span class="onb-at">@</span>'+
+        '<input id="rsOnbSeed" class="onb-input" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="'+L("cuenta_de_tu_nicho","niche_account")+'" value="'+ESC(_sv)+'" aria-label="'+L("Una cuenta de tu nicho","An account in your niche")+'">'+okChip+'</div></div>'+
+      onbErr()+
+      '<div class="onb-row">'+onbBackBtn()+'<button class="btn btn-lg btn-primary onb-cta" data-act="onb-seed-next">'+IC.arr+' '+L("Continuar","Continue")+'</button></div>'+
+      '<button class="onb-skip" data-act="onb-seed-skip">'+L("No sé a quién poner ahora","Not sure who to add yet")+'</button>');
   }
   // Paso 4 — VALOR (aha): roba 1 de 3 reels explosivos → tu 1er guion a tu medida
   // (nicho + tono; aún NO voz personal — esa es la promesa del cierre/entrenar voz).
@@ -654,6 +670,7 @@
     switch(S.onb.step){
       case "niche": return onbNicheHTML();
       case "subniche": return onbSubnicheHTML();
+      case "seed": return onbSeedHTML();
       case "goal": return onbGoalHTML();
       case "close": return onbCloseHTML();
       default: return onbHandleHTML();
@@ -721,12 +738,28 @@
   }
   function onbSubNext(){
     if(!(S.onb.subniches||[]).length){ S.onb.error=L("Elige al menos una etiqueta — es la clave del match.","Pick at least one tag — it's the key to the match."); return render(); }
-    // Dispara EN 2º PLANO el descubrimiento de reels del nicho (Apify hashtag) → al
-    // llegar al radar la pool ya tiene reels acertados. Una sola vez por onboarding.
-    if(!isDemo() && !S.onb._discoverFired){ S.onb._discoverFired=true; try{ apiPost("/api/onboarding/discover-niche",{niche:S.onb.niche, subniches:S.onb.subniches||[]}); }catch(e){} }
-    // «value» y «competitors» retirados → directo a goal (sub → goal → close). El
-    // descubrimiento de nicho auto-sigue a los creadores; competidores extra = en el radar.
-    onbTrack("onb_step_completed"); onbGoto("goal");
+    onbTrack("onb_step_completed"); onbGoto("seed");
+  }
+  // Dispara EN 2º PLANO el descubrimiento (relatedProfiles del seed → gate Groq →
+  // competidores+reels). Una sola vez por onboarding. seed opcional: vacío = fallback
+  // hashtag en el backend.
+  function onbFireDiscover(){
+    if(isDemo() || S.onb._discoverFired) return;
+    S.onb._discoverFired=true;
+    try{ apiPost("/api/onboarding/discover-niche",{niche:S.onb.niche, subniches:S.onb.subniches||[], seed:S.onb.seed||""}); }catch(e){}
+  }
+  function onbSeedNext(){
+    var inp=document.getElementById("rsOnbSeed");
+    var h=(inp?inp.value:S.onb.seed||"").trim().replace(/^@+/,"").toLowerCase();
+    if(!/^[a-z0-9._]{2,30}$/.test(h)){ S.onb.error=L("Escribe una cuenta de Instagram sin @ (o pulsa «No sé a quién poner»).","Type an Instagram account without @ (or hit «Not sure who to add»)."); S.onb.seed=h; return render(); }
+    S.onb.seed=h;
+    onbFireDiscover();
+    onbTrack("onb_step_completed",{seed:h}); onbGoto("goal");
+  }
+  function onbSeedSkip(){
+    S.onb.seed="";
+    onbFireDiscover();   // sin seed → el backend cae a hashtag
+    onbTrack("onb_step_skipped"); onbGoto("goal");
   }
   // Reels reciclados del subnicho (recycling library). Demo siembra local.
   function onbLoadValue(){
@@ -3994,6 +4027,7 @@
     if(S.sheet){ var _si=document.getElementById("rsSheetInput"); if(_si) S.sheet.initial=_si.value; }
     // growth-2: conserva el handle a medio teclear ante un render de fondo.
     if(S.onb && S.onb.step==="handle"){ var _oi=document.getElementById("rsOnbHandle"); if(_oi) S.onb.handle=_oi.value; }
+    if(S.onb && S.onb.step==="seed"){ var _si=document.getElementById("rsOnbSeed"); if(_si) S.onb.seed=_si.value; }
     // Fix review (T4/a11y): #rsToast/#rsErr deben ser nodos PERSISTENTES — una región
     // aria-live solo se anuncia cuando su contenido MUTA estando ya en el DOM. Si se
     // recrean en cada innerHTML, el patrón render()+showToast() no se anuncia. La vista
@@ -5607,6 +5641,8 @@
     if(act==="onb-tag-toggle") return onbTagToggle(btn.getAttribute("data-k"));
     if(act==="onb-tag-add") return onbTagAdd();
     if(act==="onb-sub-next") return onbSubNext();
+    if(act==="onb-seed-next") return onbSeedNext();
+    if(act==="onb-seed-skip") return onbSeedSkip();
     if(act==="onb-value-next") return onbValueNext();
     if(act==="onb-value-steal") return onbValueSteal(parseInt(btn.getAttribute("data-i"),10)||0);
     if(act==="onb-value-reset") return onbValueReset();
