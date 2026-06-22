@@ -3249,6 +3249,12 @@
     }
     /* En el modal de upgrade ya hay un badge i18n (.price-badge "Más elegido") → evita el doble. */
     .upgrade-modal .price-card.featured::before { display: none; }
+    /* Badge «Más elegido» como LAZO sobre el borde de la card (no empuja el contenido). */
+    .upgrade-modal .upgrade-card .price-badge {
+      position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+      margin: 0; white-space: nowrap; z-index: 3; box-shadow: 0 4px 14px rgba(79,124,255,.35);
+    }
+    .upgrade-modal .upgrade-card.featured { padding-top: 26px; }
     /* Billing toggle */
     .billing-toggle {
       display: inline-flex; align-items: center; gap: 4px;
@@ -3334,8 +3340,10 @@
     .ucmp-table th, .ucmp-table td { padding: 11px 12px; text-align: center; border-bottom: 1px solid var(--border); }
     .ucmp-table thead th { font-weight: 700; color: var(--text); font-size: .92rem; border-bottom: 2px solid var(--border); }
     .ucmp-table td.ucmp-feat, .ucmp-table th.ucmp-feat { text-align: left; color: var(--text2); font-weight: 500; }
-    .ucmp-table .ucmp-on { background: var(--brand-50, rgba(47,91,255,.08)); }
-    .ucmp-table thead th.ucmp-on { color: var(--brand); border-bottom-color: var(--brand); }
+    /* Columna destacada: tinte translúcido (var(--brand-50) resolvía a casi BLANCO en
+       tema oscuro → tapaba los valores). Translúcido funciona en claro y oscuro. */
+    .ucmp-table .ucmp-on { background: rgba(79,124,255,.12); }
+    .ucmp-table thead th.ucmp-on { color: var(--brand-500, #4f7cff); border-bottom-color: var(--brand); }
     .ucmp-table tbody tr:last-child td { border-bottom: none; }
     .ucmp-yes { color: var(--success-fg, #3FE0A0); font-weight: 700; }
     .ucmp-no { color: var(--text3); }
