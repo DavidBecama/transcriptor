@@ -845,19 +845,40 @@
     '</div></div></div>';
   }
   function onbWaitForNiche(){
-    var t0=Date.now(), HARD=68000;   // tope duro: nunca se atasca (descubrimiento+scrape)
+    var t0=Date.now(), HARD=70000;   // tope duro: nunca se atasca (descubrimiento+scrape)
+    var lastN=-1, stable=0;
     (function loop(){
       if(!S._onbWaiting) return;
       var el=Date.now()-t0;
-      // listo = ya hay reels REALES de los creadores del nicho (no el seed de la pool vieja).
-      var ready=((S.reels||[]).length>0 && !S.radarSeed);
-      if(ready || el>HARD){
+      var n=(S.reels||[]).length;
+      var hasReal=(n>0 && !S.radarSeed);   // reels REALES del nicho (no el seed de la pool vieja)
+      if(hasReal){ if(n===lastN) stable++; else { stable=0; lastN=n; } }
+      // NO soltar al primer reel: los creadores terminan de scrapearse escalonados (~60s).
+      // listo = hay reels reales Y (ya hay buena pool, O llevan ~8s sin crecer, O tope duro).
+      if((hasReal && (n>=8 || stable>=2)) || el>HARD){
         S._onbWaiting=false; render(); onbStartTour();
-        if(!ready) showToast(L("Tu radar se está llenando con reels de tu nicho — pulsa «Actualizar radar» en un momento.","Your radar is filling with niche reels — hit «Refresh radar» in a moment."));
+        if(!hasReal) showToast(L("Tu radar se está llenando con reels de tu nicho — pulsa «Actualizar radar» en un momento.","Your radar is filling with niche reels — hit «Refresh radar» in a moment."));
+        else onbRadarCatchup();   // sigue trayendo los creadores que terminen de scrapearse luego
         return;
       }
       if(typeof loadBrandData==="function"){ try{ loadBrandData(); }catch(e){} }
       setTimeout(loop, 4000);
+    })();
+  }
+  // Tras soltar al radar, sigue refrescando en 2º plano (~1 min) para que aparezcan los
+  // reels de creadores que terminen de scrapearse más tarde — sin pedir refresco manual.
+  // Para cuando la pool deja de crecer 3 sondeos seguidos (ya cuajó) o agota los intentos.
+  function onbRadarCatchup(){
+    var tries=0, lastN=(S.reels||[]).length, stable=0;
+    (function loop(){
+      if(++tries>9) return;   // ~72s máx
+      if(typeof loadBrandData==="function"){ try{ loadBrandData(); }catch(e){} }
+      setTimeout(function(){
+        var n=(S.reels||[]).length;
+        if(n===lastN) stable++; else { stable=0; lastN=n; }
+        if(stable>=3) return;   // 3 sondeos sin crecer = la pool ya cuajó
+        loop();
+      }, 8000);
     })();
   }
   // CIERRE: ingiere (prod) → Cerebro ~50% + 1er guión; demo simula y siembra panel.
