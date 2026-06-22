@@ -8164,7 +8164,7 @@ def onboarding_discover_niche():
         return jsonify({"ok": False, "error": "no_subniches"}), 200
     try:
         from tasks import discover_niche_creators_task  # noqa: E402
-        discover_niche_creators_task.delay(niche, subs)
+        discover_niche_creators_task.delay(user["id"], niche, subs)
     except Exception:
         logger.warning("onboarding_discover_niche: enqueue failed")
         return jsonify({"ok": False, "error": "enqueue_failed"}), 200

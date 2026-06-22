@@ -800,6 +800,32 @@
   // Tras el onboarding, arranca el House Tour (orden Fathom: onboarding → tour).
   // El auto-start de index.html se inhibe mientras la pantalla de onboarding existe.
   function onbStartTour(){ if(typeof window.startTour==="function"){ setTimeout(function(){ try{ window.startTour(); }catch(e){} }, 700); } }
+  // Pantalla de espera tras el onboarding: mientras Apify descubre+scrapea los creadores
+  // del nicho (auto-seguidos en el paso de tags), el radar arranca con reels ACERTADOS.
+  function onbWaitHTML(){
+    var subs=((S.onb&&S.onb.subniches)||[]).slice(0,3).map(function(t){return "#"+t;}).join(" ");
+    return '<div class="scroll"><div class="canvas"><div class="onbwait">'+
+      '<div class="onbwait-orb">'+IC.brain+'<span class="onbwait-ring"></span></div>'+
+      '<div class="onbwait-t">'+L("Preparando tu radar…","Setting up your radar…")+'</div>'+
+      '<div class="onbwait-d">'+L("Estoy rastreando los creadores que más petan en "+(subs||"tu nicho")+" y trayéndote sus reels — para que arranques con lo MÁS acertado.","Tracking the top creators in "+(subs||"your niche")+" and pulling their reels — so you start with the most on-point picks.")+'</div>'+
+      '<div class="onbwait-sub"><span class="mini-spin"></span> '+L("Suele tardar menos de un minuto…","Usually under a minute…")+'</div>'+
+    '</div></div></div>';
+  }
+  function onbWaitForNiche(){
+    var t0=Date.now(), MAX=80000;   // ~80s tope (5 creadores × scrape en paralelo)
+    (function loop(){
+      if(!S._onbWaiting) return;
+      // listo = ya hay reels REALES de los creadores seguidos (no el seed) o se agotó el tiempo.
+      var ready=((S.reels||[]).length>0 && !S.radarSeed);
+      if(ready || (Date.now()-t0)>MAX){
+        S._onbWaiting=false; render(); onbStartTour();
+        if(!ready) showToast(L("Tu radar se sigue llenando con reels de tu nicho — pulsa «Actualizar radar» en un momento.","Your radar is still filling with niche reels — hit «Refresh radar» in a moment."));
+        return;
+      }
+      if(typeof loadBrandData==="function"){ try{ loadBrandData(); }catch(e){} }
+      setTimeout(loop, 5000);
+    })();
+  }
   // CIERRE: ingiere (prod) → Cerebro ~50% + 1er guión; demo simula y siembra panel.
   function onbFinish(){
     onbTrack("onb_step_completed");
@@ -820,9 +846,9 @@
       S.onb.busy=false; S.onb.skipped=true; S.user.onbV2Done=true;
       var v=(r.ok&&r.d&&r.d.voice!=null)?r.d.voice:50;
       try{ brand().voice=Math.max(brand().voice||0,v); }catch(e){}
-      S.tab="dashboard"; render(); onbStartTour();
-      if(typeof loadBrandData==="function"){ try{ loadBrandData(); }catch(e){} }
-      showToast(L("Cerebro al "+v+"% · analizando tu nicho, tu panel se está llenando…","Brain at "+v+"% · analyzing your niche, your panel is filling up…"));
+      // Espera a que lleguen los reels del nicho (descubrimiento Apify) → luego el tour.
+      S._onbWaiting=true; S.radarSeed=false; S.reels=[]; S.tab="dashboard"; render(); onbWaitForNiche();
+      showToast(L("Cerebro al "+v+"% · buscando los reels más acertados de tu nicho…","Brain at "+v+"% · finding the most on-point reels for your niche…"));
     });
   }
   function onbSkip(){ onbTrack("onb_skipped"); S.onb.skipped=true; if(!isDemo()){ try{ apiPost("/api/onboarding/complete",{handle:S.onb.handle, skipped:true, niche:S.onb.niche, subniches:S.onb.subniches||[]}); }catch(e){} } S.tab="dashboard"; render(); }
@@ -1507,6 +1533,7 @@
     '</div>';
   }
   function dashboardHTML(){
+    if(S._onbWaiting) return onbWaitHTML();   // tras el onboarding: esperando los reels del nicho (Apify)
     var st=S.stats||{competitors:0,reels_week:0,exploded_week:0,stolen_today:0}; var b=brand();
     var sorted=feedReels();
     var line = st.exploded_week>0
