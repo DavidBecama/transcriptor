@@ -9843,9 +9843,9 @@
       display:flex; align-items:center; justify-content:center; }
     .rs .anzd-back:hover { color:var(--text-primary); border-color:var(--accent); }
     .rs .anzd-head-t { font-weight:700; font-size:16px; color:var(--text-primary); }
-    .rs .anzd-grid { display:grid; grid-template-columns:260px 1fr; gap:22px; align-items:start; }
-    .rs .anzd-thumb { position:relative; width:100%; aspect-ratio:9/13; max-height:380px; border-radius:14px;
-      overflow:hidden; background:var(--surface-sunken); display:flex; align-items:center; justify-content:center; margin-bottom:12px; }
+    .rs .anzd-grid { display:grid; grid-template-columns:320px 1fr; gap:28px; align-items:stretch; }
+    .rs .anzd-thumb { position:relative; width:100%; aspect-ratio:9/13; max-height:520px; border-radius:14px;
+      overflow:hidden; background:var(--surface-sunken); display:flex; align-items:center; justify-content:center; margin-bottom:14px; }
     .rs .anzd-thumb-img { width:100%; height:100%; object-fit:cover; }
     .rs .anzd-thumb-ph { color:var(--text-tertiary); opacity:.4; transform:scale(2.2); }
     .rs .anzd-plat { position:absolute; left:8px; bottom:8px; font-size:9px; text-transform:uppercase; letter-spacing:.04em;
@@ -9861,11 +9861,11 @@
     .rs .anzd-nostat { font-size:12px; color:var(--text-tertiary); margin-bottom:12px; }
     .rs .anzd-link { display:inline-block; font-size:13px; color:var(--accent); text-decoration:none; }
     .rs .anzd-link:hover { text-decoration:underline; }
-    .rs .anzd-main { min-width:0; }
-    .rs .anzd-acts { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .rs .anzd-main { min-width:0; display:flex; flex-direction:column; }
+    .rs .anzd-acts { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
     .rs .anzd-txlabel { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); margin-bottom:8px; }
-    .rs .anzd-tx { white-space:pre-wrap; line-height:1.62; font-size:14.5px; color:var(--text-secondary);
-      background:var(--surface-overlay); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:18px; }
+    .rs .anzd-tx { flex:1; min-height:46vh; white-space:pre-wrap; line-height:1.75; font-size:15.5px; color:var(--text-secondary);
+      background:var(--surface-overlay); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:22px 24px; }
     .rs--mobile .anzd-grid { grid-template-columns:1fr; }
     .rs--mobile .anzd-thumb { max-width:220px; margin-left:auto; margin-right:auto; }
     .rs--mobile .sheet-body { padding:20px 16px; max-width:100%; }
@@ -10256,6 +10256,10 @@
     .rs .rs-lock--sm .rs-lock-over .btn { width:auto; }
     .rs .rs-skel { background:var(--surface-raised); border:1px solid var(--border-default); border-radius:18px; height:160px; animation: rsPulse 1.3s ease-in-out infinite; }
     @keyframes rsPulse { 0%,100%{opacity:.5;} 50%{opacity:.8;} }
+    /* Spinner de carga inicial (boot) — claro sobre el fondo oscuro para que no parezca pantalla vacía. */
+    .rs .rs-boot { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:60px 0 34px; }
+    .rs .rs-boot-spin { width:38px; height:38px; border-radius:99px; border:3px solid var(--border-default); border-top-color:var(--brand-500); animation:rsSpin .8s linear infinite; }
+    .rs .rs-boot-t { font-size:13px; color:var(--text-tertiary); letter-spacing:.02em; }
 
     /* ══ v0.18.x "el despertar" — titular + oportunidad del día ══ */
     .rs .awaken { margin-bottom:22px; }
@@ -28024,6 +28028,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=100"></script>
+<script src="/static/js/radar-loop.js?v=101"></script>
 </body>
 </html>
