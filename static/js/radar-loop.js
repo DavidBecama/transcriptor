@@ -542,7 +542,8 @@
     } else {
       var cards=(S.onb.valueReels||[]).map(function(r,i){
         // Miniatura real del reel (thumb del subnicho); si no hay, gradiente + play.
-        var th=r.thumb||r.thumbnail_b64||r.thumbnail_url||null;
+        // El seed real trae thumb_b64/thumb_url (sin «nail»); incluirlos o salía azul.
+        var th=r.thumb||r.thumb_b64||r.thumb_url||r.thumbnail_b64||r.thumbnail_url||null;
         var thumbInner=th
           ? '<img src="'+ESC(th)+'" alt="" loading="lazy">'
           : '<div class="onb-vcard-ph" style="background:'+_galGrad(r.handle||String(i))+'">'+_icPlay+'</div>';
@@ -958,6 +959,39 @@
         '</div>'+
       '</div>'+
       '<button class="btn btn-lg btn-primary" data-act="fillweek">'+IC.bolt+' '+L("Generar "+count+" guiones","Generate "+count+" scripts")+'</button>'+
+    '</div>';
+  }
+  /* #8 PROACTIVIDAD — «Tu siguiente paso»: la gente nueva está perdida; aquí le
+     decimos LA acción más útil AHORA (una sola, sin pensar) según señales reales.
+     Prioridad = bucle núcleo (seguir→robar→grabar) y luego voz/IG. */
+  function dashboardNextStepHTML(){
+    if(S.filter==="fav"||S.creatorFilter) return "";   // solo en el dashboard normal
+    var s=brainSignals();
+    var gus=(S.guiones||[]).filter(function(g){return g.status!=="discarded";});
+    var nGui=gus.length, nRec=gus.filter(function(g){return g.status==="recorded";}).length;
+    var igOn=!!S.igConnected;
+    var st;
+    if(s.comps<1){
+      st={t:L("Sigue a tu primer competidor","Follow your first competitor"), b:L("Es de quien te traigo las ideas que petan. Añade 1 y arranca tu radar.","They're who I bring you winning ideas from. Add 1 and start your radar."), c:L("Añadir competidor","Add competitor"), act:"add-comp"};
+    } else if(nGui<1){
+      st={t:L("Roba tu primera idea","Steal your first idea"), b:L("Elige el reel más explosivo de tu radar y te lo convierto en guion, en tu voz.","Pick the most explosive reel on your radar and I'll turn it into a script, in your voice."), c:L("Ver mi radar ↓","See my radar ↓"), act:"dns-feed"};
+    } else if(nRec<1){
+      st={t:L("Graba tu primer guion","Record your first script"), b:L("Ya tienes un guion listo. Ábrelo en el teleprónter y léelo a cámara — gratis.","You've got a script ready. Open it in the teleprompter and read it to camera — free."), c:L("Ir a Guiones","Go to Scripts"), act:"tab", k:"guiones"};
+    } else if((s.voice||0)<50){
+      st={t:L("Entrena tu voz","Train your voice"), b:L("Cuanto más me entrenas, más tuyo suena el siguiente guion. 2 minutos.","The more you train me, the more the next script sounds like you. 2 minutes."), c:L("Entrenar mi voz","Train my voice"), act:"tab", k:"brain"};
+    } else if(!igOn){
+      st={t:L("Conecta tu Instagram","Connect your Instagram"), b:L("Para medir qué de lo que publicas funciona y doblar lo que pega.","To measure what works on what you post and double down on it."), c:L("Conectar Instagram","Connect Instagram"), act:"tab", k:"metrics"};
+    } else if(nGui<4){
+      st={t:L("Roba tu próxima idea","Steal your next idea"), b:L("Vas "+nGui+"/4 para Nivel 3 — cada guion afina tu Cerebro.","You're at "+nGui+"/4 for Level 3 — every script tunes your Brain."), c:L("Ver mi radar ↓","See my radar ↓"), act:"dns-feed"};
+    } else {
+      st={t:L("Vas en racha 🔥","You're on a streak 🔥"), b:L("Sigue robando y publicando — cada reel te acerca al siguiente nivel.","Keep stealing and posting — every reel gets you closer to the next level."), c:L("Ver mi radar ↓","See my radar ↓"), act:"dns-feed"};
+    }
+    var dk=st.k?(' data-k="'+st.k+'"'):"";
+    return '<div class="dns">'+
+      '<div class="dns-ic">'+IC.bolt+'</div>'+
+      '<div class="dns-body"><span class="dns-eyebrow">'+L("HAZ ESTO AHORA","DO THIS NOW")+'</span>'+
+        '<div class="dns-t">'+ESC(st.t)+'</div><div class="dns-b">'+ESC(st.b)+'</div></div>'+
+      '<button class="btn btn-md btn-primary dns-cta" data-act="'+st.act+'"'+dk+'>'+ESC(st.c)+'</button>'+
     '</div>';
   }
   /* v3 (mockup David «progreso / cerebro»): fila con icono cerebro azul, nivel +
@@ -1513,7 +1547,7 @@
     //   se DEMOTAN bajo la espina para no romper la jerarquía visual de David.
     return '<div class="scroll"><div class="canvas">'+
       radarHeroHTML()+            // hero con scope animado + stats (sustituye phead+statbar)
-      ""+
+      dashboardNextStepHTML()+   // #8 PROACTIVIDAD: «HAZ ESTO AHORA» — la acción más útil ya
       opportunityCarouselHTML(heroN)+   // OPORTUNIDAD justo tras el hero (acción sobre el fold)
       (S.reels.length?competitorGalleryHTML():"")+   // competidores (chips) + galería (mockup David)
       radarCerebroRowHTML()+     // progreso/cerebro (nivel + barra + Crear guion)
@@ -3139,6 +3173,42 @@
       {kind:"contraintuitivo",text:"Deja de hacer esto en "+n+": te cuesta más de lo que crees."}
     ];
   }
+  /* #2/#7 ALIMENTAR EL CEREBRO (Duolingo/dopamina): card prominente con input para
+     que el usuario cuente cosas de sí mismo → aprende. Feedback visual FUERTE (lluvia
+     de datos al cerebro 3D + pulso de crecimiento) + «gracias, voy aprendiendo». */
+  function brainFeedMeHTML(){
+    return '<div class="feedme">'+
+      '<div class="feedme-body">'+
+        '<span class="feedme-eyebrow">'+IC.bolt+' '+L("ALIMENTA TU CEREBRO","FEED YOUR BRAIN")+'</span>'+
+        '<div class="feedme-t">'+L("Cuéntame algo de ti y aprendo al instante","Tell me something about you and I learn instantly")+'</div>'+
+        '<div class="feedme-d">'+L("Tu estilo, lo que te gusta, tus muletillas, a quién admiras… cada dato hace que el siguiente guion suene MÁS tuyo.","Your style, what you like, your catchphrases, who you admire… every bit makes the next script sound MORE like you.")+'</div>'+
+        '<textarea id="rsFeedMe" class="feedme-input" rows="2" maxlength="400" placeholder="'+L("ej: hablo directo y sin rodeos, me encanta el humor seco y los datos curiosos…","e.g. I talk straight with no fluff, I love dry humor and curious facts…")+'"></textarea>'+
+        '<button class="btn btn-lg btn-primary feedme-cta" data-act="brain-feed-me">'+IC.bolt+' '+L("Alimentar al Cerebro","Feed the Brain")+'</button>'+
+      '</div>'+
+    '</div>';
+  }
+  // Lluvia de datos al cerebro 3D + pulso de crecimiento (dopamina).
+  function brainFeast(n){
+    n=n||6;
+    try{
+      if(window.RSBrain){
+        for(var i=0;i<n;i++){ (function(d){ setTimeout(function(){ try{ window.RSBrain.feed(d%2?'guio':'comp'); }catch(e){} }, d*85); })(i); }
+        setTimeout(function(){ try{ window.RSBrain.levelup(); }catch(e){} }, n*85+140);
+      }
+    }catch(e){}
+    var orb=document.querySelector(".brain-orb"); if(orb){ orb.classList.remove("feast"); void orb.offsetWidth; orb.classList.add("feast"); setTimeout(function(){ orb.classList.remove("feast"); }, 1200); }
+  }
+  function brainFeedMe(){
+    var ta=document.getElementById("rsFeedMe"); var note=ta?ta.value.trim():"";
+    if(!note){ if(ta) ta.focus(); return; }
+    brainFeast(9);   // dopamina: lluvia + pulso
+    var vg=2+_lbHash(note.slice(0,16)+"feed",0,3);   // +2..4 a la voz (optimista)
+    if(S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+vg); }
+    if(!isDemo()){ try{ apiPost('/api/brain/rate',{text:note, kind:"self_note", type:"self_note", rating:1, suggestion:note, niche:(S.onb&&S.onb.niche)||""}); }catch(e){} }
+    if(ta) ta.value="";
+    render();
+    showToast(L("+"+vg+"% · gracias 🧠 voy aprendiendo de ti. Cada dato cuenta — sigue alimentándome.","+"+vg+"% · thanks 🧠 I'm learning you. Every bit counts — keep feeding me."));
+  }
   function brainTrainHTML(){
     var mode=brainTrainMode();
     var modeLbl=mode==='hooks'?L("hooks","hooks"):L("guiones","scripts");
@@ -3426,6 +3496,7 @@
       // ── espina limpia (mockup David) ──
       brainHeaderV3HTML()+
       brainHeroV3HTML(lv, voicePct)+
+      (isDemo()?"":brainFeedMeHTML())+   // #2/#7: alimentar el Cerebro (Duolingo/dopamina)
       '<div class="ce-grid">'+brainKnowHTML(v)+brainLevelsHTML(lv)+'</div>'+
       brainMissionsHTML(lv)+
       // v3 (mockup David): el Cerebro queda SOLO con la espina (header + anillo +
@@ -4489,9 +4560,10 @@
       r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},600);
     }).catch(function(){ r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},800); });
   }
-  // Polling del task de generación async (steal cache-miss). Máx ~90s.
+  // Polling del task de generación async (steal cache-miss). Máx ~150s (la transcripción
+  // por Apify+Groq puede tardar; 90s se quedaba corto y daba "No pude terminar").
   function pollScriptTask(taskId, r, t0, cb){
-    var tries=0, MAX=45;
+    var tries=0, MAX=75;
     (function loop(){
       tries++;
       apiGet("/task/script/"+encodeURIComponent(taskId)).then(function(rr){
@@ -5392,6 +5464,7 @@
     if(act==="brain-rate") return brainRate(parseInt(btn.getAttribute("data-k"),10)||0);
     if(act==="brain-train-mode") return setBrainTrainMode(k);
     if(act==="brain-improve") return brainImprove(k==="send");
+    if(act==="brain-feed-me") return brainFeedMe();   // #2/#7: alimentar el Cerebro
     if(act==="brain-train-more") return brainTrainMore();
     if(act==="gt-start") return startGuionTinder();
     if(act==="gt-vote") return guionTinderVote(parseInt(btn.getAttribute("data-k"),10)||0);
@@ -5524,6 +5597,7 @@
     // Reusa el modal legacy global (index.html); al añadir, submitAddCompetitor
     // recarga el Radar vía window.RS_reloadRadar (puente en loadBrandData).
     if(act==="add-comp") return toggleAddComp();          // FIX2: añadir competidor inline desde el Radar
+    if(act==="dns-feed"){ var _t=document.querySelector(".opp, .feature, .rgal"); if(_t) _t.scrollIntoView({behavior:"smooth", block:"center"}); return; }   // #8: «ver mi radar» → baja a las oportunidades
     if(act==="comp-add-submit") return submitAddComp();
     if(act==="refresh-radar") return refreshRadar();
     if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
