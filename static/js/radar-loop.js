@@ -5189,6 +5189,21 @@
       })
       .catch(function(){ showError("Error de red al actualizar tus reels."); });
   }
+  // Desvincular de verdad: el handler solo cambiaba S.igConnected en local y NUNCA
+  // borraba la fila en BD → reconectar daba 409 "esta marca ya tiene perfil" en bucle.
+  // Llama al DELETE /metrics/ig-profile scopeado por marca (igual que el connect). 404
+  // (ya no había fila) cuenta como éxito. Limpia los reels cacheados de la marca.
+  function igDisconnect(){
+    showToast("Desvinculando Instagram…");
+    var url="/metrics/ig-profile"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):"");
+    apiDelete(url).then(function(r){
+      if(r.ok||r.status===404){
+        S.igConnected=false; if(S.metrics) S.metrics.videos=[]; render();
+        return showToast("Instagram desvinculado.");
+      }
+      showError((r.d&&r.d.error)||"No pude desvincular Instagram.");
+    });
+  }
 
   /* ── Equipo (Agencia): invitar + cargar miembros reales ──────────
      Mirror del estilo de igConnectProfile/refreshReels (fetch same-origin).
@@ -5578,7 +5593,7 @@
     if(act==="tp-mirror"){ S.tp.mirror=!S.tp.mirror; return render(); }
     if(act==="tp-record"){ if(S.tp.recording){ S.tp.recording=false; S.tp.playing=false; clearInterval(S.tpTimer); return render(); } tpRecordCountdown(); return; }
     if(act==="ig-connect"){ if(!isDemo()) return igConnectProfile(); S.igConnected=true; bumpEco(0,0); render(); return showToast("Instagram conectado. El sistema empezará a aprender de lo que publicas."); }
-    if(act==="ig-disconnect"){ S.igConnected=false; render(); return showToast("Instagram desvinculado."); }
+    if(act==="ig-disconnect"){ if(!isDemo()) return igDisconnect(); S.igConnected=false; render(); return showToast("Instagram desvinculado."); }
     if(act==="metric-sort"){ S.metricSort=k; return render(); }
     if(act==="metric-chart"){ S.metricChart=k; return render(); }
     if(act==="metric-view"){ S.metricView=k||"resumen"; return render(); }
