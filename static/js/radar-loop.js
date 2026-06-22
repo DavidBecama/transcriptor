@@ -4255,7 +4255,7 @@
         if(!S._tx||S._tx.id!==id) return;
         var s=r.script||{}; var txt=[s.hook].concat(s.beats||[],[s.close]).filter(Boolean).join(" ");
         S._tx={id:id, status:"ok", text:txt||"Transcripción de muestra del reel (demo)."};
-        if(S.detailReelId===id) render();
+        if(S.detailReelId===id||S._galOpen===id) render();
       },900);
       return;
     }
@@ -4264,12 +4264,12 @@
       if(!S._tx||S._tx.id!==id) return;            // cerró/abrió otro reel
       apiGet("/api/competitors/reels/"+encodeURIComponent(id)+"/transcript").then(function(res){
         if(!S._tx||S._tx.id!==id) return;
-        if(res.ok && res.d && res.d.transcript){ S._tx={id:id,status:"ok",text:res.d.transcript}; if(S.detailReelId===id) render(); return; }
+        if(res.ok && res.d && res.d.transcript){ S._tx={id:id,status:"ok",text:res.d.transcript}; if(S.detailReelId===id||S._galOpen===id) render(); return; }
         if(res.ok && res.d && res.d.pending){
-          if(++tries>24){ S._tx={id:id,status:"error",text:""}; if(S.detailReelId===id) render(); return; }   // ~60s
+          if(++tries>24){ S._tx={id:id,status:"error",text:""}; if(S.detailReelId===id||S._galOpen===id) render(); return; }   // ~60s
           setTimeout(poll, 2500); return;
         }
-        S._tx={id:id,status:"error",text:""}; if(S.detailReelId===id) render();
+        S._tx={id:id,status:"error",text:""}; if(S.detailReelId===id||S._galOpen===id) render();
       });
     })();
   }
