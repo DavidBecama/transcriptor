@@ -8149,6 +8149,28 @@ def niche_trending_reels():
                     "subniche_suggestions": _subniche_suggestions(niche)}), 200
 
 
+@app.route("/api/onboarding/discover-niche", methods=["POST"])
+@require_auth
+@limiter.limit("6 per hour")
+def onboarding_discover_niche():
+    """Dispara EN BACKGROUND el descubrimiento de creadores del nicho (Apify hashtag)
+    al poner los tags en el onboarding → cuando el user llega al radar, la pool ya tiene
+    reels ACERTADOS de su nicho. Fire-and-forget (202); si Apify falla, el radar cae al
+    seed/competidores. NO cobra créditos (es activación)."""
+    body = request.get_json(silent=True) or {}
+    niche = (body.get("niche") or "").strip()[:80]
+    subs = [t for t in (_norm_tag(s) for s in (body.get("subniches") or [])) if t][:5]
+    if not subs:
+        return jsonify({"ok": False, "error": "no_subniches"}), 200
+    try:
+        from tasks import discover_niche_creators_task  # noqa: E402
+        discover_niche_creators_task.delay(niche, subs)
+    except Exception:
+        logger.warning("onboarding_discover_niche: enqueue failed")
+        return jsonify({"ok": False, "error": "enqueue_failed"}), 200
+    return jsonify({"ok": True}), 202
+
+
 @app.route("/api/onboarding/aha-script", methods=["POST"])
 @require_auth
 @limiter.limit("12 per hour;40 per day")
