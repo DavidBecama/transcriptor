@@ -1273,11 +1273,15 @@ def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
                 vids.setdefault(uname, []).append(it)
     if not score:
         return {"status": "no_creators", "tags": tags}
-    # 2. Top creadores por engagement → upsert + auto-follow + sus vídeos + scrape async.
-    top = sorted(score.items(), key=lambda kv: -(kv[1]["eng"]))[:follow_top]
+    # 2. Candidatos por FRECUENCIA en el nicho (un creador del nicho repite; un grande
+    #    generalista tagea una vez) y luego engagement. Saltamos GENERALISTAS contaminados
+    #    (ya tageados con >4 subnichos, p.ej. @topesdegama) → preferimos creadores del nicho.
+    cands = sorted(score.items(), key=lambda kv: (-kv[1]["posts"], -kv[1]["eng"]))
     followed = 0
     scraped = 0
-    for uname, sc in top:
+    for uname, sc in cands:
+        if followed >= follow_top:
+            break
         try:
             ins = db.table("creators_global").upsert(
                 {"ig_username": uname}, on_conflict="ig_username").execute()
@@ -1287,6 +1291,8 @@ def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
                          .eq("ig_username", uname).single().execute()).data
             cid = row["id"]
             cur = set(row.get("subniches") or [])
+            if len(cur) > 4:   # generalista contaminado → no es del nicho, saltar
+                continue
             if sc["tag"] not in cur:
                 cur.add(sc["tag"])
                 db.table("creators_global").update({"subniches": list(cur)}).eq("id", cid).execute()
