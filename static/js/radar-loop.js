@@ -2096,7 +2096,19 @@
     var bk=S.user&&S.user.topupFlash; if(bk&&bk.active&&bk.expires_at){ var t=Date.parse(bk.expires_at); if(t>0) return t; }
     try{ var v=localStorage.getItem(flashKey()); return v?parseInt(v,10):(S._flashDl||0); }catch(e){ return S._flashDl||0; }
   }
-  function startFlash(){ if(flashDeadline()>0) return; var dl=Date.now()+FLASH_HOURS*3600*1000; S._flashDl=dl; try{ localStorage.setItem(flashKey(),String(dl)); }catch(e){} }
+  // Anti-repetición (prod): tras mostrarse una vez, no reaparece en FLASH_REPEAT_DAYS.
+  var FLASH_REPEAT_DAYS=14;
+  function _flashSeenCookie(){ return (document.cookie.split("; ").find(function(r){return r.indexOf("rs_flash_seen=")===0;})||"").split("=")[1]; }
+  // Arranca la oferta flash SOLO en el momento PEAK (primer valor real: 1er robo /
+  // guión, o muro) — nunca al entrar/registrarse. Idempotente (deadline persistido) +
+  // cookie anti-repetición de X días en prod (en demo no, para poder re-probar).
+  function startFlash(){
+    if(flashDeadline()>0) return;
+    if(!isDemo() && _flashSeenCookie()) return;
+    var dl=Date.now()+FLASH_HOURS*3600*1000; S._flashDl=dl;
+    try{ localStorage.setItem(flashKey(),String(dl)); }catch(e){}
+    if(!isDemo()){ try{ document.cookie="rs_flash_seen=1; path=/; max-age="+(FLASH_REPEAT_DAYS*86400); }catch(e){} }
+  }
   function flashActive(){ if(!isFree() && !isTrial()) return false; var dl=flashDeadline(); return dl>0 && (dl-Date.now())>1000; }
   function flashRemainStr(){
     var ms=Math.max(0,flashDeadline()-Date.now()), s=Math.floor(ms/1000);
@@ -4275,6 +4287,7 @@
       var s=r.script||{}; var gidNew=addGuion({title:s.hook, hook:s.hook, beats:s.beats, close:s.close, from:"@"+r.creator.handle, type:"guión"});
       removeStolenReel(id);   // loop continuity (Fathom): robado → fuera del radar, entra el siguiente
       brainEmitSignals();     // capa "alimentar": el guion nuevo entra como partícula al cerebro
+      startFlash();           // PEAK: la oferta flash arranca tras el PRIMER valor real (no al entrar)
       if(!isDemo() && r._sid){ var g=guionById(gidNew); if(g) g._sid=r._sid; }
       if(bg){ render(); showToast("Tu guion ya está listo — te espera en Guiones."); }
       else { S.activeGuionId=gidNew; S.view="script"; render(); }
