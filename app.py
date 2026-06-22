@@ -134,7 +134,7 @@ TOPUP_FLASH_PACK      = "300"
 TOPUP_FLASH_EUR       = 29
 TOPUP_FLASH_HOURS     = 48
 
-UNLIMITED_EMAILS = {"davidmiragito@gmail.com"}  # sin límite ni coste
+UNLIMITED_EMAILS = {"davidmiragito@gmail.com", "leonard@becamaconsulting.com"}  # sin límite ni coste (cuentas dev)
 
 # v0.16.x DEMO_MODE: arranque local sin login ni Supabase. El frontend instala
 # un shim de fetch con datos falsos y entra directo al Radar con un usuario de
