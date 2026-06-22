@@ -25157,8 +25157,9 @@ window.rsFlashSubscribe = rsFlashSubscribe;
     s.textContent = ".rspop-ov{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(5,7,12,.66);backdrop-filter:blur(3px);animation:rspopf .2s ease}@keyframes rspopf{from{opacity:0}to{opacity:1}}.rspop{max-width:440px;width:100%;background:#111726;border:1px solid rgba(255,255,255,.13);border-radius:22px;box-shadow:0 24px 60px rgba(0,0,0,.55);padding:30px 28px 24px;text-align:center;position:relative;color:#F3F6FC;font-family:'Schibsted Grotesk',system-ui,sans-serif}.rspop::before{content:'';position:absolute;inset:-1px -1px auto;height:3px;border-radius:22px 22px 0 0;background:linear-gradient(90deg,#FF8A3D,#2F5BFF)}.rspop-x{position:absolute;top:12px;right:14px;background:none;border:none;color:#69748C;font-size:20px;cursor:pointer;line-height:1}.rspop-eye{font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:#FF8A3D;margin-bottom:8px}.rspop-big{font-family:'Clash Display',system-ui,sans-serif;font-weight:700;font-size:40px;line-height:1.04;margin:2px 0 8px}.rspop-big em{font-style:normal;color:#6E92FF}.rspop-sub{color:#A6B1C6;font-size:14.5px;line-height:1.45;margin:0 auto 16px;max-width:344px}.rspop-cta{font-weight:700;font-size:16px;color:#fff;background:#2F5BFF;border:none;border-bottom:4px solid #1B3FD6;border-radius:12px;padding:14px 22px;width:100%;cursor:pointer}.rspop-cta:active{transform:translateY(3px);border-bottom-width:1px}.rspop-trust{display:flex;gap:14px;justify-content:center;color:#A6B1C6;font-size:12px;margin-top:12px;flex-wrap:wrap}.rspop-trust span::before{content:'✓';color:#2FD18A;margin-right:5px;font-weight:700}.rspop-fine{color:#69748C;font-size:12px;margin:10px 0 0}.rspop-sticky{position:fixed;left:10px;right:10px;bottom:10px;z-index:99999;background:#172032;border:1px solid rgba(255,255,255,.13);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.55);color:#F3F6FC;font-family:'Schibsted Grotesk',system-ui,sans-serif;animation:rspopup .25s ease}@keyframes rspopup{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}.rspop-sticky .st{flex:1;text-align:left}.rspop-sticky .st b{font-family:'Clash Display',system-ui,sans-serif;font-weight:600;font-size:15px;display:block}.rspop-sticky .st small{color:#A6B1C6;font-size:11.5px}.rspop-sticky .go{font-weight:700;font-size:13px;color:#fff;background:#2F5BFF;border:none;border-bottom:3px solid #1B3FD6;border-radius:10px;padding:10px 13px;white-space:nowrap;cursor:pointer}.rspop-sticky .stx{background:none;border:none;color:#69748C;font-size:18px;cursor:pointer;padding:0 2px}";
     document.head.appendChild(s);
   }
+  function inApp() { try { return document.body.classList.contains("rs-takeover"); } catch (e) { return false; } }
   function showDesktop() {
-    if (shown || loggedIn()) return; shown = true; css(); setSeen();
+    if (shown || loggedIn() || inApp()) return; shown = true; css(); setSeen();
     var ov = document.createElement("div"); ov.className = "rspop-ov"; ov.id = "rsPopNode";
     ov.innerHTML = '<div class="rspop" role="dialog" aria-modal="true" aria-label="Oferta de apertura">' +
       '<button class="rspop-x" aria-label="Cerrar">×</button>' +
@@ -25174,7 +25175,7 @@ window.rsFlashSubscribe = rsFlashSubscribe;
     ov.querySelector(".rspop-cta").addEventListener("click", go);
   }
   function showMobile() {
-    if (shown || loggedIn()) return; shown = true; css(); setSeen();
+    if (shown || loggedIn() || inApp()) return; shown = true; css(); setSeen();
     var b = document.createElement("div"); b.className = "rspop-sticky"; b.id = "rsPopNode";
     b.innerHTML = '<div class="st"><b>−40% el primer mes</b><small>Apertura · WELCOME aplicado ✓</small></div>' +
       '<button class="go">Lo quiero</button><button class="stx" aria-label="Cerrar">×</button>';
@@ -25188,7 +25189,8 @@ window.rsFlashSubscribe = rsFlashSubscribe;
       var t = setTimeout(showMobile, 8000);
       window.addEventListener("scroll", function onS() { if ((window.scrollY || 0) > document.documentElement.scrollHeight * 0.30) { clearTimeout(t); window.removeEventListener("scroll", onS); showMobile(); } }, { passive: true });
     } else {
-      var t2 = setTimeout(showDesktop, 30000);
+      // Desktop: ~7-8 s (antes 30 s). Sigue saltando antes por exit-intent o scroll-50%.
+      var t2 = setTimeout(showDesktop, 7500);
       document.addEventListener("mouseout", function onM(e) { if (!e.relatedTarget && e.clientY <= 0) { document.removeEventListener("mouseout", onM); clearTimeout(t2); showDesktop(); } });
       window.addEventListener("scroll", function onS2() { if ((window.scrollY || 0) > document.documentElement.scrollHeight * 0.50) { window.removeEventListener("scroll", onS2); clearTimeout(t2); showDesktop(); } }, { passive: true });
     }
@@ -27764,6 +27766,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=82"></script>
+<script src="/static/js/radar-loop.js?v=83"></script>
 </body>
 </html>
