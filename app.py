@@ -10225,15 +10225,20 @@ def get_tracked_creators_reels():
         tq = tq.eq("project_id", project_id)
     tracked = tq.execute()
     creator_ids = list({t["creator_id"] for t in (tracked.data or [])})
-    if not creator_ids and not favorites_only:
-        # SEED (SPEC #3): user sin competidores → no devolvemos vacío (acantilado de
-        # activación). Reciclamos reels que petaron en su subnicho, marca source='seed'.
+    # SEED (SPEC #3): reciclamos reels que petaron en el subnicho del user. Sirve para
+    # que el radar NUNCA quede vacío (un radar vacío rompe el house tour — sus pasos
+    # apuntan a .feature/.rgal/«robar» — y la 1ª impresión). source='seed'.
+    def _seed_response():
         try:
             prof = get_profile(uid)
-            seed = _recycled_reels(prof.get("subniches"), prof.get("niche"), limit=20)
+            return _recycled_reels(prof.get("subniches"), prof.get("niche"), limit=20)
         except Exception:
             logger.warning("[seed] feed fallback failed uid=%s", uid)
-            seed = []
+            return []
+
+    if not creator_ids and not favorites_only:
+        # user sin competidores → seed directo (acantilado de activación).
+        seed = _seed_response()
         return jsonify({"reels": seed, "total": len(seed),
                         "has_more": False, "seed": True})
 
@@ -10299,6 +10304,13 @@ def get_tracked_creators_reels():
                   .order("posted_at", desc=True)
                   .limit(200)
                   .execute()).data or []
+        if not cand and offset == 0:
+            # Competidores aún sin reels (scrape async pendiente) o sin reels → seed,
+            # para no dejar el radar (ni el house tour) vacío en el first-run.
+            seed = _seed_response()
+            if seed:
+                return jsonify({"reels": seed, "total": len(seed),
+                                "has_more": False, "seed": True})
         _annotate(cand)
         cand.sort(key=lambda r: (r.get("explosion_score") or 0), reverse=True)
         total = len(cand)
@@ -10320,6 +10332,12 @@ def get_tracked_creators_reels():
         q = q.in_("creator_id", creator_ids)
     rows = q.execute()
     reels = _annotate(rows.data or [])
+    if not reels and not favorites_only and offset == 0:
+        # mismo fallback seed que el path de explosión (radar nunca vacío en first-run).
+        seed = _seed_response()
+        if seed:
+            return jsonify({"reels": seed, "total": len(seed),
+                            "has_more": False, "seed": True})
     total = rows.count or 0
     has_more = (offset + len(reels)) < total
 
