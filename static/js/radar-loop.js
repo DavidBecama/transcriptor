@@ -258,7 +258,8 @@
     var b=brand();
     return '<span class="brand-static"><span class="brand-dot" style="background:'+ESC(b.color||"#4f7cff")+'"></span><span class="brand-name">'+ESC(b.name)+'</span></span>';
   }
-  // ── Menú de cuenta (rail, abajo): email + plan + Configuración + Cerrar sesión.
+  // ── Menú de cuenta (rail, abajo): email + plan + Ajustes + Cerrar sesión.
+  //    «Ajustes» abre la MISMA página v3 que el rail (acct-settings → switchTab).
   //    El logout reusa la función global logout() de la chrome (POST /auth/logout). ──
   function _planLabel(p){ p=(p||"").toLowerCase(); return ({free:"Free",pro:"Pro",creator:"Creator",creador:"Creator",agency:"Agency",agencia:"Agency"})[p] || (p?p.charAt(0).toUpperCase()+p.slice(1):"Free"); }
   function _planClass(p){ p=(p||"").toLowerCase(); if(p==="creador")p="creator"; if(p==="agencia")p="agency"; return ({free:"free",pro:"pro",creator:"creator",agency:"agency"})[p]||"free"; }
@@ -276,7 +277,7 @@
             '<span class="plan-badge '+_planClass(pl)+'">'+_planLabel(pl)+'</span>'+
           '</span>'+
         '</div>'+
-        '<button class="brand-opt" data-act="acct-settings" role="menuitem">'+IC.gear+' Configuración</button>'+
+        '<button class="brand-opt" data-act="acct-settings" role="menuitem">'+IC.gear+' '+L("Ajustes","Settings")+'</button>'+
         '<button class="brand-opt" data-act="acct-feedback" role="menuitem">'+IC.chat+' '+L("Enviar feedback","Send feedback")+'</button>'+
         '<button class="brand-opt rs-acct-logout" data-act="acct-logout" role="menuitem">'+IC.logout+' Cerrar sesión</button>'+
       '</div>';
@@ -1927,11 +1928,18 @@
     // Tarjetas de plan CLICABLES: subida → checkout Whop; bajada → plan más barato /
     // Free = cancelar (acceso hasta fin de periodo). El plan actual = «Tu plan», inerte.
     var tiers=AJ_TIERS.filter(function(t){ return t.k!=="trial" || cur==="trial"; });
+    // Compliance: la tarjeta "Free" desde un plan DE PAGO es una baja → etiqueta clara
+    // («Cancelar suscripción»), no un ambiguo «Bajar a Free». Desde trial no hay sub que
+    // cancelar → «Pasar a Free».
+    var paidNow=(cur==="basic"||cur==="estudio"||cur==="agency");
     var grid=tiers.map(function(t){
       var isCur=t.k===cur, up=_ajPrice(t.k)>_ajPrice(cur);
+      var pickLbl = t.k==="free"
+        ? (paidNow?L("Cancelar suscripción","Cancel subscription"):L("Pasar a Free","Switch to Free"))
+        : (up?L("Mejorar","Upgrade"):L("Bajar","Downgrade"));
       var cta = isCur
         ? '<span class="aj-tier-cur">'+IC.check+' '+L("Tu plan","Your plan")+'</span>'
-        : '<span class="aj-tier-cta '+(up?"up":"down")+'">'+(t.k==="free"?L("Bajar a Free","Switch to Free"):(up?L("Mejorar","Upgrade"):L("Bajar","Downgrade")))+' '+IC.arr+'</span>';
+        : '<span class="aj-tier-cta '+(up?"up":"down")+'">'+pickLbl+' '+IC.arr+'</span>';
       return '<button class="aj-tier'+(isCur?" is-current":(t.featured?" featured":""))+'"'+
         (isCur?' disabled aria-disabled="true"':' data-act="plan-pick" data-k="'+t.k+'"')+'>'+
         '<span class="aj-tier-name">'+ESC(t.name)+(t.featured&&!isCur?' <i class="aj-tier-star">'+IC.spark+'</i>':'')+'</span>'+
@@ -5237,7 +5245,9 @@
     if(act==="legacy") return openLegacy(k);
     if(act==="acct-toggle"){ S.acctMenu=!S.acctMenu; S.brandMenu=false; return render(); }
     if(act==="acct-close"){ S.acctMenu=false; return render(); }
-    if(act==="acct-settings"){ S.acctMenu=false; return openLegacy("settings"); }
+    // Unificado: el menú abre la MISMA pantalla v3 que el rail (antes openLegacy →
+    // panel legacy con tarjetas de plan no clicables = la "regresión" reportada).
+    if(act==="acct-settings"){ S.acctMenu=false; return switchTab("settings"); }
     if(act==="acct-feedback"){ return openFeedback(); }
     if(act==="acct-logout"){ S.acctMenu=false;
       // Reusa el logout real de la chrome (POST /auth/logout + reset tracking + redirect).
@@ -5400,7 +5410,12 @@
     if(act==="plan-pick"){
       var pk=k||btn.getAttribute("data-k"); var cur=_ajCurTier();
       if(!pk||pk===cur) return;
-      if(isDemo()){ showToast(L("En la app real esto abre el checkout de "+_ajTier(pk).name+".","In the real app this opens the "+_ajTier(pk).name+" checkout.")); return; }
+      if(isDemo()){
+        showToast((pk==="free"||pk==="trial")
+          ? L("En la app real esto cancela tu suscripción (acceso hasta fin de periodo).","In the real app this cancels your subscription (access until period end).")
+          : L("En la app real esto abre el checkout de "+_ajTier(pk).name+".","In the real app this opens the "+_ajTier(pk).name+" checkout."));
+        return;
+      }
       if(pk==="free"||pk==="trial"){
         if(typeof window.settingsCancelSub==="function"){ try{ window.settingsCancelSub(); return; }catch(e){} }
         if(typeof window.openUpgradeModal==="function"){ window.openUpgradeModal("settings_plan"); }
