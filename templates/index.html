@@ -26071,6 +26071,22 @@ function renderTourStep() {
   `;
   tourTooltip.style.display = "block";
 
+  // MÓVIL: el tooltip es un bottom-sheet que tapa la mitad inferior. scrollIntoView
+  // 'center' dejaba el target DETRÁS del sheet → lo re-encuadramos en el área visible
+  // POR ENCIMA del sheet (una vez). Excepción: targets del rail (barra inferior) → el
+  // tooltip se LEVANTA sobre el rail en positionTooltip, no hace falta scroll.
+  if (window.innerWidth < 768 && el && !(el.closest && el.closest('.rail'))) {
+    var _safe = window.innerHeight - (tourTooltip.offsetHeight || 0);
+    var _rr = el.getBoundingClientRect();
+    var _delta = (_rr.top + _rr.height / 2) - (_safe / 2);
+    if (Math.abs(_delta) > 8) {
+      var _sc = el.closest('.scroll, .oscroll') || document.scrollingElement || document.documentElement;
+      var _pSB = _sc.style.scrollBehavior; _sc.style.scrollBehavior = "auto";
+      _sc.scrollTop += _delta;
+      _sc.style.scrollBehavior = _pSB;
+    }
+  }
+
   // Paso SIN encuadre (noFrame): nada de spotlight; oscurecemos todo y dejamos el
   // texto a un lado (centrado vertical en escritorio; bottom-sheet en móvil).
   if (step.noFrame) {
@@ -26080,7 +26096,7 @@ function renderTourStep() {
       if (window.innerWidth >= 768) {
         tourTooltip.style.left = "140px";
         tourTooltip.style.top = Math.max(20, Math.round((window.innerHeight - tourTooltip.offsetHeight) / 2)) + "px";
-      } else { tourTooltip.style.top = ""; tourTooltip.style.left = ""; }
+      } else { tourTooltip.style.top = ""; tourTooltip.style.left = ""; tourTooltip.style.bottom = ""; }
     }));
     return;
   }
@@ -26135,10 +26151,14 @@ function positionTooltip(el) {
   const tt = tourTooltip;
   const isMobile = window.innerWidth < 768;
 
-  // Mobile: fixed bottom sheet, no positioning needed
+  // Mobile: bottom-sheet. PERO si el target está en el rail (barra inferior fija), el
+  // sheet a bottom:0 lo taparía → lo LEVANTAMOS justo por encima del rail para que la
+  // pestaña resaltada quede visible debajo del tooltip.
   if (isMobile) {
     tt.style.top = "";
     tt.style.left = "";
+    var railEl = el && el.closest && el.closest('.rail');
+    tt.style.bottom = railEl ? (railEl.getBoundingClientRect().height + 8) + "px" : "";
     return;
   }
 
