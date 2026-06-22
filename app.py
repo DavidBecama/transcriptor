@@ -8197,6 +8197,25 @@ def onboarding_aha_script():
         track_event("onboarding_aha_generated", uid, {"niche": niche})
     except Exception:
         pass
+
+    # Persistir el PRIMER guion del usuario (si aún no tiene ninguno) → su «primer
+    # guion» deja de ser efímero: aparece en Guiones y CUENTA para el nivel del
+    # Cerebro (el bloque del Radar pasa de 0/3 a 1/3). Solo el primero, para no
+    # acumular si prueba varios reels en el onboarding. Sigue sin cobrar créditos.
+    try:
+        flat = "\n".join([script["hook"]] + script["beats"] + [script["close"]]).strip()
+        n_scripts = (db.table("scripts").select("id", count="exact").eq("user_id", uid).execute()).count or 0
+        if flat and n_scripts == 0:
+            db.table("scripts").insert({
+                "user_id": uid,
+                "title": (f"Mi primer guion · @{handle}" if handle else "Mi primer guion")[:80],
+                "script": flat,
+                "from_competitor_username": handle or None,
+                "project_id": _req_project_id(),
+            }).execute()
+    except Exception:
+        logger.warning("aha_script persist failed user=%s", uid)
+
     return jsonify({"script": script}), 200
 
 
