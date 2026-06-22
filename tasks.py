@@ -791,7 +791,7 @@ def transcribe_task(self, url, language, user_id, ip, is_paid=False, charge=None
             headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
             with open(audio_path, "rb") as f:
                 files = {"file": ("audio.mp3", f, "audio/mpeg")}
-                data = {"model": "whisper-large-v3", "response_format": "json"}
+                data = {"model": os.environ.get("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo"), "response_format": "json"}
                 if language:
                     data["language"] = language
                 resp = requests.post(GROQ_URL, headers=headers, files=files, data=data, timeout=120)
@@ -1040,6 +1040,7 @@ def scrape_creator_task(creator_id: str) -> dict:
                 "views": item.get("videoPlayCount") or item.get("videoViewCount") or 0,
                 "likes": item.get("likesCount") or 0,
                 "comments": item.get("commentsCount") or 0,
+                "shares": item.get("sharesCount") or 0,   # ítem 6: Apify lo trae (includeSharesCount)
                 "posted_at": item.get("timestamp"),
                 "thumb_url": display_url,
                 "thumb_b64": _download_thumbnail_b64(display_url),
@@ -1048,15 +1049,26 @@ def scrape_creator_task(creator_id: str) -> dict:
                 "fetched_at": datetime.now(timezone.utc).isoformat(),
             })
         if rows:
+            def _upsert(rs):
+                db.table("creator_reels_global").upsert(rs, on_conflict="creator_id,ig_reel_id").execute()
             try:
-                db.table("creator_reels_global").upsert(
-                    rows, on_conflict="creator_id,ig_reel_id"
-                ).execute()
+                _upsert(rows)
                 reels_count = len(rows)
             except Exception as e:
-                logger.exception("scrape_creator upsert failed for %s: %s", ig_username, e)
-                final_status = "failed"
-                last_error = f"upsert: {str(e)[:200]}"
+                # Degradación segura: si la columna `shares` aún no está migrada en prod,
+                # reintenta sin ella (no rompe el scrape hasta correr la migración).
+                if "shares" in str(e).lower():
+                    for _r in rows:
+                        _r.pop("shares", None)
+                    try:
+                        _upsert(rows); reels_count = len(rows)
+                    except Exception as e2:
+                        logger.exception("scrape_creator upsert (no-shares) failed for %s: %s", ig_username, e2)
+                        final_status = "failed"; last_error = f"upsert: {str(e2)[:200]}"
+                else:
+                    logger.exception("scrape_creator upsert failed for %s: %s", ig_username, e)
+                    final_status = "failed"
+                    last_error = f"upsert: {str(e)[:200]}"
 
     # 5. UPDATE final del creator.
     update_payload = {
@@ -1546,7 +1558,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                         headers = {"Authorization": "Bearer " + GROQ_API_KEY}
                         with open(audio_path, "rb") as f:
                             files = {"file": ("audio.mp3", f, "audio/mpeg")}
-                            data = {"model": "whisper-large-v3", "response_format": "json"}
+                            data = {"model": os.environ.get("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo"), "response_format": "json"}
                             resp = requests.post(GROQ_URL, headers=headers, files=files, data=data, timeout=120)
                             resp.raise_for_status()
                             transcript_text = (resp.json().get("text") or "").strip()
@@ -1678,12 +1690,14 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
 
         llm_title = ""
         _alt_hooks = None   # 3 hooks (device distinto): persistimos los 2 alternativos.
+        _rec_fmt = None     # ítem 10: formato de grabación clasificado por el LLM.
         if isinstance(result, dict):
             if result.get("title"):
                 llm_title = str(result["title"]).strip()[:80]
             _ah = result.get("alt_hooks")
             if isinstance(_ah, list):
                 _alt_hooks = [str(h).strip() for h in _ah if str(h or "").strip()][:4] or None
+            _rec_fmt = result.get("recording_format") or None
         if isinstance(result, dict) and "hook" in result:
             flat = (result["hook"] + "\n" +
                     "\n".join(result.get("body", [])) + "\n" +
@@ -1732,7 +1746,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                 "viral": "Viral", "divertido": "Divertido", "hooks": "Hooks",
                 "storytelling": "Storytelling", "story": "Storytelling", "linkedin": "LinkedIn",
             }
-            ins = db.table("scripts").insert({
+            _row = {
                 "user_id":                user_id,
                 "transcription_id":       None,
                 "idea_id":                None,
@@ -1743,7 +1757,17 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                 "from_competitor_username": ig_username,
                 "assistant_name":         _TASK_LABELS.get(style_label, style_label) if style_label else None,
                 "alt_hooks":              _alt_hooks,   # 2 hooks alternativos (device distinto)
-            }).execute()
+                "recording_format":       _rec_fmt,     # ítem 10
+            }
+            try:
+                ins = db.table("scripts").insert(_row).execute()
+            except Exception as _e1:
+                # Degradación segura: columna recording_format aún sin migrar → sin ella.
+                if "recording_format" in str(_e1).lower():
+                    _row.pop("recording_format", None)
+                    ins = db.table("scripts").insert(_row).execute()
+                else:
+                    raise
             if ins.data:
                 script_id = ins.data[0].get("id")
         except Exception as e:
@@ -1859,7 +1883,7 @@ def transcribe_reel_task(self, reel_id):
             headers = {"Authorization": "Bearer " + GROQ_API_KEY}
             with open(audio_path, "rb") as f:
                 files = {"file": ("audio.mp3", f, "audio/mpeg")}
-                data = {"model": "whisper-large-v3", "response_format": "json"}
+                data = {"model": os.environ.get("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo"), "response_format": "json"}
                 resp = requests.post(GROQ_URL_L, headers=headers, files=files, data=data, timeout=120)
                 resp.raise_for_status()
                 transcript_text = (resp.json().get("text") or "").strip()

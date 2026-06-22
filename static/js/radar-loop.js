@@ -184,9 +184,15 @@
       explosionTxt: exp!=null?(exp>=10?Math.round(exp):(Math.round(exp*10)/10)):null,
       views: typeof r.views==="string"?r.views:fmtNum(r.views),
       likes: typeof r.likes==="string"?r.likes:fmtNum(r.likes),
+      comments:(r.comments!=null?(typeof r.comments==="string"?r.comments:fmtNum(r.comments)):null),
+      shares:(r.shares!=null?(typeof r.shares==="string"?r.shares:fmtNum(r.shares)):null),   // ítem 6: compartidos del competidor (Apify includeSharesCount)
       dur:r.dur||durFmt(r.video_duration_sec), cap:r.cap||r.caption||"", sum:r.sum||"",
       thumb:r.thumb_b64||r.thumb_url||r.thumb||null, fav:!!(r.is_favorite||r.fav),
       seed:(r.source==="seed"),   // SPEC #3: reel del nicho mientras llenas tu radar
+      // URL del reel ORIGINAL (ítem 9): para abrir en IG/TikTok. ig_url/permalink si vienen;
+      // si no, se construye desde ig_reel_id (NO usar video_url: es el MP4 de Apify, caduca).
+      ig_reel_id:r.ig_reel_id||null,
+      url:r.ig_url||r.url||r.permalink||(r.ig_reel_id?("https://www.instagram.com/reel/"+r.ig_reel_id+"/"):null),
       script:r.script||null, hooks:r.hooks||null };
   }
 
@@ -246,7 +252,9 @@
           ? '<button class="brand-opt add" data-act="brand-cap">'+IC.plus+' Marca extra (tope '+S.brandsCap+')</button>'
           : '<button class="brand-opt add" data-act="brand-add">'+IC.plus+' Nueva marca'+(S.brandsCap!=null?' ('+S.brands.length+'/'+S.brandsCap+')':'')+'</button>';
       }
-      menu='<div class="brand-menu">'+items+'</div>';
+      // Cierre on-outside-click (mismo patrón que el menú de cuenta): backdrop full-screen
+      // que cierra al clicar fuera. El cierre on-select ya lo hace openBrand (brandMenu=false).
+      menu='<div class="brand-backdrop" data-act="brand-close"></div><div class="brand-menu">'+items+'</div>';
     }
     return '<button class="brand-switch" data-act="brand-toggle">'+dot+
         '<span class="brand-name">'+ESC(label)+'</span>'+
@@ -960,12 +968,22 @@
   // que es justo cuando hace falta). El input inline + el banner "analizando" viven aquí,
   // no dentro de filtersHTML (que no se renderiza sin reels). Incluye "Actualizar radar".
   function radarAddBarHTML(){
+    // Contador "X / límite del plan" por MARCA (ítem 4) — del backend (loadTracked).
+    var used=(S.trackedCount!=null?S.trackedCount:(Array.isArray(S.tracked)?S.tracked.length:0));
+    var lim=S.trackedLimit;
+    var atCap=(lim!=null && used>=lim);
+    var counter=(lim!=null)
+      ? '<span class="addbar-count'+(atCap?" full":"")+'" title="'+L("Competidores en esta marca / tope de tu plan","Competitors in this brand / your plan cap")+'">'+used+' / '+lim+'</span>'
+      : '';
     var bar='<div class="radar-addbar">'+
-      '<button class="fchip ghost'+(S.addCompOpen?" on":"")+'" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+      // Acción primaria prominente (ítem 4): añadir competidor + contador al lado.
+      '<button class="addbar-cta'+(S.addCompOpen?" on":"")+'" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+      counter+
       '<button class="fchip ghost" data-act="add-reel">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
       '<button class="fchip ghost" data-act="analyze-reel" title="'+L("Transcribe un reel suelto sin seguir a su autor","Transcribe a single reel without following its author")+'">'+IC.doc+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
       '<span style="flex:1"></span>'+
-      '<button class="fchip ghost" data-act="refresh-radar" title="'+L("Busca lo nuevo de tus competidores","Check what\'s new from your competitors")+'">'+IC.repeat+' '+L("Actualizar radar","Refresh radar")+'</button>'+
+      // Forzar refresh ya (ítem 7): el job diario renueva solo; este botón lo fuerza.
+      '<button class="fchip addbar-refresh" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores ahora (se renueva solo cada día)","Pull what's new from your competitors now (auto-refreshes daily)")+'">'+IC.repeat+' '+L("Actualizar radar","Refresh radar")+'</button>'+
     '</div>';
     return bar+addCompInlineHTML()+analyzingBannerHTML();
   }
@@ -1029,7 +1047,7 @@
     var open=(S._galOpen===r.id);
     return '<div class="crd'+(open?' crd--open':'')+'">'+
       '<div class="crd-main">'+
-        '<div class="crd-thumb">'+thumbInner+
+        '<div class="crd-thumb" data-act="reel-original" data-id="'+ESC(r.id)+'" role="button" tabindex="0" title="'+L("Abrir el reel original","Open the original reel")+'" aria-label="'+L("Abrir el reel original de @"+r.creator.handle,"Open @"+r.creator.handle+"'s original reel")+'">'+thumbInner+
           (mult?'<span class="crd-mult">'+IC.bolt+' '+ESC(mult)+'</span>':'')+
           (r.dur?'<span class="crd-dur">'+ESC(r.dur)+'</span>':'')+
           '<span class="crd-play">'+_icPlay+'</span>'+
@@ -1062,6 +1080,7 @@
         stat(L("Views","Views"), r.views)+
         stat(L("Likes","Likes"), r.likes)+
         stat(L("Comentarios","Comments"), (r.comments!=null?r.comments:'–'))+
+        stat(L("Compartidos","Shares"), (r.shares!=null?r.shares:'–'))+   // ítem 6
       '</div>'+
       '<div class="crd-txwrap"><span class="crd-tx-lbl">'+L("TRANSCRIPCIÓN · DETECTADA","TRANSCRIPT · DETECTED")+'</span>'+txBody+'</div>'+
       '<button class="btn btn-md btn-primary crd-steal-full" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba la idea","Steal the idea")+'</button>'+
@@ -1214,7 +1233,7 @@
         ? '<button class="feat-scarce out feat-scarce-btn" data-act="open-plans">'+IC.bolt+' '+L("Hechos tus 3 guiones de hoy — vuelve mañana o desbloquéalos","Today's 3 scripts done — come back tomorrow or unlock them")+' '+IC.arr+'</button>'
         : '<div class="feat-scarce">'+IC.bolt+' '+L("Te queda"+(_fl===1?"":"n")+" <b>"+_fl+"</b> guion"+(_fl===1?"":"es")+" hoy","<b>"+_fl+"</b> script"+(_fl===1?"":"s")+" left today")+'</div>');
     return '<article class="feature">'+
-      '<div class="feature-thumb"><div class="thumb">'+thumbInner+
+      '<div class="feature-thumb"><div class="thumb" data-act="reel-original" data-id="'+ESC(r.id)+'" role="button" tabindex="0" title="'+L("Abrir el reel original","Open the original reel")+'" aria-label="'+L("Abrir el reel original de @"+r.creator.handle,"Open @"+r.creator.handle+"'s original reel")+'">'+thumbInner+
         '<span class="feat-play">'+_icPlay+'</span>'+
         '<span class="thumb-tag">reel · @'+ESC(r.creator.handle)+'</span><span class="dur">'+ESC(r.dur)+'</span></div></div>'+
       '<div class="feature-main">'+
@@ -2790,7 +2809,12 @@
     // traía los competidores de TODAS las marcas. Marca "default" → sin filtro.
     var _pid=_pidOf(S.brandId);
     apiGet("/api/tracked-creators"+(_pid?("?project_id="+encodeURIComponent(_pid)):"")).then(function(r){
-      if(r.ok && r.d && Array.isArray(r.d.tracked)){ S.tracked=r.d.tracked; if(S.tab==="brain"||S.tab==="dashboard") render(); brainLevelPulse(); }
+      if(r.ok && r.d && Array.isArray(r.d.tracked)){
+        S.tracked=r.d.tracked;
+        // Contador "X / límite del plan" (ítem 4): usa el uso/límite POR MARCA del backend.
+        if(r.d.usage){ S.trackedCount=(r.d.usage.per_brand_used!=null?r.d.usage.per_brand_used:S.tracked.length); S.trackedLimit=r.d.usage.per_brand_limit; }
+        if(S.tab==="brain"||S.tab==="dashboard") render(); brainLevelPulse();
+      }
     });
   }
 
@@ -2839,9 +2863,14 @@
     apiPost("/api/tracked-creators", body).then(function(r){
       if(!r.ok){
         if(r.status===402||(r.d&&r.d.error==="no_credits")) return showPaywall("no_credits");
-        if(r.d&&r.d.error==="tc.error.already_tracking"){ return showToast(L("Ya seguías a @"+handle+".","Already following @"+handle+".")); }
-        if(r.d&&r.d.error==="tc.error.plan_limit_reached"){ return showPaywall("tracked_creators"); }
-        return showError((r.d&&r.d.message)||L("No pude añadir a @"+handle+".","Couldn't add @"+handle+"."));
+        var _e=(r.d&&r.d.error)||"";
+        if(_e==="tc.error.already_tracking"){ return showToast(L("Ya seguías a @"+handle+".","Already following @"+handle+".")); }
+        if(_e==="tc.error.plan_limit_reached"){ return showPaywall("tracked_creators"); }
+        // Mensajes claros para los errores que antes caían a un genérico (ítem 2):
+        if(_e==="tc.error.project_required"){ return showError(L("Elige una marca antes de añadir un competidor.","Pick a brand before adding a competitor.")); }
+        if(_e==="tc.error.project_limit_reached"){ return showError(L("Tope de competidores de ESTA marca alcanzado ("+((r.d&&r.d.limit)||"")+"). Sube de plan o usa otra marca.","This brand's competitor cap reached. Upgrade or use another brand.")); }
+        if(_e==="tc.error.invalid_username"){ return showError(L("Ese @usuario de Instagram no es válido.","That Instagram @handle isn't valid.")); }
+        return showError((r.d&&r.d.message)||L("No pude añadir a @"+handle+". Reinténtalo.","Couldn't add @"+handle+". Try again."));
       }
       S.analyzing=S.analyzing||{}; S.analyzing[handle]=true;
       loadTracked(); render();
@@ -3474,13 +3503,30 @@
       : 'Ya tienes el guión, guardado en Guiones. Pásalo al teleprompter y grábalo — grabar no gasta créditos.';
     return '<div class="belt"><div class="belt-h"><h4>¿Y ahora?</h4></div><p class="belt-sub">'+sub+'</p><div class="belt-grid'+(items.length===1?' solo':'')+'">'+rows+'</div></div>';
   }
+  // Ítem 10: FORMATO DE GRABACIÓN sugerido. El LLM clasifica el reel original en uno de
+  // estos 5; aquí va la copia "cómo hacerlo" + icono (la clasificación NO se inventa).
+  var REC_FORMATS={
+    selfie:{label:L("Selfie · a cámara","Selfie · to camera"),how:L("Cámara frontal, tú hablando directo. El hook, a los ojos.","Front camera, talking straight to it. Hook, eye to eye."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'},
+    pizarra:{label:L("Pizarra · explicador","Whiteboard · explainer"),how:L("Escribe o dibuja la idea mientras la cuentas.","Write or draw the idea as you tell it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'},
+    podcast:{label:L("Podcast · clip","Podcast · clip"),how:L("Plano sentado, micro a la vista, tono conversación.","Seated shot, mic in frame, conversational tone."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>'},
+    escritorio:{label:L("Pantalla · escritorio","Screen · desktop"),how:L("Graba la pantalla mostrando el cómo, tu voz encima.","Screen-record the how-to, voice over it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'},
+    "broll-vo":{label:L("B-roll + voz en off","B-roll + voiceover"),how:L("Imágenes de apoyo + tu voz narrando. Sin salir tú.","Cutaway footage + your narration. No on-camera you."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>'}
+  };
+  function _recFmtDemo(r){ var s=_durSec(r&&r.dur||"")||0; var keys=["selfie","pizarra","podcast","escritorio","broll-vo"];
+    if(s>=90) return "podcast"; if(s>0&&s<=18) return "selfie"; return keys[_lbHash((r&&(r.id||r.cap))||"x",0,keys.length)]; }
+  function recFormatCardHTML(r){
+    var k=(r&&r.recFormat)||(isDemo()?_recFmtDemo(r):null); var f=k&&REC_FORMATS[k]; if(!f) return '';
+    return '<div class="recfmt"><div class="recfmt-ic">'+f.ic+'</div>'+
+      '<div class="recfmt-tx"><div class="recfmt-k">'+L("Cómo grabarlo","How to record it")+' · <b>'+f.label+'</b></div>'+
+      '<div class="recfmt-d">'+f.how+'</div></div></div>';
+  }
   function scriptRevealHTML(){
     var r=S.reel,s=r.script||{hook:"",beats:[],close:""};
     var beats=(s.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
     return '<div class="script-wrap fade-in"><div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div><div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
       '<div class="script-acts"><button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>'+
         '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
-      '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+conveyorHTML()+'</div>';
+      '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+recFormatCardHTML(r)+conveyorHTML()+'</div>';
   }
   /* v3 (mockup David · «Editor de guion»): overlay a pantalla completa con barra
      propia (‹ Guiones · /editor · estado guardado · Copiar · Marcar grabado) y dos
@@ -4380,7 +4426,7 @@
   }
   function ensureScript(r,cb){
     if(r.script&&r.script.hook){ setTimeout(function(){cb();},1700); return; }
-    if(isDemo()){ setTimeout(function(){cb();},1700); return; }
+    if(isDemo()){ r.recFormat=r.recFormat||_recFmtDemo(r); setTimeout(function(){cb();},1700); return; }
     var t0=Date.now();
     apiPost("/api/competitors/reels/"+encodeURIComponent(r.id)+"/generate-script",{language:(document.documentElement.lang||"es")}).then(function(rr){
       // Duplicado reciente (409) → reusamos el guion existente (sin re-cobro). Traemos su texto.
@@ -4389,6 +4435,7 @@
       // Sync (200): el script viene en la respuesta.
       if(rr.d && (rr.d.mode==="sync" || rr.d.script || rr.d.result)){
         r._sid=rr.d.script_id||r._sid; r.script=parseScript(rr.d.script||rr.d.result,r);
+        if(rr.d.recording_format) r.recFormat=rr.d.recording_format;   // ítem 10
         return setTimeout(function(){cb();},Math.max(0,1500-(Date.now()-t0)));
       }
       // Async (202): pollear /task/script/<id> hasta SUCCESS, luego traer el texto.
@@ -5277,6 +5324,7 @@
     }
     if(act==="legacy-back") return closeLegacy();
     if(act==="brand-toggle"){ S.brandMenu=!S.brandMenu; return render(); }
+    if(act==="brand-close"){ S.brandMenu=false; return render(); }
     if(act==="brand") return openBrand(id);
     if(act==="all-brands"){ S.brandMenu=false; S.view="feed"; S.tab="dashboard"; return render(); }   // B3: portfolio fuera → al Radar
     if(act==="open-brand") return openBrand(id);
@@ -5323,7 +5371,7 @@
     }
     if(act==="steal") return steal(id);
     if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
-    if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.ig_url||_ro.url||_ro.permalink; if(_u){ try{ window.open(_u,"_blank"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
+    if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.url||_ro.ig_url||_ro.permalink||(_ro.ig_reel_id?("https://www.instagram.com/reel/"+_ro.ig_reel_id+"/"):null); if(_u){ try{ window.open(_u,"_blank","noopener"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
     if(act==="reel-dismiss") return reelDismiss(id);
     if(act==="undo-dismiss") return undoDismiss();
     if(act==="reel-detail") return openReelDetail(id);
