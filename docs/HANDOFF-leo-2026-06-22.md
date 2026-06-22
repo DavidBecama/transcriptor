@@ -40,6 +40,7 @@ Reseteé `leonard@becamaconsulting.com` varias veces para QA del onboarding/tour
 8. **Ranking → «cuota de atención del nicho»** — hoy "Próximamente"; necesita histórico agregado por competidor (Apify).
 
 ### David (infra/billing)
+- 🔴🔴 **RESEND: dominio sin verificar → NINGÚN email sale desde el 16-may** (welcome, nudges día 1/7, weekly digest, trial, alertas de crecimiento — TODO). La cuenta (`ia.consulting.david@gmail.com`) está en **modo test**: solo envía a tu propia cuenta; `reelscript.net` no está verificado (la key `re_fKfAy…` da 400 "domain not verified" / 403 al listar dominios). **ACCIÓN:** reverificar `reelscript.net` en Resend (registros DNS) + key full-access (o atada al dominio verificado). Yo arreglé un RecursionError (gevent+SSL) que tapaba el problema en junio (v0.25.10), pero el bloqueo de fondo es el dominio — **es lo #1 para que la publi tenga emails.**
 - **Rate limit de Apify** → **varias cuentas de Apify** + rotación de peticiones para que no se caiga por exceso (fue lo que tumbó guiones+métricas esta mañana).
 - **Confirmar** si recargaste Apify/Groq o fue temporal.
 - **Re-enganchar `prod`** en el VPS (detached HEAD tras los deploys, mismo commit `8786ea5`).
