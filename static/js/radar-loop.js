@@ -2298,7 +2298,7 @@
     // Top reels REALES.
     var top=V.slice().sort(function(a,b){ return (b.views||0)-(a.views||0); }).slice(0,4);
     var topH=top.map(function(v,i){ return '<div class="mt-top-row"><span class="mt-top-rank">'+(i+1)+'</span>'+
-      '<div class="mt-top-thumb">'+(v.dur?'<span class="mt-top-dur">'+ESC(v.dur)+'</span>':'')+'</div>'+
+      '<div class="mt-top-thumb">'+(v.thumb?'<img class="mt-top-img" src="'+ESC(v.thumb)+'" alt="" loading="lazy"/>':'')+(v.dur?'<span class="mt-top-dur">'+ESC(v.dur)+'</span>':'')+'</div>'+
       '<div class="mt-top-title">'+ESC(v.cap||v.from_guion||L("(sin título)","(untitled)"))+'</div>'+
       '<div class="mt-top-stat"><div class="mt-mono">'+fmtKM(v.views||0)+'</div><div class="mt-top-k">repros</div></div>'+
       '<div class="mt-top-stat"><div class="mt-mono">'+fmtKM((v.likes||0)+(v.comments||0))+'</div><div class="mt-top-k">interac.</div></div>'+

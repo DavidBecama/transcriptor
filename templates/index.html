@@ -10700,6 +10700,7 @@
     .rs .mt-top-row { display:flex; align-items:center; gap:16px; padding:12px 4px; border-top:1px solid var(--border-default); }
     .rs .mt-top-rank { width:22px; flex:none; font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-tertiary); }
     .rs .mt-top-thumb { position:relative; width:38px; height:52px; flex:none; border-radius:7px; overflow:hidden; background:linear-gradient(155deg, var(--surface-sunken), var(--surface-overlay)); border:1px solid var(--border-default); }
+    .rs .mt-top-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
     .rs .mt-top-dur { position:absolute; right:2px; bottom:2px; padding:1px 3px; border-radius:4px; background:rgba(0,0,0,.6); color:#fff; font-family:var(--font-mono); font-size:8px; }
     .rs .mt-top-title { flex:1; min-width:0; font-size:14px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rs .mt-top-stat { text-align:right; flex:none; }
@@ -27825,6 +27826,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=87"></script>
+<script src="/static/js/radar-loop.js?v=88"></script>
 </body>
 </html>
