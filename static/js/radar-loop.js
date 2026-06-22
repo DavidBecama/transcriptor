@@ -135,7 +135,8 @@
     reels:[], favs:{}, filter:"explosion", feedExpanded:false,
     ideas:[], guiones:[], activeGuionId:null, guiFilter:"all", _fillGuionIds:[],
     igConnected:false, metrics:null, metricSort:"recent", metricChart:"views",
-    tab:"dashboard",                    // dashboard | ideas | guiones
+    analyses:null, analyzeLoading:false, analyzeStep:"", analyzeErr:null, analyzeUrl:"",   // página «Analizar reel»
+    tab:"dashboard",                    // dashboard | guiones | metrics | leaderboard | brain | settings | analizar
     view:"feed",                        // feed(overlay off) | gen | script | result | prompter | fillweek
     reel:null, genKind:"script", resultKind:"hooks", done:{},
     _fillPhase:null, brandMenu:false, acctMenu:false,
@@ -4095,6 +4096,7 @@
     else if(S.tab==="dashboard") html+=dashboardHTML();
     else if(S.tab==="guiones") html+=guionesHTML();
     else if(S.tab==="metrics") html+=metricsHTML();
+    else if(S.tab==="analizar") html+=analizarHTML();
     else if(S.tab==="leaderboard") html+=leaderboardPageHTML();
     else if(S.tab==="brain") html+=brainHTML();
     else if(S.tab==="settings") html+=ajustesHTML();   // v3: Ajustes como página isla (mockup David)
@@ -4212,6 +4214,7 @@
     // T2: al entrar en Cerebro, asegura la lista de asistentes fresca (loadAssistants
     // refresca la isla vía RadarLoop.refresh al resolver).
     if(t==="brain"){ try{ if(typeof loadAssistants==="function") loadAssistants(); }catch(e){} loadTracked(); }
+    if(t==="analizar"){ S.analyzeErr=null; loadAnalyses(); }
     render();
   }
 
@@ -5114,6 +5117,123 @@
       onSecondary: username?function(){ _followAuthor(username); }:null
     });
   }
+  /* ════════ PÁGINA «Analizar reel» (nativa isla) ════════════════════════════════
+     Lista PERSISTIDA de análisis (tabla `transcriptions` vía GET /history) + analizar
+     uno nuevo (POST /transcribe → poll /task, que YA guarda el resultado). Entrada =
+     botón «Analizar un reel» del Radar. Borrar = DELETE /history/<id>. Métricas
+     (views/likes/comments) las trae el backend en planes de pago. Estilo v3. */
+  function analyzeDemoSeed(){
+    return [
+      { id:"d1", author_username:"nick_saraev", platform:"instagram", created_at:"2026-06-20T10:00:00Z",
+        views:182000, likes:9400, comments:210, text:DEMO_REEL_TRANSCRIPT, thumbnail_b64:null },
+      { id:"d2", author_username:"hormozi", platform:"instagram", created_at:"2026-06-18T17:30:00Z",
+        views:540000, likes:31000, comments:880, thumbnail_b64:null,
+        text:"El error número uno al empezar: intentar gustar a todos. Habla para una sola persona y serás magnético para miles. Define a quién le hablas, ponle nombre, y escribe cada guion como si fuera un mensaje para esa persona." }
+    ];
+  }
+  function loadAnalyses(){
+    if(isDemo()){ if(!S.analyses) S.analyses=analyzeDemoSeed(); if(S.tab==="analizar") render(); return; }
+    apiGet("/history").then(function(r){
+      S.analyses=(r&&Array.isArray(r.d))?r.d:[];
+      if(S.tab==="analizar") render();
+    });
+  }
+  function _anzNum(n){ n=+n||0; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,"")+"M"; if(n>=1e3) return (n/1e3).toFixed(1).replace(/\.0$/,"")+"K"; return ""+n; }
+  function _anzDate(s){ try{ var d=new Date(s); var dd=Math.floor((Date.now()-d.getTime())/86400000);
+    if(dd<=0) return L("hoy","today"); if(dd===1) return L("ayer","yesterday");
+    if(dd<30) return L("hace "+dd+" días",dd+"d ago"); return d.toLocaleDateString(); }catch(e){ return ""; } }
+  function _anzFind(id){ return (S.analyses||[]).filter(function(a){ return String(a.id)===String(id); })[0]; }
+  function analyzeCardHTML(a){
+    var au=a.author_username?("@"+String(a.author_username).replace(/^@+/,"")):L("autor desconocido","unknown author");
+    var thumb=a.thumbnail_b64
+      ? '<img class="anz-thumb-img" src="'+ESC(a.thumbnail_b64)+'" alt="" loading="lazy">'
+      : '<span class="anz-thumb-ph">'+IC.doc+'</span>';
+    var mets=[];
+    if(a.views!=null&&a.views!=="") mets.push('<span>'+IC.eye+' '+_anzNum(a.views)+'</span>');
+    if(a.likes!=null&&a.likes!=="") mets.push('<span>'+IC.heart+' '+_anzNum(a.likes)+'</span>');
+    if(a.comments!=null&&a.comments!=="") mets.push('<span>'+IC.chat+' '+_anzNum(a.comments)+'</span>');
+    var prev=String(a.text||"").slice(0,180);
+    return '<article class="anz-card">'+
+      '<div class="anz-thumb">'+thumb+'<span class="anz-plat">'+ESC(a.platform||"reel")+'</span></div>'+
+      '<div class="anz-body">'+
+        '<div class="anz-top"><span class="anz-author">'+ESC(au)+'</span><span class="anz-date">'+_anzDate(a.created_at)+'</span></div>'+
+        (mets.length?'<div class="anz-mets">'+mets.join("")+'</div>':'')+
+        '<p class="anz-prev">'+(prev?ESC(prev)+((a.text||"").length>180?"…":""):'<i>'+L("(sin transcripción)","(no transcript)")+'</i>')+'</p>'+
+        '<div class="anz-acts">'+
+          '<button class="btn btn-sm btn-secondary" data-act="analyze-view" data-id="'+ESC(a.id)+'">'+IC.eye+' '+L("Ver","View")+'</button>'+
+          '<button class="btn btn-sm btn-ghost" data-act="analyze-copy" data-id="'+ESC(a.id)+'">'+L("Copiar","Copy")+'</button>'+
+          (a.author_username?'<button class="btn btn-sm btn-ghost" data-act="analyze-follow" data-h="'+ESC(String(a.author_username).replace(/^@+/,""))+'">'+L("Seguir","Follow")+'</button>':'')+
+          '<button class="btn btn-sm btn-ghost anz-del" data-act="analyze-del" data-id="'+ESC(a.id)+'">'+L("Borrar","Delete")+'</button>'+
+        '</div>'+
+      '</div>'+
+    '</article>';
+  }
+  function analizarHTML(){
+    var loading=!!S.analyzeLoading, list=S.analyses;
+    var form='<div class="anz-form">'+
+      '<input id="rsAnalyzeUrl" class="anz-input" type="text" autocomplete="off" spellcheck="false" placeholder="'+L("Pega la URL de un reel (Instagram / TikTok)","Paste a reel URL (Instagram / TikTok)")+'" value="'+ESC(S.analyzeUrl||"")+'"'+(loading?' disabled':'')+'>'+
+      '<button class="btn btn-md btn-primary anz-go" data-act="analyze-run"'+(loading?' disabled':'')+'>'+
+        (loading?'<span class="rs-ldr"></span> '+ESC(S.analyzeStep||L("Analizando…","Analyzing…")):IC.bolt+' '+L("Analizar","Analyze"))+'</button>'+
+    '</div>'+
+    (S.analyzeErr?'<div class="anz-err">'+ESC(S.analyzeErr)+'</div>':'')+
+    '<div class="anz-hint">'+L("Transcribo el reel y lo guardo aquí. No sigo a su autor — puedes hacerlo tú con «Seguir».","I transcribe the reel and save it here. I don't follow its author — you can with «Follow».")+'</div>';
+    var body;
+    if(list==null) body='<div class="anz-loading"><span class="rs-ldr"></span> '+L("Cargando tus análisis…","Loading your analyses…")+'</div>';
+    else if(!list.length) body='<div class="anz-empty"><span class="anz-empty-h">'+L("Aún no has analizado ningún reel.","No reels analyzed yet.")+'</span><span class="anz-empty-s">'+L("Pega un link arriba y aparecerá aquí, guardado.","Paste a link above and it shows up here, saved.")+'</span></div>';
+    else body='<div class="anz-count">'+L(list.length+" análisis guardados",list.length+" saved analyses")+'</div><div class="anz-grid">'+list.map(analyzeCardHTML).join("")+'</div>';
+    return '<div class="scroll"><div class="canvas anz-canvas">'+
+      '<header class="anz-head"><h1 class="h-title">'+L("Analizar un reel","Analyze a reel")+'</h1>'+
+      '<p class="h-sub">'+L("Pega cualquier reel y te saco la transcripción y sus métricas. Todo queda guardado aquí.","Paste any reel and I pull its transcript and metrics. Everything is saved here.")+'</p></header>'+
+      form+body+
+    '</div></div>';
+  }
+  function analyzeRun(){
+    var inp=document.getElementById("rsAnalyzeUrl");
+    var url=(inp?inp.value:S.analyzeUrl||"").trim();
+    S.analyzeUrl=url; S.analyzeErr=null;
+    if(!/^https?:\/\/\S+\.\S+/i.test(url)){ S.analyzeErr=L("Pega una URL válida (empieza por http).","Paste a valid URL (starts with http)."); return render(); }
+    if(isDemo()){
+      S.analyzeLoading=true; S.analyzeStep=L("Analizando…","Analyzing…"); render();
+      setTimeout(function(){
+        S.analyzeLoading=false; S.analyzeUrl="";
+        S.analyses=[{ id:"d"+(S.analyses||[]).length+"_"+(S.guiones||[]).length, author_username:"nick_saraev", platform:"instagram",
+          created_at:new Date().toISOString(), views:120000, likes:8000, comments:140, text:DEMO_REEL_TRANSCRIPT, thumbnail_b64:null }].concat(S.analyses||[]);
+        render(); showToast(L("Reel analizado y guardado.","Reel analyzed and saved."));
+      }, 1400);
+      return;
+    }
+    S.analyzeLoading=true; S.analyzeStep=L("Encolando…","Queuing…"); render();
+    apiPost("/transcribe",{url:url}).then(function(res){
+      if(!res.ok){ S.analyzeLoading=false; S.analyzeErr=(res.d&&res.d.error)||L("No pude analizar el reel. Revisa el link.","Couldn't analyze it. Check the link."); return render(); }
+      var taskId=res.d&&res.d.task_id;
+      if(!taskId){ S.analyzeLoading=false; S.analyzeErr=L("No pude encolar el análisis.","Couldn't queue it."); return render(); }
+      var tries=0;
+      (function poll(){
+        apiGet("/task/"+encodeURIComponent(taskId)).then(function(r){
+          var d=r.d||{};
+          if(d.state==="success"){
+            S.analyzeLoading=false; S.analyzeUrl=""; S.analyzeStep="";
+            if(d.credits_cents!=null) S.user.credits=d.credits_cents;
+            showToast(L("Reel analizado y guardado.","Reel analyzed and saved."));
+            loadAnalyses();   // recarga el historial (la task ya lo persistió)
+            return;
+          }
+          if(d.state==="error"){ S.analyzeLoading=false; S.analyzeErr=d.error||L("El análisis falló. No se ha gastado tu análisis.","Analysis failed. No analysis spent."); return render(); }
+          S.analyzeStep=d.step||L("Transcribiendo…","Transcribing…");
+          if(S.tab==="analizar") render();
+          if(++tries>48){ S.analyzeLoading=false; S.analyzeErr=L("Está tardando demasiado. Inténtalo en un rato.","Taking too long. Try again later."); return render(); }
+          setTimeout(poll, 2500);
+        });
+      })();
+    });
+  }
+  function analyzeView(id){ var a=_anzFind(id); if(a) showReelTranscript(a.text||"", a.author_username||null); }
+  function analyzeCopy(id){ var a=_anzFind(id); if(!a) return; try{ if(navigator.clipboard) navigator.clipboard.writeText(a.text||""); }catch(e){} showToast(L("Transcripción copiada.","Transcript copied.")); }
+  function analyzeDelete(id){
+    if(!_anzFind(id)) return;
+    S.analyses=(S.analyses||[]).filter(function(x){ return String(x.id)!==String(id); }); render();
+    if(!isDemo()) apiDelete("/history/"+encodeURIComponent(id));
+  }
   /* A · «Añadir reel» REAL — encadena flujos que ya existen (cero endpoints nuevos):
        1. POST /transcribe — cobra 1 análisis free / crédito (backend = verdad; 402 = muro).
        2. poll GET /task/<id> — la task devuelve `username` (autor del reel).
@@ -5653,7 +5773,12 @@
     if(act==="gal-menu"){ S.galMenu=!S.galMenu; return render(); }   // desplegable «+N» de competidores que no caben
     if(act==="expand-feed"){ S.feedExpanded=true; return render(); }
     if(act==="add-reel") return addReelManual();
-    if(act==="analyze-reel") return analyzeReelOnly();
+    if(act==="analyze-reel") return switchTab("analizar");   // → página «Analizar reel» (historial persistido)
+    if(act==="analyze-run") return analyzeRun();
+    if(act==="analyze-view") return analyzeView(btn.getAttribute("data-id"));
+    if(act==="analyze-copy") return analyzeCopy(btn.getAttribute("data-id"));
+    if(act==="analyze-del") return analyzeDelete(btn.getAttribute("data-id"));
+    if(act==="analyze-follow") return _followAuthor(btn.getAttribute("data-h"));
     // growth-2: onboarding de activación
     // onboarding v2 (7 pasos)
     if(act==="onb-handle-next") return onbHandleNext();

@@ -9791,6 +9791,45 @@
     .rs .analyze-tx { max-height:46vh; overflow-y:auto; white-space:pre-wrap; line-height:1.55;
       font-size:14px; color:var(--text-secondary); background:var(--surface-overlay);
       border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px; }
+    /* ── Página «Analizar reel» (nativa isla) ── */
+    .rs .anz-canvas { max-width:880px; }
+    .rs .anz-head { margin-bottom:18px; }
+    .rs .anz-form { display:flex; gap:10px; margin-bottom:10px; }
+    .rs .anz-input { flex:1; min-width:0; height:46px; padding:0 14px; font-size:14px; color:var(--text-primary);
+      background:var(--surface-overlay); border:1px solid var(--border-subtle); border-radius:var(--radius-md); outline:none; }
+    .rs .anz-input:focus { border-color:var(--accent); }
+    .rs .anz-input:disabled { opacity:.6; }
+    .rs .anz-go { white-space:nowrap; height:46px; }
+    .rs .anz-err { color:var(--danger); font-size:13px; margin:2px 2px 8px; }
+    .rs .anz-hint { color:var(--text-tertiary); font-size:12.5px; margin:0 2px 22px; }
+    .rs .anz-count { color:var(--text-tertiary); font-size:11px; text-transform:uppercase; letter-spacing:.05em; margin:0 2px 12px; }
+    .rs .anz-loading, .rs .anz-empty { display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:8px; padding:54px 16px; color:var(--text-tertiary); text-align:center; }
+    .rs .anz-empty-h { color:var(--text-secondary); font-weight:600; font-size:15px; }
+    .rs .anz-empty-s { font-size:13px; }
+    .rs .anz-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .rs .anz-card { display:flex; gap:14px; padding:14px; background:var(--surface-overlay);
+      border:1px solid var(--border-subtle); border-radius:var(--radius-lg); }
+    .rs .anz-thumb { position:relative; flex:0 0 86px; width:86px; height:110px; border-radius:10px; overflow:hidden;
+      background:var(--surface-sunken); display:flex; align-items:center; justify-content:center; }
+    .rs .anz-thumb-img { width:100%; height:100%; object-fit:cover; }
+    .rs .anz-thumb-ph { color:var(--text-tertiary); opacity:.5; }
+    .rs .anz-plat { position:absolute; left:6px; bottom:6px; font-size:9px; text-transform:uppercase; letter-spacing:.04em;
+      background:rgba(0,0,0,.6); color:#fff; padding:2px 5px; border-radius:5px; }
+    .rs .anz-body { flex:1; min-width:0; display:flex; flex-direction:column; }
+    .rs .anz-top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+    .rs .anz-author { font-weight:600; font-size:14px; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rs .anz-date { font-size:11px; color:var(--text-tertiary); flex:0 0 auto; }
+    .rs .anz-mets { display:flex; gap:12px; margin:5px 0 6px; color:var(--text-tertiary); font-size:12px; }
+    .rs .anz-mets span { display:inline-flex; align-items:center; gap:4px; }
+    .rs .anz-prev { flex:1; margin:0 0 10px; font-size:12.5px; line-height:1.5; color:var(--text-secondary);
+      display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .rs .anz-acts { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+    .rs .anz-del { margin-left:auto; color:var(--text-tertiary); }
+    .rs .anz-del:hover { color:var(--danger); }
+    .rs--mobile .anz-grid { grid-template-columns:1fr; }
+    .rs--mobile .anz-form { flex-direction:column; }
+    .rs--mobile .anz-go { width:100%; }
     .rs--mobile .sheet-body { padding:20px 16px; max-width:100%; }
     /* móvil: los botones de acción (nowrap) forzaban el ancho del sheet > viewport y lo
        descuadraban (anclado a la derecha, cortado por la izquierda). Que envuelvan. */
@@ -27945,6 +27984,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=97"></script>
+<script src="/static/js/radar-loop.js?v=98"></script>
 </body>
 </html>
