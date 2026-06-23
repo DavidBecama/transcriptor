@@ -1050,7 +1050,7 @@
         '<button class="brain-comp-x" data-act="untrack" data-id="'+ESC(String(tt.id))+'" data-handle="'+ESC(h)+'" title="Dejar de seguir a @'+ESC(h)+'" aria-label="Dejar de seguir a @'+ESC(h)+'">'+IC.x+'</button>'+
       '</div>';
     }).join("");
-    return '<details class="comp-manage"><summary>Tus competidores · '+t.length+'</summary><div class="comp-manage-list">'+rows+'</div></details>';
+    return '<details class="comp-manage" open><summary>'+L("Tus competidores · ","Your competitors · ")+t.length+'</summary><div class="comp-manage-list">'+rows+'</div></details>';
   }
 
   // v3 (mockup David «llena mi semana»): fila degradada con icono azul + chispa
@@ -1269,8 +1269,11 @@
     var ordered=comps.slice();
     if(active){ var ai=ordered.map(function(c){return c.handle;}).indexOf(active); if(ai>=MAXVIS){ var a=ordered.splice(ai,1)[0]; ordered.unshift(a); } }
     var vis=ordered.slice(0,MAXVIS), hidden=ordered.slice(MAXVIS);
-    var chips=chip("",L("Todos","All"),S.reels.length,!active)+
-      vis.map(function(c){ return chip(c.handle,"@"+c.handle,c.n,active===c.handle); }).join("");
+    // Sin número: el «N» era el conteo de REELS (Todos=20=10+10), pero bajo el título
+    // «Competidores» parecía «20 competidores» y confundía. El conteo real de
+    // competidores + reels por competidor vive en «Tus competidores» (trackedManageHTML).
+    var chips=chip("",L("Todos","All"),null,!active)+
+      vis.map(function(c){ return chip(c.handle,"@"+c.handle,null,active===c.handle); }).join("");
     // desplegable con buscador para el resto (gente seguida que no cabe en la fila).
     // VA FUERA de la tira con scroll (.rgal-comps tiene overflow → recortaría el menú).
     var moreWrap="";
@@ -1664,6 +1667,7 @@
       // ── bloques bajo la espina (recortados por decisión del usuario) ──
       flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro (condicional)
       (S.reels.length?radarAddBarHTML():"")+   // añadir competidor/reel + actualizar  ← SE QUEDA
+      (S.reels.length?trackedManageHTML():"")+ // «Tus competidores» con × para quitar (re-añadido: ver/gestionar a quién sigues sin tener que vaciar el radar)
       seedBannerHTML()+           // aviso «esto petó en tu nicho» (solo radar-seed, demo vacío)
       suggestedCompHTML()+        // «Te lo sugiero · Nuevo en tu nicho»               ← SE QUEDA
       (S.reels.length?communityGalleryHTML():"")+   // «Creaciones de la comunidad»    ← SE QUEDA
