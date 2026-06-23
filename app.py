@@ -365,10 +365,12 @@ def trial_scripts_today(user_id) -> int:
 
 
 def trial_daily_left(profile: dict) -> int:
-    """Guiones que le quedan HOY en el trial (None-equivalente: 0 si no está en trial)."""
-    if not in_trial(profile):
-        return 0
-    return max(0, TRIAL_DAILY_SCRIPTS - trial_scripts_today(profile.get("id")))
+    """Robos/guiones que le quedan HOY al FREE (tope diario = FREE_DAILY_SCRIPTS, modelo
+    2026-06-23 sin trial). Los planes de pago NO tienen tope diario → devuelve el tope
+    (el front lo ignora para pago vía isFree())."""
+    if (profile.get("plan", "free") or "free") != "free":
+        return FREE_DAILY_SCRIPTS
+    return max(0, FREE_DAILY_SCRIPTS - trial_scripts_today(profile.get("id")))
 
 
 def effective_plan(profile: dict) -> str:
