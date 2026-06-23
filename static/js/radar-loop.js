@@ -5261,34 +5261,48 @@
     var au=a.author_username?("@"+String(a.author_username).replace(/^@+/,"")):L("autor desconocido","unknown author");
     var thumb=a.thumbnail_b64
       ? '<img class="anzd-thumb-img" src="'+ESC(a.thumbnail_b64)+'" alt="" loading="lazy">'
-      : '<span class="anzd-thumb-ph">'+IC.doc+'</span>';
-    var stat=function(ic,v,lbl){ return (v!=null&&v!=="")?'<div class="anzd-stat"><span class="anzd-stat-ic">'+ic+'</span><span class="anzd-stat-v">'+_anzNum(v)+'</span><span class="anzd-stat-l">'+lbl+'</span></div>':''; };
-    var stats=[stat(IC.eye,a.views,L("views","views")),stat(IC.heart,a.likes,L("likes","likes")),
-               stat(IC.chat,a.comments,L("coment.","comments")),stat(IC.repeat,a.shares,L("shares","shares"))].join("");
-    if(!stats.trim()) stats='<div class="anzd-nostat">'+L("Sin métricas guardadas para este reel.","No metrics saved for this reel.")+'</div>';
+      : '<div class="anzd-thumb-ph"></div>';
+    var plat=(a.platform||"instagram");
+    var platCap=plat.charAt(0).toUpperCase()+plat.slice(1);
+    // SVGs propios del rediseño (IC no los tiene): instagram, link-externo, copiar, papelera.
+    var _ig='<svg viewBox="0 0 24 24" width="13" height="13" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="1.8"></rect><circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.8"></circle><circle cx="17.5" cy="6.5" r="1" fill="currentColor"></circle></svg>';
+    var _ext='<svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M7 17L17 7M9 7h8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+    var _copy='<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.8"></rect><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.8"></path></svg>';
+    var _trash='<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+    var stat=function(cls,ic,v,lbl){ return (v!=null&&v!=="")?'<div class="anzd-stat '+cls+'"><span class="anzd-stat-ic">'+ic+'</span><span class="anzd-stat-v">'+_anzNum(v)+'</span><span class="anzd-stat-l">'+lbl+'</span></div>':''; };
+    var stats=stat("v-views",IC.eye,a.views,"Views")+stat("v-likes",IC.heart,a.likes,"Likes")+
+              stat("v-comments",IC.chat,a.comments,L("Comentarios","Comments"))+stat("v-shares",IC.repeat,a.shares,"Shares");
+    var statsBlock=stats.trim()?'<div class="anzd-stats">'+stats+'</div>':'<div class="anzd-nostat">'+L("Sin métricas guardadas para este reel.","No metrics saved for this reel.")+'</div>';
+    var orig=a.url?'<a class="anzd-orig" href="'+ESC(a.url)+'" target="_blank" rel="noopener noreferrer">'+L("Ver original en "+platCap,"View original on "+platCap)+_ext+'</a>':'';
     var stealing=!!S.analyzeStealing;
-    var link=a.url?'<a class="anzd-link" href="'+ESC(a.url)+'" target="_blank" rel="noopener noreferrer">'+L("Ver original en "+(a.platform||"Instagram"),"View original on "+(a.platform||"Instagram"))+'</a>':'';
+    var wc=(a.text||"").trim().split(/\s+/).filter(Boolean).length;
     return '<div class="scroll"><div class="canvas anzd-canvas">'+
+      '<div class="anzd-glow" aria-hidden="true"></div>'+
       '<header class="anzd-head">'+
         '<button class="anzd-back" data-act="analyze-back" aria-label="'+L("Volver","Back")+'">'+IC.back+'</button>'+
-        '<span class="anzd-head-t">'+L("Reel analizado","Analyzed reel")+'</span></header>'+
+        '<div class="anzd-head-tt"><span class="anzd-head-t">'+L("Reel analizado","Analyzed reel")+'</span>'+
+          '<span class="anzd-head-sub">'+L("Transcripción y métricas del contenido","Transcript and content metrics")+'</span></div>'+
+      '</header>'+
       '<div class="anzd-grid">'+
         '<aside class="anzd-side">'+
-          '<div class="anzd-thumb">'+thumb+'<span class="anzd-plat">'+ESC(a.platform||"reel")+'</span></div>'+
-          '<div class="anzd-author">'+ESC(au)+'</div>'+
-          '<div class="anzd-date">'+_anzDate(a.created_at)+'</div>'+
-          '<div class="anzd-stats">'+stats+'</div>'+
-          link+
+          '<div class="anzd-thumb">'+thumb+'<div class="anzd-thumb-shade"></div>'+
+            '<span class="anzd-plat">'+_ig+' '+ESC(platCap)+'</span>'+
+            '<div class="anzd-thumb-meta"><div class="anzd-thumb-author">'+ESC(au)+'</div>'+
+              '<div class="anzd-thumb-date">'+L("Publicado ","Posted ")+_anzDate(a.created_at)+'</div></div>'+
+          '</div>'+
+          statsBlock+
+          orig+
         '</aside>'+
         '<section class="anzd-main">'+
           '<div class="anzd-acts">'+
-            '<button class="btn btn-md btn-primary" data-act="analyze-steal" data-id="'+ESC(a.id)+'"'+(stealing?' disabled':'')+'>'+(stealing?'<span class="rs-ldr"></span> '+L("Robando…","Stealing…"):IC.bolt+' '+L("Robar guion","Steal script"))+'</button>'+
-            (a.author_username?'<button class="btn btn-md btn-secondary" data-act="analyze-follow" data-h="'+ESC(String(a.author_username).replace(/^@+/,""))+'">'+L("Seguir","Follow")+'</button>':'')+
-            '<button class="btn btn-md btn-ghost" data-act="analyze-copy" data-id="'+ESC(a.id)+'">'+L("Copiar","Copy")+'</button>'+
-            '<button class="btn btn-md btn-ghost anz-del" data-act="analyze-del" data-id="'+ESC(a.id)+'">'+L("Borrar","Delete")+'</button>'+
+            '<button class="anzd-btn anzd-btn-steal" data-act="analyze-steal" data-id="'+ESC(a.id)+'"'+(stealing?' disabled':'')+'>'+(stealing?'<span class="rs-ldr"></span> '+L("Robando…","Stealing…"):IC.bolt+' '+L("Robar guion","Steal script"))+'</button>'+
+            (a.author_username?'<button class="anzd-btn anzd-btn-follow" data-act="analyze-follow" data-h="'+ESC(String(a.author_username).replace(/^@+/,""))+'">'+IC.plus+' '+L("Seguir","Follow")+'</button>':'')+
+            '<button class="anzd-btn anzd-btn-ghost" data-act="analyze-copy" data-id="'+ESC(a.id)+'">'+_copy+' '+L("Copiar","Copy")+'</button>'+
+            '<button class="anzd-btn anzd-btn-del" data-act="analyze-del" data-id="'+ESC(a.id)+'">'+_trash+' '+L("Borrar","Delete")+'</button>'+
           '</div>'+
-          '<div class="anzd-txlabel">'+L("Transcripción","Transcript")+'</div>'+
-          '<div class="anzd-tx">'+(a.text?ESC(a.text):'<i>'+L("(sin transcripción)","(no transcript)")+'</i>')+'</div>'+
+          '<div class="anzd-txhead"><span class="anzd-txlabel">'+L("Transcripción","Transcript")+'</span><span class="anzd-txrule"></span>'+
+            (wc?'<span class="anzd-txwc">~'+wc+' '+L("palabras","words")+'</span>':'')+'</div>'+
+          '<div class="anzd-tx"><span class="anzd-tx-bar"></span><p>'+(a.text?ESC(a.text):'<i>'+L("(sin transcripción)","(no transcript)")+'</i>')+'</p></div>'+
         '</section>'+
       '</div>'+
     '</div></div>';

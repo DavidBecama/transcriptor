@@ -9884,38 +9884,68 @@
     .rs--mobile .anz-form { flex-direction:column; }
     .rs--mobile .anz-go { width:100%; }
     /* ── Ficha de detalle de un análisis (portada + métricas + transcripción + robar) ── */
-    .rs .anzd-canvas { max-width:920px; }
-    .rs .anzd-head { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
-    .rs .anzd-back { width:40px; height:40px; flex:0 0 40px; border-radius:50%; cursor:pointer;
-      border:1px solid var(--border-subtle); background:var(--surface-overlay); color:var(--text-secondary);
-      display:flex; align-items:center; justify-content:center; }
-    .rs .anzd-back:hover { color:var(--text-primary); border-color:var(--accent); }
-    .rs .anzd-head-t { font-weight:700; font-size:16px; color:var(--text-primary); }
-    .rs .anzd-grid { display:grid; grid-template-columns:320px 1fr; gap:28px; align-items:stretch; }
-    .rs .anzd-thumb { position:relative; width:100%; aspect-ratio:9/13; max-height:520px; border-radius:14px;
-      overflow:hidden; background:var(--surface-sunken); display:flex; align-items:center; justify-content:center; margin-bottom:14px; }
+    /* ════ Ficha «Reel analizado» (detalle) — rediseño Claude design ════ */
+    .rs .anzd-canvas { max-width:1180px; position:relative; }
+    .rs .anzd-glow { position:absolute; top:-40px; right:120px; width:420px; height:420px; pointer-events:none; z-index:0;
+      background:radial-gradient(circle, rgba(79,124,255,.16), transparent 70%); filter:blur(20px); animation:floatglow 9s ease-in-out infinite; }
+    @keyframes floatglow { 0%,100%{transform:translate(0,0);} 50%{transform:translate(0,-14px);} }
+    .rs .anzd-head { position:relative; z-index:1; display:flex; align-items:center; gap:14px; margin-bottom:26px; }
+    .rs .anzd-back { width:42px; height:42px; flex:0 0 42px; border-radius:50%; cursor:pointer; border:1px solid var(--border-default);
+      background:var(--surface-raised); color:var(--text-secondary); display:flex; align-items:center; justify-content:center; transition:all .15s ease; }
+    .rs .anzd-back:hover { color:var(--text-primary); border-color:var(--brand-400); transform:translateX(-2px); }
+    .rs .anzd-head-tt { display:flex; flex-direction:column; gap:2px; }
+    .rs .anzd-head-t { font-family:var(--font-display); font-weight:700; font-size:19px; color:var(--text-primary); letter-spacing:-.01em; }
+    .rs .anzd-head-sub { font-size:12px; color:var(--text-tertiary); }
+    .rs .anzd-grid { position:relative; z-index:1; display:grid; grid-template-columns:340px 1fr; gap:32px; align-items:start; }
+    .rs .anzd-side { position:sticky; top:16px; }
+    .rs .anzd-thumb { position:relative; width:100%; aspect-ratio:9/13; max-height:540px; border-radius:18px; overflow:hidden;
+      background:var(--surface-sunken); margin-bottom:16px; box-shadow:0 24px 60px rgba(0,0,0,.55); border:1px solid var(--border-subtle); }
     .rs .anzd-thumb-img { width:100%; height:100%; object-fit:cover; }
-    .rs .anzd-thumb-ph { color:var(--text-tertiary); opacity:.4; transform:scale(2.2); }
-    .rs .anzd-plat { position:absolute; left:8px; bottom:8px; font-size:9px; text-transform:uppercase; letter-spacing:.04em;
-      background:rgba(0,0,0,.6); color:#fff; padding:2px 6px; border-radius:5px; }
-    .rs .anzd-author { font-weight:700; font-size:16px; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .rs .anzd-date { font-size:12px; color:var(--text-tertiary); margin-bottom:14px; }
-    .rs .anzd-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
-    .rs .anzd-stat { display:flex; flex-direction:column; gap:1px; padding:10px 12px;
-      background:var(--surface-overlay); border:1px solid var(--border-subtle); border-radius:12px; }
-    .rs .anzd-stat-ic { color:var(--text-tertiary); }
-    .rs .anzd-stat-v { font-size:18px; font-weight:700; color:var(--text-primary); line-height:1.2; }
-    .rs .anzd-stat-l { font-size:10.5px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.04em; }
-    .rs .anzd-nostat { font-size:12px; color:var(--text-tertiary); margin-bottom:12px; }
-    .rs .anzd-link { display:inline-block; font-size:13px; color:var(--accent); text-decoration:none; }
-    .rs .anzd-link:hover { text-decoration:underline; }
+    .rs .anzd-thumb-ph { width:100%; height:100%; background:linear-gradient(150deg,#26356f,#0b1024 62%); }
+    .rs .anzd-thumb-shade { position:absolute; inset:0; background:linear-gradient(to top, rgba(5,5,7,.85), transparent 45%); }
+    .rs .anzd-plat { position:absolute; left:12px; top:12px; display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600;
+      background:rgba(0,0,0,.5); backdrop-filter:blur(8px); color:#fff; padding:5px 10px; border-radius:9px; border:1px solid rgba(255,255,255,.12); text-transform:capitalize; }
+    .rs .anzd-thumb-meta { position:absolute; left:0; right:0; bottom:0; padding:16px; }
+    .rs .anzd-thumb-author { font-family:var(--font-display); font-weight:700; font-size:18px; color:#fff; }
+    .rs .anzd-thumb-date { font-size:12px; color:rgba(255,255,255,.6); margin-top:2px; }
+    .rs .anzd-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+    .rs .anzd-stat { display:flex; flex-direction:column; gap:6px; padding:14px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:14px; }
+    .rs .anzd-stat-ic { display:flex; }
+    .rs .anzd-stat.v-views .anzd-stat-ic { color:#6f93ff; }
+    .rs .anzd-stat.v-likes .anzd-stat-ic { color:#ff6f8b; }
+    .rs .anzd-stat.v-comments .anzd-stat-ic { color:#5fd0a8; }
+    .rs .anzd-stat.v-shares .anzd-stat-ic { color:#e0a85f; }
+    .rs .anzd-stat-v { font-family:var(--font-display); font-size:21px; font-weight:700; color:var(--text-primary); line-height:1; }
+    .rs .anzd-stat-l { font-size:10.5px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.05em; }
+    .rs .anzd-nostat { font-size:12px; color:var(--text-tertiary); margin-bottom:16px; padding:14px; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:14px; }
+    .rs .anzd-orig { display:flex; align-items:center; justify-content:center; gap:8px; height:42px; border-radius:12px; font-size:13.5px; font-weight:600;
+      color:#9aaeff; text-decoration:none; background:rgba(79,124,255,.08); border:1px solid rgba(79,124,255,.2); transition:all .15s ease; }
+    .rs .anzd-orig:hover { background:rgba(79,124,255,.14); border-color:rgba(79,124,255,.4); }
     .rs .anzd-main { min-width:0; display:flex; flex-direction:column; }
-    .rs .anzd-acts { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
-    .rs .anzd-txlabel { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); margin-bottom:8px; }
-    .rs .anzd-tx { flex:1; min-height:46vh; white-space:pre-wrap; line-height:1.75; font-size:15.5px; color:var(--text-secondary);
-      background:var(--surface-overlay); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:22px 24px; }
+    .rs .anzd-acts { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:22px; }
+    .rs .anzd-btn { display:inline-flex; align-items:center; gap:8px; height:46px; padding:0 20px; border:none; border-radius:13px;
+      font-family:var(--font-body); font-weight:600; font-size:14.5px; cursor:pointer; transition:all .15s ease; }
+    .rs .anzd-btn[disabled] { opacity:.7; cursor:default; }
+    .rs .anzd-btn-steal { padding:0 22px; color:#fff; background:linear-gradient(135deg,#5f86ff,#3a63ec); box-shadow:0 8px 24px rgba(79,124,255,.35); }
+    .rs .anzd-btn-steal:hover { transform:translateY(-1px); box-shadow:0 12px 30px rgba(79,124,255,.5); }
+    .rs .anzd-btn-follow { border:1px solid var(--border-default); color:var(--text-primary); background:var(--surface-overlay); }
+    .rs .anzd-btn-follow:hover { border-color:var(--border-strong); }
+    .rs .anzd-btn-ghost { padding:0 18px; color:var(--text-secondary); background:transparent; }
+    .rs .anzd-btn-ghost:hover { background:var(--surface-overlay); color:var(--text-primary); }
+    .rs .anzd-btn-del { padding:0 18px; margin-left:auto; color:var(--text-tertiary); background:transparent; }
+    .rs .anzd-btn-del:hover { background:rgba(255,90,90,.1); color:#ff6f6f; }
+    .rs .anzd-txhead { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+    .rs .anzd-txlabel { font-family:var(--font-display); font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--text-tertiary); font-weight:600; }
+    .rs .anzd-txrule { flex:1; height:1px; background:linear-gradient(to right, var(--border-default), transparent); }
+    .rs .anzd-txwc { font-size:11.5px; color:var(--text-tertiary); }
+    .rs .anzd-tx { position:relative; flex:1; min-height:46vh; background:var(--surface-raised); border:1px solid var(--border-subtle); border-radius:18px; padding:28px 30px; overflow:hidden; }
+    .rs .anzd-tx-bar { position:absolute; left:0; top:28px; bottom:28px; width:3px; border-radius:3px; background:linear-gradient(to bottom,#6f93ff,#3a63ec); opacity:.7; }
+    .rs .anzd-tx p { margin:0; white-space:pre-wrap; line-height:1.85; font-size:16px; color:var(--text-secondary); }
+    @media (prefers-reduced-motion: reduce) { .rs .anzd-glow { animation:none; } }
     .rs--mobile .anzd-grid { grid-template-columns:1fr; }
-    .rs--mobile .anzd-thumb { max-width:220px; margin-left:auto; margin-right:auto; }
+    .rs--mobile .anzd-side { position:static; }
+    .rs--mobile .anzd-thumb { max-width:260px; margin-left:auto; margin-right:auto; }
+    .rs--mobile .anzd-glow { display:none; }
     .rs--mobile .sheet-body { padding:20px 16px; max-width:100%; }
     /* móvil: los botones de acción (nowrap) forzaban el ancho del sheet > viewport y lo
        descuadraban (anclado a la derecha, cortado por la izquierda). Que envuelvan. */
@@ -28088,6 +28118,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=105"></script>
+<script src="/static/js/radar-loop.js?v=106"></script>
 </body>
 </html>
