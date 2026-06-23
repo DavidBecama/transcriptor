@@ -839,43 +839,51 @@
   // Pantalla de espera tras el onboarding: mientras Apify descubre+scrapea los creadores
   // del nicho (auto-seguidos en el paso de tags), el radar arranca con reels ACERTADOS.
   function onbWaitHTML(){
-    var subs=((S.onb&&S.onb.subniches)||[]).slice(0,3).map(function(t){return "#"+t;}).join(" ");
+    var seed=(S.onb&&S.onb.seed)?("@"+String(S.onb.seed).replace(/^@+/,"")):"";
+    var srcEs = seed ? ("a <b>"+ESC(seed)+"</b> y a creadores afines de tu nicho") : "a los creadores que más petan en tu nicho";
+    var srcEn = seed ? ("<b>"+ESC(seed)+"</b> and similar creators in your niche") : "the top creators in your niche";
     return '<div class="scroll"><div class="canvas"><div class="onbwait">'+
-      '<div class="onbwait-orb">'+IC.brain+'<span class="onbwait-ring"></span></div>'+
+      '<div class="onbw-radar" aria-hidden="true">'+
+        '<span class="onbw-ring r1"></span><span class="onbw-ring r2"></span><span class="onbw-ring r3"></span>'+
+        '<span class="onbw-sweep"></span><span class="onbw-core">'+IC.bolt+'</span>'+
+      '</div>'+
       '<div class="onbwait-t">'+L("Preparando tu radar…","Setting up your radar…")+'</div>'+
-      '<div class="onbwait-d">'+L("Estoy rastreando los creadores que más petan en "+(subs||"tu nicho")+" y trayéndote sus reels — para que arranques con lo MÁS acertado.","Tracking the top creators in "+(subs||"your niche")+" and pulling their reels — so you start with the most on-point picks.")+'</div>'+
+      '<div class="onbwait-d">'+L("Estoy analizando "+srcEs+" y trayéndote sus reels — para que arranques con lo MÁS acertado.","Analyzing "+srcEn+" and pulling their reels — so you start with the most on-point picks.")+'</div>'+
       '<div class="onbwait-sub"><span class="mini-spin"></span> '+L("Suele tardar menos de un minuto…","Usually under a minute…")+'</div>'+
     '</div></div></div>';
   }
   function onbWaitForNiche(){
-    var t0=Date.now(), HARD=70000;   // tope duro: nunca se atasca (descubrimiento+scrape)
-    var lastN=-1, stable=0;
+    var t0=Date.now(), HARD=75000, lastN=-1, stable=0;   // tope duro: nunca se atasca
+    var _pq=(S.brandId&&S.brandId!=="default")?("?project_id="+encodeURIComponent(S.brandId)):"";
+    // Sondeo SILENCIOSO (sin loadBrandData → sin repintar el skeleton → sin parpadeo):
+    // solo trae reels y, cuando cuajan, suelta al radar UNA vez.
     (function loop(){
       if(!S._onbWaiting) return;
-      var el=Date.now()-t0;
-      var n=(S.reels||[]).length;
-      var hasReal=(n>0 && !S.radarSeed);   // reels REALES del nicho (no el seed de la pool vieja)
-      if(hasReal){ if(n===lastN) stable++; else { stable=0; lastN=n; } }
-      // NO soltar al primer reel: los creadores terminan de scrapearse escalonados (~60s).
-      // listo = hay reels reales Y (ya hay buena pool, O llevan ~8s sin crecer, O tope duro).
-      if((hasReal && (n>=8 || stable>=2)) || el>HARD){
-        S._onbWaiting=false; render(); onbStartTour();
-        if(!hasReal) showToast(L("Tu radar se está llenando con reels de tu nicho — pulsa «Actualizar radar» en un momento.","Your radar is filling with niche reels — hit «Refresh radar» in a moment."));
-        else onbRadarCatchup();   // sigue trayendo los creadores que terminen de scrapearse luego
-        return;
-      }
-      if(typeof loadBrandData==="function"){ try{ loadBrandData(); }catch(e){} }
-      setTimeout(loop, 4000);
+      apiGet("/api/tracked-creators/reels"+(_pq?_pq+"&":"?")+"sort=explosion&limit=24").then(function(r){
+        if(!S._onbWaiting) return;
+        if(r&&r.ok&&r.d&&Array.isArray(r.d.reels)){ S.reels=r.d.reels.map(normReel); S.radarSeed=!!r.d.seed; }
+        var n=(S.reels||[]).length, el=Date.now()-t0;
+        var hasReal=(n>0 && !S.radarSeed);   // reels REALES del nicho (no el seed de la pool vieja)
+        if(hasReal){ if(n===lastN) stable++; else { stable=0; lastN=n; } }
+        // listo = hay reels reales Y (ya hay pool, O llevan ~7s sin crecer, O tope duro).
+        if((hasReal && (n>=6 || stable>=2)) || el>HARD){
+          S._onbWaiting=false; loadTracked(); render(); onbStartTour();
+          if(!hasReal) showToast(L("Tu radar se está llenando — pulsa «Actualizar radar» en un momento.","Your radar is filling — hit «Refresh radar» in a moment."));
+          else onbRadarCatchup();
+          return;
+        }
+        setTimeout(loop, 3500);
+      });
     })();
   }
   // Tras soltar al radar, sigue refrescando en 2º plano (~1 min) para que aparezcan los
   // reels de creadores que terminen de scrapearse más tarde — sin pedir refresco manual.
-  // Para cuando la pool deja de crecer 3 sondeos seguidos (ya cuajó) o agota los intentos.
+  // Usa el refresco LIGERO (sin skeleton) para no parpadear. Para cuando deja de crecer.
   function onbRadarCatchup(){
     var tries=0, lastN=(S.reels||[]).length, stable=0;
     (function loop(){
       if(++tries>9) return;   // ~72s máx
-      if(typeof loadBrandData==="function"){ try{ loadBrandData(); }catch(e){} }
+      if(typeof _refreshReelsLight==="function"){ try{ _refreshReelsLight(); }catch(e){} }
       setTimeout(function(){
         var n=(S.reels||[]).length;
         if(n===lastN) stable++; else { stable=0; lastN=n; }
