@@ -122,6 +122,11 @@ HOOKS_EXTRA_UNITS     = 1    # "3 hooks más" tras agotar el cupo diario gratis
 HOOKS_FREE_PER_DAY    = 2    # hooks-extra gratis por usuario y día
 FILL_WEEK_UNITS       = 12   # "Llena mi semana" (5 guiones de golpe; vs 15 sueltos)
 ADD_COMPETITOR_UNITS  = 2    # añadir competidor NUEVO más allá del cupo del plan
+# ── Modelo free 2026-06-23 (decisión Leo): moneda única, SIN trial ────────────
+WELCOME_CREDITS_CENTS = 30 * COST_CENTS   # 540 — créditos de bienvenida al registrarse
+FREE_MONTHLY_CENTS    = 15 * COST_CENTS   # 270 — recarga mensual del free (+15 cr/mes)
+FREE_DAILY_SCRIPTS    = 3                  # tope de robos/guiones por día (free) → empuja a pagar
+ANALYSIS_UNITS        = 2                  # analizar un reel = 2 créditos
 VOICE_FREE_REELS      = 5    # primeros reels de voz gratis (llegar al aha sin fricción)
 VOICE_REEL_UNITS      = 2    # por reel de voz transcrito tras el cupo gratis
 AGENCY_EXTRA_BRAND_CREDITS = 96   # +96 cr/mes por marca extra de Agencia (+10€/marca)
@@ -315,13 +320,11 @@ def _parse_ts(ts):
 
 
 def in_trial(profile: dict) -> bool:
-    """True si el usuario está dentro de la VENTANA temporal del trial (3 días).
-    Un plan de pago real NO está 'en trial' (ya paga). No mira el tope (eso lo
-    hace trial_usable)."""
-    if profile.get("plan", "free") != "free":
-        return False
-    dt = _parse_ts(profile.get("trial_ends_at"))
-    return bool(dt and datetime.now(timezone.utc) < dt)
+    """Trial RETIRADO (2026-06-23, decisión Leo): todos entran directos en FREE con
+    30 créditos de bienvenida + 15/mes + tope de 3 robos/día. Se conserva la función
+    (siempre False) para no romper los call-sites (trial_usable, paid_features_active,
+    effective_plan, /auth/me…)."""
+    return False
 
 
 def trial_credits_used(profile: dict) -> int:
@@ -958,12 +961,32 @@ def get_profile(user_id: str) -> dict:
     """Devuelve el perfil del usuario, reseteando los contadores diarios si hace falta."""
     result = db.table("profiles").select("*").eq("id", user_id).execute()
     if not result.data:
-        db.table("profiles").insert({"id": user_id}).execute()
-        return {"id": user_id, "credits_cents": 0,
+        # Cuenta nueva → 30 créditos de bienvenida (modelo free 2026-06-23, sin trial).
+        # usage_reset_at = mes que viene → la 1ª recarga de +15 cr cae el mes siguiente.
+        _nm = _next_month_boundary(datetime.now(timezone.utc)).isoformat()
+        db.table("profiles").insert({"id": user_id, "credits_cents": WELCOME_CREDITS_CENTS,
+                                     "usage_reset_at": _nm}).execute()
+        return {"id": user_id, "credits_cents": WELCOME_CREDITS_CENTS,
                 "free_used_today": 0, "free_adapt_used_today": 0,
                 "free_reset_date": str(date.today()),
                 "free_adapt_reset_date": str(date.today())}
     profile = result.data[0]
+    # Recarga mensual del FREE (+15 créditos): moneda única, reusa usage_reset_at como
+    # frontera (los planes de pago la usan para resetear monthly_usage; el free no la
+    # usa para nada más). Existentes sin frontera → se inicializa SIN regalar.
+    if (profile.get("plan") or "free") == "free":
+        _now = datetime.now(timezone.utc)
+        _reset = _parse_ts(profile.get("usage_reset_at"))
+        if _reset is None:
+            _nm = _next_month_boundary(_now).isoformat()
+            db.table("profiles").update({"usage_reset_at": _nm}).eq("id", user_id).execute()
+            profile["usage_reset_at"] = _nm
+        elif _now >= _reset:
+            _newc = (profile.get("credits_cents") or 0) + FREE_MONTHLY_CENTS
+            _nm = _next_month_boundary(_now).isoformat()
+            db.table("profiles").update({"credits_cents": _newc, "usage_reset_at": _nm}).eq("id", user_id).execute()
+            profile["credits_cents"] = _newc
+            profile["usage_reset_at"] = _nm
     updates = {}
     if profile.get("free_reset_date") != str(date.today()):
         updates["free_used_today"] = 0
@@ -1227,20 +1250,21 @@ def _on_signup_complete(user_id, lang):
     try:
         import emails as _emails
         # 1) ensure unsubscribe_token exists + lang persisted + trial iniciado
-        prof = db.table("profiles").select("unsubscribe_token, lang, trial_ends_at").eq("id", user_id).execute()
+        prof = db.table("profiles").select("unsubscribe_token, lang, credits_cents, usage_reset_at").eq("id", user_id).execute()
         existing = (prof.data or [{}])[0]
         updates = {}
         if not existing.get("unsubscribe_token"):
             updates["unsubscribe_token"] = _emails.gen_unsubscribe_token()
         if not existing.get("lang"):
             updates["lang"] = lang or "es"
-        # reverse-trial: 7 días de Pro al registrarse (solo si no se fijó ya —
-        # idempotente, no se extiende en re-llamadas).
-        started_trial = not existing.get("trial_ends_at")
+        # Modelo free 2026-06-23 (SIN trial): 30 créditos de BIENVENIDA al registrarse.
+        # Idempotente: solo si aún no tiene saldo (re-llamadas no regalan otra vez).
+        # usage_reset_at = mes que viene → la 1ª recarga de +15 cr cae el mes siguiente.
+        started_trial = not existing.get("credits_cents")
         if started_trial:
-            updates["trial_ends_at"] = (
-                datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)
-            ).isoformat()
+            updates["credits_cents"] = WELCOME_CREDITS_CENTS
+            updates["usage_reset_at"] = _next_month_boundary(
+                datetime.now(timezone.utc)).isoformat()
         if updates:
             db.table("profiles").update(updates).eq("id", user_id).execute()
         # 2) enqueue email_log rows (idempotente vía UNIQUE)
@@ -1253,9 +1277,9 @@ def _on_signup_complete(user_id, lang):
             logger.warning("send_email_now dispatch failed user=%s err=%s", user_id, e)
         # 4) growth-1: evento de funnel «registro» (server-side, fiable)
         track_event("user_registered", user_id, {"lang": lang or "es"})
-        # panel: inicio del reverse-trial (solo la 1ª vez que se fija el trial).
+        # panel: bienvenida (solo la 1ª vez, al regalar los 30 créditos).
         if started_trial:
-            track_event("trial_started", user_id, {"plan": "pro", "trial_days": TRIAL_DAYS})
+            track_event("welcome_credits_granted", user_id, {"credits": WELCOME_CREDITS_CENTS // COST_CENTS})
     except Exception as e:
         # NUNCA romper el signup por errores en el flujo de email.
         logger.warning("_on_signup_complete failed user=%s err=%s", user_id, e)
@@ -1612,22 +1636,17 @@ def transcribe():
             ok, err_msg = check_monthly_limit(profile)
             if not ok:
                 return jsonify({"error": err_msg}), 429
-        elif free_analysis_left_week(user["id"]) > 0:
-            # FREE: 3 análisis cada 7 días (ventana móvil, cuenta transcriptions).
-            pass
-        elif profile["credits_cents"] >= 2 * COST_CENTS:
+        elif profile["credits_cents"] >= ANALYSIS_UNITS * COST_CENTS:
+            # Modelo 2026-06-23: analizar un reel = 2 créditos (sin análisis gratis/semana).
             pass
         else:
-            # Cata agotada y sin créditos → muro claro.
-            # growth-1: paywall_shown. after_first_value=True (el free ya hizo
-            # sus 3 análisis → el muro llega DESPUÉS del valor, como pide el research).
             track_event("paywall_shown", user["id"], {
                 "wall": "analysis", "plan": profile.get("plan", "free"),
                 "after_first_value": True,
             })
             return jsonify({
-                "error": "Has usado tus 3 análisis gratis de esta semana. Sube a Creador para seguir "
-                         "analizando — o recarga créditos sin cambiar de plan."
+                "error": f"Analizar un reel cuesta {ANALYSIS_UNITS} créditos y no te quedan. "
+                         "Recarga créditos o sube de plan."
             }), 402
 
     # ── Actualizar contador antes de encolar ──────────────────────────────
@@ -1652,22 +1671,17 @@ def transcribe():
                     "monthly_usage": (fresh.get("monthly_usage") or 0) + 1
                 }).eq("id", user["id"]).execute()
                 charge = {"kind": "monthly"}
-            elif free_analysis_left_week(user["id"]) > 0:
-                # FREE semanal: NO hay contador que tocar — la propia fila de
-                # `transcriptions` (insertada por la task al terminar) ES el registro.
-                # Nada que reembolsar si falla (no se inserta fila). charge=None.
-                charge = None
-            elif (fresh.get("credits_cents") or 0) >= 2 * COST_CENTS:
-                cost_cents = 2 * COST_CENTS
+            elif (fresh.get("credits_cents") or 0) >= ANALYSIS_UNITS * COST_CENTS:
+                cost_cents = ANALYSIS_UNITS * COST_CENTS
                 db.table("profiles").update(
                     {"credits_cents": (fresh.get("credits_cents") or 0) - cost_cents}
                 ).eq("id", user["id"]).execute()
                 charge = {"kind": "credits", "cents": cost_cents}
             else:
-                # Carrera: cupo/saldo agotado entre el check y el lock.
+                # Carrera: saldo agotado entre el check y el lock.
                 return jsonify({
-                    "error": "Has usado tus 3 análisis gratis de esta semana. Sube a Creador para seguir "
-                             "analizando — o recarga créditos sin cambiar de plan."
+                    "error": f"Analizar un reel cuesta {ANALYSIS_UNITS} créditos y no te quedan. "
+                             "Recarga créditos o sube de plan."
                 }), 402
         finally:
             release_credit_lock(user["id"], _tclock)
@@ -6072,10 +6086,17 @@ def transcription_to_script(t_id):
     profile = get_profile(uid)
     plan = profile.get("plan", "free")
 
-    # Cobro 1 crédito (mismo patrón v0.14.29 idea_to_script).
+    # Cobro 3 créditos por guión (robar desde un reel analizado).
     SCRIPT_COST = SCRIPT_UNITS * COST_CENTS   # econ: 3 créditos por guión
     SCRIPT_USAGE_UNITS = SCRIPT_UNITS
     is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
+    # TOPE DIARIO del FREE (modelo 2026-06-23): 3 robos/día → "vuelve mañana".
+    if not is_paid_unlimited and trial_scripts_today(uid) >= FREE_DAILY_SCRIPTS:
+        track_event("paywall_shown", uid, {"wall": "free_daily", "plan": plan})
+        return jsonify({
+            "error": "trial_daily_limit",
+            "message": f"Hechos tus {FREE_DAILY_SCRIPTS} guiones de hoy — vuelve mañana o desbloquéalos subiendo de plan.",
+        }), 402
     if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SCRIPT_COST:
         return jsonify({
             "error": "no_credits",
@@ -9154,36 +9175,28 @@ def generate_script_from_competitor_reel(reel_id: str):
         logger.warning("generate_script: dup check failed user=%s reel=%s err=%s",
                        uid, reel_id, e)
 
-    # Trial (Fathom 18/06): 5 días de Pro pero TOPE DIARIO de 3 guiones. Muro suave
-    # "vuelve mañana" — empuja al hábito y, al 4º, a desbloquear. Antes de la cuota.
-    if in_trial(profile) and trial_scripts_today(uid) >= TRIAL_DAILY_SCRIPTS:
-        track_event("paywall_shown", uid, {"wall": "trial_daily", "plan": plan})
-        return jsonify({
-            "error": "trial_daily_limit",
-            "message": f"Has hecho tus {TRIAL_DAILY_SCRIPTS} guiones de hoy. Vuelve mañana — o desbloquea sin límite."
-        }), 402
-
     # 1-2. Quién puede generar y cómo se paga este guion (sin cobrar todavía).
-    #   paid  → cuenta contra su asignación mensual (monthly_usage).
-    #   free  → 2 guiones/mes (reverse-trial) → luego topups (credits_cents) → muro.
+    #   paid → asignación mensual (monthly_usage); free → créditos (3/guión).
     SCRIPT_COST = SCRIPT_UNITS * COST_CENTS  # econ: 3 créditos por guión
     SCRIPT_USAGE_UNITS = SCRIPT_UNITS
     is_paid_unlimited = paid_features_active(profile, user)  # plan de pago REAL (no fantasma)
-    use_free_lifetime = False
-    if not is_paid_unlimited:
-        if free_lifetime_left(profile) > 0:
-            use_free_lifetime = True
-        elif (profile.get("credits_cents") or 0) < SCRIPT_COST:
-            # growth-1: paywall_shown. after_first_value=True — el free ya gastó sus
-            # guiones del mes (reverse-trial: 2/mes) → el muro llega tras el éxito.
-            _free_n = PLANS["free"].get("free_scripts_monthly", 2)
-            track_event("paywall_shown", uid, {
-                "wall": "hazlo_mio", "plan": plan, "after_first_value": True,
-            })
-            return jsonify({
-                "error": "free_limit_reached",
-                "message": f"Has usado tus {_free_n} guiones gratis de este mes. Sube a Creador para seguir creando."
-            }), 402
+
+    # TOPE DIARIO del FREE (modelo 2026-06-23): 3 robos/día → "vuelve mañana o
+    # desbloquéalos". Empuja al hábito y, al 4º, a pagar. Los planes de pago no tienen tope.
+    if not is_paid_unlimited and trial_scripts_today(uid) >= FREE_DAILY_SCRIPTS:
+        track_event("paywall_shown", uid, {"wall": "free_daily", "plan": plan})
+        return jsonify({
+            "error": "trial_daily_limit",
+            "message": f"Hechos tus {FREE_DAILY_SCRIPTS} guiones de hoy — vuelve mañana o desbloquéalos subiendo de plan."
+        }), 402
+
+    # Free: robar SIEMPRE cuesta créditos (3). Sin saldo → muro.
+    if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SCRIPT_COST:
+        track_event("paywall_shown", uid, {"wall": "no_credits", "plan": plan, "after_first_value": True})
+        return jsonify({
+            "error": "no_credits",
+            "message": "No te quedan créditos. Recarga o sube de plan para seguir robando guiones."
+        }), 402
 
     # 3. Cargar reel + ownership.
     try:
@@ -9386,12 +9399,6 @@ def generate_script_from_competitor_reel(reel_id: str):
                 db.table("profiles").update({
                     "monthly_usage": (fresh.get("monthly_usage") or 0) + SCRIPT_USAGE_UNITS
                 }).eq("id", uid).execute()
-            elif use_free_lifetime:
-                if free_lifetime_left(fresh) <= 0:   # re-check bajo lock
-                    _release_lock()
-                    return jsonify({"error": "free_limit_reached",
-                                    "message": "Has usado tus guiones gratis de este mes. Sube a Creador para seguir creando."}), 402
-                _free_month_consume(uid, fresh, "free_lifetime_uses")   # reset+incremento mensual
             else:
                 if (fresh.get("credits_cents") or 0) < SCRIPT_COST:   # re-check bajo lock
                     _release_lock()
@@ -9413,13 +9420,6 @@ def generate_script_from_competitor_reel(reel_id: str):
                 if is_paid_unlimited:
                     db.table("profiles").update({
                         "monthly_usage": max(0, (profile.get("monthly_usage") or 0))
-                    }).eq("id", uid).execute()
-                elif use_free_lifetime:
-                    # Decrementa el contador del mes (robusto ante el reset mensual:
-                    # restaurar el valor absoluto previo podía borrar la cuota del mes nuevo).
-                    cur = (get_profile(uid).get("free_lifetime_uses") or 0)
-                    db.table("profiles").update({
-                        "free_lifetime_uses": max(0, cur - 1)
                     }).eq("id", uid).execute()
                 else:
                     db.table("profiles").update({
@@ -11270,10 +11270,10 @@ def _charge_units_locked(uid, units, user):
             }).eq("id", uid).execute()
             state = {"mode": "paid", "free_used": 0, "credits_charged": 0, "units": int(units)}
         else:
-            free_avail = free_lifetime_left(fresh)
-            free_used = min(free_avail, int(units))
-            paid_units = int(units) - free_used
-            credits_needed = paid_units * cost_per_unit
+            # Moneda única (modelo 2026-06-23, sin trial ni free_lifetime): TODO cuesta
+            # créditos. free_used queda en 0 (el bloque de free_lifetime de abajo no corre).
+            free_used = 0
+            credits_needed = int(units) * cost_per_unit
             if (fresh.get("credits_cents") or 0) < credits_needed:
                 release_credit_lock(uid, _lock)
                 return (jsonify({

@@ -4533,7 +4533,7 @@
     // confirma el backend (free_limit_reached). El muro borroso ya enseña el valor.
     // Free = trial: tope de 3 guiones/día (Fathom 18/06). En demo lo demostramos; en real
     // lo cuenta y resetea el backend. El muro diario empuja a volver mañana o a pagar.
-    if(isTrial() && S.user.dayLeft!=null && S.user.dayLeft<=0){ showDailyLimit(); return; }
+    if(isFree() && S.user.dayLeft!=null && S.user.dayLeft<=0){ showDailyLimit(); return; }   // tope diario free (3 robos/día)
     // Fix review (T6): si ESTE reel ya tiene un robo en vuelo (lo mandó a background
     // con X/Esc/«seguir navegando»), no relanzamos — reabrimos el orbe del que ya
     // corre. Evita guiones duplicados y, en demo, el doble descuento de crédito.
@@ -4651,8 +4651,8 @@
   function showDailyLimit(){
     startFlash();   // 1er muro diario → arranca la oferta flash
     render();       // muestra el banner de la oferta en el radar
-    showToast(L("Has hecho tus 3 guiones de hoy. Vuelve mañana — o desbloquea sin límite.",
-                "You've used your 3 scripts for today. Come back tomorrow — or unlock unlimited."),
+    showToast(L("Hechos tus 3 guiones de hoy — vuelve mañana o desbloquéalos subiendo de plan.",
+                "Done your 3 scripts for today — come back tomorrow or unlock by upgrading."),
               L("Ver planes","See plans"), "open-plans");
   }
   function ensureScript(r,cb){

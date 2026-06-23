@@ -353,7 +353,7 @@
       {"@type": "Question", "name": "¿Qué es Reelscript exactamente?", "acceptedAnswer": {"@type": "Answer", "text": "No es un transcriptor: es el sistema operativo de tu contenido. Cada día te muestra lo que ya explota en tu nicho, lo convierte en guiones con tu voz listos para grabar, y aprende de lo que publicas para sonar cada vez más a ti."}},
       {"@type": "Question", "name": "¿En qué se diferencia de pedírselo a ChatGPT?", "acceptedAnswer": {"@type": "Answer", "text": "Reelscript no escribe \"texto de IA\": escribe lo que dirías tú. Aprende tu tono, tu estructura y tus muletillas de tus propios reels, y se afina con cada guión que grabas. \"Tu voz al N%\" mide cuánto te conoce — y solo sube."}},
       {"@type": "Question", "name": "¿De dónde salen las ideas?", "acceptedAnswer": {"@type": "Answer", "text": "Del Radar: vigila a tus competidores y ordena sus reels por lo que más está explotando frente a su media. No partes de una página en blanco, partes de lo que ya funciona en tu nicho."}},
-      {"@type": "Question", "name": "¿Hay plan gratis?", "acceptedAnswer": {"@type": "Answer", "text": "Sí: empiezas con 3 días de Pro completo gratis, sin tarjeta. Al acabar pasas a Free para siempre (3 análisis a la semana y 2 guiones al mes, 2 competidores en el radar). Creador (29€/mes) trae 200 créditos al mes, Cerebro y métricas; Agencia (129€/mes) añade multi-marca y equipo."}},
+      {"@type": "Question", "name": "¿Hay plan gratis?", "acceptedAnswer": {"@type": "Answer", "text": "Sí: gratis para siempre. Empiezas con 30 créditos de bienvenida (sin tarjeta) y recibes 15 créditos cada mes; máximo 3 robos de guion al día y 2 competidores en el radar. Robar un guion cuesta 3 créditos, analizar un reel 2. Creador (29€/mes) trae 200 créditos al mes sin tope diario, Cerebro y métricas; Agencia (129€/mes) añade multi-marca y equipo."}},
       {"@type": "Question", "name": "¿Puedo cancelar cuando quiera?", "acceptedAnswer": {"@type": "Answer", "text": "Sí. Cancelas desde el portal de Stripe en un click y mantienes el acceso hasta el final del periodo facturado. Sin permanencias."}},
       {"@type": "Question", "name": "¿Mis datos y mis guiones están seguros?", "acceptedAnswer": {"@type": "Answer", "text": "Tus transcripciones, ideas y guiones viven en Supabase con row-level security: solo tú accedes a lo tuyo. Los pagos los procesa Stripe — nunca vemos ni guardamos datos de tarjeta. Puedes exportar o borrar todos tus datos cuando quieras."}}
       {% endif %}
@@ -13546,7 +13546,7 @@
         <button type="button" class="rsl-btn rsl-btn-primary" onclick="openAuth('register','landing_hero')" data-i18n-en="Steal your first script free">Roba tu primer guion gratis</button>
         <a class="rsl-hero-link" href="#rslLoop" data-i18n-html-en="See how it works <span aria-hidden=&quot;true&quot;>→</span>">Ver cómo funciona <span aria-hidden="true">→</span></a>
       </div>
-      <p class="rsl-hero-micro" data-i18n-en="3 days of Pro free · no card">3 días de Pro gratis · sin tarjeta</p>
+      <p class="rsl-hero-micro" data-i18n-en="30 free credits · no card">30 créditos gratis · sin tarjeta</p>
 
       <!-- VÍDEO real de «Hazlo mío» en marco de navegador (autoplay muted loop). -->
       <div class="rsl-hero-media">
@@ -13770,17 +13770,17 @@
       <div class="rsl-plans">
         <div class="rsl-plan rsl-rise">
           <h3>Free</h3>
-          <p class="rsl-for" data-i18n-en="7 days of full Pro. No card. Then free forever.">3 días de Pro completo. Sin tarjeta. Luego, gratis para siempre.</p>
+          <p class="rsl-for" data-i18n-en="Free forever. No card. 30 welcome credits.">Gratis para siempre. Sin tarjeta. 30 créditos de bienvenida.</p>
           <p class="rsl-price">€0</p>
           <p class="rsl-yr">&nbsp;</p>
           <p class="rsl-day">&nbsp;</p>
           <ul>
-            <li data-i18n-html-en="<strong>3 days of Pro free</strong>, no card"><strong>3 días de Pro gratis</strong>, sin tarjeta</li>
-            <li data-i18n-html-en="Then: <strong>3 analyses/week + 2 scripts</strong>/month">Luego: <strong>3 análisis/semana + 2 guiones</strong>/mes</li>
-            <li data-i18n-html-en="<strong>1 competitor</strong> on your radar"><strong>1 competidor</strong> en tu radar</li>
+            <li data-i18n-html-en="<strong>30 credits</strong> to start, no card"><strong>30 créditos</strong> de bienvenida, sin tarjeta</li>
+            <li data-i18n-html-en="<strong>+15 credits</strong> / month · max 3 steals/day"><strong>+15 créditos</strong>/mes · máx 3 robos/día</li>
+            <li data-i18n-html-en="<strong>2 competitors</strong> on your radar"><strong>2 competidores</strong> en tu radar</li>
             <li class="rsl-zero" data-i18n-en="Free forever, no card">Gratis para siempre, sin tarjeta</li>
           </ul>
-          <button type="button" class="rsl-btn rsl-btn-ghost" onclick="openAuth('register','landing_plan_free')" data-i18n-en="Start 3-day Pro trial">Empezar 3 días de Pro</button>
+          <button type="button" class="rsl-btn rsl-btn-ghost" onclick="openAuth('register','landing_plan_free')" data-i18n-en="Start free">Empezar gratis</button>
           <p class="rsl-risk">&nbsp;</p>
         </div>
         <div class="rsl-plan rsl-rise">
@@ -13885,7 +13885,7 @@
 <!-- ═══ STICKY CTA (aparece al pasar el hero) ═══ -->
 <div class="rsl-sticky-cta" id="rslStickyCta" role="complementary" aria-label="{% if lang == 'en' %}Start free{% else %}Empezar gratis{% endif %}">
   <div class="rsl-sticky-in">
-    <p class="rsl-msg" data-i18n-html-en="<span class=&quot;rsl-dot&quot; aria-hidden=&quot;true&quot;></span>Your niche is posting right now.<small>3 days of Pro free · no card</small>"><span class="rsl-dot" aria-hidden="true"></span>Tu nicho está publicando ahora mismo.<small>3 días de Pro gratis · sin tarjeta</small></p>
+    <p class="rsl-msg" data-i18n-html-en="<span class=&quot;rsl-dot&quot; aria-hidden=&quot;true&quot;></span>Your niche is posting right now.<small>30 free credits · no card</small>"><span class="rsl-dot" aria-hidden="true"></span>Tu nicho está publicando ahora mismo.<small>30 créditos gratis · sin tarjeta</small></p>
     <a class="rsl-btn rsl-btn-primary" href="#pricingSection" data-i18n-en="Start free">Empieza gratis</a>
   </div>
 </div>
@@ -15463,7 +15463,7 @@
   <div class="modal">
     <button class="modal-x" onclick="closeModal('authOverlay')">✕</button>
     <h2 data-i18n="auth.title">Welcome to Reelscript</h2>
-    <p data-i18n="auth.sub">3 days of Pro free, no card. Unlock everything and see what blew up in your niche.</p>
+    <p data-i18n="auth.sub">30 free credits, no card. Unlock everything and see what blew up in your niche.</p>
     <div class="tabs">
       <button class="tab on" id="tabLogin" onclick="switchTab('login')" data-i18n="auth.login">Log in</button>
       <button class="tab"    id="tabReg"   onclick="switchTab('register')" data-i18n="auth.register">Create account</button>
@@ -15620,7 +15620,7 @@ const LANGS = {
     "cta.pill1": "5 gratis al día", "cta.pill2": "Sin suscripción", "cta.pill3": "Saldo sin caducidad",
     "cta.btn": "✦ Probar gratis ahora",
     "auth.title": "Bienvenido a Reelscript",
-    "auth.sub": "3 días de Pro gratis, sin tarjeta. Desbloquea todo y mira lo que petó en tu nicho.",
+    "auth.sub": "30 créditos gratis, sin tarjeta. Desbloquea todo y mira lo que petó en tu nicho.",
     "auth.login": "Entrar", "auth.register": "Crear cuenta",
     "auth.google_button": "Continuar con Google",
     "auth.or_separator": "o",
@@ -16122,7 +16122,7 @@ const LANGS = {
     "cta.pill1": "5 free/day", "cta.pill2": "No subscription", "cta.pill3": "Balance never expires",
     "cta.btn": "✦ Try it free now",
     "auth.title": "Welcome to Reelscript",
-    "auth.sub": "3 days of Pro free, no card. Unlock everything and see what blew up in your niche.",
+    "auth.sub": "30 free credits, no card. Unlock everything and see what blew up in your niche.",
     "auth.login": "Log in", "auth.register": "Create account",
     "auth.google_button": "Continue with Google",
     "auth.or_separator": "or",
@@ -25672,8 +25672,8 @@ const PLAN_META = {
     icon: "✅", label: "Free",
     price:    { monthEur: 0,    monthUsd: 0,    yearEur: 0,    yearUsd: 0,    billedEur: 0,     billedUsd: 0 },
     ideal:    { es: "3 días de Pro gratis, luego gratis para siempre.", en: "3 days of Pro free, then free forever." },
-    features: { es: ["3 días de Pro gratis, sin tarjeta","Luego: 3 análisis/semana + 2 guiones/mes","2 competidores en tu radar","Gratis para siempre"],
-                en: ["3 days of Pro free, no card","Then: 3 analyses/week + 2 scripts/month","2 competitors on your radar","Free forever"] },
+    features: { es: ["30 créditos de bienvenida, sin tarjeta","+15 créditos al mes","Máx 3 robos al día","2 competidores en tu radar","Gratis para siempre"],
+                en: ["30 welcome credits, no card","+15 credits per month","Max 3 steals per day","2 competitors on your radar","Free forever"] },
   },
   pro: {
     icon: "⚡", label: "Pro",
@@ -28125,6 +28125,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=111"></script>
+<script src="/static/js/radar-loop.js?v=112"></script>
 </body>
 </html>
