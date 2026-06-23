@@ -7848,7 +7848,7 @@ def resend_webhook():
 # Agency 15 por marca. base_slots_global = per_brand × nº marcas del plan (techo global);
 # per_project_slots = el límite POR marca que enforcea el gate cuando hay project_id.
 TRACKED_CREATORS_LIMITS = {
-    "free":    {"enabled": True,  "base_slots_global": 1,   "per_project_slots": None, "requires_project": False},
+    "free":    {"enabled": True,  "base_slots_global": 2,   "per_project_slots": None, "requires_project": False},   # onboarding sigue seed + 1 afín (decisión Leo)
     "pro":     {"enabled": True,  "base_slots_global": 1,   "per_project_slots": None, "requires_project": False},
     "creator": {"enabled": True,  "base_slots_global": 5,   "per_project_slots": 5,    "requires_project": False},  # Basic · 1 marca × 5
     "estudio": {"enabled": True,  "base_slots_global": 36,  "per_project_slots": 12,   "requires_project": False},  # Content Creator · 3 marcas × 12
@@ -8166,9 +8166,16 @@ def onboarding_discover_niche():
         seed = ""
     if not subs and not seed:
         return jsonify({"ok": False, "error": "no_input"}), 200
+    # Cap por plan: el descubrimiento NO debe seguir más competidores de los que el plan
+    # permite (free=2 → seed + 1). Se lo pasamos como follow_top; el seed va siempre 1º.
+    try:
+        cap = get_tracked_creators_limit(effective_plan(get_profile(user["id"])))["base_slots_global"]
+    except Exception:
+        cap = 2
+    follow_top = max(2, min(cap, 6))   # al menos seed+1; tope 6 para no sobre-scrapear
     try:
         from tasks import discover_niche_creators_task  # noqa: E402
-        discover_niche_creators_task.delay(user["id"], niche, subs, seed)
+        discover_niche_creators_task.delay(user["id"], niche, subs, seed, follow_top)
     except Exception:
         logger.warning("onboarding_discover_niche: enqueue failed", exc_info=True)
         return jsonify({"ok": False, "error": "enqueue_failed"}), 200
