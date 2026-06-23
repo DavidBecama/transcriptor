@@ -4446,6 +4446,44 @@ def list_scripts():
     return jsonify(rows.data)
 
 
+@app.route("/scripts/<script_id>/source", methods=["GET"])
+@require_auth
+def script_source(script_id):
+    """Miniatura + URL del reel FUENTE de un guión (para el editor de guion), resuelto
+    BAJO DEMANDA vía las FK que `scripts` ya guarda — sin columnas nuevas ni bloat en
+    /scripts: from_competitor_reel_id → creator_reels_global (thumb_b64 + ig_reel_id→url),
+    o transcription_id → transcriptions (thumbnail_b64 + url)."""
+    user = current_user()
+    sc_r = (db.table("scripts")
+              .select("id, from_competitor_reel_id, transcription_id")
+              .eq("id", script_id).eq("user_id", user["id"]).limit(1).execute())
+    if not sc_r.data:
+        return jsonify({"error": "not_found"}), 404
+    sc = sc_r.data[0]
+    url = thumb = None
+    rid = sc.get("from_competitor_reel_id")
+    tid = sc.get("transcription_id")
+    try:
+        if rid:
+            rr = (db.table("creator_reels_global").select("ig_reel_id, thumb_b64")
+                    .eq("id", rid).limit(1).execute())
+            if rr.data:
+                x = rr.data[0]
+                thumb = x.get("thumb_b64")
+                if x.get("ig_reel_id"):
+                    url = "https://www.instagram.com/reel/%s/" % x["ig_reel_id"]
+        elif tid:
+            tt = (db.table("transcriptions").select("url, thumbnail_b64")
+                    .eq("id", tid).eq("user_id", user["id"]).limit(1).execute())
+            if tt.data:
+                x = tt.data[0]
+                url = x.get("url")
+                thumb = x.get("thumbnail_b64")
+    except Exception:
+        logger.warning("script_source lookup failed sid=%s", script_id, exc_info=True)
+    return jsonify({"url": url, "thumb_b64": thumb})
+
+
 @app.route("/scripts", methods=["POST"])
 @require_auth
 def create_script():
