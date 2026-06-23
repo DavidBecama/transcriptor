@@ -3477,11 +3477,13 @@ def _llm_call_provider(provider: str, system: str, user_content: str,
         "temperature": temperature,
         "max_tokens": mt,
     }
-    # P0-1: json-mode para Gemini (mismo patrón que _call_llm_json). Todos los
-    # callers de _call_llm esperan JSON (adapt_with_ai, derive_voice_profile,
-    # hook-regen ×3) → evita la prosa/JSON-con-texto que rompía _parse_ai_json.
-    # Groq/llama ignora response_format silenciosamente → solo lo forzamos en Gemini.
+    # P0-1: json-mode. Todos los callers de _call_llm esperan JSON (adapt_with_ai,
+    # derive_voice_profile, hook-regen ×3) → evita la prosa/JSON-con-texto que rompía
+    # _parse_ai_json. Gemini siempre; Groq/llama TAMBIÉN soporta json_object (probado)
+    # pero EXIGE la palabra "json" en los mensajes → guard para no romper la llamada.
     if "gemini" in model.lower():
+        payload["response_format"] = {"type": "json_object"}
+    elif provider == "groq" and "json" in (system + "\n" + user_content).lower():
         payload["response_format"] = {"type": "json_object"}
 
     def _do_request(pl):
@@ -5580,47 +5582,17 @@ def develop_idea(raw_text, assistant_id=None, user_id=None, language="es"):
             "Ningún otro formato."
         )
 
-    api_key = OPENROUTER_API_KEY or GROQ_API_KEY
-    url = OPENROUTER_URL if OPENROUTER_API_KEY else "https://api.groq.com/openai/v1/chat/completions"
-    model = OPENROUTER_MODEL if OPENROUTER_API_KEY else "llama-3.3-70b-versatile"
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        **({"HTTP-Referer": "https://reelscript.net", "X-Title": "ReelScript"} if OPENROUTER_API_KEY else {}),
-    }
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": f"Idioma de salida: {language}. Idea cruda del usuario: {raw_text}"},
-        ],
-        "temperature": 0.7,
-        # v0.14.15a: was 2000 — Gemini truncating long structured outputs (Unterminated string)
-        "max_tokens": 4000,
-    }
-    # v0.14.15a: force JSON output. Gemini via OpenRouter supports response_format
-    # json_object; Llama-3.3 fallback (Groq) ignores it silently. Condicionado a Gemini.
-    if "gemini" in (model or "").lower():
-        payload["response_format"] = {"type": "json_object"}
-    resp = requests.post(url, headers=headers, json=payload, timeout=60)
-    resp.raise_for_status()
-    content = resp.json()["choices"][0]["message"]["content"]
-    if not content:
-        logger.warning("develop_idea: LLM returned empty content user=%s", raw_text[:60])
-        return None
-    content = content.strip()
-
-    # Parse JSON from response
-    import json as json_mod
-    # Strip markdown fences if present
-    if content.startswith("```"):
-        content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    # v0.25.43: usa el helper resiliente (_call_llm_json con FALLBACK a Groq) en vez
+    # de pegar inline solo a OpenRouter — con OpenRouter sin saldo (402) esto quedaba
+    # 100% roto. El helper fuerza json-mode (Gemini y Groq) y parsea/strip de fences.
     try:
-        return json_mod.loads(content)
-    except json_mod.JSONDecodeError:
-        # v0.14.15a: log first 500 chars of raw LLM output for postmortem before re-raising
-        logger.error("develop_idea raw LLM response (first 500 chars): %s", repr(content[:500]))
+        return _call_llm_json(
+            system,
+            f"Idioma de salida: {language}. Idea cruda del usuario: {raw_text}",
+            max_tokens=4000, temperature=0.7,
+        )
+    except Exception as e:
+        logger.error("develop_idea LLM failed user=%s err=%s", raw_text[:60], e)
         raise
 
 
@@ -6304,40 +6276,66 @@ def _call_llm_json(system_prompt, user_prompt, max_tokens=4000, temperature=0.7,
     Levanta json.JSONDecodeError si Gemini trunca; el caller decide qué hacer.
 
     v0.15.9.b: kwargs model y timeout para tareas ligeras (Flash 2.0, 10s).
-    Default mantiene comportamiento previo (OPENROUTER_MODEL, 60s)."""
-    api_key = OPENROUTER_API_KEY or GROQ_API_KEY
-    url = OPENROUTER_URL if OPENROUTER_API_KEY else "https://api.groq.com/openai/v1/chat/completions"
-    if model is None:
-        model = OPENROUTER_MODEL if OPENROUTER_API_KEY else "llama-3.3-70b-versatile"
+    Default mantiene comportamiento previo (OPENROUTER_MODEL, 60s).
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        **({"HTTP-Referer": "https://reelscript.net", "X-Title": "ReelScript"} if OPENROUTER_API_KEY else {}),
-    }
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-    if "gemini" in (model or "").lower():
-        payload["response_format"] = {"type": "json_object"}
-
-    resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
-    resp.raise_for_status()
-    content = resp.json()["choices"][0]["message"]["content"].strip()
-    if content.startswith("```"):
-        content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    v0.25.43: FALLBACK A GROQ. Antes solo pegaba a OpenRouter (o Groq si no había
+    key OR) → con OpenRouter sin saldo (402), «Generar ideas» y demás quedaban 100%
+    rotos. Ahora intenta OpenRouter y, si falla (HTTP/parse), cae a Groq llama-3.3."""
     import json as _json_mod
-    try:
+
+    def _attempt(provider):
+        if provider == "openrouter":
+            key = OPENROUTER_API_KEY
+            url = OPENROUTER_URL
+            mdl = model or OPENROUTER_MODEL
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                       "HTTP-Referer": "https://reelscript.net", "X-Title": "ReelScript"}
+            mt = max_tokens
+        else:  # groq
+            key = GROQ_API_KEY
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            mdl = "llama-3.3-70b-versatile"
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            mt = min(max_tokens, 8000)
+        payload = {
+            "model": mdl,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": temperature,
+            "max_tokens": mt,
+        }
+        combined = (system_prompt + "\n" + user_prompt).lower()
+        if "gemini" in mdl.lower():
+            payload["response_format"] = {"type": "json_object"}
+        elif provider == "groq" and "json" in combined:
+            payload["response_format"] = {"type": "json_object"}
+        resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        resp.raise_for_status()
+        content = resp.json()["choices"][0]["message"]["content"].strip()
+        if content.startswith("```"):
+            content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
         return _json_mod.loads(content)
-    except _json_mod.JSONDecodeError:
-        logger.error("_call_llm_json raw response (first 500): %s", repr(content[:500]))
-        raise
+
+    providers = []
+    if OPENROUTER_API_KEY:
+        providers.append("openrouter")
+    if GROQ_API_KEY:
+        providers.append("groq")
+    if not providers:
+        raise RuntimeError("Sin proveedor LLM configurado (OPENROUTER_API_KEY / GROQ_API_KEY)")
+
+    last_err = None
+    for i, prov in enumerate(providers):
+        try:
+            return _attempt(prov)
+        except Exception as e:
+            last_err = e
+            has_more = i + 1 < len(providers)
+            logger.warning("_call_llm_json provider=%s falló (%s) — %s",
+                           prov, e, ("fallback al siguiente" if has_more else "sin más proveedores"))
+    raise last_err
 
 
 SUGGEST_IDEAS_SYSTEM = (
