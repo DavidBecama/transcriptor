@@ -840,16 +840,29 @@
   // del nicho (auto-seguidos en el paso de tags), el radar arranca con reels ACERTADOS.
   function onbWaitHTML(){
     var seed=(S.onb&&S.onb.seed)?("@"+String(S.onb.seed).replace(/^@+/,"")):"";
-    var srcEs = seed ? ("a <b>"+ESC(seed)+"</b> y a creadores afines de tu nicho") : "a los creadores que más petan en tu nicho";
-    var srcEn = seed ? ("<b>"+ESC(seed)+"</b> and similar creators in your niche") : "the top creators in your niche";
+    var step1 = seed ? L("Analizando a <b>"+ESC(seed)+"</b>","Analyzing <b>"+ESC(seed)+"</b>") : L("Analizando tu nicho","Analyzing your niche");
     return '<div class="scroll"><div class="canvas"><div class="onbwait">'+
       '<div class="onbw-radar" aria-hidden="true">'+
-        '<span class="onbw-ring r1"></span><span class="onbw-ring r2"></span><span class="onbw-ring r3"></span>'+
-        '<span class="onbw-sweep"></span><span class="onbw-core">'+IC.bolt+'</span>'+
+        '<div class="onbw-grid1"></div><div class="onbw-grid2"></div><div class="onbw-grid3"></div>'+
+        '<div class="onbw-sweep"><div class="onbw-fan"></div><div class="onbw-arm"></div></div>'+
+        '<span class="onbw-blip" style="top:24%;left:70%;width:9px;height:9px;animation-delay:.3s"></span>'+
+        '<span class="onbw-blip" style="top:66%;left:30%;width:7px;height:7px;animation-delay:1.1s"></span>'+
+        '<span class="onbw-blip" style="top:72%;left:62%;width:8px;height:8px;animation-delay:1.8s"></span>'+
+        '<span class="onbw-blip" style="top:32%;left:34%;width:6px;height:6px;animation-delay:2.3s"></span>'+
+        '<div class="onbw-core-wrap"><div class="onbw-core">'+IC.bolt+'</div></div>'+
       '</div>'+
-      '<div class="onbwait-t">'+L("Preparando tu radar…","Setting up your radar…")+'</div>'+
-      '<div class="onbwait-d">'+L("Estoy analizando "+srcEs+" y trayéndote sus reels — para que arranques con lo MÁS acertado.","Analyzing "+srcEn+" and pulling their reels — so you start with the most on-point picks.")+'</div>'+
-      '<div class="onbwait-sub"><span class="mini-spin"></span> '+L("Suele tardar menos de un minuto…","Usually under a minute…")+'</div>'+
+      '<div class="onbw-cards" aria-hidden="true">'+
+        '<span class="onbw-card"><span class="onbw-card-ava"></span>'+L("Reel encontrado · 4.2M views","Reel found · 4.2M views")+'</span>'+
+        '<span class="onbw-card c2"><span class="onbw-card-ava"></span>'+L("Creador afín de tu nicho","Similar creator in your niche")+'</span>'+
+      '</div>'+
+      '<div class="onbw-title">'+L("Preparando tu radar…","Setting up your radar…")+'</div>'+
+      '<div class="onbw-steps">'+
+        '<div class="onbw-step s1"><i></i>'+step1+'</div>'+
+        '<div class="onbw-step s2"><i></i>'+L("Buscando creadores afines de tu nicho","Finding similar creators in your niche")+'</div>'+
+        '<div class="onbw-step s3"><i></i>'+L("Trayéndote sus reels más acertados","Pulling their most on-point reels")+'</div>'+
+      '</div>'+
+      '<div class="onbw-prog" aria-hidden="true"><div class="onbw-prog-fill"></div></div>'+
+      '<div class="onbw-hint">'+L("Suele tardar menos de un minuto…","Usually under a minute…")+'</div>'+
     '</div></div></div>';
   }
   function onbWaitForNiche(){
@@ -6061,7 +6074,17 @@
      CARGA DE DATOS
      ════════════════════════════════════════════════════════════════ */
   function setDevice(){ S.device=window.matchMedia("(max-width:720px)").matches?"mobile":"desktop"; }
-  function skeletonHTML(){ return railHTML()+'<div class="work">'+cmdHTML()+'<div class="scroll"><div class="canvas"><div class="rs-boot"><span class="rs-boot-spin" aria-hidden="true"></span><span class="rs-boot-t">'+L("Cargando…","Loading…")+'</span></div><div class="statbar"><div class="stat"></div><div class="stat"></div><div class="stat"></div><div class="stat"></div></div><div class="rs-skel" style="height:200px;margin-bottom:14px"></div><div class="rs-skel"></div><div class="rs-skel"></div></div></div></div>'; }
+  function skeletonHTML(){ return railHTML()+'<div class="work">'+cmdHTML()+'<div class="scroll"><div class="canvas">'+
+      '<div class="rs-boot">'+
+        '<div class="rs-boot-orb">'+
+          '<div class="rs-boot-core">'+IC.bolt+'</div>'+
+          '<svg class="rs-boot-ring" viewBox="0 0 100 100" fill="none" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="var(--brand-500)" stroke-width="4" stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="220"></circle></svg>'+
+        '</div>'+
+        '<div class="rs-boot-tt"><span class="rs-boot-label">'+L("Cargando Reelscript","Loading Reelscript")+'</span>'+
+          '<div class="rs-boot-dots" aria-hidden="true"><span></span><span></span><span></span></div>'+
+        '</div>'+
+      '</div>'+
+    '</div></div></div>'; }
 
   // DEMO MVP: siembra guiones (con HOOKS agrupados + métricas de publicación) y un
   // perfil de métricas con reels VINCULADOS a sus guiones — para ver el loop completo.
