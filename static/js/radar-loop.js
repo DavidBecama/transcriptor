@@ -2728,10 +2728,21 @@
     try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}   // destello del cerebro 3D
   }
   function closeLevelup(){ S.levelup=null; render(); }
+  // Tema por nivel (color + subtítulo) — animación "una por nivel" (improvisada).
+  // Cada nivel destino tiñe el orbe/botón/chispas y cuenta qué desbloquea.
+  function levelupTheme(to){
+    return ({
+      2:{a:"#6f93ff", sub:L("Ya imitas los patrones que funcionan en tu nicho: tus guiones salen con la estructura de lo que peta.","You now mirror what works in your niche: your scripts come out with proven structure.")},
+      3:{a:"#8b5cf6", sub:L("Robas guiones que petan y los haces TUYOS — menos retoques, más tu voz.","You steal scripts that pop and make them YOURS — fewer tweaks, more your voice.")},
+      4:{a:"#12a37c", sub:L("Estratega: el Cerebro distingue lo que va a explotar y te lo prioriza.","Strategist: the Brain spots what'll explode and prioritizes it for you.")},
+      5:{a:"#f59e0b", sub:L("Nivel Viral: tu Cerebro clava tu tono. Ahora juegas para viralizar.","Viral level: your Brain nails your tone. Now you play to go viral.")}
+    })[to] || {a:"#6f93ff", sub:L("Tu Cerebro sube de nivel: clava mejor tu tono y necesitas menos retoques.","Your Brain levels up: it nails your tone better with fewer tweaks.")};
+  }
   function levelupHTML(){
     var lu=S.levelup; if(!lu) return "";
+    var th=levelupTheme(lu.to);
     var sparks=""; for(var i=0;i<18;i++){ sparks+='<i style="--a:'+(i*20)+'deg;--dl:'+(0.25+(i%6)*0.07).toFixed(2)+'s"></i>'; }
-    return '<div class="overlay lvlup-overlay" role="dialog" aria-modal="true" aria-label="'+L("Subida de nivel del Cerebro","Brain level up")+'">'+
+    return '<div class="overlay lvlup-overlay" role="dialog" aria-modal="true" aria-label="'+L("Subida de nivel del Cerebro","Brain level up")+'" style="--lvl-a:'+th.a+'">'+
       '<div class="lvlup-stage">'+
         '<div class="lvlup-rings"><span></span><span></span><span></span></div>'+
         '<div class="lvlup-sparks">'+sparks+'</div>'+
@@ -2740,7 +2751,7 @@
       '<div class="lvlup-card">'+
         '<div class="lvlup-eye">'+L("CEREBRO · NIVEL ","BRAIN · LEVEL ")+lu.to+'</div>'+
         '<h2 class="lvlup-h">'+ESC(lu.name)+'</h2>'+
-        '<p class="lvlup-sub">'+L("Tu Cerebro sube de nivel: ahora clava mejor tu tono y necesitas menos retoques en cada guion.","Your Brain levels up: it nails your tone better and you tweak each script less.")+'</p>'+
+        '<p class="lvlup-sub">'+th.sub+'</p>'+
         '<button class="lvlup-btn" data-act="levelup-done">'+L("Continuar","Continue")+'</button>'+
       '</div>'+
     '</div>';
@@ -4962,10 +4973,17 @@
     var doIt=function(){
       S.tracked=(S.tracked||[]).filter(function(x){ return String(x.id)!==String(tid); });
       if(S.stats && S.stats.competitors>0) S.stats.competitors-=1;
+      // FIX backlog #7: quitar TAMBIÉN sus reels del feed para que el Radar refleje el
+      // cambio YA (antes seguían visibles hasta recargar la página).
+      var hl=String(handle||"").toLowerCase().replace(/^@+/,"");
+      if(hl && Array.isArray(S.reels)){
+        S.reels=S.reels.filter(function(r){ return String((r.creator&&r.creator.handle)||"").toLowerCase().replace(/^@+/,"")!==hl; });
+      }
       render();
       showToast("Dejaste de seguir a @"+handle+".");
       apiDelete("/api/tracked-creators/"+encodeURIComponent(tid)).then(function(r){
         if(!r.ok && !isDemo()){ showError("No pude dejar de seguir a @"+handle+". Reintenta."); loadTracked(); }
+        else if(!isDemo()){ _refreshReelsLight(); }   // resync feed/stats/tracked desde el backend
       });
     };
     if(typeof window!=="undefined" && typeof window.confirmModal==="function"){

@@ -11488,30 +11488,30 @@
     @media (prefers-reduced-motion: reduce){ .rs .cmd .brain-cmd-up { animation:none; } }
     @media (max-width:720px){ .rs .cmd .brain-cmd .bcm-t { display:none; } }
     /* ── Pantalla de subida de nivel del Cerebro (overlay celebración) ── */
-    .rs .lvlup-overlay { position:fixed; inset:0; z-index:300; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:30px; padding:32px; text-align:center;
-      background:radial-gradient(120% 80% at 50% 38%, color-mix(in srgb,var(--brand-500) 26%, var(--surface-base)) 0%, var(--surface-base) 62%); animation:rsFadeIn .3s ease-out; }
+    .rs .lvlup-overlay { --lvl-a:var(--brand-500); position:fixed; inset:0; z-index:300; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:30px; padding:32px; text-align:center;
+      background:radial-gradient(120% 80% at 50% 38%, color-mix(in srgb,var(--lvl-a) 26%, var(--surface-base)) 0%, var(--surface-base) 62%); animation:rsFadeIn .3s ease-out; }
     .rs .lvlup-stage { position:relative; width:172px; height:172px; display:flex; align-items:center; justify-content:center; }
     .rs .lvlup-rings { position:absolute; inset:0; }
-    .rs .lvlup-rings span { position:absolute; inset:0; margin:auto; width:120px; height:120px; border-radius:50%; border:2px solid color-mix(in srgb,var(--brand-500) 60%, transparent); opacity:0; animation:rsLvlRing 2s ease-out infinite; }
+    .rs .lvlup-rings span { position:absolute; inset:0; margin:auto; width:120px; height:120px; border-radius:50%; border:2px solid color-mix(in srgb,var(--lvl-a) 60%, transparent); opacity:0; animation:rsLvlRing 2s ease-out infinite; }
     .rs .lvlup-rings span:nth-child(2){ animation-delay:.5s; }
     .rs .lvlup-rings span:nth-child(3){ animation-delay:1s; }
     @keyframes rsLvlRing { 0%{ transform:scale(.55); opacity:.7; } 100%{ transform:scale(1.7); opacity:0; } }
     .rs .lvlup-sparks { position:absolute; inset:0; }
-    .rs .lvlup-sparks i { position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:50%; background:#9fc0ff; box-shadow:0 0 8px #6f93ff;
+    .rs .lvlup-sparks i { position:absolute; top:50%; left:50%; width:6px; height:6px; border-radius:50%; background:color-mix(in srgb,var(--lvl-a) 70%, #fff); box-shadow:0 0 8px var(--lvl-a);
       transform:rotate(var(--a)) translateY(0) scale(0); animation:rsLvlSpark 1.1s var(--ease-out) var(--dl) forwards; }
     @keyframes rsLvlSpark { 0%{ transform:rotate(var(--a)) translateY(-14px) scale(0); opacity:0; } 35%{ opacity:1; } 100%{ transform:rotate(var(--a)) translateY(-92px) scale(1); opacity:0; } }
     .rs .lvlup-orb { position:relative; width:96px; height:96px; border-radius:28px; display:flex; align-items:center; justify-content:center; color:#fff;
-      background:linear-gradient(135deg, var(--brand-500), #6f93ff); box-shadow:0 12px 40px rgba(79,124,255,.5); animation:rsLvlPop .7s var(--ease-out); }
+      background:linear-gradient(135deg, var(--lvl-a), color-mix(in srgb,var(--lvl-a) 55%, #fff)); box-shadow:0 12px 40px color-mix(in srgb,var(--lvl-a) 50%, transparent); animation:rsLvlPop .7s var(--ease-out); }
     .rs .lvlup-orb svg { width:46px; height:46px; }
-    .rs .lvlup-orb .lvlup-orb-n { position:absolute; right:-6px; bottom:-6px; min-width:28px; height:28px; padding:0 7px; border-radius:14px; background:#fff; color:var(--brand-600);
+    .rs .lvlup-orb .lvlup-orb-n { position:absolute; right:-6px; bottom:-6px; min-width:28px; height:28px; padding:0 7px; border-radius:14px; background:#fff; color:color-mix(in srgb,var(--lvl-a) 80%, #000);
       font-family:var(--font-mono); font-weight:800; font-size:15px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,.28); }
     @keyframes rsLvlPop { 0%{ transform:scale(.3); opacity:0; } 60%{ transform:scale(1.12); } 100%{ transform:scale(1); opacity:1; } }
     .rs .lvlup-card { max-width:420px; animation:rsLvlRise .5s var(--ease-out) .15s both; }
-    .rs .lvlup-eye { font-family:var(--font-mono); font-size:12px; letter-spacing:.18em; color:var(--brand-500); font-weight:700; }
+    .rs .lvlup-eye { font-family:var(--font-mono); font-size:12px; letter-spacing:.18em; color:var(--lvl-a); font-weight:700; }
     .rs .lvlup-h { font-family:var(--font-display-2); font-weight:700; font-size:40px; line-height:1.04; letter-spacing:-.02em; margin:8px 0 0; color:var(--text-primary); }
     .rs .lvlup-sub { font-size:15px; color:var(--text-secondary); margin:12px 0 0; }
     .rs .lvlup-btn { margin-top:24px; height:46px; padding:0 30px; border:none; border-radius:11px; cursor:pointer; font-size:15px; font-weight:700; color:#fff;
-      background:linear-gradient(135deg, var(--brand-500), #6f93ff); box-shadow:0 8px 24px rgba(79,124,255,.36); transition:filter .15s, transform .1s; }
+      background:linear-gradient(135deg, var(--lvl-a), color-mix(in srgb,var(--lvl-a) 55%, #fff)); box-shadow:0 8px 24px color-mix(in srgb,var(--lvl-a) 38%, transparent); transition:filter .15s, transform .1s; }
     .rs .lvlup-btn:hover { filter:brightness(1.06); }
     .rs .lvlup-btn:active { transform:translateY(1px); }
     @keyframes rsLvlRise { 0%{ transform:translateY(14px); opacity:0; } 100%{ transform:translateY(0); opacity:1; } }
@@ -28168,6 +28168,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=116"></script>
+<script src="/static/js/radar-loop.js?v=117"></script>
 </body>
 </html>
