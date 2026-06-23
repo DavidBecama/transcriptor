@@ -3447,17 +3447,27 @@ def _parse_ai_json(raw: str, style: str) -> dict:
     return data
 
 
-def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_tokens: int = 20000) -> str:
-    """Call OpenRouter/Groq and return raw text response."""
-    api_key = OPENROUTER_API_KEY or GROQ_API_KEY
-    url = OPENROUTER_URL if OPENROUTER_API_KEY else "https://api.groq.com/openai/v1/chat/completions"
-    model = OPENROUTER_MODEL if OPENROUTER_API_KEY else "llama-3.3-70b-versatile"
+def _llm_call_provider(provider: str, system: str, user_content: str,
+                       temperature: float, max_tokens: int) -> str:
+    """Una llamada a UN proveedor (openrouter | groq). Devuelve texto crudo o levanta."""
+    if provider == "openrouter":
+        api_key = OPENROUTER_API_KEY
+        url = OPENROUTER_URL
+        model = OPENROUTER_MODEL
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://reelscript.net", "X-Title": "ReelScript",
+        }
+        mt = max_tokens
+    else:  # groq
+        api_key = GROQ_API_KEY
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        model = "llama-3.3-70b-versatile"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        # Groq llama-3.3-70b: ventana 32k → no pedir 20k de salida (revienta el contexto).
+        mt = min(max_tokens, 8000)
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        **({"HTTP-Referer": "https://reelscript.net", "X-Title": "ReelScript"} if OPENROUTER_API_KEY else {}),
-    }
     payload = {
         "model": model,
         "messages": [
@@ -3465,11 +3475,12 @@ def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_toke
             {"role": "user", "content": user_content},
         ],
         "temperature": temperature,
-        "max_tokens": max_tokens,
+        "max_tokens": mt,
     }
     # P0-1: json-mode para Gemini (mismo patrón que _call_llm_json). Todos los
     # callers de _call_llm esperan JSON (adapt_with_ai, derive_voice_profile,
     # hook-regen ×3) → evita la prosa/JSON-con-texto que rompía _parse_ai_json.
+    # Groq/llama ignora response_format silenciosamente → solo lo forzamos en Gemini.
     if "gemini" in model.lower():
         payload["response_format"] = {"type": "json_object"}
 
@@ -3486,8 +3497,8 @@ def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_toke
     except (KeyError, IndexError, TypeError):
         finish = None
     if finish == "length":
-        app.logger.warning("LLM finish_reason=length model=%s — 1 reintento con max_tokens=%s", model, max_tokens * 2)
-        data = _do_request(dict(payload, max_tokens=max_tokens * 2))
+        app.logger.warning("LLM finish_reason=length provider=%s model=%s — 1 reintento con max_tokens=%s", provider, model, mt * 2)
+        data = _do_request(dict(payload, max_tokens=mt * 2))
 
     # v0.15.7.a: OpenRouter/Gemini puede devolver content=null cuando el modelo
     # emite refusal o cuando system+user no producen salida válida (ej. style
@@ -3497,12 +3508,41 @@ def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_toke
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as e:
-        app.logger.warning("LLM response missing expected structure for model=%s: %s", model, e)
+        app.logger.warning("LLM response missing expected structure for provider=%s model=%s: %s", provider, model, e)
         raise ValueError("LLM returned malformed response")
     if content is None:
-        app.logger.warning("LLM returned empty content for model=%s", model)
+        app.logger.warning("LLM returned empty content for provider=%s model=%s", provider, model)
         raise ValueError("LLM returned empty content")
     return content.strip()
+
+
+def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_tokens: int = 20000) -> str:
+    """Genera con el LLM principal (OpenRouter) y, si falla, CAE A GROQ.
+
+    Motivo (2026-06): OpenRouter se queda sin saldo y las peticiones grandes
+    (un guion ~1500 tok) devuelven 402 'requires more credits' → "robar guion"
+    fallaba a veces. Con ambos keys, OpenRouter es primario y Groq (llama-3.3-70b)
+    es la red de seguridad para que el guion SIEMPRE salga."""
+    providers = []
+    if OPENROUTER_API_KEY:
+        providers.append("openrouter")
+    if GROQ_API_KEY:
+        providers.append("groq")
+    if not providers:
+        raise RuntimeError("Sin proveedor LLM configurado (OPENROUTER_API_KEY / GROQ_API_KEY)")
+
+    last_err = None
+    for i, prov in enumerate(providers):
+        try:
+            return _llm_call_provider(prov, system, user_content, temperature, max_tokens)
+        except Exception as e:
+            last_err = e
+            has_more = i + 1 < len(providers)
+            app.logger.warning(
+                "LLM provider=%s falló (%s) — %s",
+                prov, e, ("fallback al siguiente proveedor" if has_more else "sin más proveedores"),
+            )
+    raise last_err
 
 
 # ══════════════════════════════════════════════════════════════════════════════

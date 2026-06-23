@@ -332,9 +332,10 @@
       // T1 (IDI): captura de ideas siempre a mano, en cualquier vista de la isla.
       '<button class="cmd-idea" data-act="idea-capture" title="Apunta una idea — se desarrolla en Guiones" aria-label="Apunta una idea"><span class="cmd-idea-bulb">'+IC.bulb+'</span><span class="cmd-idea-t">Apunta una idea</span></button>'+
       demoToggle+
-      // v3 (mockup David): barra limpia — fuera el badge Cerebro y la Racha del
-      // command bar (el Cerebro sigue accesible por su pestaña). Solo queda el
-      // estado de plan/créditos a la derecha. demoToggle es solo-demo (no va a prod).
+      // Nivel del Cerebro SIEMPRE visible (todas las páginas) y CENTRADO en la barra
+      // (.cmd-brain-center = posición absoluta al medio). Cuando hay nivel pendiente,
+      // se transforma en el botón ¡Subir de nivel!
+      '<div class="cmd-brain-center">'+brainCmdChipHTML()+'</div>'+
       pillStatHTML()+
     '</div>';
   }
@@ -394,6 +395,18 @@
   function ecoLevelName(l){ return ({1:L("Aprendiz","Apprentice"),2:L("Imitador","Imitator"),3:L("Ladrón","Thief"),4:L("Estratega","Strategist"),5:L("Viral","Viral")})[l||1]||L("Aprendiz","Apprentice"); }
   // #6 conversión (vanidad + aversión a perder progreso): el nivel del Cerebro como
   // ESTATUS visible en el header del Radar, no solo dentro de la pestaña Cerebro.
+  // Chip del Cerebro en la command bar (global, todas las páginas). Estado normal =
+  // nivel + nombre (lleva al Cerebro). Si hay nivel pendiente de recoger →
+  // botón pulsante «¡Subir de nivel el cerebro!» (data-act="brain-levelup").
+  function brainCmdChipHTML(){
+    var lv=brainLevel();
+    if(lv.canLevelUp){
+      return '<button class="brain-cmd brain-cmd-up" data-act="brain-levelup" title="'+L("Tu Cerebro tiene un nivel listo — recógelo","Your Brain has a level ready — claim it")+'">'+
+        '<span class="bcm-ic">'+IC.brain+'</span><span class="bcm-up">'+L("¡Subir de nivel el cerebro!","Level up your brain!")+'</span></button>';
+    }
+    return '<button class="brain-cmd" data-act="tab" data-k="brain" title="'+L("Tu Cerebro — cuanto más creas, más tuyo suena","Your Brain — the more you create, the more it sounds like you")+'">'+
+      '<span class="bcm-ic">'+IC.brain+'</span><span class="bcm-t">'+L("Cerebro","Brain")+'</span> <b>Nv '+lv.level+'</b></button>';
+  }
   function brainBadgeHTML(){
     var lv=brainLevel();
     return '<button class="brain-badge" data-act="tab" data-k="brain" title="'+L("Tu Cerebro — cuanto más creas, más tuyo suena","Your Brain — the more you create, the more it sounds like you")+'">'+IC.brain+' '+L("Cerebro","Brain")+' <b>Nv '+lv.level+'</b> · '+ESC(ecoLevelName(lv.level))+'</button>';
@@ -1110,6 +1123,20 @@
      «Crear guion». Usa brainLevel() (señales reales) — no inventa el nivel. */
   function radarCerebroRowHTML(){
     var bl=brainLevel();
+    // Nivel pendiente de recoger → la fila se vuelve un CTA de subida (manual).
+    if(bl.canLevelUp){
+      var segsF=''; for(var j=0;j<4;j++){ segsF+='<span class="rcb-seg on"></span>'; }
+      return '<div class="rcb rcb-up">'+
+        '<div class="rcb-ic">'+IC.brain+'</div>'+
+        '<div class="rcb-body">'+
+          '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · nivel "+bl.level,"Your brain · level "+bl.level)+'</span>'+
+            '<span class="rcb-prog">'+L("¡Nivel "+bl.earned+" listo!","Level "+bl.earned+" ready!")+'</span></div>'+
+          '<div class="rcb-desc">'+L("Has cumplido lo necesario para el <b>Nivel "+bl.earned+"</b>. Recógelo para que el Cerebro afine aún más tu voz.","You've met everything for <b>Level "+bl.earned+"</b>. Claim it so the Brain tunes your voice even more.")+'</div>'+
+          '<div class="rcb-bars">'+segsF+'</div>'+
+        '</div>'+
+        '<button class="btn btn-md btn-primary" data-act="brain-levelup">'+IC.brain+' '+L("¡Subir de nivel!","Level up!")+'</button>'+
+      '</div>';
+    }
     var g=Math.min(4,(bl.signals&&bl.signals.guiones)||0);
     var nx=bl.next||bl.level;
     var segs=''; for(var i=0;i<4;i++){ segs+='<span class="rcb-seg'+(i<g?' on':'')+'"></span>'; }
@@ -2625,6 +2652,21 @@
     var nPub=metricVideos().length;
     return {voice:voicePct, comps:nComps, guiones:nGuiones, pub:nPub};
   }
+  // Nivel RECLAMADO (subir de nivel ahora es MANUAL, no automático): persiste por
+  // usuario/marca en localStorage. La primera vez adopta el nivel ganado para que
+  // los usuarios existentes no vean un botón de "re-subir" a donde ya estaban.
+  function brainClaimedKey(){ return "rs_brain_claimed_"+((S.user&&S.user.email)||"x")+"|"+(S.brandId||""); }
+  function brainClaimedGet(){
+    // DEMO: nivel reclamado en sesión (no localStorage) y arranca en 1 → siempre hay
+    // nivel pendiente para PREVISUALIZAR el botón ¡Subir de nivel! y su animación.
+    // Al recargar vuelve a 1; subes uno a uno hasta el ganado y luego ves el chip normal.
+    if(isDemo()) return S._demoClaimed!=null?S._demoClaimed:1;
+    try{ var v=localStorage.getItem(brainClaimedKey()); return v!=null?parseInt(v,10):null; }catch(e){ return null; }
+  }
+  function brainClaimedSet(n){
+    if(isDemo()){ S._demoClaimed=n; return; }
+    try{ localStorage.setItem(brainClaimedKey(),String(n)); }catch(e){}
+  }
   function brainLevel(){
     var s=brainSignals();
     var REQS={
@@ -2636,29 +2678,72 @@
       5:[ {ok:s.pub>=5,     label:"5 publicados con métricas ("+Math.min(5,s.pub)+"/5)", cta:{t:"Vincular mis reels", act:"tab", k:"metrics"}},
           {ok:s.voice>=75,  label:"Voz al 75% (vas al "+s.voice+"%)",                 cta:{t:"Refinar mi voz", act:"voice-refine"}} ]
     };
-    var level=1;
-    for(var n=2;n<=5;n++){ if(REQS[n].every(function(r){return r.ok;})) level=n; else break; }
+    var earned=1;
+    for(var n=2;n<=5;n++){ if(REQS[n].every(function(r){return r.ok;})) earned=n; else break; }
+    // DEMO: forzamos nivel ganado al máximo para PREVISUALIZAR la subida — así, con el
+    // reclamado arrancando en 1, siempre hay botón y se recorren las 5 pantallas. (En
+    // prod el nivel ganado es el real de las señales.)
+    if(isDemo()) earned=5;
+    // Nivel mostrado = el RECLAMADO (≤ ganado). Si ganado > reclamado → hay nivel pendiente
+    // de "recoger" con el botón ¡Subir de nivel!.
+    var claimed=brainClaimedGet();
+    if(claimed==null){ claimed=earned; brainClaimedSet(earned); }
+    var level=Math.min(claimed, earned);
+    var canLevelUp=earned>level;
     var next=level<5?level+1:null;
     var reqs=next?REQS[next]:[];
     var missing=reqs.filter(function(r){return !r.ok;});
     var pct=next?Math.round(reqs.filter(function(r){return r.ok;}).length/Math.max(1,reqs.length)*100):100;
-    return {level:level, next:next, reqs:reqs, missing:missing, nextAction:missing[0]||null, pct:pct, signals:s};
+    return {level:level, earned:earned, canLevelUp:canLevelUp, next:next, reqs:reqs, missing:missing, nextAction:missing[0]||null, pct:pct, signals:s};
   }
   /* B3 · momento de recompensa: si el nivel SUBIÓ desde la última foto (entrenar voz,
      seguir competidor, crear guion, vincular publicados…), toast + orbe en pulso +
      la barra del hero se re-anima de 0 → pct. Llamar tras cada recarga de señales. */
   function brainLevelPulse(){
     brainEmitSignals();   // capa "alimentar": lanza partículas reales por cada señal que subió
-    var lv=brainLevel().level;
-    if(S._lvlSeen==null){ S._lvlSeen=lv; return; }
-    if(lv===S._lvlSeen) return;
-    if(lv<S._lvlSeen){ S._lvlSeen=lv; return; }   // bajó (p.ej. descartó guiones): sin fanfarria
-    S._lvlSeen=lv;
-    showToast("Nivel "+lv+" · "+ecoLevelName(lv)+" — el sistema te conoce mejor: guiones con menos retoques.");
-    try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}   // destello global del cerebro 3D
-    var orb=document.querySelector(".brain-orb"); if(orb){ orb.classList.add("lvlup"); setTimeout(function(){ orb.classList.remove("lvlup"); },1600); }
-    var fill=document.querySelector(".brain-hero .eco-fill");
-    if(fill){ var w=fill.style.width; fill.style.width="0%"; void fill.offsetWidth; fill.style.width=w; }
+    // Subir de nivel es MANUAL (botón ¡Subir de nivel! arriba). Aquí solo avisamos
+    // cuando el nivel GANADO sube — la fanfarria de verdad va en la pantalla manual.
+    var bl=brainLevel();
+    var e=bl.earned;
+    if(S._earnedSeen==null){ S._earnedSeen=e; return; }
+    if(e<=S._earnedSeen){ if(e<S._earnedSeen) S._earnedSeen=e; return; }   // bajó: sin ruido
+    S._earnedSeen=e;
+    if(bl.canLevelUp){
+      showToast("¡Tu Cerebro puede subir a Nivel "+bl.earned+"! Recógelo arriba.", "Subir de nivel", "brain-levelup");
+      try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e2){}   // destello global del cerebro 3D
+      var orb=document.querySelector(".brain-orb"); if(orb){ orb.classList.add("lvlup"); setTimeout(function(){ orb.classList.remove("lvlup"); },1600); }
+    }
+  }
+  /* Subida de nivel MANUAL: el usuario pulsa «¡Subir de nivel!», recoge el nivel
+     (commit del reclamado) y se le muestra una pantalla de animación. De momento es
+     una pantalla genérica improvisada — más adelante una por nivel. */
+  function brainLevelup(){
+    var bl=brainLevel();
+    if(!bl.canLevelUp) return;
+    var to=bl.level+1;
+    brainClaimedSet(to);          // recoge el nivel (commit)
+    S._earnedSeen=bl.earned;      // ya avisado: no re-nudge
+    S.levelup={to:to, name:ecoLevelName(to)};
+    render();
+    try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}   // destello del cerebro 3D
+  }
+  function closeLevelup(){ S.levelup=null; render(); }
+  function levelupHTML(){
+    var lu=S.levelup; if(!lu) return "";
+    var sparks=""; for(var i=0;i<18;i++){ sparks+='<i style="--a:'+(i*20)+'deg;--dl:'+(0.25+(i%6)*0.07).toFixed(2)+'s"></i>'; }
+    return '<div class="overlay lvlup-overlay" role="dialog" aria-modal="true" aria-label="'+L("Subida de nivel del Cerebro","Brain level up")+'">'+
+      '<div class="lvlup-stage">'+
+        '<div class="lvlup-rings"><span></span><span></span><span></span></div>'+
+        '<div class="lvlup-sparks">'+sparks+'</div>'+
+        '<div class="lvlup-orb">'+IC.brain+'<span class="lvlup-orb-n">'+lu.to+'</span></div>'+
+      '</div>'+
+      '<div class="lvlup-card">'+
+        '<div class="lvlup-eye">'+L("CEREBRO · NIVEL ","BRAIN · LEVEL ")+lu.to+'</div>'+
+        '<h2 class="lvlup-h">'+ESC(lu.name)+'</h2>'+
+        '<p class="lvlup-sub">'+L("Tu Cerebro sube de nivel: ahora clava mejor tu tono y necesitas menos retoques en cada guion.","Your Brain levels up: it nails your tone better and you tweak each script less.")+'</p>'+
+        '<button class="lvlup-btn" data-act="levelup-done">'+L("Continuar","Continue")+'</button>'+
+      '</div>'+
+    '</div>';
   }
   function brainVoice(b){
     // v0.19: perfil de voz REAL (GET /api/voice) si existe; si no, demo del nicho.
@@ -2770,7 +2855,16 @@
     }
     // B2: con voz entrenada, el banner se generaliza a la SIGUIENTE acción de nivel
     // (una sola, la de más impacto). Al nivel máximo desaparece — nada que empujar.
-    var lv=brainLevel(); var na=lv.nextAction;
+    var lv=brainLevel();
+    // Nivel ganado pendiente de recoger → banner de acción (subida manual).
+    if(lv.canLevelUp){
+      return '<div class="voice-banner vb-up">'+
+        '<span class="vb-ic">'+IC.brain+'</span>'+
+        '<span class="vb-text"><b>¡Nivel '+lv.earned+' listo!</b> Ya cumples lo necesario — recoge tu nuevo nivel del Cerebro.</span>'+
+        '<button class="btn btn-sm btn-primary" data-act="brain-levelup">¡Subir de nivel!</button>'+
+      '</div>';
+    }
+    var na=lv.nextAction;
     if(!na) return '';
     // Si la CTA lleva a la pestaña en la que ya estás (p.ej. «roba un guion» en el
     // Radar), el botón sobra: la acción está en pantalla. Solo texto.
@@ -4139,6 +4233,7 @@
     else if(S.view==="prompter") html+=teleprompterHTML();
     else if(S.view==="fillweek") html+='<div class="overlay" role="dialog" aria-modal="true" aria-label="Llena mi semana"><div class="obar"><button class="back" data-act="close-feed" aria-label="Cerrar">'+IC.x+'</button><span class="otitle">Llena mi semana</span></div><div class="oscroll" id="rsFillHost">'+fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase)+'</div></div>';
     if(S.communityInfo) html+=communityInfoModalHTML();   // mini-modal «Más información» Comunidad
+    if(S.levelup) html+=levelupHTML();   // pantalla de animación al subir de nivel el Cerebro
     if(S.sheet) html+=sheetHTML();   // T2: el sheet de entrada va SOBRE cualquier overlay
     // Teleprónter: preservar la posición de scroll a través del re-render (los toggles
     // de play/velocidad/texto re-pintan; sin esto el scroll saltaría a 0).
@@ -5808,6 +5903,8 @@
     if(act==="brain-rate") return brainRate(parseInt(btn.getAttribute("data-k"),10)||0);
     if(act==="brain-train-mode") return setBrainTrainMode(k);
     if(act==="brain-improve") return brainImprove(k==="send");
+    if(act==="brain-levelup") return brainLevelup();   // recoger el nivel pendiente (manual)
+    if(act==="levelup-done") return closeLevelup();
     if(act==="brain-feed-me") return brainFeedMe();   // #2/#7: alimentar el Cerebro
     if(act==="brain-train-more") return brainTrainMore();
     if(act==="gt-start") return startGuionTinder();
