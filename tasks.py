@@ -1286,40 +1286,12 @@ def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
     niche_ctx = ", ".join([x for x in ([niche] + list(subniches or [])) if x]) or (niche or "")
 
     keep_unames: list = []
-    # 1. SEED: relatedProfiles del propio usuario (1 a 1 con reintento si viene vacío).
+    # 1. SEED: seguir SOLO al referente que el user eligió a mano (decisión Leo 2026-06-23).
+    #    Los "afines" del nicho ya NO se auto-siguen: el 2º competidor lo añade el user a
+    #    mano (botón «+ Añadir») o vía la tarjeta «Te lo sugiero» (co-ocurrencia). Así el
+    #    radar arranca SOLO con el referente que él escogió, no con gente que no eligió.
     if seed_handle:
-        seed_actor = (f"https://api.apify.com/v2/acts/apify~instagram-scraper"
-                      f"/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=512")
-        rel = []
-        for attempt in range(2):
-            try:
-                resp = requests.post(seed_actor, json={
-                    "directUrls": [f"https://www.instagram.com/{seed_handle}/"],
-                    "resultsType": "details", "resultsLimit": 1}, timeout=SCRAPE_TIMEOUT_SEC)
-                if resp.status_code >= 400:
-                    logger.warning("[discover] apify seed %s: %s", resp.status_code, (resp.text or "")[:160])
-                    continue
-                items = resp.json() or []
-                rel = (items[0].get("relatedProfiles") or []) if items else []
-                if rel:
-                    break
-            except Exception as e:
-                logger.warning("[discover] seed scrape attempt %d failed: %s", attempt, e)
-        cands = []
-        seen = set()
-        for rp in rel:
-            u = (rp.get("username") or "").strip().lstrip("@").lower()
-            if u and u != seed_handle and u not in seen and re.match(r"^[a-z0-9._]{1,30}$", u):
-                seen.add(u)
-                cands.append({"u": u, "name": rp.get("full_name") or ""})
-        if cands:
-            keep_unames = _gate_creators_groq(cands, niche_ctx)[:follow_top]
-            logger.info("[discover] seed=@%s related=%d gate_keep=%d", seed_handle, len(cands), len(keep_unames))
-        # El SEED es el creador relevante que el user eligió A MANO → SEGUIRLO SIEMPRE,
-        # el PRIMERO (aunque relatedProfiles venga vacío, p.ej. cuentas que IG no sugiere).
-        # Así el radar arranca con SUS reels reales del nicho en vez de caer al hashtag
-        # (que mete motivacional/spam fuera de nicho — el bug de @__davidalaya).
-        keep_unames = ([seed_handle] + [u for u in keep_unames if u != seed_handle])[:follow_top]
+        keep_unames = [seed_handle]
 
     # 2. FALLBACK: SOLO por hashtag si NO hay seed (el user saltó el paso). Con seed, el
     #    propio seed ya garantiza ≥1 creador relevante → nunca metemos hashtag (= spam).

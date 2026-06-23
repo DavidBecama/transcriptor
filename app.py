@@ -11396,7 +11396,7 @@ def _existing_idea_titles(uid, idea_id):
 def ideas_generate_batch():
     """Isla Signal — botón «Generar 3 ideas». Genera y persiste un lote de ideas
     desarrolladas (develop_idea x N; el frontend manda count=3). Cobra 10 créditos
-    por el lote (COST.idea5=10) ANTES del LLM y refunda si NINGUNA idea sale.
+    por el lote (COST.idea5=5) ANTES del LLM y refunda si NINGUNA idea sale.
     Response: {ideas:[{id,raw_text,title,category,status}], cost_cents, credits_cents, credits}."""
     user = current_user()
     uid = user["id"]
@@ -11411,8 +11411,8 @@ def ideas_generate_batch():
         if prof.data and prof.data[0].get("default_idea_assistant"):
             assistant_id = prof.data[0]["default_idea_assistant"]
 
-    # Coste del lote: COST.idea5 = 10 créditos (no por idea). Frontend genera 3 ideas.
-    err, refund, _ = _charge_units_locked(uid, 10, user)
+    # Coste del lote: COST.idea5 = 5 créditos (no por idea). Frontend genera 3 ideas.
+    err, refund, _ = _charge_units_locked(uid, 5, user)
     if err:
         return err
 

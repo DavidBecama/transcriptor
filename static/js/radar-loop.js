@@ -118,7 +118,7 @@
   var GEN_TITLE = { script:"Cocinando el guion…", hooks:"Buscando tu hook", carousel:"Montando el carrusel", linkedin:"Pasando a LinkedIn", x:"Tejiendo el hilo", serie:"Creando tu serie" };
   // econ (economia-creditos.md): 1 guión = 3 créditos. hooks "3 más" = 2 gratis/día
   // luego 1 (ver hooksUnitsToday). "Llena mi semana" 5 guiones = 12. Regenerar = 1.
-  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:10, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30 };   // idea5 = lote de «Generar 3 ideas» (3 ideas, 10 créd.)
+  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:5, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30 };   // idea5 = lote de «Generar 3 ideas» (3 ideas, 5 créd.)
   var HOOKS_FREE_PER_DAY = 2;   // primeros "3 hooks más" del día gratis (demo + prod)
   function hooksUnitsToday(){   // demo: 0 mientras queden gratis hoy, luego COST.hooks5
     if(typeof S.hooksToday!=="number") S.hooksToday=0;
@@ -1016,6 +1016,9 @@
     });
   }
   function suggestedCompHTML(){
+    // Al TOPE de competidores del plan → no sugerir (no puedes añadir más; quita uno o sube).
+    var _u=(S.trackedCount!=null?S.trackedCount:(Array.isArray(S.tracked)?S.tracked.length:0));
+    if(S.trackedLimit!=null && _u>=S.trackedLimit) return '';
     var c=suggestedComp(); if(!c) return '';
     var why=c.why || L(c.why_es, c.why_en);   // real → string; demo → bilingüe
     var tag=c.tag || L(c.tag_es, c.tag_en);
