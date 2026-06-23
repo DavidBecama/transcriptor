@@ -1706,7 +1706,7 @@
       : '<div class="rs-empty" style="margin-top:10px">Aún ninguna desarrollada. Desarrolla una de arriba o genera 5 de golpe.</div>';
     return '<section class="ideas-zone">'+
       '<div class="feed-head"><span class="feed-title">'+IC.bulb+' Sin desarrollar'+(raw.length?' <span class="ct">· '+raw.length+'</span>':'')+'</span>'+
-        '<button class="btn btn-sm btn-secondary" data-act="gen5ideas">'+IC.spark+' 5 ideas</button>'+
+        '<button class="btn btn-sm btn-secondary" data-act="gen5ideas" title="'+L("Cuesta "+COST.idea5+" crédito el lote","Costs "+COST.idea5+" credit per batch")+'">'+IC.spark+' '+L("5 ideas · "+COST.idea5+" créd.","5 ideas · "+COST.idea5+" cr")+'</button>'+
       '</div>'+
       '<p class="ideas-zone-sub">Ideas en bruto, guardadas gratis. Desarrolla cuando quieras (cuesta '+COST.scripts5+' créditos).</p>'+
       '<button class="explosion-btn" data-act="explosion"><span class="ex-head">'+IC.spark+' Explosión creativa</span><span class="ex-sub">5 ideas × 5 guiones × 5 hooks — '+COST.explosion+' créditos</span></button>'+
@@ -2011,7 +2011,7 @@
       '<div class="guix-head"><div class="guix-head-l"><div class="guix-ic">'+IC.bolt+'</div>'+
         '<div><div class="guix-h">'+L("Explosión creativa","Creative explosion")+'</div>'+
         '<div class="guix-sub">'+L("Cinco ideas nuevas a partir de lo que explota. Cada una con tres ganchos listos.","Five fresh ideas from what's exploding. Each with three ready hooks.")+'</div></div></div>'+
-        '<button class="btn btn-lg btn-primary" data-act="gen5ideas">'+IC.bolt+' '+L("Generar 5 ideas","Generate 5 ideas")+'</button>'+
+        '<button class="btn btn-lg btn-primary" data-act="gen5ideas" title="'+L("Genera 5 ideas desarrolladas. Cuesta "+COST.idea5+" crédito el lote.","Generates 5 developed ideas. Costs "+COST.idea5+" credit per batch.")+'">'+IC.bolt+' '+L("Generar 5 ideas · "+COST.idea5+" créd.","Generate 5 ideas · "+COST.idea5+" cr")+'</button>'+
       '</div>'+grid+
     '</section>';
   }
@@ -2473,11 +2473,9 @@
       '<div class="mt-kpis">'+kpiH+'</div>'+
       // tendencia REAL por fecha de publicación (el scrape trae el timestamp de cada reel)
       '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels en el tiempo","Your reels over time")+'</span><span class="mt-card-meta">'+L("repros por reel · por fecha","plays per reel · by date")+'</span></div>'+_metTimeline(V)+'</div>'+
-      '<div class="mt-grid2">'+
+      '<div class="mt-grid2 mt-grid4">'+
         '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Desglose de interacción","Interaction breakdown")+'</span><span class="mt-card-meta">'+fmtKM(sInter)+' total</span></div><div class="mt-bars">'+engH+'</div></div>'+
         '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Duración óptima","Optimal length")+'</span><span class="mt-card-meta">'+L("repros medias · tus reels","avg plays · your reels")+'</span></div><div class="mt-durs">'+durH+'</div></div>'+
-      '</div>'+
-      '<div class="mt-grid2">'+
         '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Ganchos que funcionan","Hooks that work")+'</span><span class="mt-card-meta">'+L("aperturas de tus top reels","openers of your top reels")+'</span></div>'+_metHooks(V)+'</div>'+
         '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos para publicar","Best times to post")+'</span><span class="mt-card-meta">'+L("repros · tus publicaciones","plays · your posts")+'</span></div>'+_metBestTime(V)+'</div>'+
       '</div>'+
@@ -5271,8 +5269,9 @@
     var _copy='<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.8"></rect><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.8"></path></svg>';
     var _trash='<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
     var stat=function(cls,ic,v,lbl){ return (v!=null&&v!=="")?'<div class="anzd-stat '+cls+'"><span class="anzd-stat-ic">'+ic+'</span><span class="anzd-stat-v">'+_anzNum(v)+'</span><span class="anzd-stat-l">'+lbl+'</span></div>':''; };
+    // Shares: Apify casi nunca lo trae (sale 0) → solo lo mostramos si hay dato real (>0).
     var stats=stat("v-views",IC.eye,a.views,"Views")+stat("v-likes",IC.heart,a.likes,"Likes")+
-              stat("v-comments",IC.chat,a.comments,L("Comentarios","Comments"))+stat("v-shares",IC.repeat,a.shares,"Shares");
+              stat("v-comments",IC.chat,a.comments,L("Comentarios","Comments"))+stat("v-shares",IC.repeat,(a.shares>0?a.shares:null),"Shares");
     var statsBlock=stats.trim()?'<div class="anzd-stats">'+stats+'</div>':'<div class="anzd-nostat">'+L("Sin métricas guardadas para este reel.","No metrics saved for this reel.")+'</div>';
     // Refrescar métricas (solo IG): rellena/actualiza vía Apify. Abierto a todos los planes.
     var refreshing=!!S.analyzeRefreshing;
@@ -5426,6 +5425,13 @@
       return h.toLowerCase()===String(handle).toLowerCase();
     });
     if(already){ _refreshRadarLight(); return showToast("Reel analizado · ya sigues a @"+handle+" — su radar se actualiza solo."); }
+    // Límite DURO del plan: si ya estás al tope de competidores, NO seguir (el backend
+    // tiene cap blando que cobraría créditos y excedería el «solo N»). Pre-check aquí.
+    var _used=(S.trackedCount!=null?S.trackedCount:(Array.isArray(S.tracked)?S.tracked.length:0));
+    var _lim=S.trackedLimit;
+    if(_lim!=null && _used>=_lim){
+      return showError(L("Ya sigues a tus "+_lim+" competidores. Quítale el seguimiento a uno en el Radar (o sube de plan) para seguir a @"+handle+".","You already follow your "+_lim+" competitors. Unfollow one in the Radar (or upgrade) to follow @"+handle+"."));
+    }
     var body={ig_username:handle};
     var _pid=_pidOf(S.brandId); if(isAgency()&&_pid) body.project_id=_pid;
     apiPost("/api/tracked-creators",body).then(function(r){
