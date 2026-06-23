@@ -1762,7 +1762,9 @@
     var g={ id:gid("g"), seq:++_gseq, title:(p.title||p.hook||"Guión"),
       hook:p.hook||"", beats:p.beats||[], close:p.close||"",
       hooks:p.hooks||[], expanded:false,
-      from:p.from||null, brand:brand().name, type:p.type||"guión", status:"draft" };
+      from:p.from||null, brand:brand().name, type:p.type||"guión", status:"draft",
+      // fuente del reel robado → miniatura/URL/stats reales en el editor (persisten en sesión).
+      thumb:p.thumb||null, url:p.url||null, srcViews:p.srcViews||"", srcLikes:p.srcLikes||"" };
     S.guiones.unshift(g); return g.id;
   }
   function guionById(id){ return S.guiones.filter(function(x){return x.id===id;})[0]; }
@@ -3792,8 +3794,8 @@
     // barra IA
     var ai=[["Acortar",IC.arrL],["Más gancho",IC.spark],["Cambiar tono",IC.layers],["Más ejemplos",IC.plus]];
     var aiH=ai.map(function(a){ return '<button class="ed-ai" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+a[1]+' '+L(a[0],a[0])+'</button>'; }).join("");
-    // rail · fuente
-    var th=_demoThumbs(); var thumb=(th&&th.length)?th[0]:null;
+    // rail · fuente — miniatura REAL del reel (r.thumb); demo cae a las demo-thumbs.
+    var thumb=r.thumb||(isDemo()?(((_demoThumbs()||[])[0])||null):null);
     var thumbInner=thumb?'<img src="'+ESC(thumb)+'" alt="" loading="lazy">':'<div class="ed-src-ph" style="background:'+_galGrad(gid||handle||"src")+'"></div>';
     var srcPanel = handle ? ('<div class="ed-rail-block">'+
       '<span class="ed-rail-k">'+L("› fuente","› source")+'</span>'+
@@ -3808,7 +3810,7 @@
             (r.views?'<div><div class="ed-src-v">'+ESC(r.views)+'</div><div class="ed-src-l">views</div></div>':'')+
             (r.likes?'<div><div class="ed-src-v">'+ESC(r.likes)+'</div><div class="ed-src-l">likes</div></div>':'')+
           '</div>'+
-          (r.id?'<button class="btn btn-sm btn-secondary" data-act="reel-original" data-id="'+ESC(r.id)+'">'+L("Ver original","View original")+'</button>':'')+
+          (r.url?'<a class="btn btn-sm btn-secondary" href="'+ESC(r.url)+'" target="_blank" rel="noopener noreferrer">'+L("Ver original","View original")+'</a>':(r.id?'<button class="btn btn-sm btn-secondary" data-act="reel-original" data-id="'+ESC(r.id)+'">'+L("Ver original","View original")+'</button>':''))+
         '</div>'+
       '</div>'+
     '</div>') : '';
@@ -3861,7 +3863,6 @@
           srcPanel+txPanel+varPanel+
           '<div class="ed-rail-cta">'+
             '<button class="btn btn-lg btn-primary" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.bolt+' '+L("Regenerar guion","Regenerate script")+'</button>'+
-            '<button class="btn btn-md btn-secondary" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+IC.repeat+' '+L("Roba como un artista","Steal like an artist")+'</button>'+
           '</div>'+
         '</div>'+
       '</div>'+
@@ -4569,7 +4570,7 @@
         return;
       }
       // El guión generado se guarda SIEMPRE en Guiones (draft). No se pierde nada.
-      var s=r.script||{}; var gidNew=addGuion({title:s.hook, hook:s.hook, beats:s.beats, close:s.close, from:"@"+r.creator.handle, type:"guión"});
+      var s=r.script||{}; var gidNew=addGuion({title:s.hook, hook:s.hook, beats:s.beats, close:s.close, from:"@"+r.creator.handle, type:"guión", thumb:r.thumb||null, url:r.url||null, srcViews:r.views||"", srcLikes:r.likes||""});
       removeStolenReel(id);   // loop continuity (Fathom): robado → fuera del radar, entra el siguiente
       brainEmitSignals();     // capa "alimentar": el guion nuevo entra como partícula al cerebro
       startFlash();           // PEAK: la oferta flash arranca tras el PRIMER valor real (no al entrar)
@@ -5348,7 +5349,7 @@
         render(); return showError((r.d&&r.d.message)||(r.d&&r.d.error)||L("No pude generar el guion ahora mismo. Reinténtalo.","Couldn't generate the script right now. Try again."));
       }
       var p=scriptToParts(r.d.script);
-      var gidNew=addGuion({title:p.hook, hook:p.hook, beats:p.beats, close:p.close, from:a.author_username?("@"+a.author_username):null, type:"guión"});
+      var gidNew=addGuion({title:p.hook, hook:p.hook, beats:p.beats, close:p.close, from:a.author_username?("@"+a.author_username):null, type:"guión", thumb:a.thumbnail_b64||null, url:a.url||null, srcViews:a.views||"", srcLikes:a.likes||""});
       if(r.d.script_id){ var g=guionById(gidNew); if(g) g._sid=r.d.script_id; }
       refreshCredits().then(function(){ flashSpark(0); });
       render();
@@ -6076,7 +6077,7 @@
       return;
     }
     if(act==="gui-record"){ var g=guionById(id); if(g){ S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; S.view="prompter"; render(); } return; }
-    if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.reel={id:go.from,creator:{handle:(go.from||"").replace(/^@/,"")},script:{hook:go.hook,beats:go.beats,close:go.close},dur:"",views:"",likes:"",when:go.when||""}; S.view="editor"; render(); } return; }   // v3 «Abrir guion» → editor (vista propia)
+    if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.reel={id:go.from,creator:{handle:(go.from||"").replace(/^@/,"")},script:{hook:go.hook,beats:go.beats,close:go.close},dur:"",views:go.srcViews||"",likes:go.srcLikes||"",when:go.when||"",thumb:go.thumb||null,url:go.url||null}; S.view="editor"; render(); } return; }   // v3 «Abrir guion» → editor (miniatura/URL del reel fuente arrastradas)
     if(act==="ed-close"){ S.view="feed"; S.tab="guiones"; S.activeGuionId=null; return render(); }   // v3 editor → vuelve a Guiones
     // v3 Ajustes (página isla)
     if(act==="set-tab"){ S.setTab=k; return render(); }
