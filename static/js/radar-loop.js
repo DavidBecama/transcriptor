@@ -6077,7 +6077,18 @@
       return;
     }
     if(act==="gui-record"){ var g=guionById(id); if(g){ S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; S.view="prompter"; render(); } return; }
-    if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.reel={id:go.from,creator:{handle:(go.from||"").replace(/^@/,"")},script:{hook:go.hook,beats:go.beats,close:go.close},dur:"",views:go.srcViews||"",likes:go.srcLikes||"",when:go.when||"",thumb:go.thumb||null,url:go.url||null}; S.view="editor"; render(); } return; }   // v3 «Abrir guion» → editor (miniatura/URL del reel fuente arrastradas)
+    if(act==="gui-open"){ var go=guionById(id); if(go){ S.activeGuionId=go.id; S.reel={id:go.from,creator:{handle:(go.from||"").replace(/^@/,"")},script:{hook:go.hook,beats:go.beats,close:go.close},dur:"",views:go.srcViews||"",likes:go.srcLikes||"",when:go.when||"",thumb:go.thumb||null,url:go.url||null}; S.view="editor"; render();
+      // Si no tenemos miniatura/URL en sesión, las pedimos al backend (resuelve por la
+      // FK del reel fuente). Cubre guiones de sesiones anteriores / tras recargar.
+      if(!isDemo() && go._sid && (!go.thumb || !go.url)){
+        apiGet("/scripts/"+encodeURIComponent(go._sid)+"/source").then(function(r){
+          if(r&&r.ok&&r.d&&(r.d.url||r.d.thumb_b64)){
+            go.thumb=go.thumb||r.d.thumb_b64||null; go.url=go.url||r.d.url||null;
+            if(S.view==="editor" && S.activeGuionId===go.id){ S.reel.thumb=go.thumb; S.reel.url=go.url; render(); }
+          }
+        });
+      }
+    } return; }   // v3 «Abrir guion» → editor (miniatura/URL del reel fuente: sesión + backend on-demand)
     if(act==="ed-close"){ S.view="feed"; S.tab="guiones"; S.activeGuionId=null; return render(); }   // v3 editor → vuelve a Guiones
     // v3 Ajustes (página isla)
     if(act==="set-tab"){ S.setTab=k; return render(); }
