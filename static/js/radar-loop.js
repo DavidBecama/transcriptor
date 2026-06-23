@@ -118,7 +118,7 @@
   var GEN_TITLE = { script:"Cocinando el guion…", hooks:"Buscando tu hook", carousel:"Montando el carrusel", linkedin:"Pasando a LinkedIn", x:"Tejiendo el hilo", serie:"Creando tu serie" };
   // econ (economia-creditos.md): 1 guión = 3 créditos. hooks "3 más" = 2 gratis/día
   // luego 1 (ver hooksUnitsToday). "Llena mi semana" 5 guiones = 12. Regenerar = 1.
-  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:1, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30 };
+  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:10, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30 };   // idea5 = lote de «Generar 3 ideas» (3 ideas, 10 créd.)
   var HOOKS_FREE_PER_DAY = 2;   // primeros "3 hooks más" del día gratis (demo + prod)
   function hooksUnitsToday(){   // demo: 0 mientras queden gratis hoy, luego COST.hooks5
     if(typeof S.hooksToday!=="number") S.hooksToday=0;
@@ -1706,7 +1706,7 @@
       : '<div class="rs-empty" style="margin-top:10px">Aún ninguna desarrollada. Desarrolla una de arriba o genera 5 de golpe.</div>';
     return '<section class="ideas-zone">'+
       '<div class="feed-head"><span class="feed-title">'+IC.bulb+' Sin desarrollar'+(raw.length?' <span class="ct">· '+raw.length+'</span>':'')+'</span>'+
-        '<button class="btn btn-sm btn-secondary" data-act="gen5ideas" title="'+L("Cuesta "+COST.idea5+" crédito el lote","Costs "+COST.idea5+" credit per batch")+'">'+IC.spark+' '+L("5 ideas · "+COST.idea5+" créd.","5 ideas · "+COST.idea5+" cr")+'</button>'+
+        '<button class="btn btn-sm btn-secondary" data-act="gen5ideas" title="'+L("Cuesta "+COST.idea5+" créditos el lote","Costs "+COST.idea5+" credits per batch")+'">'+IC.spark+' '+L("3 ideas · "+COST.idea5+" créd.","3 ideas · "+COST.idea5+" cr")+'</button>'+
       '</div>'+
       '<p class="ideas-zone-sub">Ideas en bruto, guardadas gratis. Desarrolla cuando quieras (cuesta '+COST.scripts5+' créditos).</p>'+
       '<button class="explosion-btn" data-act="explosion"><span class="ex-head">'+IC.spark+' Explosión creativa</span><span class="ex-sub">5 ideas × 5 guiones × 5 hooks — '+COST.explosion+' créditos</span></button>'+
@@ -2011,7 +2011,7 @@
       '<div class="guix-head"><div class="guix-head-l"><div class="guix-ic">'+IC.bolt+'</div>'+
         '<div><div class="guix-h">'+L("Explosión creativa","Creative explosion")+'</div>'+
         '<div class="guix-sub">'+L("Cinco ideas nuevas a partir de lo que explota. Cada una con tres ganchos listos.","Five fresh ideas from what's exploding. Each with three ready hooks.")+'</div></div></div>'+
-        '<button class="btn btn-lg btn-primary" data-act="gen5ideas" title="'+L("Genera 5 ideas desarrolladas. Cuesta "+COST.idea5+" crédito el lote.","Generates 5 developed ideas. Costs "+COST.idea5+" credit per batch.")+'">'+IC.bolt+' '+L("Generar 5 ideas · "+COST.idea5+" créd.","Generate 5 ideas · "+COST.idea5+" cr")+'</button>'+
+        '<button class="btn btn-lg btn-primary" data-act="gen5ideas" title="'+L("Genera 3 ideas desarrolladas. Cuesta "+COST.idea5+" créditos el lote.","Generates 3 developed ideas. Costs "+COST.idea5+" credits per batch.")+'">'+IC.bolt+' '+L("Generar 3 ideas · "+COST.idea5+" créd.","Generate 3 ideas · "+COST.idea5+" cr")+'</button>'+
       '</div>'+grid+
     '</section>';
   }
@@ -4940,13 +4940,13 @@
   }
 
   function gen5ideas(btn){
-    if(isDemo()){ spend(COST.idea5); var seed=Date.now()%97; var fresh=pick(BANK_IDEAS,5,seed).map(function(t,i){return makeIdea(t,seed+i*7);}); S.ideas=fresh.concat(S.ideas); render(); flashSpark(-COST.idea5); showToast("5 ideas nuevas para expandir."); return; }
+    if(isDemo()){ spend(COST.idea5); var seed=Date.now()%97; var fresh=pick(BANK_IDEAS,3,seed).map(function(t,i){return makeIdea(t,seed+i*7);}); S.ideas=fresh.concat(S.ideas); render(); flashSpark(-COST.idea5); showToast("3 ideas nuevas para expandir."); return; }
     var restore=_btnLoading(btn);
-    showToast("Generando 5 ideas…");
-    apiPost("/ideas/generate-batch",{count:5, project_id:S.brandId&&S.brandId!=="default"?S.brandId:null, language:rsLang()}).then(function(r){
+    showToast("Generando 3 ideas…");
+    apiPost("/ideas/generate-batch",{count:3, project_id:S.brandId&&S.brandId!=="default"?S.brandId:null, language:rsLang()}).then(function(r){
       if(!r.ok || !r.d || !Array.isArray(r.d.ideas)){ restore(); return showPaywallOrError(r); }
       var fresh=r.d.ideas.map(function(i){ var it=normIdea(i); it.expanded=true; it._scriptsLoaded=true; it._brand=(i.project_id||S.brandId||"default"); return it; });
-      S.ideas=fresh.concat(S.ideas); applyCredits(r.d, COST.idea5); render(); showToast("5 ideas nuevas para expandir.");
+      S.ideas=fresh.concat(S.ideas); applyCredits(r.d, COST.idea5); render(); showToast("3 ideas nuevas para expandir.");
     });
   }
   function gen5scripts(ideaId, btn){
