@@ -1313,9 +1313,15 @@ def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
         if cands:
             keep_unames = _gate_creators_groq(cands, niche_ctx)[:follow_top]
             logger.info("[discover] seed=@%s related=%d gate_keep=%d", seed_handle, len(cands), len(keep_unames))
+        # El SEED es el creador relevante que el user eligió A MANO → SEGUIRLO SIEMPRE,
+        # el PRIMERO (aunque relatedProfiles venga vacío, p.ej. cuentas que IG no sugiere).
+        # Así el radar arranca con SUS reels reales del nicho en vez de caer al hashtag
+        # (que mete motivacional/spam fuera de nicho — el bug de @__davidalaya).
+        keep_unames = ([seed_handle] + [u for u in keep_unames if u != seed_handle])[:follow_top]
 
-    # 2. FALLBACK: si el seed da <3 creadores limpios, completar por HASHTAG.
-    if len(keep_unames) < 3:
+    # 2. FALLBACK: SOLO por hashtag si NO hay seed (el user saltó el paso). Con seed, el
+    #    propio seed ya garantiza ≥1 creador relevante → nunca metemos hashtag (= spam).
+    if not seed_handle and len(keep_unames) < 3:
         tags = []
         for s in (subniches or [])[:2]:
             t = re.sub(r"[^a-z0-9áéíóúñ]", "", (s or "").strip().lower())
