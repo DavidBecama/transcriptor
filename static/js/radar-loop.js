@@ -136,7 +136,7 @@
     ideas:[], guiones:[], activeGuionId:null, guiFilter:"all", _fillGuionIds:[],
     igConnected:false, metrics:null, metricSort:"recent", metricChart:"views",
     analyses:null, analyzeLoading:false, analyzeStep:"", analyzeErr:null, analyzeUrl:"",   // página «Analizar reel»
-    analyzeDetailId:null, analyzeStealing:false,   // ficha de detalle + robar guion
+    analyzeDetailId:null, analyzeStealing:false, analyzeRefreshing:false,   // ficha de detalle + robar guion + refrescar métricas
     tab:"dashboard",                    // dashboard | guiones | metrics | leaderboard | brain | settings | analizar
     view:"feed",                        // feed(overlay off) | gen | script | result | prompter | fillweek
     reel:null, genKind:"script", resultKind:"hooks", done:{},
@@ -5273,6 +5273,9 @@
     var stats=stat("v-views",IC.eye,a.views,"Views")+stat("v-likes",IC.heart,a.likes,"Likes")+
               stat("v-comments",IC.chat,a.comments,L("Comentarios","Comments"))+stat("v-shares",IC.repeat,a.shares,"Shares");
     var statsBlock=stats.trim()?'<div class="anzd-stats">'+stats+'</div>':'<div class="anzd-nostat">'+L("Sin métricas guardadas para este reel.","No metrics saved for this reel.")+'</div>';
+    // Refrescar métricas (solo IG): rellena/actualiza vía Apify. Abierto a todos los planes.
+    var refreshing=!!S.analyzeRefreshing;
+    var refreshBtn=(plat==="instagram")?'<button class="anzd-refresh" data-act="analyze-refresh-metrics" data-id="'+ESC(a.id)+'"'+(refreshing?' disabled':'')+'>'+(refreshing?'<span class="rs-ldr"></span> '+L("Actualizando…","Refreshing…"):'↻ '+L("Actualizar métricas","Refresh metrics"))+'</button>':'';
     var orig=a.url?'<a class="anzd-orig" href="'+ESC(a.url)+'" target="_blank" rel="noopener noreferrer">'+L("Ver original en "+platCap,"View original on "+platCap)+_ext+'</a>':'';
     var stealing=!!S.analyzeStealing;
     var wc=(a.text||"").trim().split(/\s+/).filter(Boolean).length;
@@ -5291,6 +5294,7 @@
               '<div class="anzd-thumb-date">'+L("Publicado ","Posted ")+_anzDate(a.created_at)+'</div></div>'+
           '</div>'+
           statsBlock+
+          refreshBtn+
           orig+
         '</aside>'+
         '<section class="anzd-main">'+
@@ -5307,8 +5311,22 @@
       '</div>'+
     '</div></div>';
   }
-  function analyzeView(id){ S.analyzeDetailId=id; S.analyzeStealing=false; render(); }
+  function analyzeView(id){ S.analyzeDetailId=id; S.analyzeStealing=false; S.analyzeRefreshing=false; render(); }
   function analyzeBack(){ S.analyzeDetailId=null; render(); }
+  function analyzeRefreshMetrics(id){
+    var a=_anzFind(id); if(!a || S.analyzeRefreshing) return;
+    if(isDemo()){ showToast(L("En demo no se actualizan métricas reales.","Demo: real metrics not refreshed.")); return; }
+    S.analyzeRefreshing=true; render();
+    apiPost("/transcriptions/"+encodeURIComponent(id)+"/refresh-metrics",{}).then(function(r){
+      S.analyzeRefreshing=false;
+      if(r.ok && r.d && r.d.metrics){
+        ["views","likes","comments","shares","published_at","metrics_updated_at"].forEach(function(k){ if(r.d.metrics[k]!=null) a[k]=r.d.metrics[k]; });
+        render(); showToast(L("Métricas actualizadas.","Metrics updated."));
+      } else {
+        render(); showError((r.d&&r.d.error)||L("No pude actualizar las métricas. Inténtalo en un momento.","Couldn't refresh metrics. Try again in a moment."));
+      }
+    });
+  }
   function analyzeSteal(id){
     var a=_anzFind(id); if(!a) return;
     if(S.analyzeStealing) return;
@@ -5891,6 +5909,7 @@
     if(act==="analyze-follow") return _followAuthor(btn.getAttribute("data-h"));
     if(act==="analyze-back") return analyzeBack();
     if(act==="analyze-steal") return analyzeSteal(btn.getAttribute("data-id"));
+    if(act==="analyze-refresh-metrics") return analyzeRefreshMetrics(btn.getAttribute("data-id"));
     if(act==="go-guiones") return _anzGoGuiones();
     // growth-2: onboarding de activación
     // onboarding v2 (7 pasos)

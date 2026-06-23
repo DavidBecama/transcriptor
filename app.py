@@ -1893,10 +1893,8 @@ def _is_metrics_plan(profile: dict) -> bool:
 @limiter.limit("30 per minute")
 def refresh_transcription_metrics(tid: int):
     user = current_user()
-    profile = get_profile(user["id"])
-    if not _is_metrics_plan(profile):
-        return jsonify({"error": "Las métricas son una feature de los planes de pago.",
-                        "upgrade_required": True}), 403
+    # Métricas abiertas a TODOS los planes (decisión Leo): el dato es info pública y el
+    # cooldown 30s + rate-limit ya frenan el abuso de llamadas Apify. (Antes capado.)
 
     # Cooldown 30s por (uid, tid) para evitar abuso — en Redis (compartido entre
     # workers; reserva atómica con SET NX EX). Fallback a memoria si Redis no está.
@@ -1949,10 +1947,8 @@ def refresh_transcription_metrics(tid: int):
 @limiter.limit("3 per hour")
 def refresh_transcription_metrics_bulk():
     user = current_user()
-    profile = get_profile(user["id"])
-    if not _is_metrics_plan(profile):
-        return jsonify({"error": "Las métricas son una feature de los planes de pago.",
-                        "upgrade_required": True}), 403
+    # Métricas abiertas a todos los planes (decisión Leo). El rate-limit (3/h) ya frena
+    # el abuso. (Antes capado a _is_metrics_plan.)
 
     # Selecciona hasta 50 más recientes (instagram only) cuyas métricas sean
     # NULL o tengan más de 24h.
