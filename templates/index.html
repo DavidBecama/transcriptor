@@ -9700,19 +9700,46 @@
     .rs .onbwait-d { font-size:15px; color:var(--text-secondary); margin-top:12px; line-height:1.55; }
     .rs .onbwait-sub { display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--text-tertiary); margin-top:22px; }
     @keyframes rsSpin { to { transform:rotate(360deg); } }
-    /* Animación «radar escaneando» (onboarding wait): núcleo + anillos que expanden + barrido cónico. */
-    .rs .onbw-radar { position:relative; width:150px; height:150px; margin-bottom:30px; display:flex; align-items:center; justify-content:center; }
-    .rs .onbw-core { position:relative; z-index:2; width:72px; height:72px; border-radius:22px; display:flex; align-items:center; justify-content:center;
-      background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); box-shadow:0 10px 34px rgba(47,91,255,.45); }
-    .rs .onbw-core svg { width:34px; height:34px; color:#fff; }
-    .rs .onbw-ring { position:absolute; top:50%; left:50%; width:72px; height:72px; border-radius:50%; transform:translate(-50%,-50%);
-      border:2px solid rgba(79,124,255,.5); opacity:0; animation:onbwPulse 2.4s ease-out infinite; }
-    .rs .onbw-ring.r2 { animation-delay:.8s; }
-    .rs .onbw-ring.r3 { animation-delay:1.6s; }
-    @keyframes onbwPulse { 0% { width:72px; height:72px; opacity:.65; } 100% { width:150px; height:150px; opacity:0; } }
-    .rs .onbw-sweep { position:absolute; top:50%; left:50%; width:150px; height:150px; transform:translate(-50%,-50%); border-radius:50%;
-      background:conic-gradient(from 0deg, transparent 0deg, rgba(79,124,255,.22) 45deg, transparent 90deg); animation:rsSpin 2.2s linear infinite; }
-    @media (prefers-reduced-motion: reduce) { .rs .onbw-ring, .rs .onbw-sweep { animation:none; } }
+    /* Animación «radar escaneando» (onboarding wait) — rediseño Claude design:
+       barrido cónico + blips de creadores + core flotante + tarjetas «encontrado»
+       + pasos rotando + barra de progreso. Colores vía variables (claro/oscuro). */
+    .rs .onbw-radar { position:relative; width:248px; height:248px; margin-bottom:34px; display:flex; align-items:center; justify-content:center; }
+    .rs .onbw-grid1 { position:absolute; inset:0; border-radius:50%; border:1px solid rgba(79,124,255,.14); }
+    .rs .onbw-grid2 { position:absolute; top:50%; left:50%; width:66%; height:66%; transform:translate(-50%,-50%); border-radius:50%; border:1px solid rgba(79,124,255,.12); }
+    .rs .onbw-grid3 { position:absolute; top:50%; left:50%; width:34%; height:34%; transform:translate(-50%,-50%); border-radius:50%; border:1px solid rgba(79,124,255,.1); }
+    .rs .onbw-sweep { position:absolute; inset:0; border-radius:50%; transform-origin:50% 50%; animation:radarSweep 2.4s linear infinite;
+      -webkit-mask:radial-gradient(circle, transparent 17%, #000 18%); mask:radial-gradient(circle, transparent 17%, #000 18%); }
+    .rs .onbw-fan { position:absolute; inset:0; border-radius:50%; background:conic-gradient(from 0deg, rgba(111,147,255,.45) 0deg, rgba(79,124,255,.16) 38deg, transparent 80deg); }
+    .rs .onbw-arm { position:absolute; top:50%; left:50%; width:50%; height:2px; transform-origin:0 50%; transform:translateY(-50%);
+      background:linear-gradient(90deg, rgba(111,147,255,.25), #8aa6ff); box-shadow:0 0 8px rgba(111,147,255,.7); }
+    .rs .onbw-blip { position:absolute; border-radius:99px; background:var(--brand-400); box-shadow:0 0 9px rgba(111,147,255,.9); animation:blipPop 2.6s ease-out infinite; }
+    .rs .onbw-core-wrap { position:relative; z-index:3; animation:coreFloat 3.2s ease-in-out infinite; }
+    .rs .onbw-core { width:76px; height:76px; border-radius:24px; display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(140deg,var(--brand-600),var(--brand-500)); animation:coreGlow 2.6s ease-in-out infinite; }
+    .rs .onbw-core svg { width:36px; height:36px; color:#fff; }
+    .rs .onbw-cards { position:relative; height:30px; width:100%; margin-bottom:6px; }
+    .rs .onbw-card { position:absolute; left:50%; transform:translateX(-50%); display:inline-flex; align-items:center; gap:7px; padding:5px 11px 5px 6px;
+      border-radius:99px; background:var(--surface-overlay); border:1px solid var(--border-default); font-size:12px; color:var(--text-secondary); white-space:nowrap; animation:cardIn 4.8s ease-in-out infinite; }
+    .rs .onbw-card.c2 { animation-delay:2.4s; }
+    .rs .onbw-card-ava { width:18px; height:18px; border-radius:99px; background:linear-gradient(135deg,var(--brand-400),var(--brand-600)); }
+    .rs .onbw-title { font-family:var(--font-display); font-weight:700; font-size:27px; color:var(--text-primary); letter-spacing:-.01em; }
+    .rs .onbw-steps { position:relative; height:24px; width:100%; margin-top:14px; }
+    .rs .onbw-step { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:9px; font-size:14px; color:var(--text-secondary); animation:stepFade 9s ease-in-out infinite; }
+    .rs .onbw-step.s2 { animation-delay:3s; }
+    .rs .onbw-step.s3 { animation-delay:6s; }
+    .rs .onbw-step i { width:6px; height:6px; border-radius:99px; background:var(--brand-500); flex:0 0 auto; }
+    .rs .onbw-step b { color:var(--text-primary); font-weight:600; }
+    .rs .onbw-prog { width:230px; height:5px; border-radius:99px; background:var(--border-default); overflow:hidden; margin-top:18px; }
+    .rs .onbw-prog-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--brand-600),var(--brand-400)); animation:barFill 55s linear forwards; }
+    .rs .onbw-hint { font-size:12.5px; color:var(--text-tertiary); margin-top:12px; }
+    @keyframes radarSweep { to { transform:rotate(360deg); } }
+    @keyframes blipPop { 0%{transform:scale(0);opacity:0;} 12%{transform:scale(1.35);opacity:1;} 30%{transform:scale(1);opacity:1;} 82%{opacity:1;} 100%{transform:scale(1);opacity:0;} }
+    @keyframes coreFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-5px);} }
+    @keyframes coreGlow { 0%,100%{box-shadow:0 14px 40px rgba(79,124,255,.35),0 0 0 0 rgba(79,124,255,.45);} 50%{box-shadow:0 18px 52px rgba(79,124,255,.55),0 0 0 14px rgba(79,124,255,0);} }
+    @keyframes cardIn { 0%{transform:translate(-50%,10px) scale(.9);opacity:0;} 6%{transform:translate(-50%,0) scale(1);opacity:1;} 40%{opacity:1;} 46%{transform:translate(-50%,-8px) scale(.96);opacity:0;} 100%{opacity:0;} }
+    @keyframes barFill { 0%{width:8%;} 100%{width:92%;} }
+    @keyframes stepFade { 0%{opacity:0;transform:translateY(6px);} 8%,30%{opacity:1;transform:translateY(0);} 38%,100%{opacity:0;transform:translateY(-6px);} }
+    @media (prefers-reduced-motion: reduce) { .rs .onbw-sweep, .rs .onbw-blip, .rs .onbw-core-wrap, .rs .onbw-core, .rs .onbw-card, .rs .onbw-step, .rs .onbw-prog-fill { animation:none; } }
     /* #8 PROACTIVIDAD — «Tu siguiente paso» (HAZ ESTO AHORA): tarjeta destacada con
        acento de marca, para que el usuario perdido sepa QUÉ hacer ya. */
     .rs .dns { display:flex; align-items:center; gap:18px; padding:20px 22px; margin:16px 0 18px; border-radius:20px;
@@ -10277,10 +10304,22 @@
     .rs .rs-lock--sm .rs-lock-over .btn { width:auto; }
     .rs .rs-skel { background:var(--surface-raised); border:1px solid var(--border-default); border-radius:18px; height:160px; animation: rsPulse 1.3s ease-in-out infinite; }
     @keyframes rsPulse { 0%,100%{opacity:.5;} 50%{opacity:.8;} }
-    /* Spinner de carga inicial (boot) — claro sobre el fondo oscuro para que no parezca pantalla vacía. */
-    .rs .rs-boot { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:60px 0 34px; }
-    .rs .rs-boot-spin { width:38px; height:38px; border-radius:99px; border:3px solid var(--border-default); border-top-color:var(--brand-500); animation:rsSpin .8s linear infinite; }
-    .rs .rs-boot-t { font-size:13px; color:var(--text-tertiary); letter-spacing:.02em; }
+    /* Carga inicial (boot) — orbe + anillo dibujándose + 3 puntos (rediseño Claude design). */
+    .rs .rs-boot { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; min-height:62vh; padding:40px 0; }
+    .rs .rs-boot-orb { position:relative; width:64px; height:64px; }
+    .rs .rs-boot-core { position:absolute; inset:0; border-radius:20px; display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(140deg,var(--brand-600),var(--brand-500)); box-shadow:0 12px 38px rgba(79,124,255,.4); animation:bootGlow 1.8s ease-in-out infinite; }
+    .rs .rs-boot-core svg { width:28px; height:28px; color:#fff; }
+    .rs .rs-boot-ring { position:absolute; inset:-12px; width:88px; height:88px; transform-origin:50% 50%; animation:bootDash 1.4s cubic-bezier(.5,0,.5,1) infinite; }
+    .rs .rs-boot-tt { display:flex; flex-direction:column; align-items:center; gap:12px; }
+    .rs .rs-boot-label { font-family:var(--font-display); font-weight:500; font-size:15px; color:var(--text-primary); letter-spacing:.01em; }
+    .rs .rs-boot-dots { display:flex; gap:5px; }
+    .rs .rs-boot-dots span { width:6px; height:6px; border-radius:99px; background:var(--brand-500); animation:dotPulse 1.2s ease-in-out infinite; }
+    .rs .rs-boot-dots span:nth-child(2){ animation-delay:.15s; }
+    .rs .rs-boot-dots span:nth-child(3){ animation-delay:.3s; }
+    @keyframes bootGlow { 0%,100%{opacity:.55;} 50%{opacity:1;} }
+    @keyframes bootDash { 0%{stroke-dashoffset:289;} 50%{stroke-dashoffset:75;transform:rotate(135deg);} 100%{stroke-dashoffset:289;transform:rotate(450deg);} }
+    @keyframes dotPulse { 0%,80%,100%{opacity:.25;transform:translateY(0);} 40%{opacity:1;transform:translateY(-4px);} }
 
     /* ══ v0.18.x "el despertar" — titular + oportunidad del día ══ */
     .rs .awaken { margin-bottom:22px; }
@@ -28049,6 +28088,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=103"></script>
+<script src="/static/js/radar-loop.js?v=104"></script>
 </body>
 </html>
