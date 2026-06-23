@@ -842,8 +842,10 @@ def transcribe_task(self, url, language, user_id, ip, is_paid=False, charge=None
         "thumbnail_b64": thumb_b64,
         "author_username": author_username,
     }
-    # v0.14.7: métricas solo para paid plans con datos Apify reales (Instagram).
-    if is_paid and apify_item and platform == "instagram":
+    # Métricas para TODOS los planes: el dato (views/likes/comments/shares) ya viene
+    # en el `apify_item` de la propia transcripción (Instagram) → guardarlo es gratis y
+    # es info pública = el núcleo del valor de «Analizar». (Antes capado a is_paid.)
+    if apify_item and platform == "instagram":
         insert_data.update(_extract_metrics(apify_item))
 
     db.table("transcriptions").insert(insert_data).execute()

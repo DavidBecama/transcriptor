@@ -194,7 +194,8 @@ PLANS = {
         # ya no una cata de por vida. Contadores: free_lifetime_uses=guiones del mes,
         # free_analysis_uses=análisis del mes (reset por free_month_reset_at).
         "free_scripts_monthly": 3,     # 3 "Hazlo mío"/mes (= 9 cr a 3 cr/guion)
-        "free_analysis_monthly": 3,    # 3 análisis (transcripciones)/mes
+        "free_analysis_monthly": 3,    # (legacy) — el límite real de análisis es SEMANAL ↓
+        "free_analysis_weekly": 3,     # 3 análisis (transcripciones) cada 7 días (ventana móvil, cuenta transcriptions)
         "monthly_uses": 0,             # → PLAN_LIMITS None (sin límite mensual; usa los free_*_monthly)
         "daily_free": 0,
         "scripts_max": 5,
@@ -1109,9 +1110,25 @@ def free_lifetime_left(profile: dict) -> int:
 
 
 def free_analysis_left(profile: dict) -> int:
-    """Análisis (transcripciones) gratis que le quedan ESTE MES a un free (post-trial)."""
+    """(Legacy mensual — conservado por compat; el límite real es semanal ↓.)"""
     cap = PLANS["free"]["free_analysis_monthly"]
     return max(0, cap - _free_month_used(profile, "free_analysis_uses"))
+
+
+def free_analysis_left_week(user_id: str) -> int:
+    """Análisis (transcripciones) gratis que le quedan a un free en los ÚLTIMOS 7 DÍAS.
+    Ventana MÓVIL contada directamente de la tabla `transcriptions` (no usa contador):
+    decoplado de los guiones gratis (que siguen mensuales) y solo cuentan los análisis
+    que de verdad se completaron (la task inserta la fila solo al terminar)."""
+    cap = PLANS["free"].get("free_analysis_weekly", 3)
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        r = (db.table("transcriptions").select("id", count="exact")
+               .eq("user_id", user_id).gte("created_at", since).limit(1).execute())
+        used = r.count or 0
+    except Exception:
+        used = 0
+    return max(0, cap - used)
 
 
 # ── Download / transcription helpers ─────────────────────────────────────────
@@ -1468,9 +1485,9 @@ def auth_me():
         "free_lifetime_limit": PLANS["free"]["free_scripts_monthly"],
         "free_lifetime_used": _free_month_used(profile, "free_lifetime_uses"),
         "free_lifetime_left": free_lifetime_left(profile),
-        "free_analysis_limit": PLANS["free"]["free_analysis_monthly"],
-        "free_analysis_used": _free_month_used(profile, "free_analysis_uses"),
-        "free_analysis_left": free_analysis_left(profile),
+        "free_analysis_limit": PLANS["free"].get("free_analysis_weekly", 3),
+        "free_analysis_used": max(0, PLANS["free"].get("free_analysis_weekly", 3) - free_analysis_left_week(profile["id"])),
+        "free_analysis_left": free_analysis_left_week(profile["id"]),
         "avatar_seed": profile.get("avatar_seed", "default"),
         "has_stripe_sub": bool(profile.get("stripe_subscription_id")),
         # A1: tono preset (personalidad del 1er guion sin voz) + opciones + si hay voz.
@@ -1595,8 +1612,8 @@ def transcribe():
             ok, err_msg = check_monthly_limit(profile)
             if not ok:
                 return jsonify({"error": err_msg}), 429
-        elif free_analysis_left(profile) > 0:
-            # FREE mensual (reverse-trial): 3 análisis/mes (reset por free_month_reset_at).
+        elif free_analysis_left_week(user["id"]) > 0:
+            # FREE: 3 análisis cada 7 días (ventana móvil, cuenta transcriptions).
             pass
         elif profile["credits_cents"] >= 2 * COST_CENTS:
             pass
@@ -1609,7 +1626,7 @@ def transcribe():
                 "after_first_value": True,
             })
             return jsonify({
-                "error": "Has usado tus 3 análisis gratis de este mes. Sube a Creador para seguir "
+                "error": "Has usado tus 3 análisis gratis de esta semana. Sube a Creador para seguir "
                          "analizando — o recarga créditos sin cambiar de plan."
             }), 402
 
@@ -1635,10 +1652,11 @@ def transcribe():
                     "monthly_usage": (fresh.get("monthly_usage") or 0) + 1
                 }).eq("id", user["id"]).execute()
                 charge = {"kind": "monthly"}
-            elif free_analysis_left(fresh) > 0:
-                # FREE mensual: consumir 1 análisis del mes (reset+incremento bajo lock).
-                _free_month_consume(user["id"], fresh, "free_analysis_uses")
-                charge = {"kind": "free_analysis"}
+            elif free_analysis_left_week(user["id"]) > 0:
+                # FREE semanal: NO hay contador que tocar — la propia fila de
+                # `transcriptions` (insertada por la task al terminar) ES el registro.
+                # Nada que reembolsar si falla (no se inserta fila). charge=None.
+                charge = None
             elif (fresh.get("credits_cents") or 0) >= 2 * COST_CENTS:
                 cost_cents = 2 * COST_CENTS
                 db.table("profiles").update(
@@ -1648,7 +1666,7 @@ def transcribe():
             else:
                 # Carrera: cupo/saldo agotado entre el check y el lock.
                 return jsonify({
-                    "error": "Has usado tus 3 análisis gratis de este mes. Sube a Creador para seguir "
+                    "error": "Has usado tus 3 análisis gratis de esta semana. Sube a Creador para seguir "
                              "analizando — o recarga créditos sin cambiar de plan."
                 }), 402
         finally:
