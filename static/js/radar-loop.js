@@ -706,7 +706,7 @@
       onbBackBtn()+
       '<div class="onbc-ava-wrap">'+
         '<span class="onbc-ava-fb">'+ESC(initialsOf(h))+'</span>'+
-        '<img class="onbc-ava" src="https://unavatar.io/instagram/'+encodeURIComponent(h)+'?fallback=false" alt="" referrerpolicy="no-referrer" loading="eager" onload="this.classList.add(\'on\')" onerror="this.remove()"/>'+
+        (S.onb.avatar?'<img class="onbc-ava on" src="'+ESC(S.onb.avatar)+'" alt=""/>':'')+
         '<span class="onbc-badge">'+IC.ig+'</span>'+
       '</div>'+
       '<h2 class="onb-h">'+L("¿Eres tú, @"+ESC(h)+"?","Is this you, @"+ESC(h)+"?")+'</h2>'+
@@ -751,6 +751,9 @@
     // plano, para que al acabar el onboarding + house tour el user tenga sus métricas.
     // Una sola vez por onboarding (volver/avanzar no re-dispara).
     if(!isDemo() && !S.onb._igConnected){ S.onb._igConnected=true; onbConnectIG(h); }
+    // FOTO de perfil (David/Bernat): petición Apify YA en el paso del handle → la miniatura
+    // aparece en «este eres tú» y en la carga. unavatar.io daba 403 (rate-limit free).
+    if(!isDemo() && !S.onb._avatarReq){ S.onb._avatarReq=true; onbFetchAvatar(h); }
     onbNext();
   }
   // Conecta el Instagram del usuario y lanza el análisis de su perfil en SEGUNDO PLANO.
@@ -764,6 +767,15 @@
     post("/metrics/ig-profile", pid?{username:h,project_id:pid}:{username:h})
       .then(function(){ post("/metrics/analyze", pid?{project_id:pid}:{}).catch(function(){}); })
       .catch(function(){});
+  }
+  // Trae la FOTO de perfil de IG (base64 vía Apify, endpoint /api/onboarding/ig-avatar) y
+  // la guarda en S.onb.avatar → la usan «este eres tú» y la carga. Best-effort (si falla,
+  // se queda en iniciales). Tarda ~5-15s (scrape Apify), así que llega async y re-renderiza.
+  function onbFetchAvatar(h){
+    if(isDemo() || !h) return;
+    apiGet("/api/onboarding/ig-avatar?handle="+encodeURIComponent(h)).then(function(r){
+      if(r && r.ok && r.d && r.d.avatar){ S.onb.avatar=r.d.avatar; render(); }
+    });
   }
   function onbPickNiche(n){
     var ni=document.getElementById("rsOnbNiche"); if(ni) ni.value="";
@@ -894,7 +906,7 @@
     var meH=(S.onb&&S.onb.handle)?String(S.onb.handle).replace(/^@+/,""):"";
     var meBlock = meH ? ('<div class="onbw-me">'+
       '<span class="onbw-me-ava"><span class="onbw-me-fb">'+ESC(initialsOf(meH))+'</span>'+
-        '<img class="onbw-me-img" src="https://unavatar.io/instagram/'+encodeURIComponent(meH)+'?fallback=false" alt="" referrerpolicy="no-referrer" loading="eager" onload="this.classList.add(\'on\')" onerror="this.remove()"/>'+
+        (S.onb.avatar?'<img class="onbw-me-img on" src="'+ESC(S.onb.avatar)+'" alt=""/>':'')+
         '<span class="onbw-me-pulse"></span></span>'+
       '<span class="onbw-me-txt"><b>'+L("Analizando tu perfil","Analyzing your profile")+'</b> · @'+ESC(meH)+'<span class="onbw-me-sub">'+L("aprendiendo cómo hablas para clavar tu voz","learning how you talk to nail your voice")+'</span></span>'+
     '</div>') : '';

@@ -7378,6 +7378,49 @@ def _scrape_ig_reels(username_or_urls: list[str], limit: int = 10) -> list[dict]
     return results
 
 
+@app.route("/api/onboarding/ig-avatar", methods=["GET"])
+@require_auth
+@limiter.limit("12 per minute")
+def onboarding_ig_avatar():
+    """Foto de perfil de IG del usuario para el paso «este eres tú» del onboarding
+    (David/Bernat 24-jun). Scrapea el perfil con Apify (resultsType=details, 1 item),
+    baja la foto a base64 (evita CORS/caducidad del CDN de IG). Best-effort: si Apify
+    falla o el perfil es privado → avatar=None y el front cae a las iniciales."""
+    handle = (request.args.get("handle") or "").strip().lstrip("@").lower()
+    if not re.match(r"^[a-z0-9._]{1,30}$", handle):
+        return jsonify({"avatar": None, "error": "bad_handle"}), 400
+    token = os.environ.get("APIFY_TOKEN", "")
+    if not token:
+        return jsonify({"avatar": None}), 200
+    try:
+        actor_url = ("https://api.apify.com/v2/acts/apify~instagram-scraper"
+                     "/run-sync-get-dataset-items?token=" + token + "&memory=256")
+        resp = requests.post(actor_url, json={
+            "directUrls": ["https://www.instagram.com/" + handle + "/"],
+            "resultsType": "details", "resultsLimit": 1,
+        }, timeout=45)
+        resp.raise_for_status()
+        items = resp.json() or []
+        item = items[0] if items else {}
+        pic = (item.get("profilePicUrlHD") or item.get("profilePicUrl")
+               or item.get("profile_pic_url_hd") or item.get("profile_pic_url"))
+        b64 = None
+        if pic:
+            try:
+                from tasks import _download_thumbnail_b64  # lazy (rompe circular)
+                b64 = _download_thumbnail_b64(pic)
+            except Exception as e:
+                logger.warning("ig-avatar: b64 fetch failed handle=%s err=%s", handle, e)
+        return jsonify({
+            "avatar": b64,
+            "full_name": item.get("fullName") or item.get("full_name"),
+            "followers": item.get("followersCount") or item.get("followers_count"),
+        }), 200
+    except Exception as e:
+        logger.warning("onboarding_ig_avatar failed handle=%s err=%s", handle, e)
+        return jsonify({"avatar": None}), 200
+
+
 @app.route("/metrics/ig-profile", methods=["POST"])
 @require_auth
 @limiter.limit("5 per minute")
