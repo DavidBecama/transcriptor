@@ -443,7 +443,7 @@
      contenido ingerido + el objetivo (STYLE_PROMPTS/PRESET_TONES intactos en
      backend + selector en Cerebro). Pantalla dedicada que oculta el radar vacío.
      Demo-funcional vía ?onb=1. ════════════════════════════════════════════════ */
-  var ONB_STEPS=["handle","niche","subniche","seed","goal","close"];   // «seed» = el user añade UNA cuenta de su nicho a mano → scrapeamos sus relatedProfiles (grafo de IG) para sacar competidores+reels acertados. La cuenta PROPIA (handle) se scrapea solo para métricas. («value» y «competitors» viejos retirados.)
+  var ONB_STEPS=["handle","confirm","niche","subniche","seed","goal","close"];   // «confirm» (David 24-jun) = «este eres tú» con tu foto de IG → confianza + sensación de análisis personal. «seed» = el user añade UNA cuenta de su nicho a mano → scrapeamos sus relatedProfiles. La cuenta PROPIA (handle) se scrapea solo para métricas.
   function nicheChips(){ return rsLang()==="en"
     ? ["Fitness","Finance","Marketing","Cooking","Fashion","Beauty","Travel","Tech","Education","Real estate","Health","Business"]
     : ["Fitness","Finanzas","Marketing","Cocina","Moda","Belleza","Viajes","Tecnología","Educación","Inmobiliaria","Salud","Negocios"]; }
@@ -696,8 +696,29 @@
       '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-finish"'+(S.onb.busy?' disabled':'')+'>'+(S.onb.busy?'<span class="mini-spin"></span> '+L("Preparando…","Preparing…"):IC.bolt+' '+L("Abrir mi primer guion","Open my first script"))+'</button>'+
     '</section>';
   }
+  // «Este eres tú» (David 24-jun): tras poner el @, confirmamos con su FOTO de perfil
+  // real de IG (vía unavatar.io, sin Apify; fallback a iniciales si falla/privado) →
+  // confianza + sensación de "te estoy analizando a TI". Su perfil ya se está
+  // scrapeando en 2º plano (onbConnectIG disparado en el paso handle).
+  function onbConfirmHTML(){
+    var h=(S.onb.handle||"").replace(/^@+/,"");
+    return '<section class="onb-step onb-confirm">'+
+      onbBackBtn()+
+      '<div class="onbc-ava-wrap">'+
+        '<span class="onbc-ava-fb">'+ESC(initialsOf(h))+'</span>'+
+        '<img class="onbc-ava" src="https://unavatar.io/instagram/'+encodeURIComponent(h)+'?fallback=false" alt="" referrerpolicy="no-referrer" loading="eager" onload="this.classList.add(\'on\')" onerror="this.remove()"/>'+
+        '<span class="onbc-badge">'+IC.ig+'</span>'+
+      '</div>'+
+      '<h2 class="onb-h">'+L("¿Eres tú, @"+ESC(h)+"?","Is this you, @"+ESC(h)+"?")+'</h2>'+
+      '<p class="onb-sub">'+L("Voy a analizar TU cuenta para que el Cerebro aprenda cómo hablas y clave tu voz en cada guion.","I'll analyze YOUR account so the Brain learns how you talk and nails your voice in every script.")+'</p>'+
+      onbErr()+
+      '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-confirm-yes">'+IC.check+' '+L("Sí, soy yo","Yes, that's me")+'</button>'+
+      '<button class="onb-skip" data-act="onb-confirm-edit">'+L("No, cambiar mi usuario","No, change my handle")+'</button>'+
+    '</section>';
+  }
   function onbStepHTML(){
     switch(S.onb.step){
+      case "confirm": return onbConfirmHTML();
       case "niche": return onbNicheHTML();
       case "subniche": return onbSubnicheHTML();
       case "seed": return onbSeedHTML();
@@ -6221,6 +6242,8 @@
     // growth-2: onboarding de activación
     // onboarding v2 (7 pasos)
     if(act==="onb-handle-next") return onbHandleNext();
+    if(act==="onb-confirm-yes") return onbNext();        // «este eres tú» → seguir
+    if(act==="onb-confirm-edit") return onbGoto("handle");   // cambiar el @
     if(act==="onb-pick-niche") return onbPickNiche(btn.getAttribute("data-k"));
     if(act==="onb-niche-next") return onbNicheNext();
     if(act==="onb-tag-toggle") return onbTagToggle(btn.getAttribute("data-k"));
