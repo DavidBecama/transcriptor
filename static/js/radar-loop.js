@@ -872,7 +872,9 @@
       '<div class="onbw-steps">'+
         '<div class="onbw-step s1"><i></i>'+step1+'</div>'+
         '<div class="onbw-step s2"><i></i>'+L("Buscando creadores afines de tu nicho","Finding similar creators in your niche")+'</div>'+
-        '<div class="onbw-step s3"><i></i>'+L("Trayéndote sus reels más acertados","Pulling their most on-point reels")+'</div>'+
+        '<div class="onbw-step s3"><i></i>'+L("Detectando tendencias de tu nicho","Detecting your niche's trends")+'</div>'+
+        '<div class="onbw-step s4"><i></i>'+L("Midiendo qué ganchos retienen más","Measuring which hooks retain best")+'</div>'+
+        '<div class="onbw-step s5"><i></i>'+L("Trayéndote sus reels más acertados","Pulling their most on-point reels")+'</div>'+
       '</div>'+
       '<div class="onbw-prog" aria-hidden="true"><div class="onbw-prog-fill"></div></div>'+
       '<div class="onbw-hint">'+L("Suele tardar menos de un minuto…","Usually under a minute…")+'</div>'+
@@ -927,8 +929,14 @@
       S.onb.skipped=true; S.user.onbV2Done=true;
       try{ var b=brand(); if(b){ b.voice=Math.max(b.voice||0,50); b.level=Math.max(b.level||1,2); } }catch(e){}
       if(typeof seedDemoContent==="function" && !(S.reels||[]).length){ try{ seedDemoContent(); }catch(e){} }
-      S.tab="dashboard"; render(); onbStartTour();
-      showToast(L("Cerebro al 35% · tu primer guión está listo. Róbalo →","Brain at 35% · your first script is ready. Steal it →"));
+      // Mostrar la animación de carga del radar ~4.8s (en demo no hay scrape real) ANTES de
+      // aterrizar en el dashboard sembrado → la demo enseña la carga post-onboarding (antes
+      // saltaba directo y se sentía abrupto/roto).
+      var _seeded=S.reels; S.reels=[]; S.radarSeed=false; S._onbWaiting=true; S.tab="dashboard"; render();
+      setTimeout(function(){
+        S._onbWaiting=false; if(_seeded&&_seeded.length) S.reels=_seeded; render(); onbStartTour();
+        showToast(L("Cerebro al 35% · tu primer guión está listo. Róbalo →","Brain at 35% · your first script is ready. Steal it →"));
+      }, 4800);
       return;
     }
     S.onb.busy=true; render();
