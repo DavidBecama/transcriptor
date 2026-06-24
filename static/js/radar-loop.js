@@ -404,8 +404,10 @@
       return '<button class="brain-cmd brain-cmd-up" data-act="brain-levelup" title="'+L("Tu Cerebro tiene un nivel listo — recógelo","Your Brain has a level ready — claim it")+'">'+
         '<span class="bcm-ic">'+IC.brain+'</span><span class="bcm-up">'+L("¡Subir de nivel el cerebro!","Level up your brain!")+'</span></button>';
     }
-    return '<button class="brain-cmd" data-act="tab" data-k="brain" title="'+L("Tu Cerebro — cuanto más creas, más tuyo suena","Your Brain — the more you create, the more it sounds like you")+'">'+
-      '<span class="bcm-ic">'+IC.brain+'</span><span class="bcm-t">'+L("Cerebro","Brain")+'</span> <b>Nv '+lv.level+'</b></button>';
+    var lvlTxt=lv.level>=1?('Nv '+lv.level):L("nuevo","new");
+    var pctTxt=lv.full?'':' · '+lv.pct+'%';
+    return '<button class="brain-cmd" data-act="tab" data-k="brain" title="'+L("Tu Cerebro — aliméntalo cada día para subir de nivel","Your Brain — feed it daily to level up")+'">'+
+      '<span class="bcm-ic">'+IC.brain+'</span><span class="bcm-t">'+L("Cerebro","Brain")+'</span> <b>'+lvlTxt+'</b>'+pctTxt+'</button>';
   }
   function brainBadgeHTML(){
     var lv=brainLevel();
@@ -1161,32 +1163,49 @@
      «Crear guion». Usa brainLevel() (señales reales) — no inventa el nivel. */
   function radarCerebroRowHTML(){
     var bl=brainLevel();
-    // Nivel pendiente de recoger → la fila se vuelve un CTA de subida (manual).
+    var lvlTxt=bl.level>=1?(L("nivel ","level ")+bl.level):L("nuevo","new");
+    // Nivel máximo (Viral): barra fija al 100%, sin CTA de subida.
+    if(bl.full){
+      return '<div class="rcb">'+
+        '<div class="rcb-ic">'+IC.brain+'</div>'+
+        '<div class="rcb-body">'+
+          '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · ","Your brain · ")+lvlTxt+'</span>'+
+            '<span class="rcb-prog">'+ESC(ecoLevelName(5))+' · '+L("máximo","max")+'</span></div>'+
+          '<div class="rcb-desc">'+L("Tu Cerebro está al máximo: clava tu voz y juega para viralizar. Sigue alimentándolo para mantenerlo afilado.","Your Brain is maxed: it nails your voice. Keep feeding it to stay sharp.")+'</div>'+
+          '<div class="rcb-xp"><div class="rcb-xp-fill" style="width:100%"></div></div>'+
+        '</div>'+
+        '<button class="btn btn-md btn-secondary" data-act="tab" data-k="brain">'+IC.brain+' '+L("Ver Cerebro","See Brain")+'</button>'+
+      '</div>';
+    }
+    // Barra del nivel al 100% → CTA de subida (manual).
     if(bl.canLevelUp){
-      var segsF=''; for(var j=0;j<4;j++){ segsF+='<span class="rcb-seg on"></span>'; }
       return '<div class="rcb rcb-up">'+
         '<div class="rcb-ic">'+IC.brain+'</div>'+
         '<div class="rcb-body">'+
-          '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · nivel "+bl.level,"Your brain · level "+bl.level)+'</span>'+
-            '<span class="rcb-prog">'+L("¡Nivel "+bl.earned+" listo!","Level "+bl.earned+" ready!")+'</span></div>'+
-          '<div class="rcb-desc">'+L("Has cumplido lo necesario para el <b>Nivel "+bl.earned+"</b>. Recógelo para que el Cerebro afine aún más tu voz.","You've met everything for <b>Level "+bl.earned+"</b>. Claim it so the Brain tunes your voice even more.")+'</div>'+
-          '<div class="rcb-bars">'+segsF+'</div>'+
+          '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · ","Your brain · ")+lvlTxt+'</span>'+
+            '<span class="rcb-prog">'+L("¡Barra al 100%!","Bar at 100%!")+'</span></div>'+
+          '<div class="rcb-desc">'+L("Tu Cerebro está listo para subir a <b>"+ESC(ecoLevelName(bl.next))+"</b>. Recoge el nivel y mira la animación.","Your Brain is ready to reach <b>"+ESC(ecoLevelName(bl.next))+"</b>. Claim it and watch the animation.")+'</div>'+
+          '<div class="rcb-xp"><div class="rcb-xp-fill" style="width:100%"></div></div>'+
         '</div>'+
         '<button class="btn btn-md btn-primary" data-act="brain-levelup">'+IC.brain+' '+L("¡Subir de nivel!","Level up!")+'</button>'+
       '</div>';
     }
-    var g=Math.min(4,(bl.signals&&bl.signals.guiones)||0);
-    var nx=bl.next||bl.level;
-    var segs=''; for(var i=0;i<4;i++){ segs+='<span class="rcb-seg'+(i<g?' on':'')+'"></span>'; }
+    // En curso: barra continua (hitos + ejercicio diario) hacia el siguiente nivel.
+    var nx=bl.next;
+    var cta = bl.exReady
+      ? '<button class="btn btn-md btn-primary" data-act="tab" data-k="brain">'+IC.bolt+' '+L("Alimentar +"+BRAIN_DAILY_GAIN+"%","Feed +"+BRAIN_DAILY_GAIN+"%")+'</button>'
+      : '<button class="btn btn-md btn-secondary" data-act="tab" data-k="brain">'+IC.brain+' '+L("Ver Cerebro","See Brain")+'</button>';
     return '<div class="rcb">'+
       '<div class="rcb-ic">'+IC.brain+'</div>'+
       '<div class="rcb-body">'+
-        '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · nivel "+bl.level,"Your brain · level "+bl.level)+'</span>'+
-          '<span class="rcb-prog">'+g+'/4 '+L("guiones para N"+nx,"scripts to L"+nx)+'</span></div>'+
-        '<div class="rcb-desc">'+L("Cada guion que creas afina tu voz: el Cerebro clava mejor tu tono. Crea 4 para subir a <b>Nivel "+nx+"</b>.","Every script you make tunes your voice: the Brain nails your tone better. Make 4 to reach <b>Level "+nx+"</b>.")+'</div>'+
-        '<div class="rcb-bars">'+segs+'</div>'+
+        '<div class="rcb-top"><span class="rcb-lvl">'+L("Tu cerebro · ","Your brain · ")+lvlTxt+'</span>'+
+          '<span class="rcb-prog">'+bl.pct+'% '+L("a "+ESC(ecoLevelName(nx)),"to "+ESC(ecoLevelName(nx)))+'</span></div>'+
+        '<div class="rcb-desc">'+(bl.exReady
+            ? L("Aliméntalo hoy (+"+BRAIN_DAILY_GAIN+"%) — cada día sube hacia <b>"+ESC(ecoLevelName(nx))+"</b> y clava mejor tu tono.","Feed it today (+"+BRAIN_DAILY_GAIN+"%) — every day it climbs toward <b>"+ESC(ecoLevelName(nx))+"</b>.")
+            : L("Ya lo alimentaste hoy. Vuelve en "+brainExNextHrs()+"h para sumar otro +"+BRAIN_DAILY_GAIN+"% hacia <b>"+ESC(ecoLevelName(nx))+"</b>.","Fed today. Back in "+brainExNextHrs()+"h for another +"+BRAIN_DAILY_GAIN+"% toward <b>"+ESC(ecoLevelName(nx))+"</b>."))+'</div>'+
+        '<div class="rcb-xp"><div class="rcb-xp-fill" style="width:'+Math.max(3,bl.pct)+'%"></div></div>'+
       '</div>'+
-      '<button class="btn btn-md btn-secondary" data-act="tab" data-k="guiones">'+IC.plus+' '+L("Crear guion","Create script")+'</button>'+
+      cta+
     '</div>';
   }
   function filtersHTML(){
@@ -1589,12 +1608,11 @@
     // B2: el nivel del Cerebro, visible en el Radar y clicable (lleva al Cerebro,
     // donde está la checklist completa). Derivado de señales reales (brainLevel).
     var lv=brainLevel();
-    var lvDetail=lv.next
-      ? ('falta'+(lv.missing.length>1?'n':'')+' '+lv.missing.length+' para N'+lv.next)
-      : 'al máximo';
+    var lvNum=lv.level>=1?String(lv.level):"—";
+    var lvDetail=lv.full ? 'al máximo' : (lv.canLevelUp ? '¡listo, súbelo!' : (lv.pct+'% a N'+lv.next));
     var brainCell='<div class="stat stat-link" data-act="tab" data-k="brain" role="button" tabindex="0" '+
-      'title="Abrir el Cerebro" aria-label="Cerebro: nivel '+lv.level+', '+ESC(lvDetail)+'">'+
-      '<div class="stat-k">Cerebro</div><div class="stat-v">Nivel '+lv.level+'</div>'+
+      'title="Abrir el Cerebro" aria-label="Cerebro: nivel '+lvNum+', '+ESC(lvDetail)+'">'+
+      '<div class="stat-k">Cerebro</div><div class="stat-v">'+(lv.level>=1?('Nivel '+lv.level):L("Nuevo","New"))+'</div>'+
       '<div class="stat-d acc">'+ESC(lvDetail)+'</div></div>';
     return '<div class="statbar">'+stats.map(function(s){
       return '<div class="stat"><div class="stat-k">'+ESC(s[0])+'</div><div class="stat-v">'+ESC(s[1])+'</div>'+(s[2]?'<div class="stat-d '+s[3]+'">'+ESC(s[2])+'</div>':'')+'</div>';
@@ -2698,86 +2716,99 @@
     var nPub=metricVideos().length;
     return {voice:voicePct, comps:nComps, guiones:nGuiones, pub:nPub};
   }
-  // Nivel RECLAMADO (subir de nivel ahora es MANUAL, no automático): persiste por
-  // usuario/marca en localStorage. La primera vez adopta el nivel ganado para que
-  // los usuarios existentes no vean un botón de "re-subir" a donde ya estaban.
-  function brainClaimedKey(){ return "rs_brain_claimed_"+((S.user&&S.user.email)||"x")+"|"+(S.brandId||""); }
+  /* ── XP del Cerebro (modelo 2026-06-24, pedido por Leo) ──────────────────────
+     Cada nivel tiene su PROPIA barra 0→100%. Al 100% → botón ¡Subir de nivel! +
+     animación → la barra se REINICIA a 0 para el siguiente nivel. Hasta N4→N5; al
+     reclamar N5 se queda a 100% (máximo). El % = HITOS (acciones puntuales, derivadas
+     de señales reales) + EJERCICIO DIARIO acumulado (botón «Alimentar», CD 24h, +5%).
+     Niveles reclamables: 1 Aprendiz · 2 Imitador · 3 Ladrón · 4 Estratega · 5 Viral.
+     Empiezas en 0 (Cerebro nuevo); el TUTORIAL llena la barra de N1 → primer subir. */
+  var BRAIN_DAILY_GAIN=5;   // % por ejercicio diario (botón Alimentar, CD 24h)
+  // Claves v2 (reinician el modelo viejo): nivel reclamado, XP diario, ts del último ejercicio.
+  function _brainKey(suf){ return "rs_brain_"+suf+"_"+((S.user&&S.user.email)||"x")+"|"+(S.brandId||""); }
   function brainClaimedGet(){
-    // DEMO: nivel reclamado en sesión (no localStorage) y arranca en 1 → siempre hay
-    // nivel pendiente para PREVISUALIZAR el botón ¡Subir de nivel! y su animación.
-    // Al recargar vuelve a 1; subes uno a uno hasta el ganado y luego ves el chip normal.
-    if(isDemo()) return S._demoClaimed!=null?S._demoClaimed:1;
-    try{ var v=localStorage.getItem(brainClaimedKey()); return v!=null?parseInt(v,10):null; }catch(e){ return null; }
+    if(isDemo()) return S._demoClaimed!=null?S._demoClaimed:0;   // demo arranca en 0 → previsualizar desde N1
+    try{ var v=localStorage.getItem(_brainKey("clv2")); return v!=null?parseInt(v,10):0; }catch(e){ return 0; }
   }
-  function brainClaimedSet(n){
-    if(isDemo()){ S._demoClaimed=n; return; }
-    try{ localStorage.setItem(brainClaimedKey(),String(n)); }catch(e){}
+  function brainClaimedSet(n){ if(isDemo()){ S._demoClaimed=n; return; } try{ localStorage.setItem(_brainKey("clv2"),String(n)); }catch(e){} }
+  function brainDailyXpGet(){ if(isDemo()) return S._demoDailyXp||0; try{ var v=localStorage.getItem(_brainKey("xpv2")); return v!=null?parseInt(v,10):0; }catch(e){ return 0; } }
+  function brainDailyXpSet(n){ n=Math.max(0,n); if(isDemo()){ S._demoDailyXp=n; return; } try{ localStorage.setItem(_brainKey("xpv2"),String(n)); }catch(e){} }
+  function brainExTsGet(){ if(isDemo()) return 0; try{ return parseInt(localStorage.getItem(_brainKey("extsv2"))||"0",10)||0; }catch(e){ return 0; } }
+  function brainExTsSet(t){ if(isDemo()) return; try{ localStorage.setItem(_brainKey("extsv2"),String(t)); }catch(e){} }
+  // CD de 24h. En DEMO no hay CD → puedes pulsar Alimentar repetidamente y ver la barra subir.
+  function brainExReady(){ if(isDemo()) return true; return (Date.now()-brainExTsGet())>=24*3600*1000; }
+  function brainExNextHrs(){ var ms=24*3600*1000-(Date.now()-brainExTsGet()); return Math.max(1,Math.ceil(ms/3600000)); }
+  // Suma el ejercicio diario a la barra del nivel actual (respeta el CD). Devuelve true si sumó.
+  function brainAddDailyXp(){
+    if(!brainExReady()) return false;
+    brainDailyXpSet(brainDailyXpGet()+BRAIN_DAILY_GAIN);
+    if(!isDemo()) brainExTsSet(Date.now());
+    return true;
+  }
+  // HITOS por nivel: el % NO-diario de la barra del nivel que estás completando (next=claimed+1).
+  function brainMilestonePct(claimed, s){
+    var n=claimed+1;   // nivel que estás llenando
+    if(n===1) return (isDemo() || (S.user&&S.user.onbV2Done)) ? 100 : 0;   // N1: acabar el tutorial = 100%
+    if(n===2){
+      if(isDemo()) return 75;   // demo: hitos casi hechos → 5 «Alimentar» para previsualizar la subida
+      var m=Math.min(s.guiones,4)*12.5;   // 4 guiones = 50% (12,5% c/u)
+      if(s.voice>=30) m+=25;              // voz ≥30% = 25%
+      return Math.min(75, m);             // tope hitos 75% → el 25% final SIEMPRE es ejercicio diario
+    }
+    return isDemo()?75:0;   // N3..N5: de momento SOLO ejercicio diario (demo arranca al 75% para previsualizar)
   }
   function brainLevel(){
     var s=brainSignals();
-    var REQS={
-      2:[ {ok:s.voice>0,    label:"Entrena tu voz",                                   cta:{t:"Entrenar mi voz", act:"voice-focus"}},
-          {ok:s.comps>=1,   label:"Sigue a 1 competidor",                             cta:{t:"Añadir competidor", act:"add-comp"}} ],
-      3:[ {ok:s.guiones>=4, label:"Crea 4 guiones ("+Math.min(4,s.guiones)+"/4)",     cta:{t:"Robar un guion del radar", act:"tab", k:"dashboard"}},
-          {ok:s.voice>=50,  label:"Voz al 50% (vas al "+s.voice+"%)",                 cta:{t:"Refinar mi voz", act:"voice-refine"}} ],
-      4:[ {ok:s.pub>=1,     label:"Publica en Instagram — lo detecto al analizar tu perfil",  cta:{t:"Analizar mi perfil ahora · 10 cr", act:"force-scrape"}} ],
-      5:[ {ok:s.pub>=5,     label:"5 publicados con métricas ("+Math.min(5,s.pub)+"/5)", cta:{t:"Vincular mis reels", act:"tab", k:"metrics"}},
-          {ok:s.voice>=75,  label:"Voz al 75% (vas al "+s.voice+"%)",                 cta:{t:"Refinar mi voz", act:"voice-refine"}} ]
-    };
-    var earned=1;
-    for(var n=2;n<=5;n++){ if(REQS[n].every(function(r){return r.ok;})) earned=n; else break; }
-    // DEMO: forzamos nivel ganado al máximo para PREVISUALIZAR la subida — así, con el
-    // reclamado arrancando en 1, siempre hay botón y se recorren las 5 pantallas. (En
-    // prod el nivel ganado es el real de las señales.)
-    if(isDemo()) earned=5;
-    // Nivel mostrado = el RECLAMADO (≤ ganado). Si ganado > reclamado → hay nivel pendiente
-    // de "recoger" con el botón ¡Subir de nivel!.
-    var claimed=brainClaimedGet();
-    if(claimed==null){ claimed=earned; brainClaimedSet(earned); }
-    var level=Math.min(claimed, earned);
-    var canLevelUp=earned>level;
-    var next=level<5?level+1:null;
-    var reqs=next?REQS[next]:[];
-    var missing=reqs.filter(function(r){return !r.ok;});
-    var pct=next?Math.round(reqs.filter(function(r){return r.ok;}).length/Math.max(1,reqs.length)*100):100;
-    return {level:level, earned:earned, canLevelUp:canLevelUp, next:next, reqs:reqs, missing:missing, nextAction:missing[0]||null, pct:pct, signals:s};
+    var claimed=brainClaimedGet();   // 0..5 (0 = Cerebro nuevo, sin reclamar N1)
+    if(claimed>=5){
+      // Nivel máximo: barra fija al 100%, sin botón. Shims para call-sites viejos.
+      return {level:5, claimed:5, next:null, canLevelUp:false, pct:100, milestone:100, daily:0, full:true,
+              exReady:false, signals:s, earned:5, reqs:[], missing:[], nextAction:null};
+    }
+    var milestone=brainMilestonePct(claimed, s);
+    var daily=brainDailyXpGet();
+    var pct=Math.min(100, milestone+daily);
+    var canLevelUp=pct>=100;
+    return {level:claimed, claimed:claimed, next:claimed+1, canLevelUp:canLevelUp, pct:pct, milestone:milestone, daily:daily,
+            full:false, exReady:brainExReady(), signals:s,
+            // shims: el modelo viejo (reqs/missing/nextAction/earned) ya no aplica.
+            earned:claimed, reqs:[], missing:[], nextAction:null};
   }
   /* B3 · momento de recompensa: si el nivel SUBIÓ desde la última foto (entrenar voz,
      seguir competidor, crear guion, vincular publicados…), toast + orbe en pulso +
      la barra del hero se re-anima de 0 → pct. Llamar tras cada recarga de señales. */
   function brainLevelPulse(){
     brainEmitSignals();   // capa "alimentar": lanza partículas reales por cada señal que subió
-    // Subir de nivel es MANUAL (botón ¡Subir de nivel! arriba). Aquí solo avisamos
-    // cuando el nivel GANADO sube — la fanfarria de verdad va en la pantalla manual.
-    var bl=brainLevel();
-    var e=bl.earned;
-    if(S._earnedSeen==null){ S._earnedSeen=e; return; }
-    if(e<=S._earnedSeen){ if(e<S._earnedSeen) S._earnedSeen=e; return; }   // bajó: sin ruido
-    S._earnedSeen=e;
-    if(bl.canLevelUp){
-      showToast("¡Tu Cerebro puede subir a Nivel "+bl.earned+"! Recógelo arriba.", "Subir de nivel", "brain-levelup");
-      try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e2){}   // destello global del cerebro 3D
+    // Subir es MANUAL. Avisamos cuando la barra LLEGA al 100% (canLevelUp pasa a true).
+    var can=brainLevel().canLevelUp;
+    if(S._canLvlSeen==null){ S._canLvlSeen=can; return; }
+    if(can && !S._canLvlSeen){
+      showToast("¡Tu Cerebro está al 100%! Súbelo de nivel arriba ↑", "Subir de nivel", "brain-levelup");
+      try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e2){}
       var orb=document.querySelector(".brain-orb"); if(orb){ orb.classList.add("lvlup"); setTimeout(function(){ orb.classList.remove("lvlup"); },1600); }
     }
+    S._canLvlSeen=can;
   }
-  /* Subida de nivel MANUAL: el usuario pulsa «¡Subir de nivel!», recoge el nivel
-     (commit del reclamado) y se le muestra una pantalla de animación. De momento es
-     una pantalla genérica improvisada — más adelante una por nivel. */
+  /* Subida de nivel MANUAL: la barra del nivel llegó al 100% → el user pulsa
+     «¡Subir de nivel!», RECLAMA el nivel, la barra se REINICIA a 0 para el siguiente
+     y se reproduce la animación temática del nivel reclamado. */
   function brainLevelup(){
     var bl=brainLevel();
     if(!bl.canLevelUp) return;
-    var to=bl.level+1;
-    brainClaimedSet(to);          // recoge el nivel (commit)
-    S._earnedSeen=bl.earned;      // ya avisado: no re-nudge
+    var to=bl.claimed+1;          // nivel que reclamas (1..5)
+    brainClaimedSet(to);
+    brainDailyXpSet(0);           // reinicia la barra del ejercicio diario para el siguiente nivel
+    S._canLvlSeen=false;
     S.levelup={to:to, name:ecoLevelName(to)};
     render();
-    try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}   // destello del cerebro 3D
+    try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
   }
   function closeLevelup(){ S.levelup=null; render(); }
   // Tema por nivel (color + subtítulo) — animación "una por nivel" (improvisada).
   // Cada nivel destino tiñe el orbe/botón/chispas y cuenta qué desbloquea.
   function levelupTheme(to){
     return ({
+      1:{a:"#94a3b8", sub:L("Tu Cerebro despierta: ya conoce tu nicho y a quién mirar. A partir de aquí, cada día lo haces más tuyo.","Your Brain wakes up: it knows your niche and who to watch. From here, every day makes it more yours.")},
       2:{a:"#6f93ff", sub:L("Ya imitas los patrones que funcionan en tu nicho: tus guiones salen con la estructura de lo que peta.","You now mirror what works in your niche: your scripts come out with proven structure.")},
       3:{a:"#8b5cf6", sub:L("Robas guiones que petan y los haces TUYOS — menos retoques, más tu voz.","You steal scripts that pop and make them YOURS — fewer tweaks, more your voice.")},
       4:{a:"#12a37c", sub:L("Estratega: el Cerebro distingue lo que va a explotar y te lo prioriza.","Strategist: the Brain spots what'll explode and prioritizes it for you.")},
@@ -2939,25 +2970,26 @@
     // B2: con voz entrenada, el banner se generaliza a la SIGUIENTE acción de nivel
     // (una sola, la de más impacto). Al nivel máximo desaparece — nada que empujar.
     var lv=brainLevel();
-    // Nivel ganado pendiente de recoger → banner de acción (subida manual).
+    // Barra al 100% pendiente de recoger → banner de acción (subida manual).
     if(lv.canLevelUp){
       return '<div class="voice-banner vb-up">'+
         '<span class="vb-ic">'+IC.brain+'</span>'+
-        '<span class="vb-text"><b>¡Nivel '+lv.earned+' listo!</b> Ya cumples lo necesario — recoge tu nuevo nivel del Cerebro.</span>'+
+        '<span class="vb-text"><b>¡Nivel '+lv.next+' listo!</b> Tu Cerebro está al 100% — recógelo.</span>'+
         '<button class="btn btn-sm btn-primary" data-act="brain-levelup">¡Subir de nivel!</button>'+
       '</div>';
     }
-    var na=lv.nextAction;
-    if(!na) return '';
-    // Si la CTA lleva a la pestaña en la que ya estás (p.ej. «roba un guion» en el
-    // Radar), el botón sobra: la acción está en pantalla. Solo texto.
-    var btn=(na.cta.act==="tab" && na.cta.k===S.tab)
-      ? ''
-      : '<button class="btn btn-sm btn-secondary" data-act="'+ESC(na.cta.act)+'"'+(na.cta.k?' data-k="'+ESC(na.cta.k)+'"':'')+'>'+ESC(na.cta.t)+'</button>';
+    if(lv.full) return '';   // nivel máximo: nada que empujar
+    // En curso: nudge de progreso (% hacia el siguiente nivel) + alimentar si toca.
+    var nm=ESC(ecoLevelName(lv.next));
+    var feedBtn=lv.exReady
+      ? '<button class="btn btn-sm btn-primary" data-act="tab" data-k="brain">'+IC.bolt+' '+L("Alimentar +"+BRAIN_DAILY_GAIN+"%","Feed +"+BRAIN_DAILY_GAIN+"%")+'</button>'
+      : '';
     return '<div class="voice-banner">'+
       '<span class="vb-ic">'+IC.brain+'</span>'+
-      '<span class="vb-text"><b>Nivel '+lv.level+'</b> — '+(lv.missing.length===1?'te falta 1 paso':'te faltan '+lv.missing.length+' pasos')+' para el Nivel '+lv.next+': '+ESC(na.label)+'.</span>'+
-      btn+
+      '<span class="vb-text"><b>'+lv.pct+'%</b> '+L("hacia","toward")+' <b>'+nm+'</b> — '+(lv.exReady
+          ? L("aliméntalo hoy para +"+BRAIN_DAILY_GAIN+"%","feed it today for +"+BRAIN_DAILY_GAIN+"%")
+          : L("vuelve en "+brainExNextHrs()+"h para +"+BRAIN_DAILY_GAIN+"%","back in "+brainExNextHrs()+"h for +"+BRAIN_DAILY_GAIN+"%"))+'.</span>'+
+      feedBtn+
     '</div>';
   }
   function voiceEvidenceHTML(){
@@ -3357,49 +3389,20 @@
      no puedes hacer más). Demo: localStorage. Real: S.user.brainProgress del backend
      (+ POST /api/brain/exercise-done) — pendiente de migración. */
   function _todayStr(){ return new Date().toISOString().slice(0,10); }
-  // Progreso CONTINUO hacia el siguiente nivel (0-1), con crédito parcial para los
-  // requisitos contables (guiones/publicados/voz) → el % se mueve con CADA acción.
-  function _brainWithin(lv){
-    if(!lv.next) return 0;   // Nivel máximo (5) → su banda ya vale 100%.
-    var s=lv.signals||{}, n=lv.next, p;
-    if(n===2)      p=[ s.voice>0?1:0, Math.min(1,(s.comps||0)/1) ];                 // voz iniciada + 1 competidor
-    else if(n===3) p=[ Math.min(1,(s.guiones||0)/4), Math.min(1,(s.voice||0)/50) ]; // 4 guiones + voz 50%
-    else if(n===4) p=[ Math.min(1,(s.pub||0)/1) ];                                  // 1 publicado
-    else           p=[ Math.min(1,(s.pub||0)/5), Math.min(1,(s.voice||0)/75) ];     // 5 publicados + voz 75%
-    return p.reduce(function(a,b){return a+b;},0)/p.length;
-  }
-  function brainProgress(){
-    if(isDemo()){ try{ var v=localStorage.getItem("rs_brain_progress"); return v!=null?parseInt(v,10):35; }catch(e){ return 35; } }
-    // PROD: el % sale de los NIVELES + acciones (no de un contador suelto). Sube con
-    // voz/competidores/guiones/publicados y llega a 100 en Nivel 5. N1→0 N2→25 N3→50
-    // N4→75 N5→100, rellenando dentro de cada nivel según _brainWithin.
-    var lv=brainLevel();
-    return Math.max(0,Math.min(100, Math.round(((lv.level-1) + _brainWithin(lv)) / 4 * 100)));
-  }
-  function brainExDoneToday(){
-    if(isDemo()){ try{ return localStorage.getItem("rs_brain_ex_date")===_todayStr(); }catch(e){ return false; } }
-    return S.user.brainExDate===_todayStr();
-  }
-  function brainLastGain(){
-    if(isDemo()){ try{ return parseInt(localStorage.getItem("rs_brain_ex_gain")||"4",10); }catch(e){ return 4; } }
-    return S.user.brainLastGain||4;
-  }
+  // El % del Cerebro ES la barra del nivel actual (hitos + ejercicio diario).
+  function brainProgress(){ return brainLevel().pct; }
+  // El ejercicio diario ya se hizo = el CD de 24h aún no está listo.
+  function brainExDoneToday(){ return !brainExReady(); }
+  function brainLastGain(){ return BRAIN_DAILY_GAIN; }
+  // Completa el ejercicio del día → +5% a la barra del nivel (respeta el CD de 24h).
   function _brainCompleteExercise(){
-    if(brainExDoneToday()) return;
-    var day=_todayStr();
-    if(isDemo()){
-      var gain=3+_lbHash(day+"g",0,4);  // +3..6 (teatro demo: % por localStorage)
-      try{ localStorage.setItem("rs_brain_progress",String(Math.min(95,brainProgress()+gain))); localStorage.setItem("rs_brain_ex_date",day); localStorage.setItem("rs_brain_ex_gain",String(gain)); }catch(e){}
-      try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
-      return showToast(L("+"+gain+"% · Cerebro entrenado hoy. Vuelve mañana para subir más.","+"+gain+"% · Brain trained today. Come back tomorrow for more."));
-    }
-    // PROD: el ejercicio entrena tu VOZ → sube confidence (input del nivel → del %).
-    var vg=2+_lbHash(day+"v",0,2);  // +2..3 determinista
-    if(S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+vg); }
-    S.user.brainExDate=day; S.user.brainLastGain=vg;
-    try{ apiPost('/api/brain/exercise-done',{}); }catch(e){}
+    if(!brainAddDailyXp()) return;   // en CD → no suma
+    // PROD: además entrena un poco la VOZ (señal real que alimenta los hitos).
+    if(!isDemo() && S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+2); }
+    if(!isDemo()){ try{ apiPost('/api/brain/exercise-done',{}); }catch(e){} }
     try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
-    showToast(L("+"+vg+"% a tu voz · Cerebro entrenado hoy. Vuelve mañana para subir más.","+"+vg+"% to your voice · Brain trained today. Come back tomorrow."));
+    brainLevelPulse();   // por si la barra llegó al 100%
+    showToast(L("+"+BRAIN_DAILY_GAIN+"% al Cerebro · vuelve mañana para subir más.","+"+BRAIN_DAILY_GAIN+"% to your Brain · come back tomorrow for more."));
   }
   function brainTrainMode(){
     // El DÍA decide (alterna hooks/guiones); el usuario no elige (1 ejercicio/día).
@@ -3470,13 +3473,18 @@
      que el usuario cuente cosas de sí mismo → aprende. Feedback visual FUERTE (lluvia
      de datos al cerebro 3D + pulso de crecimiento) + «gracias, voy aprendiendo». */
   function brainFeedMeHTML(){
+    var ready=brainExReady();
+    // El botón Alimentar = ejercicio diario: +5% a la barra del nivel, CD 24h.
+    var cta = ready
+      ? '<button class="btn btn-lg btn-primary feedme-cta" data-act="brain-feed-me">'+IC.bolt+' '+L("Alimentar al Cerebro · +"+BRAIN_DAILY_GAIN+"%","Feed the Brain · +"+BRAIN_DAILY_GAIN+"%")+'</button>'
+      : '<button class="btn btn-lg btn-secondary feedme-cta" disabled>'+IC.check+' '+L("Alimentado hoy · vuelve en "+brainExNextHrs()+"h","Fed today · back in "+brainExNextHrs()+"h")+'</button>';
     return '<div class="feedme">'+
       '<div class="feedme-body">'+
-        '<span class="feedme-eyebrow">'+IC.bolt+' '+L("ALIMENTA TU CEREBRO","FEED YOUR BRAIN")+'</span>'+
-        '<div class="feedme-t">'+L("Cuéntame algo de ti y aprendo al instante","Tell me something about you and I learn instantly")+'</div>'+
-        '<div class="feedme-d">'+L("Tu estilo, lo que te gusta, tus muletillas, a quién admiras… cada dato hace que el siguiente guion suene MÁS tuyo.","Your style, what you like, your catchphrases, who you admire… every bit makes the next script sound MORE like you.")+'</div>'+
-        '<textarea id="rsFeedMe" class="feedme-input" rows="2" maxlength="400" placeholder="'+L("ej: hablo directo y sin rodeos, me encanta el humor seco y los datos curiosos…","e.g. I talk straight with no fluff, I love dry humor and curious facts…")+'"></textarea>'+
-        '<button class="btn btn-lg btn-primary feedme-cta" data-act="brain-feed-me">'+IC.bolt+' '+L("Alimentar al Cerebro","Feed the Brain")+'</button>'+
+        '<span class="feedme-eyebrow">'+IC.bolt+' '+L("ALIMENTA TU CEREBRO","FEED YOUR BRAIN")+' <span class="brain-tag">'+L("+"+BRAIN_DAILY_GAIN+"% · 1 al día","+"+BRAIN_DAILY_GAIN+"% · 1/day")+'</span></span>'+
+        '<div class="feedme-t">'+L("Cuéntame algo de ti y subo tu Cerebro","Tell me something about you and your Brain levels up")+'</div>'+
+        '<div class="feedme-d">'+L("Tu estilo, lo que te gusta, tus muletillas, a quién admiras… cada día que me alimentas, <b>+"+BRAIN_DAILY_GAIN+"%</b> hacia el siguiente nivel y el guion suena MÁS tuyo.","Your style, what you like, your catchphrases… each day you feed me, <b>+"+BRAIN_DAILY_GAIN+"%</b> toward the next level and scripts sound MORE like you.")+'</div>'+
+        '<textarea id="rsFeedMe" class="feedme-input" rows="2" maxlength="400"'+(ready?'':' disabled')+' placeholder="'+L("ej: hablo directo y sin rodeos, me encanta el humor seco y los datos curiosos…","e.g. I talk straight with no fluff, I love dry humor and curious facts…")+'"></textarea>'+
+        cta+
       '</div>'+
     '</div>';
   }
@@ -3494,19 +3502,21 @@
   function brainFeedMe(){
     var ta=document.getElementById("rsFeedMe"); var note=ta?ta.value.trim():"";
     if(!note){ if(ta) ta.focus(); return; }
+    if(!brainExReady()){ return showToast(L("Ya alimentaste al Cerebro hoy · vuelve en "+brainExNextHrs()+"h.","Already fed the Brain today · back in "+brainExNextHrs()+"h.")); }
     brainFeast(9);   // dopamina: lluvia + pulso
-    var vg=2+_lbHash(note.slice(0,16)+"feed",0,3);   // +2..4 a la voz (optimista)
-    if(S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+vg); }
+    if(S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+2); }   // la nota también afina la voz
     if(!isDemo()){ try{ apiPost('/api/brain/rate',{text:note, kind:"self_note", type:"self_note", rating:1, suggestion:note, niche:(S.onb&&S.onb.niche)||""}); }catch(e){} }
+    brainAddDailyXp();   // +5% a la barra del nivel (ejercicio diario, CD 24h)
     if(ta) ta.value="";
+    brainLevelPulse();   // por si llegó al 100%
     render();
-    showToast(L("+"+vg+"% · gracias 🧠 voy aprendiendo de ti. Cada dato cuenta — sigue alimentándome.","+"+vg+"% · thanks 🧠 I'm learning you. Every bit counts — keep feeding me."));
+    showToast(L("+"+BRAIN_DAILY_GAIN+"% al Cerebro · gracias 🧠 vuelve mañana para subir más.","+"+BRAIN_DAILY_GAIN+"% to your Brain · thanks 🧠 come back tomorrow for more."));
   }
   function brainTrainHTML(){
     var mode=brainTrainMode();
     var modeLbl=mode==='hooks'?L("hooks","hooks"):L("guiones","scripts");
     var head='<div class="brain-section-t">'+L("Tu ejercicio de hoy: entrena tus "+modeLbl,"Today's exercise: train your "+modeLbl)+
-      ' <span class="brain-tag">'+L("+3-6% al Cerebro · 1 al día","+3-6% to your Brain · 1 a day")+'</span></div>';
+      ' <span class="brain-tag">'+L("+"+BRAIN_DAILY_GAIN+"% al Cerebro · 1 al día","+"+BRAIN_DAILY_GAIN+"% to your Brain · 1 a day")+'</span></div>';
     // Ejercicio diario YA hecho → bloqueado hasta mañana (no se puede hacer más).
     if(brainExDoneToday()){
       return head+'<div class="bt-wrap"><div class="bt-done bt-locked">'+IC.check+' '+
@@ -3652,7 +3662,7 @@
             '<div class="ce-ring-c">'+_ceBrainSVG+'</div>'+
             '<div id="rsBrainStage" class="brain3d-stage" style="display:none"><div class="brain-orb">'+IC.brain+'</div></div>'+
           '</div>'+
-          '<span class="ce-ring-lvl">'+L("NIVEL","LEVEL")+' <b>'+lv.level+'</b></span>'+
+          '<span class="ce-ring-lvl">'+(lv.level>=1?(L("NIVEL","LEVEL")+' <b>'+lv.level+'</b>'):'<b>'+L("NUEVO","NEW")+'</b>')+'</span>'+
         '</div>'+
         '<div class="ce-hero-body">'+
           '<div class="ce-kicker">'+ESC(kicker)+'</div>'+
@@ -4467,7 +4477,7 @@
   // Cambiar de marca reinicia la foto de nivel (S._lvlSeen): otra marca = otras
   // señales — sin esto el toast de level-up dispararía en falso al saltar a una
   // marca más avanzada.
-  function switchBrand(id){ if(S.brandId===id){ S.brandMenu=false; return render(); } S.brandId=id; S.brandMenu=false; S._lvlSeen=null; loadBrandData(); }
+  function switchBrand(id){ if(S.brandId===id){ S.brandMenu=false; return render(); } S.brandId=id; S.brandMenu=false; S._canLvlSeen=null; loadBrandData(); }
   // Zoom de portfolio → radar de una marca. En demo no recarga (reusa el feed),
   // solo ajusta stats de la marca; en prod recarga sus datos reales.
   // En demo: ajusta stats + feed a la marca activa (cada marca ve cosas distintas).
@@ -4518,7 +4528,7 @@
         showToast("Creando «"+name+"»…");
         apiPost("/projects",{name:name}).then(function(r){
           if(r.ok && r.d && r.d.id){
-            reloadBrands(function(){ S.brandId=r.d.id; S.tab="dashboard"; S.view="feed"; S._lvlSeen=null; loadBrandData(); showToast("Marca «"+name+"» creada."); });
+            reloadBrands(function(){ S.brandId=r.d.id; S.tab="dashboard"; S.view="feed"; S._canLvlSeen=null; loadBrandData(); showToast("Marca «"+name+"» creada."); });
           } else if(r.status===403){
             showError((r.d&&r.d.error)||"Has llegado al tope de marcas de tu plan.");
             if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("brand_limit"); }catch(e){} }
@@ -4552,7 +4562,7 @@
       apiDelete("/projects/"+encodeURIComponent(id)).then(function(r){
         if(!r.ok){ return showError("No pude borrar la marca."); }
         reloadBrands(function(){
-          if(S.brandId===id){ S.brandId=(S.brands[0]&&S.brands[0].id)||"default"; S._lvlSeen=null; loadBrandData(); }
+          if(S.brandId===id){ S.brandId=(S.brands[0]&&S.brands[0].id)||"default"; S._canLvlSeen=null; loadBrandData(); }
           else render();
           showToast("Marca «"+(name||"")+"» borrada.");
         });
@@ -4568,7 +4578,7 @@
     var toFree=(k==="free");
     var plan=toFree?"creador":k;   // free reusa el layout de creador (1 marca) + isFree()=true
     if(S.plan===plan && (S._demoFree===true)===toFree){ return; }   // sin cambio real
-    S._demoFree=toFree; S.plan=plan; S.brandMenu=false; S.view="feed"; S.feedExpanded=false; S._lvlSeen=null;
+    S._demoFree=toFree; S.plan=plan; S.brandMenu=false; S.view="feed"; S.feedExpanded=false; S._canLvlSeen=null;
     // Free = trial Pro de 5 días con tope de 3 guiones/día (Fathom 18/06): el free ES el trial.
     if(toFree){ S.user.trialActive=true; S.user.trialDaysLeft=5; S.user.dayLeft=3; }
     else { S.user.trialActive=false; }

@@ -9770,6 +9770,9 @@
     .rs .rcb .rcb-bars { display:flex; gap:6px; margin-top:1px; }
     .rs .rcb .rcb-seg { width:48px; height:6px; border-radius:999px; background:var(--surface-sunken); }
     .rs .rcb .rcb-seg.on { background:linear-gradient(90deg, var(--brand-500,#2F5BFF), var(--success-fg,#3FE0A0)); }
+    /* Barra de XP continua del nivel (hitos + ejercicio diario) */
+    .rs .rcb .rcb-xp { height:8px; border-radius:999px; background:var(--surface-sunken); overflow:hidden; margin-top:3px; }
+    .rs .rcb .rcb-xp-fill { height:100%; border-radius:999px; background:linear-gradient(90deg, var(--brand-500,#2F5BFF), var(--success-fg,#3FE0A0)); transition:width .6s cubic-bezier(.2,.8,.2,1); }
     .rs .rcb > .btn { flex:none; }
     /* móvil: el bloque «Tu cerebro · nivel» apila — el texto deja de apretarse y el
        botón «Crear guion» pasa a ancho completo abajo. */
@@ -28184,6 +28187,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=120"></script>
+<script src="/static/js/radar-loop.js?v=121"></script>
 </body>
 </html>
