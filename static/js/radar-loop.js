@@ -3799,7 +3799,7 @@
       // ── espina limpia (mockup David) ──
       brainHeaderV3HTML()+
       brainHeroV3HTML(lv, voicePct)+
-      (isDemo()?"":brainFeedMeHTML())+   // #2/#7: alimentar el Cerebro (Duolingo/dopamina)
+      brainFeedMeHTML()+   // #2/#7: alimentar el Cerebro (ejercicio diario +5%, CD 24h). También en demo para previsualizar la escalera.
       '<div class="ce-grid">'+brainKnowHTML(v)+brainLevelsHTML(lv)+'</div>'+
       brainMissionsHTML(lv)+
       // v3 (mockup David): el Cerebro queda SOLO con la espina (header + anillo +
