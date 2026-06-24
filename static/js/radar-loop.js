@@ -1036,6 +1036,36 @@
       if(r && r.ok && r.d){ S._lbReal=r.d; if(S.tab==="leaderboard") render(); }
     });
   }
+  // Recarga LIGERA de métricas (summary + videos + insights) al entrar en la pestaña
+  // Métricas. El scrape del perfil propio se lanza en el paso 1 del onboarding
+  // (onbConnectIG) y es síncrono pero tarda ~40-60s; loadBrandData solo lee una vez al
+  // inicio, así que sin esto los reels recién scrapeados no aparecen hasta recargar.
+  function loadMetricsLight(retries){
+    if(isDemo() || S._metricsLoading) return;
+    S._metricsLoading=true;
+    var q=S.brandId?("?brand="+encodeURIComponent(S.brandId)):"";
+    var _pq=(S.brandId&&S.brandId!=="default")?("?project_id="+encodeURIComponent(S.brandId)):"";
+    Promise.all([
+      fetch("/metrics/summary"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch("/metrics/videos"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch("/api/metrics/insights"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
+    ]).then(function(res){
+      S._metricsLoading=false;
+      var met=res[0], vids=res[1], ins=res[2];
+      if(met){ S.metrics=met; S.igConnected=!!(met&&met.connected); }
+      S.metrics=S.metrics||{};
+      if(vids){ S.metrics.videos=(vids.videos||[]).map(normMetricVideo); }
+      if(ins){ S.metrics.insights={ what_works:ins.what_works||[], next:ins.next||null }; }
+      if(S.tab==="metrics") render();
+      // Si el perfil está conectado pero aún no hay reels (scrape del onboarding en
+      // curso), reintenta en silencio mientras sigas en Métricas (~45s) → los datos
+      // aparecen solos sin que el user tenga que recargar ni pulsar nada.
+      var n=(S.metrics.videos||[]).length;
+      if(n===0 && S.igConnected && (retries||0)<5 && S.tab==="metrics"){
+        setTimeout(function(){ loadMetricsLight((retries||0)+1); }, 9000);
+      }
+    });
+  }
   function suggestedCompHTML(){
     // Al TOPE de competidores del plan → no sugerir (no puedes añadir más; quita uno o sube).
     var _u=(S.trackedCount!=null?S.trackedCount:(Array.isArray(S.tracked)?S.tracked.length:0));
@@ -2475,6 +2505,14 @@
     // nunca datos inventados (directiva David: no subir demo-data a prod).
     var V=metricVideos(); var hasV=V.length>0;
     if(!hasV){
+      // Perfil ya conectado (lo enlazamos en el paso 1 del onboarding) → el scrape está
+      // en curso: estado «analizando» que se actualiza solo (loadMetricsLight reintenta).
+      if(S.igConnected){
+        return '<div class="mt-stack"><div class="mt-card">'+
+          '<div class="mt-empty"><div class="mt-empty-ic"><span class="analyzing-spin"></span></div>'+
+          '<h3 class="mt-empty-h">'+L("Analizando tu perfil…","Analyzing your profile…")+'</h3>'+
+          '<p class="mt-empty-p">'+L("Estoy leyendo tus reels publicados de Instagram. En cuanto termine verás aquí tus números REALES — se actualiza solo, no hace falta recargar.","I'm reading your published Instagram reels. Your REAL numbers will show up here shortly — it updates on its own.")+'</p></div></div></div>';
+      }
       return '<div class="mt-stack"><div class="mt-card">'+
         '<div class="mt-empty"><div class="mt-empty-ic">'+IC.chart+'</div>'+
         '<h3 class="mt-empty-h">'+L("Aún no he leído tus reels","I haven't read your reels yet")+'</h3>'+
@@ -4384,6 +4422,10 @@
     // refresca la isla vía RadarLoop.refresh al resolver).
     if(t==="brain"){ try{ if(typeof loadAssistants==="function") loadAssistants(); }catch(e){} loadTracked(); }
     if(t==="analizar"){ S.analyzeErr=null; loadAnalyses(); }
+    // Métricas: refresca /metrics/videos al ENTRAR (el scrape del onboarding suele
+    // terminar DESPUÉS de la carga inicial → sin esto la página queda vacía hasta
+    // recargar). Así, al acabar el tutorial, los datos reales ya están detrás del muro.
+    if(t==="metrics"){ loadMetricsLight(); }
     render();
   }
 
