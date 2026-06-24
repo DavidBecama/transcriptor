@@ -18,10 +18,12 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /app/reelscript
-            # Downtime mínimo: NO `docker compose down`. Reset duro a origin/prod (mantiene
-            # HEAD en la rama, sin detached) y `up -d --build` construye las imágenes y
-            # recrea SOLO los servicios cambiados. Si el build falla, los contenedores
-            # viejos siguen vivos (la app no se cae).
+            # Downtime mínimo: NO `docker compose down`. `up -d --build` construye las
+            # imágenes y recrea SOLO los servicios cambiados; si el build falla, los
+            # contenedores viejos siguen vivos (la app no se cae).
+            # `checkout -B prod origin/prod` = reset duro a origin/prod + RE-ENGANCHA HEAD
+            # a la rama (self-healing: deja de heredar el detached-HEAD de deploys viejos
+            # que hacían `git checkout <tag>`).
             git fetch origin
-            git reset --hard origin/prod
+            git checkout -B prod origin/prod
             docker compose up -d --build
