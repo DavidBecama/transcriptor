@@ -11007,7 +11007,13 @@
     .rs .rk-hero .lb-goal svg, .rs .rk-hero .lb-momentum svg { width:15px; height:15px; color:var(--brand-400,#6E92FF); flex:none; }
     .rs .rk-list { display:flex; flex-direction:column; gap:6px; }
     .rs .rk-row { display:flex; align-items:center; gap:14px; padding:13px 16px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:14px; }
-    .rs .rk-row.me { background:var(--brand-50, rgba(47,91,255,.16)); border-color:var(--brand-500,#2F5BFF); }
+    .rs .rk-row.me { background:color-mix(in srgb, var(--lc,#2F5BFF) 14%, transparent); border-color:var(--lc,#2F5BFF); }
+    /* Insignia y avatar de nivel del Cerebro (David 24-jun): TÚ con color por nivel,
+       competidores (no usan la app) en gris. */
+    .rs .rk-ava-lvl { border-color:var(--lc,#2F5BFF) !important; color:var(--lc,#2F5BFF) !important; box-shadow:0 0 0 2px color-mix(in srgb,var(--lc) 30%, transparent); }
+    .rs .rk-ava-guest { opacity:.85; }
+    .rs .rk-lvl { display:inline-flex; align-items:center; margin-left:8px; padding:2px 9px; border-radius:999px; font-family:var(--font-mono); font-size:10.5px; font-weight:700; letter-spacing:.02em; text-transform:uppercase;
+      color:var(--lc,#2F5BFF); background:color-mix(in srgb,var(--lc) 16%, transparent); border:1px solid color-mix(in srgb,var(--lc) 45%, transparent); }
     .rs .rk-pos { width:30px; flex:none; text-align:center; font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-tertiary); }
     .rs .rk-pos.top { color:#0c0f17; border-radius:8px; padding:3px 0; }
     .rs .rk-pos.t1 { background:linear-gradient(140deg,#FFD66B,#E8B53C); } .rs .rk-pos.t2 { background:linear-gradient(140deg,#D9E1EE,#AEB9CC); } .rs .rk-pos.t3 { background:linear-gradient(140deg,#E7B07E,#C98A52); }
@@ -28197,6 +28203,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=123"></script>
+<script src="/static/js/radar-loop.js?v=124"></script>
 </body>
 </html>

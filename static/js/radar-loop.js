@@ -394,6 +394,9 @@
   // Ajustes/toast y la tarjeta «Niveles del Cerebro» (brainLevelsHTML), para que un
   // mismo nivel no salga con dos nombres distintos. i18n vía L().
   function ecoLevelName(l){ return ({1:L("Aprendiz","Apprentice"),2:L("Imitador","Imitator"),3:L("Ladrón","Thief"),4:L("Estratega","Strategist"),5:L("Viral","Viral")})[l||1]||L("Aprendiz","Apprentice"); }
+  // Color por nivel para la insignia del ranking (David 24-jun): no-usuario gris,
+  // usuario azul (N1), N2 verde, N3 rojo, N4 violeta, N5 dorado. Da dopamina + pertenencia.
+  function brainLevelColor(l){ return ({0:"#94a3b8",1:"#4f7cff",2:"#12a37c",3:"#f5566b",4:"#8b5cf6",5:"#f59e0b"})[l]||"#94a3b8"; }
   // #6 conversión (vanidad + aversión a perder progreso): el nivel del Cerebro como
   // ESTATUS visible en el header del Radar, no solo dentro de la pestaña Cerebro.
   // Chip del Cerebro en la command bar (global, todas las páginas). Estado normal =
@@ -3137,12 +3140,21 @@
         momentum='<div class="lb-momentum">'+IC.chart+' '+L("Subiendo · <b>+"+me.growth+"%</b> este mes · llevas <b>"+streakW+" semanas</b> creciendo","Rising · <b>+"+me.growth+"%</b> this month · <b>"+streakW+" weeks</b> growing")+'</div>';
       }
     }
+    // Insignia de nivel del Cerebro SOLO en TU fila (los competidores son cuentas de
+    // IG, no usuarios → gris). Tu nivel sale de brainLevel() (localStorage), client-side.
+    var myLvl=brainLevel(); var myLvlN=myLvl.level||0; var myCol=brainLevelColor(myLvlN);
     var items=rows.map(function(r,i){
       var g=r.growth, gtxt=(g>=0?'↑':'↓')+Math.abs(g)+'%';
-      return '<div class="rk-row'+(r.you?' me':'')+'">'+
+      var ava=r.you
+        ? '<span class="rk-ava rk-ava-lvl" style="--lc:'+myCol+'">'+ESC(initialsOf(r.handle))+'</span>'
+        : '<span class="rk-ava rk-ava-guest">'+ESC(initialsOf(r.handle))+'</span>';
+      var lvlBadge=(r.you && myLvlN>=1)
+        ? ' <span class="rk-lvl" style="--lc:'+myCol+'" title="'+L("Tu nivel del Cerebro","Your Brain level")+'">'+ESC(ecoLevelName(myLvlN))+'</span>'
+        : '';
+      return '<div class="rk-row'+(r.you?' me':'')+'"'+(r.you?' style="--lc:'+myCol+'"':'')+'>'+
         '<span class="rk-pos'+(i<3?' top t'+(i+1):'')+'">'+(i+1)+'</span>'+
-        '<span class="rk-ava">'+ESC(initialsOf(r.handle))+'</span>'+
-        '<span class="rk-h">@'+ESC(r.handle)+(r.you?' <span class="rk-you">'+L("tú","you")+'</span>':'')+'</span>'+
+        ava+
+        '<span class="rk-h">@'+ESC(r.handle)+(r.you?' <span class="rk-you">'+L("tú","you")+'</span>':'')+lvlBadge+'</span>'+
         '<span class="rk-val">'+_fmtK(r.followers)+' <span class="rk-unit">'+ESC(unit)+'</span></span>'+
         '<span class="rk-g '+(g>=0?'up':'down')+'">'+gtxt+'</span>'+
         ((!r.you && !S.versus)?'<button class="btn btn-sm btn-secondary rk-beat" data-act="versus-start" data-id="'+ESC(r.handle)+'">'+IC.bolt+' '+L("Supéralo","Beat it")+'</button>':'<span class="rk-beat-sp"></span>')+
