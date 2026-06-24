@@ -901,9 +901,17 @@
         if(hasReal){ if(n===lastN) stable++; else { stable=0; lastN=n; } }
         // listo = hay reels reales Y (ya hay pool, O llevan ~7s sin crecer, O tope duro).
         if((hasReal && (n>=6 || stable>=2)) || el>HARD){
-          S._onbWaiting=false; loadTracked(); render(); onbStartTour();
-          if(!hasReal) showToast(L("Tu radar se está llenando — pulsa «Actualizar radar» en un momento.","Your radar is filling — hit «Refresh radar» in a moment."));
-          else onbRadarCatchup();
+          // MÍNIMO de pantalla de carga (el descubrimiento suele acabar durante los pasos
+          // del onboarding → sin esto soltaba en <1s y parecía que saltaba directo / "datos
+          // hardcodeados"). Esperamos a que se vea la animación de "analizando".
+          var MIN=4800;
+          var fire=function(){
+            if(!S._onbWaiting) return;
+            S._onbWaiting=false; loadTracked();
+            if(hasReal){ onbRadarCatchup(); } else { showToast(L("Tu radar se está llenando — pulsa «Actualizar radar» en un momento.","Your radar is filling — hit «Refresh radar» in a moment.")); }
+            onbShowStealOffer();   // #6: «¿quieres robar este?» antes del tour (si no hay reel → tour directo)
+          };
+          setTimeout(fire, Math.max(0, MIN-el));
           return;
         }
         setTimeout(loop, 3500);
@@ -926,6 +934,42 @@
       }, 8000);
     })();
   }
+  /* #6 (reunión 24-jun, David): tras la pantalla de carga y ANTES del house tour,
+     enseña el reel más fuerte del nicho y ofrece robarlo → el «aha» con un click.
+     Si dice Sí → robo real (con red caption-only si Apify cae). Si No → tour. */
+  function onbShowStealOffer(){
+    var top=(S.reels||[])[0];
+    if(!top && isDemo()){
+      // demo sin reels sembrados → reel de muestra para previsualizar el offer
+      top=normReel({id:"onbdemo", username:"antonlofer", views:7104218, likes:84696, explosion_score:8.4,
+        caption:"El final de Titanic habría sido otra historia con un 40% en gafas… (publi)", thumb_url:null});
+      S.reels=[top];
+    }
+    if(!top){ render(); return onbStartTour(); }   // prod sin reel (descubrimiento vacío) → tour directo
+    S.onbStealOffer={id:top.id};
+    render();
+  }
+  function onbStealOfferHTML(){
+    var o=S.onbStealOffer; if(!o) return "";
+    var r=(S.reels||[]).filter(function(x){return x.id===o.id;})[0]||(S.reels||[])[0]; if(!r) return "";
+    var h=(r.creator&&r.creator.handle)||"";
+    var thumb=r.thumb?'<img class="onbst-thumb" src="'+ESC(r.thumb)+'" alt="" loading="lazy"/>':'<div class="onbst-thumb onbst-ph">'+IC.bolt+'</div>';
+    return '<div class="scroll"><div class="canvas onbst-canvas"><div class="onbst">'+
+      '<div class="onbst-eyebrow"><span class="pip"></span>'+L("HE ANALIZADO TU NICHO","I ANALYZED YOUR NICHE")+'</div>'+
+      '<h2 class="onbst-h">'+L("Esto está petando ahora mismo 🔥","This is blowing up right now 🔥")+'</h2>'+
+      '<p class="onbst-sub">'+L("De @"+ESC(h)+" — uno de los reels más fuertes de tu nicho. ¿Te lo convierto en un guión TUYO, en tu voz?","From @"+ESC(h)+" — one of the strongest reels in your niche. Turn it into a script of YOURS?")+'</p>'+
+      '<div class="onbst-card">'+thumb+
+        '<div class="onbst-meta"><div class="onbst-handle">@'+ESC(h)+'</div>'+
+          '<div class="onbst-stats"><span>'+IC.eye+' '+ESC(r.views||"")+'</span>'+(r.likes?'<span>'+IC.heart+' '+ESC(r.likes)+'</span>':'')+(r.explosionTxt?'<span class="onbst-exp">'+IC.bolt+' '+ESC(r.explosionTxt)+'×</span>':'')+'</div>'+
+          (r.cap?'<div class="onbst-cap">'+ESC(String(r.cap).slice(0,120))+'…</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="onbst-actions">'+
+        '<button class="btn btn-lg btn-primary" data-act="onb-steal-yes" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Sí, róbalo para mí","Yes, steal it for me")+'</button>'+
+        '<button class="btn btn-md btn-secondary" data-act="onb-steal-no">'+L("Ahora no · ver mi radar","Not now · see my radar")+'</button>'+
+      '</div>'+
+    '</div></div></div>';
+  }
   // CIERRE: ingiere (prod) → Cerebro ~50% + 1er guión; demo simula y siembra panel.
   function onbFinish(){
     onbTrack("onb_step_completed");
@@ -940,8 +984,8 @@
       // saltaba directo y se sentía abrupto/roto).
       var _seeded=S.reels; S.reels=[]; S.radarSeed=false; S._onbWaiting=true; S.tab="dashboard"; render();
       setTimeout(function(){
-        S._onbWaiting=false; if(_seeded&&_seeded.length) S.reels=_seeded; render(); onbStartTour();
-        showToast(L("Cerebro al 35% · tu primer guión está listo. Róbalo →","Brain at 35% · your first script is ready. Steal it →"));
+        S._onbWaiting=false; if(_seeded&&_seeded.length) S.reels=_seeded;
+        onbShowStealOffer();   // #6: «¿quieres robar este?» (en demo también, para previsualizar)
       }, 4800);
       return;
     }
@@ -1709,6 +1753,7 @@
   }
   function dashboardHTML(){
     if(S._onbWaiting) return onbWaitHTML();   // tras el onboarding: esperando los reels del nicho (Apify)
+    if(S.onbStealOffer) return onbStealOfferHTML();   // #6: «¿quieres robar este?» antes del tour
     var st=S.stats||{competitors:0,reels_week:0,exploded_week:0,stolen_today:0}; var b=brand();
     var sorted=feedReels();
     var line = st.exploded_week>0
@@ -6086,6 +6131,8 @@
       try{ window.open(url,"_blank","noopener"); }catch(e){ location.href=url; }
       return showToast("Generando el informe del mes…");
     }
+    if(act==="onb-steal-yes"){ S.onbStealOffer=null; return steal(id); }   // #6: robar el reel ofrecido
+    if(act==="onb-steal-no"){ S.onbStealOffer=null; render(); return onbStartTour(); }
     if(act==="steal") return steal(id);
     if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
     if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.url||_ro.ig_url||_ro.permalink||(_ro.ig_reel_id?("https://www.instagram.com/reel/"+_ro.ig_reel_id+"/"):null); if(_u){ try{ window.open(_u,"_blank","noopener"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
