@@ -889,7 +889,16 @@
   function onbWaitHTML(){
     var seed=(S.onb&&S.onb.seed)?("@"+String(S.onb.seed).replace(/^@+/,"")):"";
     var step1 = seed ? L("Analizando a <b>"+ESC(seed)+"</b>","Analyzing <b>"+ESC(seed)+"</b>") : L("Analizando tu nicho","Analyzing your niche");
-    return '<div class="scroll"><div class="canvas"><div class="onbwait">'+
+    // «Analizando TU perfil» (David/Bernat 24-jun): sensación de análisis PERSONAL con
+    // tu foto real de IG. Tu perfil se scrapea en 2º plano (onbConnectIG, paso handle).
+    var meH=(S.onb&&S.onb.handle)?String(S.onb.handle).replace(/^@+/,""):"";
+    var meBlock = meH ? ('<div class="onbw-me">'+
+      '<span class="onbw-me-ava"><span class="onbw-me-fb">'+ESC(initialsOf(meH))+'</span>'+
+        '<img class="onbw-me-img" src="https://unavatar.io/instagram/'+encodeURIComponent(meH)+'?fallback=false" alt="" referrerpolicy="no-referrer" loading="eager" onload="this.classList.add(\'on\')" onerror="this.remove()"/>'+
+        '<span class="onbw-me-pulse"></span></span>'+
+      '<span class="onbw-me-txt"><b>'+L("Analizando tu perfil","Analyzing your profile")+'</b> · @'+ESC(meH)+'<span class="onbw-me-sub">'+L("aprendiendo cómo hablas para clavar tu voz","learning how you talk to nail your voice")+'</span></span>'+
+    '</div>') : '';
+    return '<div class="scroll"><div class="canvas"><div class="onbwait">'+meBlock+
       '<div class="onbw-radar" aria-hidden="true">'+
         '<div class="onbw-grid1"></div><div class="onbw-grid2"></div><div class="onbw-grid3"></div>'+
         '<div class="onbw-sweep"><div class="onbw-fan"></div><div class="onbw-arm"></div></div>'+

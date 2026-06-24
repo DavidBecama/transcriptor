@@ -9703,6 +9703,17 @@
     /* Animación «radar escaneando» (onboarding wait) — rediseño Claude design:
        barrido cónico + blips de creadores + core flotante + tarjetas «encontrado»
        + pasos rotando + barra de progreso. Colores vía variables (claro/oscuro). */
+    /* «Analizando tu perfil» (David/Bernat) — chip con tu foto de IG arriba de la carga */
+    .rs .onbw-me { display:inline-flex; align-items:center; gap:13px; padding:11px 16px 11px 11px; margin:0 auto 24px; border-radius:999px; background:var(--surface-raised); border:1px solid var(--border-default); box-shadow:0 8px 26px rgba(0,0,0,.22); animation:rsFadeIn .4s ease-out; }
+    .rs .onbw-me-ava { position:relative; width:42px; height:42px; flex:none; }
+    .rs .onbw-me-fb { position:absolute; inset:0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-weight:700; font-size:14px; color:#fff; background:linear-gradient(135deg,var(--brand-500,#2F5BFF),#6f93ff); }
+    .rs .onbw-me-img { position:absolute; inset:0; width:42px; height:42px; border-radius:50%; object-fit:cover; opacity:0; transition:opacity .35s; }
+    .rs .onbw-me-img.on { opacity:1; }
+    .rs .onbw-me-pulse { position:absolute; inset:-4px; border-radius:50%; border:2px solid var(--brand-500,#2F5BFF); opacity:0; animation:onbwMePulse 1.8s ease-out infinite; }
+    @keyframes onbwMePulse { 0%{ transform:scale(.85); opacity:.7; } 100%{ transform:scale(1.25); opacity:0; } }
+    .rs .onbw-me-txt { font-size:13.5px; color:var(--text-primary); text-align:left; line-height:1.3; } .rs .onbw-me-txt b { font-weight:700; }
+    .rs .onbw-me-sub { display:block; font-size:12px; color:var(--text-tertiary); }
+    @media (prefers-reduced-motion: reduce){ .rs .onbw-me-pulse { animation:none; } }
     .rs .onbw-radar { position:relative; width:248px; height:248px; margin-bottom:34px; display:flex; align-items:center; justify-content:center; }
     .rs .onbw-grid1 { position:absolute; inset:0; border-radius:50%; border:1px solid rgba(79,124,255,.14); }
     .rs .onbw-grid2 { position:absolute; top:50%; left:50%; width:66%; height:66%; transform:translate(-50%,-50%); border-radius:50%; border:1px solid rgba(79,124,255,.12); }
@@ -28234,6 +28245,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=129"></script>
+<script src="/static/js/radar-loop.js?v=130"></script>
 </body>
 </html>
