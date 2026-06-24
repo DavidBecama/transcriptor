@@ -956,8 +956,8 @@
     var thumb=r.thumb?'<img class="onbst-thumb" src="'+ESC(r.thumb)+'" alt="" loading="lazy"/>':'<div class="onbst-thumb onbst-ph">'+IC.bolt+'</div>';
     return '<div class="scroll"><div class="canvas onbst-canvas"><div class="onbst">'+
       '<div class="onbst-eyebrow"><span class="pip"></span>'+L("HE ANALIZADO TU NICHO","I ANALYZED YOUR NICHE")+'</div>'+
-      '<h2 class="onbst-h">'+L("Esto está petando ahora mismo 🔥","This is blowing up right now 🔥")+'</h2>'+
-      '<p class="onbst-sub">'+L("De @"+ESC(h)+" — uno de los reels más fuertes de tu nicho. ¿Te lo convierto en un guión TUYO, en tu voz?","From @"+ESC(h)+" — one of the strongest reels in your niche. Turn it into a script of YOURS?")+'</p>'+
+      '<h2 class="onbst-h">'+L("Esto está petando 🔥","This is blowing up 🔥")+'</h2>'+
+      '<p class="onbst-sub">'+L("¿Quieres robar este?","Want to steal this one?")+'</p>'+
       '<div class="onbst-card">'+thumb+
         '<div class="onbst-meta"><div class="onbst-handle">@'+ESC(h)+'</div>'+
           '<div class="onbst-stats"><span>'+IC.eye+' '+ESC(r.views||"")+'</span>'+(r.likes?'<span>'+IC.heart+' '+ESC(r.likes)+'</span>':'')+(r.explosionTxt?'<span class="onbst-exp">'+IC.bolt+' '+ESC(r.explosionTxt)+'×</span>':'')+'</div>'+
@@ -965,8 +965,7 @@
         '</div>'+
       '</div>'+
       '<div class="onbst-actions">'+
-        '<button class="btn btn-lg btn-primary" data-act="onb-steal-yes" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Sí, róbalo para mí","Yes, steal it for me")+'</button>'+
-        '<button class="btn btn-md btn-secondary" data-act="onb-steal-no">'+L("Ahora no · ver mi radar","Not now · see my radar")+'</button>'+
+        '<button class="btn btn-lg btn-primary" data-act="onb-steal-no">'+IC.bolt+' '+L("¡Enséñame!","Show me!")+'</button>'+
       '</div>'+
     '</div></div></div>';
   }
@@ -6131,8 +6130,7 @@
       try{ window.open(url,"_blank","noopener"); }catch(e){ location.href=url; }
       return showToast("Generando el informe del mes…");
     }
-    if(act==="onb-steal-yes"){ S.onbStealOffer=null; return steal(id); }   // #6: robar el reel ofrecido
-    if(act==="onb-steal-no"){ S.onbStealOffer=null; render(); return onbStartTour(); }
+    if(act==="onb-steal-no"){ S.onbStealOffer=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
     if(act==="steal") return steal(id);
     if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
     if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.url||_ro.ig_url||_ro.permalink||(_ro.ig_reel_id?("https://www.instagram.com/reel/"+_ro.ig_reel_id+"/"):null); if(_u){ try{ window.open(_u,"_blank","noopener"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
