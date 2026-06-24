@@ -704,7 +704,7 @@
     var h=(S.onb.handle||"").replace(/^@+/,"");
     return '<section class="onb-step onb-confirm">'+
       onbBackBtn()+
-      '<div class="onbc-ava-wrap">'+
+      '<div class="onbc-ava-wrap'+((!S.onb.avatar && S.onb._avatarReq && !S.onb._avatarFailed)?' loading':'')+'">'+
         '<span class="onbc-ava-fb">'+ESC(initialsOf(h))+'</span>'+
         (S.onb.avatar?'<img class="onbc-ava on" src="'+ESC(S.onb.avatar)+'" alt=""/>':'')+
         '<span class="onbc-badge">'+IC.ig+'</span>'+
@@ -751,9 +751,9 @@
     // plano, para que al acabar el onboarding + house tour el user tenga sus métricas.
     // Una sola vez por onboarding (volver/avanzar no re-dispara).
     if(!isDemo() && !S.onb._igConnected){ S.onb._igConnected=true; onbConnectIG(h); }
-    // FOTO de perfil (David/Bernat): petición Apify YA en el paso del handle → la miniatura
-    // aparece en «este eres tú» y en la carga. unavatar.io daba 403 (rate-limit free).
-    if(!isDemo() && !S.onb._avatarReq){ S.onb._avatarReq=true; onbFetchAvatar(h); }
+    // FOTO de perfil (David/Bernat): petición Apify (la miniatura aparece en «este eres
+    // tú» y en la carga). Idempotente por handle; ya pudo dispararse al teclear (head start).
+    onbFetchAvatar(h);
     onbNext();
   }
   // Conecta el Instagram del usuario y lanza el análisis de su perfil en SEGUNDO PLANO.
@@ -772,9 +772,14 @@
   // la guarda en S.onb.avatar → la usan «este eres tú» y la carga. Best-effort (si falla,
   // se queda en iniciales). Tarda ~5-15s (scrape Apify), así que llega async y re-renderiza.
   function onbFetchAvatar(h){
-    if(isDemo() || !h) return;
+    h=(h||"").trim().replace(/^@+/,"").toLowerCase();
+    if(isDemo() || !h || S.onb._avatarReq===h) return;   // idempotente por handle
+    S.onb._avatarReq=h; S.onb._avatarFailed=false;
     apiGet("/api/onboarding/ig-avatar?handle="+encodeURIComponent(h)).then(function(r){
-      if(r && r.ok && r.d && r.d.avatar){ S.onb.avatar=r.d.avatar; render(); }
+      if(S.onb._avatarReq!==h) return;   // cambió el handle entretanto
+      if(r && r.ok && r.d && r.d.avatar){ S.onb.avatar=r.d.avatar; }
+      else { S.onb._avatarFailed=true; }
+      render();
     });
   }
   function onbPickNiche(n){
@@ -4439,6 +4444,9 @@
         var v=this.value.replace(/^@+/,""); var ok=/^[a-zA-Z0-9._]{2,30}$/.test(v);
         var box=this.closest(".onb-handle"); var chip=box&&box.querySelector(".onb-handle-ok");
         if(chip) chip.classList.toggle("on", ok);
+        // HEAD START: precarga la foto de IG (Apify) cuando el handle es válido, con debounce
+        // → para cuando llegue a «este eres tú» la foto ya está (el scrape tarda ~5-15s).
+        clearTimeout(S._avaT); if(ok && !isDemo()){ S._avaT=setTimeout(function(){ onbFetchAvatar(v); }, 700); }
       }); }
       return;
     }
