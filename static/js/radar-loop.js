@@ -397,6 +397,14 @@
   // Color por nivel para la insignia del ranking (David 24-jun): no-usuario gris,
   // usuario azul (N1), N2 verde, N3 rojo, N4 violeta, N5 dorado. Da dopamina + pertenencia.
   function brainLevelColor(l){ return ({0:"#94a3b8",1:"#4f7cff",2:"#12a37c",3:"#f5566b",4:"#8b5cf6",5:"#f59e0b"})[l]||"#94a3b8"; }
+  // Cifras con gancho (David 24-jun): los 2 primeros dígitos + sufijo K/M en VERDE → "51M".
+  // Se trocea ANTES de insertar HTML (si no, el 2º replace matchearía la "m" de "num-hi").
+  function _numGreen(s){
+    s=String(s==null?"":s);
+    var lead=(s.match(/^\s*\d{1,2}/)||[""])[0];
+    var rest=ESC(s.slice(lead.length)).replace(/([KkMm]\b|mill\w*)/, '<b class="num-hi">$1</b>');
+    return (lead?'<b class="num-hi">'+ESC(lead)+'</b>':'')+rest;
+  }
   // #6 conversión (vanidad + aversión a perder progreso): el nivel del Cerebro como
   // ESTATUS visible en el header del Radar, no solo dentro de la pestaña Cerebro.
   // Chip del Cerebro en la command bar (global, todas las páginas). Estado normal =
@@ -874,7 +882,7 @@
         '<span class="onbw-card"><span class="onbw-card-ava"></span>'+L("Reel encontrado · 4.2M views","Reel found · 4.2M views")+'</span>'+
         '<span class="onbw-card c2"><span class="onbw-card-ava"></span>'+L("Creador afín de tu nicho","Similar creator in your niche")+'</span>'+
       '</div>'+
-      '<div class="onbw-title">'+L("Preparando tu radar…","Setting up your radar…")+'</div>'+
+      '<div class="onbw-title">'+L("Buscando los mejores reels para ti…","Finding the best reels for you…")+'</div>'+
       '<div class="onbw-steps">'+
         '<div class="onbw-step s1"><i></i>'+step1+'</div>'+
         '<div class="onbw-step s2"><i></i>'+L("Buscando creadores afines de tu nicho","Finding similar creators in your niche")+'</div>'+
@@ -960,12 +968,12 @@
       '<p class="onbst-sub">'+L("¿Quieres robar este?","Want to steal this one?")+'</p>'+
       '<div class="onbst-card">'+thumb+
         '<div class="onbst-meta"><div class="onbst-handle">@'+ESC(h)+'</div>'+
-          '<div class="onbst-stats"><span>'+IC.eye+' '+ESC(r.views||"")+'</span>'+(r.likes?'<span>'+IC.heart+' '+ESC(r.likes)+'</span>':'')+(r.explosionTxt?'<span class="onbst-exp">'+IC.bolt+' '+ESC(r.explosionTxt)+'×</span>':'')+'</div>'+
+          '<div class="onbst-stats"><span class="onbst-views">'+IC.eye+' '+_numGreen(r.views||"")+'</span>'+(r.likes?'<span>'+IC.heart+' '+ESC(r.likes)+'</span>':'')+(r.explosionTxt?'<span class="onbst-exp">'+IC.bolt+' '+ESC(r.explosionTxt)+'×</span>':'')+'</div>'+
           (r.cap?'<div class="onbst-cap">'+ESC(String(r.cap).slice(0,120))+'…</div>':'')+
         '</div>'+
       '</div>'+
       '<div class="onbst-actions">'+
-        '<button class="btn btn-lg btn-primary" data-act="onb-steal-no">'+IC.bolt+' '+L("¡Enséñame!","Show me!")+'</button>'+
+        '<button class="btn btn-lg btn-primary" data-act="onb-steal-no">'+IC.bolt+' '+L("Enséñame a robar","Show me how to steal")+'</button>'+
       '</div>'+
     '</div></div></div>';
   }
