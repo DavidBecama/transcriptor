@@ -1714,17 +1714,29 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                         }).eq("id", reel_id).execute()
                     except Exception:
                         pass
-                    return _fail("transcribe_error", "No se pudo procesar este reel.")
+                    # RESILIENCIA (2026-06-24): si no se pudo BAJAR/transcribir el audio
+                    # (p.ej. Apify sin saldo → 403, o Instagram bloquea yt-dlp) PERO el reel
+                    # tiene un caption con sustancia, generamos el guion SOLO con el caption
+                    # en vez de fallar. Antes esto devolvía error y "robar no funcionaba"
+                    # cada vez que Apify estaba caído. transcript_text="" → bloque caption-only.
+                    _cap = (reel.get("caption") or "").strip()
+                    if len(_cap) >= 40:
+                        logger.warning("gen_script_task: transcripción falló reel=%s → fallback a caption-only (%d chars)", reel_id, len(_cap))
+                        transcript_text = ""
+                    else:
+                        return _fail("transcribe_error", "No se pudo procesar este reel.")
 
-                # Guardar transcript en cache.
-                try:
-                    db.table("creator_reels_global").update({
-                        "transcript": transcript_text,
-                        "transcript_status": "ok",
-                        "transcript_error": None,
-                    }).eq("id", reel_id).execute()
-                except Exception as e:
-                    logger.exception("gen_script_task save transcript failed reel=%s: %s", reel_id, e)
+                # Guardar transcript en cache (SOLO si lo conseguimos; en fallback a
+                # caption-only transcript_text="" → no pisar el status 'failed' con un 'ok' vacío).
+                if transcript_text:
+                    try:
+                        db.table("creator_reels_global").update({
+                            "transcript": transcript_text,
+                            "transcript_status": "ok",
+                            "transcript_error": None,
+                        }).eq("id", reel_id).execute()
+                    except Exception as e:
+                        logger.exception("gen_script_task save transcript failed reel=%s: %s", reel_id, e)
 
         # 4. Generar guion vía adapt_with_ai (lazy import).
         self.update_state(state="PROGRESS", meta={"step": "generating_script"})
