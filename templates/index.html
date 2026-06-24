@@ -9724,9 +9724,11 @@
     .rs .onbw-card-ava { width:18px; height:18px; border-radius:99px; background:linear-gradient(135deg,var(--brand-400),var(--brand-600)); }
     .rs .onbw-title { font-family:var(--font-display); font-weight:700; font-size:27px; color:var(--text-primary); letter-spacing:-.01em; }
     .rs .onbw-steps { position:relative; height:24px; width:100%; margin-top:14px; }
-    .rs .onbw-step { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:9px; font-size:14px; color:var(--text-secondary); animation:stepFade 9s ease-in-out infinite; }
+    .rs .onbw-step { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:9px; font-size:14px; color:var(--text-secondary); animation:stepFade 15s ease-in-out infinite; }
     .rs .onbw-step.s2 { animation-delay:3s; }
     .rs .onbw-step.s3 { animation-delay:6s; }
+    .rs .onbw-step.s4 { animation-delay:9s; }
+    .rs .onbw-step.s5 { animation-delay:12s; }
     .rs .onbw-step i { width:6px; height:6px; border-radius:99px; background:var(--brand-500); flex:0 0 auto; }
     .rs .onbw-step b { color:var(--text-primary); font-weight:600; }
     .rs .onbw-prog { width:230px; height:5px; border-radius:99px; background:var(--border-default); overflow:hidden; margin-top:18px; }
@@ -9738,7 +9740,7 @@
     @keyframes coreGlow { 0%,100%{box-shadow:0 14px 40px rgba(79,124,255,.35),0 0 0 0 rgba(79,124,255,.45);} 50%{box-shadow:0 18px 52px rgba(79,124,255,.55),0 0 0 14px rgba(79,124,255,0);} }
     @keyframes cardIn { 0%{transform:translate(-50%,10px) scale(.9);opacity:0;} 6%{transform:translate(-50%,0) scale(1);opacity:1;} 40%{opacity:1;} 46%{transform:translate(-50%,-8px) scale(.96);opacity:0;} 100%{opacity:0;} }
     @keyframes barFill { 0%{width:8%;} 100%{width:92%;} }
-    @keyframes stepFade { 0%{opacity:0;transform:translateY(6px);} 8%,30%{opacity:1;transform:translateY(0);} 38%,100%{opacity:0;transform:translateY(-6px);} }
+    @keyframes stepFade { 0%{opacity:0;transform:translateY(6px);} 3%,17%{opacity:1;transform:translateY(0);} 20%,100%{opacity:0;transform:translateY(-6px);} }
     @media (prefers-reduced-motion: reduce) { .rs .onbw-sweep, .rs .onbw-blip, .rs .onbw-core-wrap, .rs .onbw-core, .rs .onbw-card, .rs .onbw-step, .rs .onbw-prog-fill { animation:none; } }
     /* #8 PROACTIVIDAD — «Tu siguiente paso» (HAZ ESTO AHORA): tarjeta destacada con
        acento de marca, para que el usuario perdido sepa QUÉ hacer ya. */
@@ -28168,6 +28170,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=117"></script>
+<script src="/static/js/radar-loop.js?v=118"></script>
 </body>
 </html>
