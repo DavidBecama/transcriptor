@@ -18,7 +18,10 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /app/reelscript
-            git fetch --tags
-            git checkout ${{ github.ref_name }}
-            docker compose down
+            # Downtime mínimo: NO `docker compose down`. Reset duro a origin/prod (mantiene
+            # HEAD en la rama, sin detached) y `up -d --build` construye las imágenes y
+            # recrea SOLO los servicios cambiados. Si el build falla, los contenedores
+            # viejos siguen vivos (la app no se cae).
+            git fetch origin
+            git reset --hard origin/prod
             docker compose up -d --build

@@ -188,6 +188,7 @@
       likes: typeof r.likes==="string"?r.likes:fmtNum(r.likes),
       comments:(r.comments!=null?(typeof r.comments==="string"?r.comments:fmtNum(r.comments)):null),
       shares:(r.shares!=null?(typeof r.shares==="string"?r.shares:fmtNum(r.shares)):null),   // ítem 6: compartidos del competidor (Apify includeSharesCount)
+      sharesN:(function(){ var n=parseInt(String(r.shares).replace(/[^\d]/g,""),10); return isFinite(n)?n:0; })(),   // raw → ocultamos el stat si 0 (IG no lo da público)
       dur:r.dur||durFmt(r.video_duration_sec), cap:r.cap||r.caption||"", sum:r.sum||"",
       thumb:r.thumb_b64||r.thumb_url||r.thumb||null, fav:!!(r.is_favorite||r.fav),
       seed:(r.source==="seed"),   // SPEC #3: reel del nicho mientras llenas tu radar
@@ -1329,7 +1330,10 @@
         stat(L("Views","Views"), r.views)+
         stat(L("Likes","Likes"), r.likes)+
         stat(L("Comentarios","Comments"), (r.comments!=null?r.comments:'–'))+
-        stat(L("Compartidos","Shares"), (r.shares!=null?r.shares:'–'))+   // ítem 6
+        // ítem 6: «Compartidos» SOLO si hay dato real (>0). Instagram/Apify no expone el
+        // recuento de shares públicamente → casi siempre 0; mostrar "0" daría señal vacía.
+        // Los shares reales esperan a Meta Graph API (mismo bucket que audiencia/retención).
+        ((r.sharesN||0)>0 ? stat(L("Compartidos","Shares"), r.shares) : '')+
       '</div>'+
       '<div class="crd-txwrap"><span class="crd-tx-lbl">'+L("TRANSCRIPCIÓN · DETECTADA","TRANSCRIPT · DETECTED")+'</span>'+txBody+'</div>'+
       '<button class="btn btn-md btn-primary crd-steal-full" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba la idea","Steal the idea")+'</button>'+
@@ -2588,6 +2592,8 @@
       '</div>'+
       '<div class="mt-grid-audtop">'+card(L("Crecimiento de seguidores","Follower growth"))+card(L("Alcance por tipo","Reach by type"))+'</div>'+
       '<div class="mt-grid3">'+card(L("Edad","Age"))+card(L("Género","Gender"))+card(L("Top ubicaciones","Top locations"))+'</div>'+
+      // Bucket Meta Graph API: shares reales + retención esperan la misma conexión.
+      '<div class="mt-grid2">'+card(L("Compartidos reales","Real shares"))+card(L("Retención / watch-time","Retention / watch-time"))+'</div>'+
     '</div>';
   }
   function metCompetidoresHTML(){
