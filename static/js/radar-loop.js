@@ -2746,21 +2746,47 @@
       5:{a:"#f59e0b", sub:L("Nivel Viral: tu Cerebro clava tu tono. Ahora juegas para viralizar.","Viral level: your Brain nails your tone. Now you play to go viral.")}
     })[to] || {a:"#6f93ff", sub:L("Tu Cerebro sube de nivel: clava mejor tu tono y necesitas menos retoques.","Your Brain levels up: it nails your tone better with fewer tweaks.")};
   }
+  // hex → rgba (para el tinte translúcido del acento por nivel).
+  function _hexA(hex,a){ var n=parseInt(String(hex).slice(1),16); return "rgba("+(n>>16&255)+","+(n>>8&255)+","+(n&255)+","+a+")"; }
+  // FX temático POR NIVEL (de Claude design): N2 plantillas que se alinean, N3 guion
+  // robado/absorbido, N4 línea de tendencia con pico, N5 ondas de choque.
+  function levelupFx(to, color){
+    if(to===2){ var s=""; for(var i=0;i<6;i++){ s+='<div class="rsx-tmpl" style="--a:'+(i*60)+'deg;animation-delay:'+(i*0.09).toFixed(2)+'s"></div>'; } return s; }
+    if(to===3){ return '<div class="rsx-steal"><div class="rsx-steal__t">GUION · 1.2M VIEWS</div><div class="rsx-steal__l" style="width:90%"></div><div class="rsx-steal__l" style="width:70%"></div><div class="rsx-steal__l" style="width:80%"></div></div>'; }
+    if(to===4){
+      var g=_hexA(color,.35), g0=_hexA(color,0);
+      return '<svg class="rsx-radar" viewBox="0 0 300 160" aria-hidden="true">'+
+        '<defs><linearGradient id="rsxTg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+g+'"/><stop offset="1" stop-color="'+g0+'"/></linearGradient></defs>'+
+        '<polyline points="0,120 50,110 95,118 140,70 175,30 200,96 250,80 300,108" fill="none" stroke="'+color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="600" stroke-dashoffset="600"><animate attributeName="stroke-dashoffset" from="600" to="0" dur="1.2s" begin="0.2s" fill="freeze"/></polyline>'+
+        '<polygon points="0,120 50,110 95,118 140,70 175,30 200,96 250,80 300,108 300,160 0,160" fill="url(#rsxTg)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.6s" begin="1s" fill="freeze"/></polygon></svg>'+
+        '<div class="rsx-spike" style="left:175px;top:30px;margin-left:-150px;margin-top:-80px"></div>';
+    }
+    if(to===5){ var s2=""; for(var j=0;j<4;j++){ s2+='<div class="rsx-shock" style="animation-delay:'+(j*0.22).toFixed(2)+'s"></div>'; } return s2; }
+    return "";
+  }
   function levelupHTML(){
     var lu=S.levelup; if(!lu) return "";
-    var th=levelupTheme(lu.to);
-    var sparks=""; for(var i=0;i<18;i++){ sparks+='<i style="--a:'+(i*20)+'deg;--dl:'+(0.25+(i%6)*0.07).toFixed(2)+'s"></i>'; }
-    return '<div class="overlay lvlup-overlay" role="dialog" aria-modal="true" aria-label="'+L("Subida de nivel del Cerebro","Brain level up")+'" style="--lvl-a:'+th.a+'">'+
-      '<div class="lvlup-stage">'+
-        '<div class="lvlup-rings"><span></span><span></span><span></span></div>'+
-        '<div class="lvlup-sparks">'+sparks+'</div>'+
-        '<div class="lvlup-orb">'+IC.brain+'<span class="lvlup-orb-n">'+lu.to+'</span></div>'+
-      '</div>'+
-      '<div class="lvlup-card">'+
-        '<div class="lvlup-eye">'+L("CEREBRO · NIVEL ","BRAIN · LEVEL ")+lu.to+'</div>'+
-        '<h2 class="lvlup-h">'+ESC(lu.name)+'</h2>'+
-        '<p class="lvlup-sub">'+th.sub+'</p>'+
-        '<button class="lvlup-btn" data-act="levelup-done">'+L("Continuar","Continue")+'</button>'+
+    var th=levelupTheme(lu.to); var accent=th.a;
+    // FX (anillos + partículas comunes + efecto del nivel) se computan UNA vez y se
+    // cachean en S.levelup._fx → un re-render incidental no reinicia la animación.
+    if(lu._fx==null){
+      var fx="";
+      for(var r=0;r<3;r++){ fx+='<div class="rsx-ring" style="animation-delay:'+(r*0.28).toFixed(2)+'s"></div>'; }
+      for(var p=0;p<22;p++){
+        var ang=Math.random()*6.283, dist=90+Math.random()*150;
+        fx+='<span class="rsx-particle" style="--tx:'+Math.round(Math.cos(ang)*dist)+'px;--ty:'+Math.round(Math.sin(ang)*dist)+'px;--d:'+(1+Math.random()*0.9).toFixed(2)+'s;animation-delay:'+(Math.random()*0.3).toFixed(2)+'s;width:'+(5+Math.round(Math.random()*6))+'px;height:'+(5+Math.round(Math.random()*6))+'px"></span>';
+      }
+      fx+=levelupFx(lu.to, accent);
+      lu._fx=fx;
+    }
+    return '<div class="rsx-overlay" role="dialog" aria-modal="true" aria-label="'+L("Subida de nivel del Cerebro","Brain level up")+'" style="--rsx-accent:'+accent+';--rsx-accent-soft:'+_hexA(accent,.32)+'">'+
+      '<div class="rsx-fx">'+lu._fx+'</div>'+
+      '<div class="rsx-stage">'+
+        '<div class="rsx-orb"><div class="rsx-orb__core">'+IC.brain+'</div><div class="rsx-orb__badge">'+lu.to+'</div></div>'+
+        '<p class="rsx-stage__eyebrow">'+L("Cerebro · Nivel ","Brain · Level ")+lu.to+'</p>'+
+        '<h2 class="rsx-stage__title">'+ESC(lu.name)+'</h2>'+
+        '<p class="rsx-stage__sub">'+th.sub+'</p>'+
+        '<button class="rsx-stage__btn" data-act="levelup-done">'+L("Continuar","Continue")+'</button>'+
       '</div>'+
     '</div>';
   }
