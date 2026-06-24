@@ -2729,8 +2729,17 @@
      de señales reales) + EJERCICIO DIARIO acumulado (botón «Alimentar», CD 24h, +5%).
      Niveles reclamables: 1 Aprendiz · 2 Imitador · 3 Ladrón · 4 Estratega · 5 Viral.
      Empiezas en 0 (Cerebro nuevo); el TUTORIAL llena la barra de N1 → primer subir. */
-  var BRAIN_DAILY_GAIN=5;   // % por ejercicio diario (botón Alimentar, CD 24h)
-  // Claves v2 (reinician el modelo viejo): nivel reclamado, XP diario, ts del último ejercicio.
+  var BRAIN_DAILY_GAIN=5;   // % por completar el ejercicio del día (train deck / tinder)
+  // FORMAS de alimentar el Cerebro (David 2026-06-24): cada una su % y su CD de 24h.
+  // El GUION es el que MÁS suma (es el activo más valioso para clavar tu voz).
+  var BRAIN_FEED_TYPES=[
+    {key:"guion",     gain:6, btype:"guiones", label:L("Un guion tuyo que petó","A script of yours that worked"), ph:L("Pega un guion o idea que te funcionó de verdad…","Paste a script or idea that really worked…")},
+    {key:"hook",      gain:2, btype:"hook",    label:L("Un hook que te mola","A hook you like"),                 ph:L("Un gancho de apertura que te encante…","An opening hook you love…")},
+    {key:"muletilla", gain:2, btype:"hook",    label:L("Tus muletillas","Your catchphrases"),                   ph:L("Frases que sueles decir, tu forma de hablar…","Phrases you often say, how you talk…")},
+    {key:"prefer",    gain:1, btype:"hook",    label:L("Tu estilo / preferencias","Your style / preferences"),  ph:L("Cómo hablas, qué evitas, a quién admiras…","How you talk, what you avoid, who you admire…")}
+  ];
+  function brainFeedDef(key){ for(var i=0;i<BRAIN_FEED_TYPES.length;i++){ if(BRAIN_FEED_TYPES[i].key===key) return BRAIN_FEED_TYPES[i]; } return BRAIN_FEED_TYPES[0]; }
+  // Claves v2 (reinician el modelo viejo): nivel reclamado, XP diario.
   function _brainKey(suf){ return "rs_brain_"+suf+"_"+((S.user&&S.user.email)||"x")+"|"+(S.brandId||""); }
   function brainClaimedGet(){
     if(isDemo()) return S._demoClaimed!=null?S._demoClaimed:0;   // demo arranca en 0 → previsualizar desde N1
@@ -2739,18 +2748,20 @@
   function brainClaimedSet(n){ if(isDemo()){ S._demoClaimed=n; return; } try{ localStorage.setItem(_brainKey("clv2"),String(n)); }catch(e){} }
   function brainDailyXpGet(){ if(isDemo()) return S._demoDailyXp||0; try{ var v=localStorage.getItem(_brainKey("xpv2")); return v!=null?parseInt(v,10):0; }catch(e){ return 0; } }
   function brainDailyXpSet(n){ n=Math.max(0,n); if(isDemo()){ S._demoDailyXp=n; return; } try{ localStorage.setItem(_brainKey("xpv2"),String(n)); }catch(e){} }
-  function brainExTsGet(){ if(isDemo()) return 0; try{ return parseInt(localStorage.getItem(_brainKey("extsv2"))||"0",10)||0; }catch(e){ return 0; } }
-  function brainExTsSet(t){ if(isDemo()) return; try{ localStorage.setItem(_brainKey("extsv2"),String(t)); }catch(e){} }
-  // CD de 24h. En DEMO no hay CD → puedes pulsar Alimentar repetidamente y ver la barra subir.
-  function brainExReady(){ if(isDemo()) return true; return (Date.now()-brainExTsGet())>=24*3600*1000; }
-  function brainExNextHrs(){ var ms=24*3600*1000-(Date.now()-brainExTsGet()); return Math.max(1,Math.ceil(ms/3600000)); }
-  // Suma el ejercicio diario a la barra del nivel actual (respeta el CD). Devuelve true si sumó.
-  function brainAddDailyXp(){
-    if(!brainExReady()) return false;
-    brainDailyXpSet(brainDailyXpGet()+BRAIN_DAILY_GAIN);
-    if(!isDemo()) brainExTsSet(Date.now());
-    return true;
-  }
+  // CD de 24h POR TIPO de alimentación (localStorage bf_<key>). Demo: sin CD → puedes
+  // alimentar repetido y ver la barra subir.
+  function _bfTsGet(key){ if(isDemo()) return 0; try{ return parseInt(localStorage.getItem(_brainKey("bf_"+key))||"0",10)||0; }catch(e){ return 0; } }
+  function _bfTsSet(key){ if(isDemo()) return; try{ localStorage.setItem(_brainKey("bf_"+key),String(Date.now())); }catch(e){} }
+  function brainFeedReady(key){ if(isDemo()) return true; return (Date.now()-_bfTsGet(key))>=24*3600*1000; }
+  function brainFeedNextHrs(key){ var ms=24*3600*1000-(Date.now()-_bfTsGet(key)); return Math.max(1,Math.ceil(ms/3600000)); }
+  function brainAnyFeedReady(){ if(isDemo()) return true; for(var i=0;i<BRAIN_FEED_TYPES.length;i++){ if(brainFeedReady(BRAIN_FEED_TYPES[i].key)) return true; } return brainFeedReady("train"); }
+  // Compat con radar/banner: "exReady" = ¿queda algo que alimentar hoy?
+  function brainExReady(){ return brainAnyFeedReady(); }
+  function brainExNextHrs(){ var m=99; BRAIN_FEED_TYPES.forEach(function(t){ if(!brainFeedReady(t.key)) m=Math.min(m,brainFeedNextHrs(t.key)); }); return m===99?1:m; }
+  // Suma XP a la barra del nivel actual (el CD lo comprueba el caller por tipo).
+  function brainAddXp(gain){ brainDailyXpSet(brainDailyXpGet()+(gain||BRAIN_DAILY_GAIN)); }
+  // Ejercicio del día (train deck / tinder) bajo su propio CD "train".
+  function brainAddDailyXp(){ if(!brainFeedReady("train")) return false; brainAddXp(BRAIN_DAILY_GAIN); _bfTsSet("train"); return true; }
   // HITOS por nivel: el % NO-diario de la barra del nivel que estás completando (next=claimed+1).
   function brainMilestonePct(claimed, s){
     var n=claimed+1;   // nivel que estás llenando
@@ -3479,17 +3490,23 @@
      que el usuario cuente cosas de sí mismo → aprende. Feedback visual FUERTE (lluvia
      de datos al cerebro 3D + pulso de crecimiento) + «gracias, voy aprendiendo». */
   function brainFeedMeHTML(){
-    var ready=brainExReady();
-    // El botón Alimentar = ejercicio diario: +5% a la barra del nivel, CD 24h.
+    var sel=S.feedType||"guion"; var def=brainFeedDef(sel); var ready=brainFeedReady(sel);
+    // Chips: cada FORMA de alimentar con su % y su estado (✓ hecho hoy / disponible).
+    var chips=BRAIN_FEED_TYPES.map(function(t){
+      var done=!brainFeedReady(t.key);
+      return '<button class="feed-chip'+(t.key===sel?' on':'')+(done?' done':'')+'" data-act="brain-feed-pick" data-k="'+t.key+'" title="'+ESC(t.label)+'">'+
+        (done?IC.check:'')+ESC(t.label)+' <b>+'+t.gain+'%</b></button>';
+    }).join("");
     var cta = ready
-      ? '<button class="btn btn-lg btn-primary feedme-cta" data-act="brain-feed-me">'+IC.bolt+' '+L("Alimentar al Cerebro · +"+BRAIN_DAILY_GAIN+"%","Feed the Brain · +"+BRAIN_DAILY_GAIN+"%")+'</button>'
-      : '<button class="btn btn-lg btn-secondary feedme-cta" disabled>'+IC.check+' '+L("Alimentado hoy · vuelve en "+brainExNextHrs()+"h","Fed today · back in "+brainExNextHrs()+"h")+'</button>';
+      ? '<button class="btn btn-lg btn-primary feedme-cta" data-act="brain-feed-me" data-k="'+sel+'">'+IC.bolt+' '+L("Alimentar · +"+def.gain+"%","Feed · +"+def.gain+"%")+'</button>'
+      : '<button class="btn btn-lg btn-secondary feedme-cta" disabled>'+IC.check+' '+L("Hecho hoy · vuelve en "+brainFeedNextHrs(sel)+"h","Done today · back in "+brainFeedNextHrs(sel)+"h")+'</button>';
     return '<div class="feedme">'+
       '<div class="feedme-body">'+
-        '<span class="feedme-eyebrow">'+IC.bolt+' '+L("ALIMENTA TU CEREBRO","FEED YOUR BRAIN")+' <span class="brain-tag">'+L("+"+BRAIN_DAILY_GAIN+"% · 1 al día","+"+BRAIN_DAILY_GAIN+"% · 1/day")+'</span></span>'+
-        '<div class="feedme-t">'+L("Cuéntame algo de ti y subo tu Cerebro","Tell me something about you and your Brain levels up")+'</div>'+
-        '<div class="feedme-d">'+L("Tu estilo, lo que te gusta, tus muletillas, a quién admiras… cada día que me alimentas, <b>+"+BRAIN_DAILY_GAIN+"%</b> hacia el siguiente nivel y el guion suena MÁS tuyo.","Your style, what you like, your catchphrases… each day you feed me, <b>+"+BRAIN_DAILY_GAIN+"%</b> toward the next level and scripts sound MORE like you.")+'</div>'+
-        '<textarea id="rsFeedMe" class="feedme-input" rows="2" maxlength="400"'+(ready?'':' disabled')+' placeholder="'+L("ej: hablo directo y sin rodeos, me encanta el humor seco y los datos curiosos…","e.g. I talk straight with no fluff, I love dry humor and curious facts…")+'"></textarea>'+
+        '<span class="feedme-eyebrow">'+IC.bolt+' '+L("ALIMENTA TU CEREBRO","FEED YOUR BRAIN")+' <span class="brain-tag">'+L("cada forma suma distinto · 1/día c/u","each way adds differently · 1/day each")+'</span></span>'+
+        '<div class="feedme-t">'+L("Dame material tuyo y subo de nivel","Give me your material and I level up")+'</div>'+
+        '<div class="feedme-d">'+L("Cuanto más concreto y MÁS TUYO, mejor clavo tu voz. Lo que más suma: <b>tus guiones que petaron</b>.","The more specific and YOURS, the better I nail your voice. What adds most: <b>your scripts that worked</b>.")+'</div>'+
+        '<div class="feed-chips">'+chips+'</div>'+
+        '<textarea id="rsFeedMe" class="feedme-input" rows="2" maxlength="600"'+(ready?'':' disabled')+' placeholder="'+ESC(def.ph)+'"></textarea>'+
         cta+
       '</div>'+
     '</div>';
@@ -3505,18 +3522,21 @@
     }catch(e){}
     var orb=document.querySelector(".brain-orb"); if(orb){ orb.classList.remove("feast"); void orb.offsetWidth; orb.classList.add("feast"); setTimeout(function(){ orb.classList.remove("feast"); }, 1200); }
   }
-  function brainFeedMe(){
+  function brainFeedPick(key){ S.feedType=key; render(); var ta=document.getElementById("rsFeedMe"); if(ta) try{ ta.focus(); }catch(e){} }
+  function brainFeedMe(key){
+    key=key||S.feedType||"guion"; var def=brainFeedDef(key);
     var ta=document.getElementById("rsFeedMe"); var note=ta?ta.value.trim():"";
     if(!note){ if(ta) ta.focus(); return; }
-    if(!brainExReady()){ return showToast(L("Ya alimentaste al Cerebro hoy · vuelve en "+brainExNextHrs()+"h.","Already fed the Brain today · back in "+brainExNextHrs()+"h.")); }
-    brainFeast(9);   // dopamina: lluvia + pulso
-    if(S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+2); }   // la nota también afina la voz
-    if(!isDemo()){ try{ apiPost('/api/brain/rate',{text:note, kind:"self_note", type:"self_note", rating:1, suggestion:note, niche:(S.onb&&S.onb.niche)||""}); }catch(e){} }
-    brainAddDailyXp();   // +5% a la barra del nivel (ejercicio diario, CD 24h)
+    if(!brainFeedReady(key)){ return showToast(L("Eso ya lo alimentaste hoy · vuelve en "+brainFeedNextHrs(key)+"h.","Already fed that today · back in "+brainFeedNextHrs(key)+"h.")); }
+    brainFeast(def.key==="guion"?12:9);   // dopamina: lluvia + pulso (más para guiones)
+    if(S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+(def.key==="guion"?3:1)); }
+    // Reusa /api/brain/rate (btype mapea a guion/hook, los valores que el backend acepta).
+    if(!isDemo()){ try{ apiPost('/api/brain/rate',{text:note, kind:def.btype, type:def.btype, rating:1, suggestion:note, source:"feed_"+def.key, niche:(S.onb&&S.onb.niche)||""}); }catch(e){} }
+    brainAddXp(def.gain); _bfTsSet(def.key);   // +gain% a la barra del nivel · CD 24h de ESTE tipo
     if(ta) ta.value="";
     brainLevelPulse();   // por si llegó al 100%
     render();
-    showToast(L("+"+BRAIN_DAILY_GAIN+"% al Cerebro · gracias 🧠 vuelve mañana para subir más.","+"+BRAIN_DAILY_GAIN+"% to your Brain · thanks 🧠 come back tomorrow for more."));
+    showToast(L("+"+def.gain+"% al Cerebro · "+def.label.toLowerCase()+" guardado 🧠","+"+def.gain+"% to your Brain · saved 🧠"));
   }
   function brainTrainHTML(){
     var mode=brainTrainMode();
@@ -6015,7 +6035,8 @@
     if(act==="brain-improve") return brainImprove(k==="send");
     if(act==="brain-levelup") return brainLevelup();   // recoger el nivel pendiente (manual)
     if(act==="levelup-done") return closeLevelup();
-    if(act==="brain-feed-me") return brainFeedMe();   // #2/#7: alimentar el Cerebro
+    if(act==="brain-feed-pick") return brainFeedPick(k);   // elegir forma de alimentar
+    if(act==="brain-feed-me") return brainFeedMe(k);   // #2/#7: alimentar el Cerebro (por tipo)
     if(act==="brain-train-more") return brainTrainMore();
     if(act==="gt-start") return startGuionTinder();
     if(act==="gt-vote") return guionTinderVote(parseInt(btn.getAttribute("data-k"),10)||0);
