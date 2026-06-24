@@ -972,6 +972,10 @@
   // CIERRE: ingiere (prod) → Cerebro ~50% + 1er guión; demo simula y siembra panel.
   function onbFinish(){
     onbTrack("onb_step_completed");
+    // Onboarding nuevo = Cerebro DESDE 0 → tras el tutorial sale el botón «¡Subir de
+    // nivel!» (reclamar N1). Reinicia el nivel reclamado y el XP diario (localStorage)
+    // sin depender de limpiar el navegador a mano.
+    try{ brainClaimedSet(0); brainDailyXpSet(0); S._canLvlSeen=null; }catch(e){}
     var picked=(S.onb.competitors||[]).filter(function(c){return c.picked;});
     onbTrack("onb_completed",{competitors:picked.length, value_reels:(S.onb.valueReels||[]).length});
     if(isDemo()){
