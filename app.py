@@ -984,7 +984,11 @@ def get_profile(user_id: str) -> dict:
             db.table("profiles").update({"usage_reset_at": _nm}).eq("id", user_id).execute()
             profile["usage_reset_at"] = _nm
         elif _now >= _reset:
-            _newc = (profile.get("credits_cents") or 0) + FREE_MONTHLY_CENTS
+            # TOPE 30 cr (Bernat 2026-06-24): los +15/mes NO se acumulan por encima del tope
+            # de bienvenida → rellena HACIA 30, nunca por encima (no farmear). Si ya tiene ≥30
+            # (p.ej. compró un pack), NO se le toca (el min recortaría créditos comprados).
+            _cur = profile.get("credits_cents") or 0
+            _newc = min(WELCOME_CREDITS_CENTS, _cur + FREE_MONTHLY_CENTS) if _cur < WELCOME_CREDITS_CENTS else _cur
             _nm = _next_month_boundary(_now).isoformat()
             db.table("profiles").update({"credits_cents": _newc, "usage_reset_at": _nm}).eq("id", user_id).execute()
             profile["credits_cents"] = _newc
