@@ -84,6 +84,7 @@
     x:'<svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     check:'<svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M5 12l5 5 9-10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     plus:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    lock:'<svg viewBox="0 0 24 24" fill="none" width="14" height="14"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10.5V8a4 4 0 018 0v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     chev:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     bolt:'<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor"/></svg>',
     doc:'<svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M7 3h7l5 5v13H7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 3v5h5M9.5 13h6M9.5 16.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
@@ -1166,29 +1167,38 @@
   /* Sugerir competidores proactivamente (Fathom 18/06): "@X acaba de petar, síguelo".
      En demo, sugerencia determinista (no seguida aún). En prod la alimenta el backend
      (creadores del nicho con métricas en alza — reutilizar el flujo de scrape). */
-  function suggestedComp(){
-    if(S._suggDismissed) return null;
-    if(!isDemo()) return S._suggReal || null;   // real: lo carga loadSuggestion()
-    var pool=[
+  // Pool de demo: 5 candidatos para previsualizar el muro de competidores.
+  function _suggDemoPool(){
+    return [
       {handle:"ia_con_marcos", x:"×8", tag_es:"Nuevo en tu nicho", tag_en:"New in your niche",
         why_es:"se pegó un reel de 210k (×8 su media)", why_en:"just hit a 210k reel (8× their average)"},
       {handle:"lucia.growth",  x:"↑45%", tag_es:"Está despegando", tag_en:"Taking off",
         why_es:"subió +45% de seguidores esta semana", why_en:"grew +45% in followers this week"},
       {handle:"hooks_diarios", x:"En racha", tag_es:"Petando ahora", tag_en:"Blowing up now",
-        why_es:"encadenó 3 reels virales en 7 días", why_en:"chained 3 viral reels in 7 days"}
+        why_es:"encadenó 3 reels virales en 7 días", why_en:"chained 3 viral reels in 7 days"},
+      {handle:"reels.lab",     x:"×5", tag_es:"Subiendo fuerte", tag_en:"Climbing fast",
+        why_es:"tiene un reel reciente de 320k", why_en:"has a recent 320k reel"},
+      {handle:"viral.coach",   x:"↑30%", tag_es:"En tu nicho", tag_en:"In your niche",
+        why_es:"creció +30% este mes", why_en:"grew +30% this month"}
     ];
-    var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){return String(t.handle||"").toLowerCase().replace(/^@+/,"");});
-    var cands=pool.filter(function(c){ return tracked.indexOf(c.handle)<0; });
-    if(!cands.length) return null;
-    return cands[ (new Date().getDate()) % cands.length ];
   }
-  // Real: carga la sugerencia del backend (1 vez), luego re-render. La UI es la misma.
+  // Lista de sugerencias (demo: pool; real: la trae loadSuggestion del backend).
+  function suggestedList(){
+    if(isDemo()) return _suggDemoPool();
+    return Array.isArray(S._suggList) ? S._suggList : (S._suggReal ? [S._suggReal] : []);
+  }
+  // Real: carga hasta 5 sugerencias del backend (1 vez), luego re-render.
   function loadSuggestion(){
-    if(isDemo() || S._suggDismissed || S._suggReal || S._suggLoading) return;
+    if(isDemo() || S._suggDismissed || S._suggLoading) return;
+    if(Array.isArray(S._suggList) && S._suggList.length) return;
     S._suggLoading=true;
-    apiGet('/api/suggested-competitor').then(function(r){
+    apiGet('/api/suggested-competitor?limit=5').then(function(r){
       S._suggLoading=false;
-      if(r && r.ok && r.d && r.d.suggestion){ S._suggReal=r.d.suggestion; if(S.tab==="dashboard") render(); }
+      if(r && r.ok && r.d){
+        S._suggReal=r.d.suggestion||null;
+        S._suggList=Array.isArray(r.d.suggestions)?r.d.suggestions:(r.d.suggestion?[r.d.suggestion]:[]);
+        if(S.tab==="dashboard") render();
+      }
     });
   }
   // Real: ranking del nicho por VIEWS medias/reel (no seguidores — el scrape no los
@@ -1233,26 +1243,60 @@
       }
     });
   }
+  // Muro de competidores (Bernat 24-jun): «Creadores que deberías vigilar» — enseña
+  // hasta 5 sugeridos; los que CABEN en tu cupo (free=2) son «Añadir», el resto salen
+  // BLOQUEADOS (blur + 🔒). Muro psicológico: ves 5, free solo te llevas 2. En plan de
+  // pago no hay muro: solo sugerencias añadibles según el hueco que te quede.
   function suggestedCompHTML(){
-    // Al TOPE de competidores del plan → no sugerir (no puedes añadir más; quita uno o sube).
-    var _u=(S.trackedCount!=null?S.trackedCount:(Array.isArray(S.tracked)?S.tracked.length:0));
-    if(S.trackedLimit!=null && _u>=S.trackedLimit) return '';
-    var c=suggestedComp(); if(!c) return '';
-    var why=c.why || L(c.why_es, c.why_en);   // real → string; demo → bilingüe
-    var tag=c.tag || L(c.tag_es, c.tag_en);
-    var whyCap=why ? (why.charAt(0).toUpperCase()+why.slice(1)) : "";
-    return '<div class="sugg-comp">'+
-      onbAvatar(c.handle)+
-      '<div class="sugg-body">'+
-        '<div class="sugg-tag">'+IC.spark+' '+L("Te lo sugiero","Suggested")+' · '+ESC(tag)+'</div>'+
-        '<div class="sugg-h">@'+ESC(c.handle)+' <span class="sugg-x">'+ESC(c.x||"")+'</span></div>'+
-        '<div class="sugg-why">'+ESC(whyCap)+'. '+L("Aún no lo sigues — añádelo y sus reels entran en tu radar.","You don't follow them yet — add them and their reels enter your radar.")+'</div>'+
-      '</div>'+
-      '<div class="sugg-actions">'+
-        '<button class="btn btn-sm btn-primary" data-act="add-suggested" data-id="'+ESC(c.handle)+'">'+IC.plus+' '+L("Añadir","Add")+'</button>'+
-        '<button class="btn btn-sm btn-ghost" data-act="sugg-dismiss">'+L("Ahora no","Not now")+'</button>'+
-      '</div>'+
-    '</div>';
+    if(S._suggDismissed) return '';
+    var wall = isDemo() || isFree();   // demo previsualiza el muro
+    var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
+      return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
+    var list=suggestedList().filter(function(c){ return tracked.indexOf(String(c.handle||"").toLowerCase())<0; });
+    if(!list.length) return '';
+    var used=(S.trackedCount!=null?S.trackedCount:tracked.length);
+    var lim=(S.trackedLimit!=null?S.trackedLimit:2);   // free = 2 por defecto
+    var freeSlots=Math.max(0, lim-used);
+    if(!wall){
+      // plan de pago: sin muro. Sin hueco → no molestamos; con hueco → sugerencias añadibles.
+      if(freeSlots<=0) return '';
+      list=list.slice(0, Math.max(1, freeSlots));
+    } else {
+      list=list.slice(0, 5);   // muro: hasta 5 visibles
+    }
+    var rows=list.map(function(c,i){
+      var why=c.why || L(c.why_es, c.why_en);   // real → string; demo → bilingüe
+      var tag=c.tag || L(c.tag_es, c.tag_en);
+      var whyCap=why ? (why.charAt(0).toUpperCase()+why.slice(1)) : "";
+      var locked=wall && i>=freeSlots;
+      if(locked){
+        return '<div class="sugg-comp locked">'+
+          '<div class="sugg-ava-wrap">'+onbAvatar(c.handle)+'<span class="sugg-ava-lock">'+IC.lock+'</span></div>'+
+          '<div class="sugg-body">'+
+            '<div class="sugg-tag sugg-tag--lock">'+IC.lock+' '+L("Bloqueado","Locked")+' · '+ESC(tag)+'</div>'+
+            '<div class="sugg-h">@'+ESC(c.handle)+' <span class="sugg-x">'+ESC(c.x||"")+'</span></div>'+
+            '<div class="sugg-why">'+ESC(whyCap)+'.</div>'+
+          '</div>'+
+          '<div class="sugg-actions"><button class="btn btn-sm btn-secondary" data-act="unlock-comp">'+IC.lock+' '+L("Desbloquear","Unlock")+'</button></div>'+
+        '</div>';
+      }
+      return '<div class="sugg-comp">'+
+        onbAvatar(c.handle)+
+        '<div class="sugg-body">'+
+          '<div class="sugg-tag">'+IC.spark+' '+L("Te lo sugiero","Suggested")+' · '+ESC(tag)+'</div>'+
+          '<div class="sugg-h">@'+ESC(c.handle)+' <span class="sugg-x">'+ESC(c.x||"")+'</span></div>'+
+          '<div class="sugg-why">'+ESC(whyCap)+'. '+L("Añádelo y sus reels entran en tu radar.","Add them and their reels enter your radar.")+'</div>'+
+        '</div>'+
+        '<div class="sugg-actions"><button class="btn btn-sm btn-primary" data-act="add-suggested" data-id="'+ESC(c.handle)+'">'+IC.plus+' '+L("Añadir","Add")+'</button></div>'+
+      '</div>';
+    }).join("");
+    var nLocked=wall ? Math.max(0, list.length-freeSlots) : 0;
+    var head='<div class="sugg-head"><span class="sugg-head-t">'+IC.eye+' '+L("Creadores que deberías vigilar","Creators you should watch")+'</span>'+
+      '<button class="sugg-hide" data-act="sugg-dismiss">'+L("Ocultar","Hide")+'</button></div>';
+    var foot = nLocked>0
+      ? '<button class="btn btn-md btn-primary sugg-unlock-cta" data-act="unlock-comp">'+IC.bolt+' '+L("Desbloquea "+nLocked+" competidor"+(nLocked>1?"es":"")+" más","Unlock "+nLocked+" more competitor"+(nLocked>1?"s":""))+'</button>'
+      : '';
+    return '<div class="sugg-card">'+head+rows+foot+'</div>';
   }
 
   // Gestión de competidores seguidos desde el Radar (acordeón plegado): borrar
@@ -5036,14 +5080,15 @@
   // Muro: free agotó sus guiones del mes (o sin créditos). Abre el modal de planes.
   function showPaywall(err){
     startFlash();   // 1er muro → arranca la oferta flash de 48h
-    var msg = (err==="free_limit_reached")
-      ? L("Sin robos gratis este mes. Tu radar tiene más ideas que petan — desbloquéalas.","No free steals left this month. Your radar has more ideas blowing up — unlock them.")
-      : L("Necesitas créditos para robar esta idea.","You need credits to steal this idea.");
+    var msg;
+    if(err==="tracked_creators")      msg=L("Ya sigues a tus 2 competidores del plan free. Desbloquea más con Pro.","You're following your 2 free-plan competitors. Unlock more with Pro.");
+    else if(err==="free_limit_reached") msg=L("Sin robos gratis este mes. Tu radar tiene más ideas que petan — desbloquéalas.","No free steals left this month. Your radar has more ideas blowing up — unlock them.");
+    else                              msg=L("Necesitas créditos para robar esta idea.","You need credits to steal this idea.");
     showToast(msg, L("Ver planes","See plans"), "open-plans");
     // FIX free-counter: refresca el contador real tras el muro (la pill no debe
     // quedarse en "1 este mes" cuando el restante real es 0).
     if(isDemo()){ render(); } else { refreshCredits().then(function(){ render(); }); }
-    if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("hazlo_mio_free_limit"); }catch(e){} }
+    if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal(err==="tracked_creators"?"tracked_creators":"hazlo_mio_free_limit"); }catch(e){} }
   }
   // Tope diario del trial: aviso suave (no es "sin créditos", es "vuelve mañana").
   function showDailyLimit(){
@@ -6268,16 +6313,24 @@
     if(act==="force-scrape"){ return forceScrape(); }
     if(act==="add-suggested"){
       var sh=btn.getAttribute("data-id")||"";
-      S._suggDismissed=true; S._suggReal=null;
+      // No escondemos la tarjeta: al añadir uno, sube el contador → el siguiente sugerido
+      // puede quedar bloqueado (cascada del muro). El añadido se filtra como ya seguido.
       if(isDemo()){
         S.tracked=(Array.isArray(S.tracked)?S.tracked:[]).concat([{id:"sugg_"+sh, handle:sh, name:sh}]);
+        if(S.trackedCount!=null) S.trackedCount++;
         showToast(L("@"+sh+" añadido a tu radar — sus reels empezarán a aparecer.","@"+sh+" added to your radar — their reels will start showing up."));
         return render();
       }
-      render();                  // oculta la tarjeta
+      render();                  // refresca el muro
       return _followAuthor(sh);  // sigue de verdad (POST /api/tracked-creators + refresh)
     }
-    if(act==="sugg-dismiss"){ S._suggDismissed=true; S._suggReal=null; showToast(L("Vale, te sugeriré otro.","Okay, I'll suggest another.")); return render(); }
+    // Muro de competidores (Bernat): el free intenta el 3º → planes.
+    if(act==="unlock-comp"){
+      try{ if(window.posthog&&window.posthog.capture) window.posthog.capture("paywall_cta_clicked",{wall:"tracked_creators",plan:S.realPlan}); }catch(e){}
+      if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("tracked_creators"); }catch(e){} }
+      return;
+    }
+    if(act==="sugg-dismiss"){ S._suggDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
     if(act==="versus-start"){
       var opp=btn.getAttribute("data-id")||"rival";
       // oppAvg = media de views del competidor; mine = tu mejor reel.
