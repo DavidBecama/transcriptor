@@ -8100,6 +8100,50 @@ def count_active_tracked(user_id: str, project_id: str | None = None,
         return 0
 
 
+def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, limit=5):
+    """Competidores CURADOS (creators_global.niche_source='seed') del nicho/subnichos
+    dados que el usuario aún no sigue. Cold-start del radar SIN grafo de co-ocurrencia
+    ni LLM (handles reales, no alucinados). Matchea por nicho amplio O por overlap de
+    subniches (que incluye el nicho granular del CSV como tag). Degrada a [] si falta
+    la semilla o la migración. Devuelve [{'id','handle','niche','subniches'}]."""
+    if limit <= 0:
+        return []
+    exclude_handles = {(h or "").lstrip("@").lower() for h in (exclude_handles or [])}
+    exclude_ids = set(exclude_ids or [])
+    pn = _norm_tag(niche or "")
+    tags = [t for t in (_norm_tag(s) for s in (subniches or [])) if t]
+    if pn and pn not in tags:
+        tags.append(pn)
+    found, seen = [], set()
+    sel = "id,ig_username,niche,subniches"
+
+    def _collect(q):
+        try:
+            for x in (q.eq("niche_source", "seed").limit(150).execute()).data or []:
+                cid = x.get("id")
+                if cid and cid not in seen:
+                    seen.add(cid)
+                    found.append(x)
+        except Exception:
+            logger.warning("[seed] query failed (¿migración onboarding_v2_tags?)", exc_info=True)
+
+    if pn:
+        _collect(db.table("creators_global").select(sel).eq("niche", pn))
+    if tags:
+        _collect(db.table("creators_global").select(sel).overlaps("subniches", tags))
+    out = []
+    for x in found:
+        cid = x.get("id")
+        h = (x.get("ig_username") or "").lstrip("@")
+        if not h or cid in exclude_ids or h.lower() in exclude_handles:
+            continue
+        out.append({"id": cid, "handle": h, "niche": x.get("niche"),
+                    "subniches": x.get("subniches") or []})
+        if len(out) >= limit:
+            break
+    return out
+
+
 @app.route("/api/onboarding/suggest-competitors", methods=["POST"])
 @require_auth
 @limiter.limit("12 per hour;40 per day")
@@ -8119,12 +8163,22 @@ def suggest_competitors():
     handle = (body.get("handle") or "").strip().lstrip("@").lower()
     platform = (body.get("platform") or "instagram").strip().lower()
     niche = (body.get("niche") or "").strip()[:160]
+    subniches = body.get("subniches") or []
 
     if not re.match(r"^[a-zA-Z0-9._]{1,30}$", handle):
         return jsonify({"error": "invalid_handle",
                         "message": "Escribe tu usuario sin @ (solo letras, números, punto y guion bajo)."}), 400
 
     track_event("onboarding_suggest_requested", uid, {"platform": platform, "has_niche": bool(niche)})
+
+    # PRIMARIO: competidores CURADOS de la semilla por nicho/subnicho (handles reales,
+    # no alucinados). El LLM solo rellena si la semilla no cubre el nicho (texto libre).
+    seed = _seed_competitors(niche, subniches, exclude_handles=[handle], limit=5)
+    creators = [{"handle": s["handle"], "reason": "referente de tu nicho"} for s in seed]
+    have = {c["handle"] for c in creators}
+    if len(creators) >= 5:
+        return jsonify({"creators": creators[:5], "handle": handle,
+                        "platform": platform, "source": "seed"}), 200
 
     system = (
         "Eres un estratega de contenido para creadores de Instagram/TikTok. "
@@ -8147,7 +8201,6 @@ def suggest_competitors():
     # reventaba el parse de _call_llm_json y devolvía 502 → bloqueaba la activación.
     # Blindaje total: cualquier fallo (red, parse, modelo) → 200 con creators:[] +
     # fallback, y el front cae a "añade a mano". NUNCA un 502 al usuario.
-    creators = []
     try:
         raw_text = _call_llm(system, user_content, temperature=0.6, max_tokens=1500)
         # Parse tolerante (sin raise): fences markdown + extracción del objeto.
@@ -8161,25 +8214,24 @@ def suggest_competitors():
             m = re.search(r"\{[\s\S]*\}", t)
             data = json.loads(m.group()) if m else {}
         raw = (data or {}).get("creators") or []
-        seen = set()
         for c in raw:
             h = (c.get("handle") or "").strip().lstrip("@").lower() if isinstance(c, dict) else ""
-            if not re.match(r"^[a-zA-Z0-9._]{1,30}$", h) or h == handle or h in seen:
+            if not re.match(r"^[a-zA-Z0-9._]{1,30}$", h) or h == handle or h in have:
                 continue
-            seen.add(h)
+            have.add(h)
             creators.append({"handle": h, "reason": (c.get("reason") or "").strip()[:120]})
             if len(creators) >= 5:
                 break
     except Exception:
         logger.exception("suggest_competitors failed user=%s handle=%s", uid, handle)
-        creators = []
 
     if not creators:
         # Nunca 502: 200 con lista vacía → el front ofrece "añade a mano".
         return jsonify({"creators": [], "fallback": True,
                         "message": "No pude buscar tu competencia ahora. Añade un competidor a mano para empezar."}), 200
 
-    return jsonify({"creators": creators, "handle": handle, "platform": platform}), 200
+    return jsonify({"creators": creators, "handle": handle, "platform": platform,
+                    "source": ("mixed" if seed else "llm")}), 200
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -8686,6 +8738,25 @@ def suggested_competitor():
     candidato de un reel reciente que petó. La UI ya existe (suggestedComp)."""
     user = current_user()
     uid = user["id"]
+    try:
+        limit = max(1, min(8, int(request.args.get("limit", 1))))
+    except Exception:
+        limit = 1
+
+    def _seed_shaped(exclude_ids, exclude_handles, n):
+        """Cold-start: rellena con competidores curados de la semilla por nicho."""
+        if n <= 0:
+            return []
+        try:
+            prof = (db.table("profiles").select("niche,subniches")
+                    .eq("id", uid).single().execute()).data or {}
+        except Exception:
+            prof = {}
+        seeds = _seed_competitors(prof.get("niche"), prof.get("subniches") or [],
+                                  exclude_handles=exclude_handles, exclude_ids=exclude_ids, limit=n)
+        return [{"handle": s["handle"], "why": "es un referente de tu nicho",
+                 "x": "top", "tag": "Top en tu nicho"} for s in seeds]
+
     # 1. Mis competidores.
     try:
         mine_r = (db.table("user_tracked_creators").select("creator_id")
@@ -8694,7 +8765,8 @@ def suggested_competitor():
     except Exception:
         mine = set()
     if not mine:
-        return jsonify({"suggestion": None}), 200
+        seeds = _seed_shaped(set(), set(), limit)
+        return jsonify({"suggestion": seeds[0] if seeds else None, "suggestions": seeds}), 200
     # 2. Peers que siguen a alguno de mis competidores.
     peer_ids = set()
     mine_list = list(mine)
@@ -8721,7 +8793,8 @@ def suggested_competitor():
         except Exception:
             pass
     if not counts:
-        return jsonify({"suggestion": None}), 200
+        seeds = _seed_shaped(mine, set(), limit)
+        return jsonify({"suggestion": seeds[0] if seeds else None, "suggestions": seeds}), 200
     ranked = sorted(counts.items(), key=lambda kv: -kv[1])[:8]
     cand_ids = [c for c, _ in ranked]
     # 4. Mejor reel reciente (explosión) de los candidatos.
@@ -8766,10 +8839,11 @@ def suggested_competitor():
         return {"handle": handle, "why": why, "x": xtag, "tag": "Lo siguen en tu nicho"}
 
     suggestions = [s for s in (_mk_suggestion(cid) for cid in ordered) if s]
-    try:
-        limit = max(1, min(8, int(request.args.get("limit", 1))))
-    except Exception:
-        limit = 1
+    # Top-up con la semilla si la co-ocurrencia no llena el muro (cold-start / nicho
+    # poco poblado). Excluye lo que ya sigo y lo ya sugerido.
+    if len(suggestions) < limit:
+        have = {(s["handle"] or "").lower() for s in suggestions}
+        suggestions += _seed_shaped(mine, have, limit - len(suggestions))
     suggestions = suggestions[:limit]
     return jsonify({
         "suggestion": suggestions[0] if suggestions else None,
