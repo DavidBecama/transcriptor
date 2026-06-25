@@ -754,6 +754,7 @@
   function onbFeedMyReels(){
     var reels=(S.onb.myReels||[]).slice(0,3);
     try{ brainFeast(12); }catch(e){}   // dopamina: lluvia al cerebro 3D
+    if(S._brain){ try{ S._brain.feed(); }catch(e){} }   // v=136: chispazo en el cerebro del onboarding
     if(!isDemo()){
       reels.forEach(function(r){
         var c=(r.caption||"").trim(); if(!c) return;
@@ -776,16 +777,53 @@
       default: return onbHandleHTML();
     }
   }
-  // A) Pantalla dedicada: ocupa todo, oculta el radar vacío del fondo.
+  // A) Pantalla dedicada: ocupa todo, oculta el radar vacío del fondo. v=136: split-screen
+  // — el CEREBRO (reel-brain.js, canvas 2D) vive en el panel izquierdo persistente
+  // (#rsBrainHost, hermano de #rsView → no se repinta) y crece paso a paso; el wizard va a
+  // la derecha. mountOnbBrain() lo monta/avanza desde render(); destroy al salir.
   function onboardingScreenHTML(){
     var i=onbIdx();
     var dots=ONB_STEPS.map(function(s,n){ return '<span class="onbp-dot'+(n<=i?" on":"")+'"></span>'; }).join("");
-    return '<div class="onb-screen"><div class="onb-screen-bg" aria-hidden="true"></div>'+
+    return '<div class="onb-screen onb-screen--split"><div class="onb-screen-bg" aria-hidden="true"></div>'+
       '<div class="onb-screen-inner">'+
         '<div class="onb-top"><span class="onb-logo">'+IC.bolt+' ReelScript</span></div>'+
         '<div class="onb-prog"><div class="onbp-dots">'+dots+'</div><span class="onbp-lbl">'+L("Paso","Step")+' '+(i+1)+' '+L("de","of")+' '+ONB_STEPS.length+'</span></div>'+
         onbStepHTML()+
       '</div></div>';
+  }
+  // Caption del cerebro por paso (del diseño de Claude Design): el cerebro «narra» su construcción.
+  function _onbBrainCap(i){
+    var caps=[
+      {tag:L("núcleo","core"),               title:L("Despierta.","Waking up.")},
+      {tag:L("reconocimiento","recognition"),title:L("Te reconozco.","I recognize you.")},
+      {tag:L("sinapsis","synapses"),         title:L("Primer chispazo.","First spark.")},
+      {tag:L("estructura","structure"),      title:L("Tomando forma.","Taking shape.")},
+      {tag:L("dendritas","dendrites"),       title:L("Ramificando.","Branching out.")},
+      {tag:L("red externa","external net"),  title:L("Conectando tu nicho.","Wiring your niche.")},
+      {tag:L("propósito","purpose"),         title:L("Con un objetivo.","With a goal.")},
+      {tag:L("online · 35%","online · 35%"), title:L("Manifestando viralidad.","Manifesting virality.")}
+    ];
+    return caps[i]||caps[0];
+  }
+  // Monta/avanza el cerebro del onboarding. Idempotente: crea ReelBrain una sola vez sobre
+  // el canvas persistente y solo llama setStep (que crece sumando, no reinicia).
+  function mountOnbBrain(){
+    var bh=document.getElementById("rsBrainHost"); if(!bh) return;
+    bh.style.display="block";
+    var cv=document.getElementById("rsBrainCanvas");
+    if(window.ReelBrain && cv){
+      if(!S._brain){ try{ S._brain=new window.ReelBrain(cv,{brand:"#4f7cff"}); }catch(e){ S._brain=null; } }
+      if(S._brain){ try{ S._brain.setStep(onbIdx()+1); }catch(e){} }
+    }
+    var cap=_onbBrainCap(onbIdx());
+    var t=document.getElementById("rsBrainTag"), h=document.getElementById("rsBrainTitle");
+    if(t) t.textContent=cap.tag; if(h) h.textContent=cap.title;
+  }
+  // Desmonta el cerebro al salir del onboarding (destroy → mata rAF/ResizeObserver).
+  function unmountOnbBrain(){
+    var bh=document.getElementById("rsBrainHost");
+    if(bh && bh.style.display!=="none") bh.style.display="none";
+    if(S._brain){ try{ S._brain.destroy(); }catch(e){} S._brain=null; }
   }
   // compat: el dashboard antiguo llamaba onboardingHTML(); ya no se usa (render
   // hace short-circuit a la pantalla dedicada), pero lo dejamos seguro.
@@ -4541,6 +4579,9 @@
     var view=document.getElementById("rsView");
     if(!view || view.parentNode!==el){
       el.innerHTML='<div class="rs-view" id="rsView"></div>'+
+        // Cerebro del onboarding (v=136): canvas PERSISTENTE (hermano de #rsView → no se
+        // repinta) para que ReelBrain crezca paso a paso sin reiniciar en cada render.
+        '<div class="onb-brain-host" id="rsBrainHost" style="display:none" aria-hidden="true"><canvas id="rsBrainCanvas"></canvas><span class="onb-bh-logo">'+IC.bolt+' ReelScript</span><div class="onb-bh-cap"><div class="onb-bh-tag" id="rsBrainTag"></div><div class="onb-bh-title" id="rsBrainTitle"></div></div></div>'+
         // Host estable (hermano de #rsView, no se re-renderiza) para montar dentro
         // una sección legacy (Analizar/Configuración) reparentando su contenedor.
         '<div class="rs-legacy" id="rsLegacy" style="display:none"></div>'+
@@ -4561,6 +4602,7 @@
     // (0 rivales · 0 reels) NO se ve detrás. Short-circuit antes de montar la isla.
     if(showOnboarding()){
       view.innerHTML=onboardingScreenHTML();
+      mountOnbBrain();   // v=136: cerebro split-screen (canvas persistente, crece por paso)
       onbView();   // PostHog: 1 evento "viewed" por paso
       var _of=document.getElementById("rsOnbHandle")||document.getElementById("rsOnbNiche")||document.getElementById("rsOnbTagInput");
       if(_of && document.activeElement!==_of){ try{ _of.focus(); }catch(e){} }
@@ -4576,6 +4618,7 @@
       }); }
       return;
     }
+    unmountOnbBrain();   // v=136: fuera del onboarding → destruir el cerebro (mata rAF/RO)
     var html='';
     html+=railHTML()+'<div class="work">'+cmdHTML();
     if(S.tab==="portfolio") html+=(isAgency()?portfolioHTML():dashboardHTML());
