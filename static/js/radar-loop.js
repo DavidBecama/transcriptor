@@ -1004,16 +1004,10 @@
   function onbWaitHTML(){
     var seed=(S.onb&&S.onb.seed)?("@"+String(S.onb.seed).replace(/^@+/,"")):"";
     var step1 = seed ? L("Analizando a <b>"+ESC(seed)+"</b>","Analyzing <b>"+ESC(seed)+"</b>") : L("Analizando tu nicho","Analyzing your niche");
-    // «Analizando TU perfil» (David/Bernat 24-jun): sensación de análisis PERSONAL con
-    // tu foto real de IG. Tu perfil se scrapea en 2º plano (onbConnectIG, paso handle).
-    var meH=(S.onb&&S.onb.handle)?String(S.onb.handle).replace(/^@+/,""):"";
-    var meBlock = meH ? ('<div class="onbw-me">'+
-      '<span class="onbw-me-ava"><span class="onbw-me-fb">'+ESC(initialsOf(meH))+'</span>'+
-        (S.onb.avatar?'<img class="onbw-me-img on" src="'+ESC(S.onb.avatar)+'" alt=""/>':'')+
-        '<span class="onbw-me-pulse"></span></span>'+
-      '<span class="onbw-me-txt"><b>'+L("Analizando tu perfil","Analyzing your profile")+'</b> · @'+ESC(meH)+'<span class="onbw-me-sub">'+L("aprendiendo cómo hablas para clavar tu voz","learning how you talk to nail your voice")+'</span></span>'+
-    '</div>') : '';
-    return '<div class="scroll"><div class="canvas"><div class="onbwait">'+meBlock+
+    // v=137 (rediseño Claude Design «Preparando tu radar»): SIN chip de perfil — radar
+    // limpio centrado a pantalla completa (el full-screen lo da .onb-fs en render).
+    var seedAt=(S.onb&&S.onb.seed)?("@"+String(S.onb.seed).replace(/^@+/,"")):"@tucreador";
+    return '<div class="scroll"><div class="canvas"><div class="onbwait">'+
       '<div class="onbw-radar" aria-hidden="true">'+
         '<div class="onbw-grid1"></div><div class="onbw-grid2"></div><div class="onbw-grid3"></div>'+
         '<div class="onbw-sweep"><div class="onbw-fan"></div><div class="onbw-arm"></div></div>'+
@@ -1025,9 +1019,9 @@
       '</div>'+
       '<div class="onbw-cards" aria-hidden="true">'+
         '<span class="onbw-card"><span class="onbw-card-ava"></span>'+L("Reel encontrado · 4.2M views","Reel found · 4.2M views")+'</span>'+
-        '<span class="onbw-card c2"><span class="onbw-card-ava"></span>'+L("Creador afín de tu nicho","Similar creator in your niche")+'</span>'+
+        '<span class="onbw-card c2"><span class="onbw-card-ava"></span>'+L("Creador afín · "+seedAt,"Similar creator · "+seedAt)+'</span>'+
       '</div>'+
-      '<div class="onbw-title">'+L("Buscando los mejores reels para ti…","Finding the best reels for you…")+'</div>'+
+      '<div class="onbw-title">'+L("Preparando tu radar…","Preparing your radar…")+'</div>'+
       '<div class="onbw-steps">'+
         '<div class="onbw-step s1"><i></i>'+step1+'</div>'+
         '<div class="onbw-step s2"><i></i>'+L("Buscando creadores afines de tu nicho","Finding similar creators in your niche")+'</div>'+
@@ -1951,8 +1945,8 @@
     '</div>';
   }
   function dashboardHTML(){
-    if(S._onbWaiting) return onbWaitHTML();   // tras el onboarding: esperando los reels del nicho (Apify)
-    if(S.onbStealOffer) return onbStealOfferHTML();   // #6: «¿quieres robar este?» antes del tour
+    // (v=137: la carga post-onb y «¿quieres robar este?» se sirven a pantalla completa
+    //  desde render() vía .onb-fs — antes se devolvían aquí, con la chrome alrededor.)
     var st=S.stats||{competitors:0,reels_week:0,exploded_week:0,stolen_today:0}; var b=brand();
     var sorted=feedReels();
     var line = st.exploded_week>0
@@ -4616,6 +4610,13 @@
         // → para cuando llegue a «este eres tú» la foto ya está (el scrape tarda ~5-15s).
         clearTimeout(S._avaT); if(ok && !isDemo()){ S._avaT=setTimeout(function(){ onbFetchAvatar(v); }, 700); }
       }); }
+      return;
+    }
+    // v=137: carga post-onboarding y «¿quieres robar este?» a PANTALLA COMPLETA — sin rail
+    // ni barra superior (short-circuit antes de montar la chrome, como el onboarding).
+    if(S._onbWaiting || S.onbStealOffer){
+      unmountOnbBrain();
+      view.innerHTML='<div class="onb-fs">'+(S._onbWaiting?onbWaitHTML():onbStealOfferHTML())+'</div>';
       return;
     }
     unmountOnbBrain();   // v=136: fuera del onboarding → destruir el cerebro (mata rAF/RO)
