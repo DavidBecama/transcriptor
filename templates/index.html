@@ -10281,7 +10281,7 @@
     .rs .onb-bh-tag { font-family:var(--font-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--brand-400); margin-bottom:10px; }
     .rs .onb-bh-title { font-family:var(--font-accent); font-weight:800; font-size:clamp(22px,2.6vw,34px); letter-spacing:-.01em; color:var(--text-primary); line-height:1.04; max-width:13ch; }
     .rs--desktop .onb-screen--split { padding-left:48vw; }
-    .rs--desktop .onb-screen--split .onb-top { display:none; }   /* el logo ya está en el panel del cerebro */
+    .rs .onb-screen--split .onb-top { display:none; }   /* el logo ya vive en el panel del cerebro (evita logo duplicado en móvil) */
     .rs--mobile .onb-brain-host { width:100%; right:0; bottom:auto; height:200px; border-right:none; border-bottom:1px solid var(--border-subtle); }
     .rs--mobile .onb-bh-logo { left:18px; top:16px; font-size:14px; }
     .rs--mobile .onb-bh-cap { left:18px; bottom:14px; }
@@ -28333,6 +28333,6 @@ async function removeCompetitor(trackingId, username) {
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=137"></script>
+<script src="/static/js/radar-loop.js?v=138"></script>
 </body>
 </html>
