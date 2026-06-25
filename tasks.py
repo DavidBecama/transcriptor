@@ -690,8 +690,13 @@ def download_audio(url, output_dir, platform):
             if i < 2:
                 time.sleep(2 * (i + 1))   # backoff 2s, 4s
 
-    logger.warning("download_audio agotado url=%s attempts=%s", url, " | ".join(attempts[-4:]))
-    raise DownloadError("rate_limit" if rate_seen else "unavailable", str(last or "")[:120])
+    # Diagnóstico (2026-06-25): incluimos los intentos (incl. el error REAL de Apify,
+    # antes tragado) en el detalle → queda en creator_reels_global.transcript_error y
+    # podemos ver por qué falló Apify (token ausente/401/402-créditos/actor) sin acceso
+    # a los logs del worker. apify_avail=False → no aparece "apify#" = APIFY_TOKEN vacío.
+    _att = "apify_avail=%s | %s" % (apify_avail, " | ".join(attempts[-5:]))
+    logger.warning("download_audio agotado url=%s attempts=%s", url, _att)
+    raise DownloadError("rate_limit" if rate_seen else "unavailable", (_att or str(last or ""))[:280])
 
 
 def _apify_metrics_only(url):
