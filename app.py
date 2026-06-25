@@ -7402,19 +7402,47 @@ def onboarding_ig_avatar():
         resp.raise_for_status()
         items = resp.json() or []
         item = items[0] if items else {}
+        from tasks import _download_thumbnail_b64  # lazy (rompe circular)
         pic = (item.get("profilePicUrlHD") or item.get("profilePicUrl")
                or item.get("profile_pic_url_hd") or item.get("profile_pic_url"))
         b64 = None
         if pic:
             try:
-                from tasks import _download_thumbnail_b64  # lazy (rompe circular)
                 b64 = _download_thumbnail_b64(pic)
             except Exception as e:
                 logger.warning("ig-avatar: b64 fetch failed handle=%s err=%s", handle, e)
+        # REELS del propio perfil (paso «tus vídeos» del onboarding): salen del MISMO scrape
+        # (latestPosts) → no esperamos al /metrics/analyze lento. Top 3 vídeos por views.
+        reels = []
+        try:
+            posts = item.get("latestPosts") or item.get("latest_posts") or []
+            vids = [p for p in posts if isinstance(p, dict) and (
+                p.get("type") in ("Video", "Reel") or p.get("videoUrl") or p.get("isVideo") or p.get("productType") == "clips")]
+            if not vids:
+                vids = [p for p in posts if isinstance(p, dict)]   # fallback: cualquier post
+            vids.sort(key=lambda p: -((p.get("videoViewCount") or p.get("videoPlayCount") or p.get("likesCount") or 0)))
+            for p in vids[:3]:
+                disp = p.get("displayUrl") or p.get("display_url") or p.get("thumbnailUrl")
+                tb = None
+                if disp:
+                    try:
+                        tb = _download_thumbnail_b64(disp)
+                    except Exception:
+                        tb = None
+                reels.append({
+                    "thumb": tb,
+                    "views": p.get("videoViewCount") or p.get("videoPlayCount") or 0,
+                    "likes": p.get("likesCount") or 0,
+                    "caption": (p.get("caption") or "")[:300],
+                    "url": p.get("url") or (("https://www.instagram.com/reel/" + p.get("shortCode") + "/") if p.get("shortCode") else None),
+                })
+        except Exception as e:
+            logger.warning("ig-avatar: reels parse failed handle=%s err=%s", handle, e)
         return jsonify({
             "avatar": b64,
             "full_name": item.get("fullName") or item.get("full_name"),
             "followers": item.get("followersCount") or item.get("followers_count"),
+            "reels": reels,
         }), 200
     except Exception as e:
         logger.warning("onboarding_ig_avatar failed handle=%s err=%s", handle, e)
