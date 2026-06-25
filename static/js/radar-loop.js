@@ -4183,10 +4183,33 @@
       '<div class="recfmt-tx"><div class="recfmt-k">'+L("Cómo grabarlo","How to record it")+' · <b>'+f.label+'</b></div>'+
       '<div class="recfmt-d">'+f.how+'</div></div></div>';
   }
+  // #2 (Bernat): el PRIMER guion robado es un hito. Lo celebramos una sola vez.
+  // Demo NO persiste (flag de sesión) para que Leo lo pueda re-previsualizar recargando.
+  function firstStealPending(){
+    if(isDemo()) return !S._demoStealDone;
+    try{ return !localStorage.getItem("rs_first_steal"); }catch(e){ return false; }
+  }
+  function markFirstSteal(){
+    if(isDemo()){ S._demoStealDone=true; return; }
+    try{ localStorage.setItem("rs_first_steal","1"); }catch(e){}
+  }
   function scriptRevealHTML(){
     var r=S.reel,s=r.script||{hook:"",beats:[],close:""};
     var beats=(s.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
-    return '<div class="script-wrap fade-in"><div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div><div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
+    // PRIMER guion → banner héroe + prueba social del reel robado (lo que petó).
+    // Solo la 1ª vez (S._firstStealCelebrate, one-shot que pone steal()).
+    var hero='';
+    if(S._firstStealCelebrate){
+      var _views=r.views?('<b class="num-hi">'+ESC(r.views)+'</b> views'):'';
+      var _mult=(r.explosionTxt!=null)?('<b class="num-hi">'+ESC(String(r.explosionTxt))+'×</b> '+L("su media","their average")):'';
+      var _proof=[_views,_mult].filter(Boolean).join(' · ');
+      hero='<div class="reveal-hero">'+
+        '<div class="reveal-hero-badge">'+IC.bolt+' '+L("TU PRIMER GUION","YOUR FIRST SCRIPT")+'</div>'+
+        '<div class="reveal-hero-t">'+L("Y ya es tuyo.","And it’s already yours.")+'</div>'+
+        (_proof?'<div class="reveal-hero-proof">'+L("Robado de un reel que hizo","Stolen from a reel that did")+' '+_proof+'</div>':'')+
+      '</div>';
+    }
+    return '<div class="script-wrap fade-in">'+hero+'<div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div><div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
       '<div class="script-acts"><button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>'+
         '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
       '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+recFormatCardHTML(r)+conveyorHTML()+'</div>';
@@ -5016,7 +5039,14 @@
       startFlash();           // PEAK: la oferta flash arranca tras el PRIMER valor real (no al entrar)
       if(!isDemo() && r._sid){ var g=guionById(gidNew); if(g) g._sid=r._sid; }
       if(bg){ render(); showToast("Tu guion ya está listo — te espera en Guiones."); }
-      else { S.activeGuionId=gidNew; S.view="script"; render(); }
+      else {
+        S.activeGuionId=gidNew; S.view="script";
+        // #2: ¿es su 1er guion robado? → celebración (banner héroe + lluvia al cerebro).
+        var _firstSteal=firstStealPending();
+        S._firstStealCelebrate=_firstSteal; if(_firstSteal) markFirstSteal();
+        render();
+        if(_firstSteal){ try{ brainFeast(16); }catch(e){} }
+      }
       // Demo: descuento local cosmético. Prod: el backend ya cobró server-side →
       // refrescamos el saldo real (/auth/me) sin descontar local (evita doble-cobro).
       if(isDemo()){ if(isTrial()){ if(S.user.dayLeft>0) S.user.dayLeft--; } else { spend(COST.script); } bumpEco(1,1); flashSpark(-COST.script); }

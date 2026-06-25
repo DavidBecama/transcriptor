@@ -12318,6 +12318,18 @@
       background: var(--success-bg); border:1px solid var(--success-border);
       padding:5px 12px; border-radius:999px; margin:0 0 14px; }
     .rs .reveal-aha svg { color: var(--success); width:15px; height:15px; }
+    /* #2 (Bernat): banner héroe del PRIMER guion robado — celebración 1-sola-vez. */
+    .rs .reveal-hero { position:relative; margin:0 0 18px; padding:20px 22px; border-radius:18px; overflow:hidden;
+      background:linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 22%, var(--surface-raised)), var(--surface-raised));
+      border:1px solid color-mix(in srgb, var(--brand-500) 40%, transparent); box-shadow:0 14px 40px color-mix(in srgb, var(--brand-500) 18%, transparent);
+      animation:revealHeroIn .5s cubic-bezier(.2,.9,.2,1); }
+    .rs .reveal-hero-badge { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--brand-300); margin-bottom:8px; }
+    .rs .reveal-hero-badge svg { width:14px; height:14px; }
+    .rs .reveal-hero-t { font-family:var(--font-accent); font-weight:800; font-size:clamp(22px,4.4vw,30px); line-height:1.05; letter-spacing:-.01em; color:var(--text-primary); }
+    .rs .reveal-hero-proof { margin-top:8px; font-size:13.5px; color:var(--text-secondary); }
+    .rs .reveal-hero-proof .num-hi { color:var(--success-fg); font-weight:800; }
+    @keyframes revealHeroIn { 0%{ opacity:0; transform:translateY(10px) scale(.98); } 100%{ opacity:1; transform:translateY(0) scale(1); } }
+    @media (prefers-reduced-motion: reduce){ .rs .reveal-hero { animation:none; } }
     /* voice-tag legible en oscuro (brand-700 sobre brand-100 se quedaba flojo) */
     .rs[data-theme="dark"] .voice-tag { color: var(--brand-400); }
     /* cinta "¿Y ahora?": botones 3D + una sola primaria fuerte (Grábalo = .chain-prim) */
@@ -26355,7 +26367,7 @@ const TOUR_STEPS = _TOUR_EN ? [
   { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "And here it is — your first script, saved. Everything you steal lives here, ready to record, edit and reuse." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Your Brain: it learns your voice. The more you create, the more the next one sounds like you. That's the moat." },
   { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "The ranking: see how you stack up against other creators in your niche — and climb." },
-  { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Metrics: see what's working on your account and double down. This is where the loop closes." },
+  { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Metrics: the hooks, hours and topics actually moving your account. Unlock them and double down — with Pro. 👉" },
 ] : [
   { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "Tu Radar. Cada día te traigo los reels que están explotando en tu nicho, ordenados por lo que merece tu próximo guion." },
   { tab: 'dashboard', target: '.feature',                    text: "Tu oportunidad de hoy: el reel más explosivo de tu nicho, con el porqué de por qué funcionó. No empiezas de cero." },
@@ -26367,7 +26379,7 @@ const TOUR_STEPS = _TOUR_EN ? [
   { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Y aquí está: tu primer guión, ya guardado. Todo lo que robas vive aquí, listo para grabar, editar y reutilizar." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Tu Cerebro: aprende tu voz. Cuanto más creas, más tuyo suena lo siguiente. Ese es el moat." },
   { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "El ranking: mira cómo vas frente a otros creadores de tu nicho — y sube posiciones." },
-  { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Métricas: mira qué funciona en tu cuenta y dóblalo. Aquí se cierra el círculo." },
+  { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Métricas: los ganchos, horas y temas que de verdad mueven tu cuenta. Destápalos y dóblalos — con Pro. 👉" },
 ];
 
 let tourStep = 0;
@@ -26619,7 +26631,20 @@ function nextTourStep() {
   if (tourStep >= TOUR_STEPS.length - 1) {
     // Activación (Fathom 18/06): completó el tutorial → 1er paso del funnel a "1er robo".
     try { window.posthog && window.posthog.capture("tutorial_completed", { steps: TOUR_STEPS.length }); } catch (e) {}
-    endTour(); return;
+    endTour();
+    // #1 (Bernat 24-jun): muro al FINAL del house tour. El último paso es Métricas
+    // (borrosas en free) → quien COMPLETA el tour está caliente: le ofrecemos Pro.
+    // Solo free (demo se trata como free para previsualizar) y una sola vez.
+    try {
+      var _plan = window.__DEMO__ ? "free" : ((window.st && st.plan) || "free");
+      if (_plan === "free" && !localStorage.getItem("rs_tour_paywall_seen")) {
+        localStorage.setItem("rs_tour_paywall_seen", "1");
+        try { window.posthog && window.posthog.capture("paywall_shown", { wall: "tour_end" }); } catch (e) {}
+        // 450ms: deja que endTour limpie el overlay del tour antes de abrir el modal.
+        setTimeout(function () { if (typeof openUpgradeModal === "function") openUpgradeModal("tour_end"); }, 450);
+      }
+    } catch (e) {}
+    return;
   }
   tourStep++;
   showTourStep();
@@ -28280,6 +28305,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=134"></script>
+<script src="/static/js/radar-loop.js?v=135"></script>
 </body>
 </html>
