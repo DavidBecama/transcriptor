@@ -443,7 +443,7 @@
      contenido ingerido + el objetivo (STYLE_PROMPTS/PRESET_TONES intactos en
      backend + selector en Cerebro). Pantalla dedicada que oculta el radar vacío.
      Demo-funcional vía ?onb=1. ════════════════════════════════════════════════ */
-  var ONB_STEPS=["handle","confirm","niche","subniche","seed","goal","close"];   // «confirm» (David 24-jun) = «este eres tú» con tu foto de IG → confianza + sensación de análisis personal. «seed» = el user añade UNA cuenta de su nicho a mano → scrapeamos sus relatedProfiles. La cuenta PROPIA (handle) se scrapea solo para métricas.
+  var ONB_STEPS=["handle","confirm","myreels","niche","subniche","seed","goal","close"];   // «myreels» = tus 3 vídeos + Alimentar el Cerebro (David 24-jun)   // «confirm» (David 24-jun) = «este eres tú» con tu foto de IG → confianza + sensación de análisis personal. «seed» = el user añade UNA cuenta de su nicho a mano → scrapeamos sus relatedProfiles. La cuenta PROPIA (handle) se scrapea solo para métricas.
   function nicheChips(){ return rsLang()==="en"
     ? ["Fitness","Finance","Marketing","Cooking","Fashion","Beauty","Travel","Tech","Education","Real estate","Health","Business"]
     : ["Fitness","Finanzas","Marketing","Cocina","Moda","Belleza","Viajes","Tecnología","Educación","Inmobiliaria","Salud","Negocios"]; }
@@ -716,9 +716,57 @@
       '<button class="onb-skip" data-act="onb-confirm-edit">'+L("No, cambiar mi usuario","No, change my handle")+'</button>'+
     '</section>';
   }
+  // «Tus vídeos» (David 24-jun): tras «este eres tú», enseña 3 reels suyos (del MISMO
+  // scrape Apify, latestPosts) + botón «Alimentar el Cerebro» → aprende su tono de los
+  // captions. Si el scrape aún no acabó → skeletons + botón deshabilitado.
+  function onbMyReelsHTML(){
+    var reels=(S.onb.myReels||[]).slice(0,3);
+    var done=!!S.onb._profileDone;
+    var loading=!done && reels.length===0;
+    var noReels=done && reels.length===0;
+    var cards;
+    if(reels.length){
+      cards=reels.map(function(r){
+        var thumb=r.thumb?'<img class="onbmr-thumb" src="'+ESC(r.thumb)+'" alt="" loading="lazy"/>':'<div class="onbmr-thumb onbmr-ph">'+IC.bolt+'</div>';
+        return '<div class="onbmr-card">'+thumb+'<div class="onbmr-views">'+IC.eye+' '+_numGreen(fmtNum(r.views||0))+'</div></div>';
+      }).join("");
+    } else {
+      cards=[0,1,2].map(function(){ return '<div class="onbmr-card onbmr-skel"'+(loading?' aria-busy="true"':'')+'></div>'; }).join("");
+    }
+    var sub = loading ? L("Analizando tus vídeos publicados…","Analyzing your published videos…")
+      : noReels ? L("No pude leer tus reels (¿perfil privado o sin vídeos?). No pasa nada, seguimos.","Couldn't read your reels (private or no videos?). No worries, let's continue.")
+      : L("Estos son tus reels. Aliméntame con ellos y aprendo tu tono, tus muletillas y cómo enganchas.","These are your reels. Feed me with them and I learn your tone, catchphrases and hooks.");
+    var cta = noReels
+      ? '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-feed-skip">'+L("Continuar","Continue")+'</button>'
+      : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-feed-myreels"'+(loading?' disabled':'')+'>'+IC.bolt+' '+(loading?L("Leyendo tus vídeos…","Reading your videos…"):L("Alimentar el Cerebro","Feed the Brain"))+'</button>';
+    return '<section class="onb-step onb-myreels">'+
+      onbBackBtn()+
+      '<div class="onbmr-eyebrow"><span class="pip"></span>'+L("HE LEÍDO TUS REELS","I READ YOUR REELS")+'</div>'+
+      '<h2 class="onb-h">'+L("Tu Cerebro ya te está leyendo","Your Brain is reading you")+'</h2>'+
+      '<p class="onb-sub">'+sub+'</p>'+
+      '<div class="onbmr-grid">'+cards+'</div>'+
+      onbErr()+
+      cta+
+      (noReels?'':'<button class="onb-skip" data-act="onb-feed-skip">'+L("Saltar este paso","Skip this step")+'</button>')+
+    '</section>';
+  }
+  function onbFeedMyReels(){
+    var reels=(S.onb.myReels||[]).slice(0,3);
+    try{ brainFeast(12); }catch(e){}   // dopamina: lluvia al cerebro 3D
+    if(!isDemo()){
+      reels.forEach(function(r){
+        var c=(r.caption||"").trim(); if(!c) return;
+        try{ apiPost('/api/brain/rate',{text:c.slice(0,300), kind:"guion", type:"guiones", rating:1, suggestion:c, source:"own_reel", niche:(S.onb&&S.onb.niche)||""}); }catch(e){}
+      });
+    }
+    if(S.voice && S.voice.has_profile){ S.voice.confidence=Math.min(92,(S.voice.confidence||0)+8); }
+    showToast(L("🧠 +8% · aprendí tu estilo de tus reels","🧠 +8% · learned your style from your reels"));
+    onbNext();
+  }
   function onbStepHTML(){
     switch(S.onb.step){
       case "confirm": return onbConfirmHTML();
+      case "myreels": return onbMyReelsHTML();
       case "niche": return onbNicheHTML();
       case "subniche": return onbSubnicheHTML();
       case "seed": return onbSeedHTML();
@@ -773,12 +821,23 @@
   // se queda en iniciales). Tarda ~5-15s (scrape Apify), así que llega async y re-renderiza.
   function onbFetchAvatar(h){
     h=(h||"").trim().replace(/^@+/,"").toLowerCase();
-    if(isDemo() || !h || S.onb._avatarReq===h) return;   // idempotente por handle
+    if(!h) return;
+    if(isDemo()){
+      // demo: sembrar reels de muestra para previsualizar el paso «tus vídeos» (sin Apify)
+      var _th=(typeof _demoThumbs==="function"?_demoThumbs():[])||[];
+      S.onb._profileDone=true;
+      S.onb.myReels=[{thumb:_th[0]||null,views:1240000,caption:"demo"},{thumb:_th[1]||null,views:842000,caption:"demo"},{thumb:_th[2]||null,views:511000,caption:"demo"}];
+      return;
+    }
+    if(S.onb._avatarReq===h) return;   // idempotente por handle
     S.onb._avatarReq=h; S.onb._avatarFailed=false;
     apiGet("/api/onboarding/ig-avatar?handle="+encodeURIComponent(h)).then(function(r){
       if(S.onb._avatarReq!==h) return;   // cambió el handle entretanto
-      if(r && r.ok && r.d && r.d.avatar){ S.onb.avatar=r.d.avatar; }
-      else { S.onb._avatarFailed=true; }
+      if(r && r.ok && r.d){
+        if(r.d.avatar) S.onb.avatar=r.d.avatar; else S.onb._avatarFailed=true;
+        if(Array.isArray(r.d.reels)) S.onb.myReels=r.d.reels;   // paso «tus vídeos»
+      } else { S.onb._avatarFailed=true; }
+      S.onb._profileDone=true;
       render();
     });
   }
@@ -6273,6 +6332,8 @@
     if(act==="onb-handle-next") return onbHandleNext();
     if(act==="onb-confirm-yes") return onbNext();        // «este eres tú» → seguir
     if(act==="onb-confirm-edit") return onbGoto("handle");   // cambiar el @
+    if(act==="onb-feed-myreels") return onbFeedMyReels();    // alimentar el Cerebro con tus reels
+    if(act==="onb-feed-skip") return onbNext();
     if(act==="onb-pick-niche") return onbPickNiche(btn.getAttribute("data-k"));
     if(act==="onb-niche-next") return onbNicheNext();
     if(act==="onb-tag-toggle") return onbTagToggle(btn.getAttribute("data-k"));
