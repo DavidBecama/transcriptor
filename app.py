@@ -8740,31 +8740,41 @@ def suggested_competitor():
         score = exp if exp is not None else 0
         if cid and (cid not in best or score > best[cid]["score"]):
             best[cid] = {"views": v, "exp": exp, "score": score}
-    chosen = None
-    for cid, cooc in ranked:
-        info = best.get(cid)
-        if info and info["views"] > 0:
-            chosen = (cid, cooc, info); break
-    if not chosen:
-        cid, cooc = ranked[0]; chosen = (cid, cooc, best.get(cid) or {})
-    cid, cooc, info = chosen
+    # Orden: primero los que tienen un reel que petó (views>0), luego el resto por
+    # co-ocurrencia. ?limit=N (muro de competidores, Bernat 24-jun) → lista de N.
+    ordered = [cid for cid, _ in ranked if (best.get(cid) or {}).get("views")]
+    ordered += [cid for cid, _ in ranked if cid not in ordered]
     try:
-        cg = db.table("creators_global").select("ig_username").eq("id", cid).single().execute()
-        handle = ((cg.data or {}).get("ig_username") or "").lstrip("@")
+        cgs = (db.table("creators_global").select("id, ig_username")
+                 .in_("id", ordered).execute()).data or []
+        handle_by_id = {r["id"]: (r.get("ig_username") or "").lstrip("@") for r in cgs}
     except Exception:
-        handle = ""
-    if not handle:
-        return jsonify({"suggestion": None}), 200
-    exp = info.get("exp"); views = info.get("views") or 0
-    if exp and exp >= 2:
-        why = f"se pegó un reel de {_fmt_views(views)} (×{exp:g} su media)"; xtag = f"×{exp:g}"
-    elif views:
-        why = f"tiene un reel reciente de {_fmt_views(views)}"; xtag = _fmt_views(views)
-    else:
-        why = "está creciendo en tu nicho"; xtag = "en alza"
-    return jsonify({"suggestion": {
-        "handle": handle, "why": why, "x": xtag, "tag": "Lo siguen en tu nicho",
-    }}), 200
+        handle_by_id = {}
+
+    def _mk_suggestion(cid):
+        handle = handle_by_id.get(cid) or ""
+        if not handle:
+            return None
+        info = best.get(cid) or {}
+        exp = info.get("exp"); views = info.get("views") or 0
+        if exp and exp >= 2:
+            why = f"se pegó un reel de {_fmt_views(views)} (×{exp:g} su media)"; xtag = f"×{exp:g}"
+        elif views:
+            why = f"tiene un reel reciente de {_fmt_views(views)}"; xtag = _fmt_views(views)
+        else:
+            why = "está creciendo en tu nicho"; xtag = "en alza"
+        return {"handle": handle, "why": why, "x": xtag, "tag": "Lo siguen en tu nicho"}
+
+    suggestions = [s for s in (_mk_suggestion(cid) for cid in ordered) if s]
+    try:
+        limit = max(1, min(8, int(request.args.get("limit", 1))))
+    except Exception:
+        limit = 1
+    suggestions = suggestions[:limit]
+    return jsonify({
+        "suggestion": suggestions[0] if suggestions else None,
+        "suggestions": suggestions,
+    }), 200
 
 
 @app.route("/api/onboarding/complete", methods=["POST"])

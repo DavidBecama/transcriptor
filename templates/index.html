@@ -11784,6 +11784,26 @@
     .rs .sugg-actions { display:flex; gap:8px; flex-shrink:0; }
     .rs--mobile .sugg-comp { flex-wrap:wrap; } .rs--mobile .sugg-actions { width:100%; }
     .rs--mobile .sugg-actions .btn-primary { flex:1; justify-content:center; }   /* «Añadir» prominente, «Ahora no» compacto */
+    /* ══ Muro de competidores (Bernat 24-jun): «Creadores que deberías vigilar» ══
+       Enseña hasta 5; los que pasan tu cupo free salen BLOQUEADOS (blur + 🔒). */
+    .rs .sugg-card { margin:18px 0; padding:16px 16px 14px; border-radius:18px; border:1px solid var(--border-default); background:var(--surface-raised); }
+    .rs .sugg-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .rs .sugg-head-t { display:inline-flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-primary); }
+    .rs .sugg-head-t svg { width:16px; height:16px; color:var(--brand-500); }
+    .rs .sugg-hide { background:none; border:none; color:var(--text-tertiary); font-size:12.5px; cursor:pointer; padding:6px 4px; }
+    .rs .sugg-hide:hover { color:var(--text-secondary); }
+    .rs .sugg-card .sugg-comp:last-of-type { margin-bottom:0; }
+    /* fila bloqueada: avatar/handle difuminados, candado, acción «Desbloquear» */
+    .rs .sugg-comp.locked { border-style:dashed; border-color:var(--border-default); background:var(--surface-base); }
+    .rs .sugg-ava-wrap { position:relative; flex-shrink:0; }
+    .rs .sugg-comp.locked .ava { filter:blur(5px); opacity:.85; }
+    .rs .sugg-ava-lock { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; }
+    .rs .sugg-ava-lock svg { width:18px; height:18px; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+    .rs .sugg-comp.locked .sugg-h { filter:blur(5px); user-select:none; color:var(--text-secondary); }
+    .rs .sugg-comp.locked .sugg-x { filter:none; }
+    .rs .sugg-tag--lock { color:var(--text-tertiary) !important; }
+    .rs .sugg-unlock-cta { width:100%; justify-content:center; margin-top:6px; }
+    @media (prefers-reduced-motion: reduce){ .rs .sugg-comp.locked .ava, .rs .sugg-comp.locked .sugg-h { filter:blur(5px); } }
     /* La miniatura 9:16 escala/recorta DENTRO de su columna (object-fit:cover en .thumb img),
        nunca estira la card: la altura la fija el cuerpo compacto, capada a max-height (.feature). */
     .rs .feature-thumb { position:relative; overflow:hidden; } .rs .feature-thumb .thumb { width:100%; height:100%; min-height:0; border:none; border-radius:0; border-right:1px solid var(--border-default); background:linear-gradient(160deg, var(--surface-sunken), var(--surface-raised)); }
@@ -28260,6 +28280,6 @@ async function removeCompetitor(trackingId, username) {
 
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
-<script src="/static/js/radar-loop.js?v=133"></script>
+<script src="/static/js/radar-loop.js?v=134"></script>
 </body>
 </html>
