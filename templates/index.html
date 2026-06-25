@@ -9691,6 +9691,12 @@
     .rs .whale > .btn { flex:none; }
     /* v3 mockup David — fila «progreso / cerebro» */
     /* Pantalla de espera tras el onboarding (descubriendo reels del nicho). */
+    /* v=137: overlay a PANTALLA COMPLETA para la carga post-onboarding y «¿quieres robar
+       este?» — tapa rail + barra superior, centrado vertical y horizontal. */
+    .rs .onb-fs { position:fixed; inset:0; z-index:55; overflow-y:auto; display:flex; flex-direction:column;
+      background:radial-gradient(120% 90% at 50% 30%, color-mix(in srgb, var(--brand-500) 9%, transparent), transparent 62%), var(--surface-base); }
+    .rs .onb-fs > .scroll { flex:1; display:flex; flex-direction:column; }
+    .rs .onb-fs .canvas { margin:auto; max-width:560px; width:100%; min-height:100%; padding:32px 22px 48px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .rs .onbwait { display:flex; flex-direction:column; align-items:center; text-align:center; padding:64px 24px; max-width:520px; margin:40px auto; }
     .rs .onbwait-orb { position:relative; width:84px; height:84px; border-radius:24px; display:flex; align-items:center; justify-content:center; margin-bottom:26px;
       background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); box-shadow:0 12px 40px rgba(47,91,255,.4); }
@@ -28327,6 +28333,6 @@ async function removeCompetitor(trackingId, username) {
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=136"></script>
+<script src="/static/js/radar-loop.js?v=137"></script>
 </body>
 </html>
