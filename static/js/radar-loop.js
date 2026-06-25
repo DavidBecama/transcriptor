@@ -3065,8 +3065,10 @@
     brainDailyXpSet(0);           // reinicia la barra del ejercicio diario para el siguiente nivel
     S._canLvlSeen=false;
     S.levelup={to:to, name:ecoLevelName(to)};
+    S._ceReward=null;
     render();
     try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
+    try{ if(S._bnInst) S._bnInst.levelUp(); }catch(e){}   // la red neuronal evoluciona (destello + onda + crece)
   }
   function closeLevelup(){ S.levelup=null; render(); }
   // Tema por nivel (color + subtítulo) — animación "una por nivel" (improvisada).
@@ -3650,6 +3652,29 @@
   }
   function pauseBrain3D(){ try{ if(window.RSBrain) window.RSBrain.pause(); }catch(e){} }
 
+  // v4 · BrainNet (red neuronal viva, canvas 2D). El canvas es PERSISTENTE (vive en
+  // S._bnCanvas y se RE-INSERTA en #ceStage en cada render) para que NO se reinicie
+  // al alimentar (que llama a render()). La instancia sobrevive entre renders.
+  function ensureBrainNet(){
+    if(typeof window==="undefined" || !window.BrainNet) return;
+    var stage=document.getElementById('ceStage'); if(!stage) return;
+    if(!S._bnCanvas){ S._bnCanvas=document.createElement('canvas'); S._bnCanvas.className='ce2-canvas'; }
+    if(S._bnCanvas.parentNode!==stage){
+      try{ stage.appendChild(S._bnCanvas); }catch(e){ return; }
+      if(S._bnInst){ try{ S._bnInst._resize(); }catch(e){} }
+    }
+    if(!S._bnInst){
+      try{ S._bnInst=new window.BrainNet(S._bnCanvas,{brand:"#4f7cff"}); }catch(e){ S._bnInst=null; }
+    }
+    if(S._bnInst){
+      var lv=brainLevel();
+      var vp=hasRealVoice()?(S.voice.confidence||0):(isDemo()?((brand()||{}).voice||40):0);
+      try{ S._bnInst.setLevel(lv.level||1); S._bnInst.update({progress:(lv.pct||0)/100, voice:vp/100}); }catch(e){}
+    }
+  }
+  // Tipo de material → color/canal de partículas de la BrainNet.
+  function _bnFeedType(k){ return k==="prefer"?"estilo":(k||"guion"); }
+
   /* ── Brain «Entrenar» (lever de INVERSIÓN, Fathom): valora hooks 👍/👎 → afina tu
      gusto Y alimenta el cerebro 3D (partícula al votar). Demo local; prod backend. */
   function ensureBrainTrain(){
@@ -3748,15 +3773,17 @@
      de datos al cerebro 3D + pulso de crecimiento) + «gracias, voy aprendiendo». */
   function brainFeedMeHTML(){
     var sel=S.feedType||"guion"; var def=brainFeedDef(sel); var ready=brainFeedReady(sel);
-    // Chips: cada FORMA de alimentar con su % y su estado (✓ hecho hoy / disponible).
+    var DOT={guion:"#f5a83d",hook:"#6f93ff",muletilla:"#a68cfa",prefer:"#33d499"};
+    // Chips: cada FORMA de alimentar con su dot de color (= material que traga el cerebro), su % y su estado.
     var chips=BRAIN_FEED_TYPES.map(function(t){
-      var done=!brainFeedReady(t.key);
+      var done=!brainFeedReady(t.key); var c=DOT[t.key]||"#6f93ff";
       return '<button class="feed-chip'+(t.key===sel?' on':'')+(done?' done':'')+'" data-act="brain-feed-pick" data-k="'+t.key+'" title="'+ESC(t.label)+'">'+
-        (done?IC.check:'')+ESC(t.label)+' <b>+'+t.gain+'%</b></button>';
+        (done?IC.check:'<span class="fc-dot" style="background:'+c+';box-shadow:0 0 7px '+c+'"></span>')+ESC(t.label)+' <b>+'+t.gain+'%</b></button>';
     }).join("");
     var cta = ready
-      ? '<button class="btn btn-lg btn-primary feedme-cta" data-act="brain-feed-me" data-k="'+sel+'">'+IC.bolt+' '+L("Alimentar · +"+def.gain+"%","Feed · +"+def.gain+"%")+'</button>'
-      : '<button class="btn btn-lg btn-secondary feedme-cta" disabled>'+IC.check+' '+L("Hecho hoy · vuelve en "+brainFeedNextHrs(sel)+"h","Done today · back in "+brainFeedNextHrs(sel)+"h")+'</button>';
+      ? '<button class="btn btn-lg btn-primary feedme-cta" style="width:auto;margin-top:0" data-act="brain-feed-me" data-k="'+sel+'">'+IC.bolt+' '+L("Alimentar · +"+def.gain+"%","Feed · +"+def.gain+"%")+'</button>'
+      : '<button class="btn btn-lg btn-secondary feedme-cta" style="width:auto;margin-top:0" disabled>'+IC.check+' '+L("Hecho hoy · vuelve en "+brainFeedNextHrs(sel)+"h","Done today · back in "+brainFeedNextHrs(sel)+"h")+'</button>';
+    var reward = S._ceReward ? '<span class="ce2-reward">'+IC.bolt+' '+ESC(S._ceReward)+'</span>' : '';
     return '<div class="feedme">'+
       '<div class="feedme-body">'+
         '<span class="feedme-eyebrow">'+IC.bolt+' '+L("ALIMENTA TU CEREBRO","FEED YOUR BRAIN")+' <span class="brain-tag">'+L("cada forma suma distinto · 1/día c/u","each way adds differently · 1/day each")+'</span></span>'+
@@ -3764,7 +3791,7 @@
         '<div class="feedme-d">'+L("Cuanto más concreto y MÁS TUYO, mejor clavo tu voz. Lo que más suma: <b>tus guiones que petaron</b>.","The more specific and YOURS, the better I nail your voice. What adds most: <b>your scripts that worked</b>.")+'</div>'+
         '<div class="feed-chips">'+chips+'</div>'+
         '<textarea id="rsFeedMe" class="feedme-input" rows="2" maxlength="600"'+(ready?'':' disabled')+' placeholder="'+ESC(def.ph)+'"></textarea>'+
-        cta+
+        '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:13px">'+cta+reward+'</div>'+
       '</div>'+
     '</div>';
   }
@@ -3779,7 +3806,7 @@
     }catch(e){}
     var orb=document.querySelector(".brain-orb"); if(orb){ orb.classList.remove("feast"); void orb.offsetWidth; orb.classList.add("feast"); setTimeout(function(){ orb.classList.remove("feast"); }, 1200); }
   }
-  function brainFeedPick(key){ S.feedType=key; render(); var ta=document.getElementById("rsFeedMe"); if(ta) try{ ta.focus(); }catch(e){} }
+  function brainFeedPick(key){ S.feedType=key; S._ceReward=null; render(); var ta=document.getElementById("rsFeedMe"); if(ta) try{ ta.focus(); }catch(e){} }
   function brainFeedMe(key){
     key=key||S.feedType||"guion"; var def=brainFeedDef(key);
     var ta=document.getElementById("rsFeedMe"); var note=ta?ta.value.trim():"";
@@ -3791,8 +3818,10 @@
     if(!isDemo()){ try{ apiPost('/api/brain/rate',{text:note, kind:def.btype, type:def.btype, rating:1, suggestion:note, source:"feed_"+def.key, niche:(S.onb&&S.onb.niche)||""}); }catch(e){} }
     brainAddXp(def.gain); _bfTsSet(def.key);   // +gain% a la barra del nivel · CD 24h de ESTE tipo
     if(ta) ta.value="";
-    brainLevelPulse();   // por si llegó al 100%
+    S._ceReward=L("+"+def.gain+"% · voy aprendiendo tu voz","+"+def.gain+"% · learning your voice")+" 🧠";   // reward inline animado en la card
+    brainLevelPulse();   // por si llegó al 100% (NO auto-sube: el nivel se reclama con el botón de arriba)
     render();
+    try{ if(S._bnInst) S._bnInst.feed(_bnFeedType(def.key)); }catch(e){}   // partículas tipadas → la red neuronal las absorbe
     showToast(L("+"+def.gain+"% al Cerebro · "+def.label.toLowerCase()+" guardado 🧠","+"+def.gain+"% to your Brain · saved 🧠"));
   }
   function brainTrainHTML(){
@@ -4030,6 +4059,41 @@
       '<div class="ce-missions-grid">'+cards+'</div>'+
     '</div>';
   }
+  // v4 · Hero inmersivo del Cerebro: panel con la red neuronal viva (BrainNet,
+  // canvas 2D montado por ensureBrainNet en #ceStage) + overlays nivel/voz, barra
+  // de progreso y stats. Reemplaza el anillo SVG estático. El fondo de la PÁGINA no
+  // cambia (este panel es el stage del cerebro, no el fondo de la app).
+  function brainHeroV4HTML(lv, voicePct, b, nGuiones){
+    var reels = hasRealVoice()?(S.voice.source_count||0):((b&&b.reelsAnalyzed)||0);
+    var racha = (S.stats&&S.stats.streak)||0;
+    var pct = Math.max(0,Math.min(100, lv.pct||0));
+    var nearUp = pct>80;
+    var vp = Math.round(voicePct||0);
+    var kicker = nearUp ? L("NUEVO · A PUNTO DE EVOLUCIONAR","NEW · ABOUT TO EVOLVE") : L("TU CEREBRO, AHORA","YOUR BRAIN, NOW");
+    var title = nearUp ? L("¡Tu Cerebro está a punto de subir de nivel!","Your Brain is about to level up!")
+                       : L("Manifestando viralidad, reel a reel.","Manifesting virality, reel by reel.");
+    var stat=function(val,lab,col){ return '<div class="ce2-stat"><div class="ce2-stat-v"'+(col?' style="color:'+col+'"':'')+'>'+ESC(String(val))+'</div><div class="ce2-stat-l">'+ESC(lab)+'</div></div>'; };
+    return '<div class="ce2-hero">'+
+      '<div class="ce2-stage" id="ceStage">'+
+        '<div class="ce2-ov ce2-net"><i></i>'+L("red neuronal","neural network")+'</div>'+
+        '<div class="ce2-ov ce2-lvlw"><div class="ce2-lvlw-k">'+L("Nivel","Level")+' '+lv.level+' / 5</div><div class="ce2-lvlw-n">'+ESC(ecoLevelName(lv.level))+'</div></div>'+
+        '<div class="ce2-ov ce2-voz"><div class="ce2-voz-v">'+vp+'%</div><div class="ce2-voz-k">'+L("voz clavada","voice nailed")+'</div></div>'+
+      '</div>'+
+      '<div class="ce2-side">'+
+        '<div class="ce2-kicker">'+kicker+'</div>'+
+        '<div class="ce2-htitle">'+title+'</div>'+
+        '<div><div class="ce2-prog-row"><span>'+L("Progreso al Nivel","Progress to Level")+' '+Math.min(5,lv.level+1)+'</span><b>'+pct+'%</b></div>'+
+          '<div class="ce2-prog-bar"><div class="ce2-prog-fill" style="width:'+pct+'%"></div></div></div>'+
+        '<div class="ce2-stats">'+
+          stat(reels, L("Reels analizados","Reels analyzed"))+
+          stat(nGuiones, L("Guiones creados","Scripts created"))+
+          stat(vp+'%', L("Tu voz, clavada","Your voice, nailed"), 'var(--success-fg,#3FE0A0)')+
+          stat(racha+L(" días"," days"), L("Racha","Streak"), 'var(--brand-500,#2F5BFF)')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
+
   function brainHTML(){
     var b=brand();
     var v=brainVoice(b);
@@ -4081,7 +4145,7 @@
     return '<div class="scroll"><div class="canvas ce-canvas">'+
       // ── espina limpia (mockup David) ──
       brainHeaderV3HTML()+
-      brainHeroV3HTML(lv, voicePct)+
+      brainHeroV4HTML(lv, voicePct, b, nGuiones)+   // v4: cerebro inmersivo (BrainNet canvas) — reemplaza el anillo SVG
       brainFeedMeHTML()+   // #2/#7: alimentar el Cerebro (ejercicio diario +5%, CD 24h). También en demo para previsualizar la escalera.
       '<div class="ce-grid">'+brainKnowHTML(v)+brainLevelsHTML(lv)+'</div>'+
       brainMissionsHTML(lv)+
@@ -4670,7 +4734,7 @@
     if(S.view==="prompter"){ if(S.tp&&S.tp.playing) tpScrollStart(); else tpScrollStop(); if(S.tp&&S.tp.recording) tpTimerStart(); }
     else { tpScrollStop(); clearInterval(S.tpTimer); clearInterval(S.tpCdTimer); if(S.tp){ S.tp.playing=false; S.tp.recording=false; } }
     // Cerebro 3D: monta/re-ancla al entrar en la pestaña Cerebro, pausa al salir.
-    if(S.tab==="brain"){ ensureBrain3D(); ensureBrainTrain(); } else pauseBrain3D();
+    if(S.tab==="brain"){ ensureBrainNet(); ensureBrain3D(); ensureBrainTrain(); } else pauseBrain3D();
     ensureFlashCountdown();   // tic-tac del reloj de la oferta flash si está visible
     if(S.tab==="dashboard") loadSuggestion();   // sugerir competidores (real): carga 1 vez
     if(S.tab==="leaderboard") loadLeaderboard(); // ranking real por views: carga 1 vez

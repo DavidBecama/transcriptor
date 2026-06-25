@@ -10719,6 +10719,38 @@
     .rs .ce-mission-r { font-size:12.5px; color:var(--text-tertiary); }
     .rs .ce-mission-done { opacity:.85; }
     .rs--mobile .ce-stats { width:100%; } .rs--mobile .ce-grid, .rs--mobile .ce-missions-grid { grid-template-columns:1fr; }
+    /* ── v4 · Cerebro inmersivo (BrainNet, canvas 2D) ── */
+    .rs .ce2-hero { display:flex; gap:16px; align-items:stretch; }
+    .rs--mobile .ce2-hero { flex-direction:column; }
+    .rs .ce2-stage { position:relative; flex:1.15 1 0; min-width:0; height:470px; border-radius:20px; overflow:hidden; border:1px solid var(--border-default); box-shadow:0 18px 50px -22px rgba(20,28,80,.7); background:radial-gradient(120% 120% at 35% 22%, #16204c 0%, #0c1030 50%, #07091c 100%); }
+    .rs--mobile .ce2-stage { flex:none; width:100%; height:250px; }
+    .rs .ce2-stage canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+    .rs .ce2-ov { position:absolute; pointer-events:none; z-index:2; }
+    .rs .ce2-net { left:18px; top:16px; display:inline-flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--brand-300); }
+    .rs .ce2-net i { width:6px; height:6px; border-radius:99px; background:var(--brand-400); box-shadow:0 0 8px var(--brand-400); display:inline-block; }
+    .rs .ce2-lvlw { left:18px; bottom:16px; }
+    .rs .ce2-lvlw-k { font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--text-tertiary); }
+    .rs .ce2-lvlw-n { font-family:var(--font-display); font-size:30px; line-height:1; color:var(--text-primary); }
+    .rs .ce2-voz { right:18px; bottom:16px; text-align:right; }
+    .rs .ce2-voz-v { font-family:var(--font-display); font-size:26px; line-height:1; color:var(--brand-300); }
+    .rs .ce2-voz-k { font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; color:var(--text-tertiary); text-transform:uppercase; }
+    .rs .ce2-side { flex:0 0 360px; width:360px; display:flex; flex-direction:column; gap:14px; justify-content:center; }
+    .rs--mobile .ce2-side { flex:none; width:100%; }
+    .rs .ce2-kicker { font-family:var(--font-display-2); font-weight:700; font-size:13px; letter-spacing:.05em; color:var(--brand-500); text-transform:uppercase; }
+    .rs .ce2-htitle { font-family:var(--font-display); font-size:25px; line-height:1.15; color:var(--text-primary); }
+    .rs .ce2-prog-row { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; color:var(--text-secondary); margin-bottom:8px; }
+    .rs .ce2-prog-row b { font-family:var(--font-mono); color:var(--text-primary); font-weight:400; }
+    .rs .ce2-prog-bar { height:10px; border-radius:99px; background:var(--surface-overlay); overflow:hidden; border:1px solid var(--border-subtle); }
+    .rs .ce2-prog-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--brand-600),var(--brand-300)); box-shadow:0 0 14px rgba(79,124,255,.5); transition:width .7s var(--ease-out); }
+    .rs .ce2-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px; }
+    .rs .ce2-stat { padding:13px 15px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:14px; }
+    .rs .ce2-stat-v { font-family:var(--font-display); font-size:26px; line-height:1; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+    .rs .ce2-stat-l { font-size:12.5px; color:var(--text-secondary); margin-top:4px; }
+    /* dots de color en los chips de alimentar + reward animado */
+    .rs .feed-chip .fc-dot { width:8px; height:8px; border-radius:99px; flex:none; display:inline-block; }
+    .rs .ce2-reward { display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--brand-300); animation:rsRewardIn .5s var(--ease-out) both; }
+    @keyframes rsRewardIn { 0%{opacity:0;transform:translateY(9px) scale(.92)} 16%{opacity:1;transform:none} 100%{opacity:1;transform:none} }
+    @media (prefers-reduced-motion: reduce){ .rs .ce2-reward { animation:none; } }
     /* ── v3 mockup David · Editor de guion ─────────────────────────────── */
     @keyframes edShim { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
     .rs .ed-overlay { position:fixed; top:0; right:0; bottom:0; left:64px; z-index:60; display:flex; flex-direction:column; padding:0; background:var(--surface-base, var(--bg, #090C15)); }
@@ -28333,6 +28365,7 @@ async function removeCompetitor(trackingId, username) {
 <!-- v0.17.x RADAR LOOP — motor multi-marca. Módulo en /static/js/radar-loop.js
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=138"></script>
+<script src="/static/js/brain-net.js?v=1"></script>
+<script src="/static/js/radar-loop.js?v=139"></script>
 </body>
 </html>
