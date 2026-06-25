@@ -705,17 +705,28 @@
   // scrapeando en 2º plano (onbConnectIG disparado en el paso handle).
   function onbConfirmHTML(){
     var h=(S.onb.handle||"").replace(/^@+/,"");
+    // Loading hasta que Apify responda (avatar OK o fallo). NO dejar Continuar antes
+    // de tiempo (bug Leo 25-jun): el botón queda en «Analizando…» mientras se trae la foto.
+    var waiting = !isDemo() && !S.onb.avatar && !S.onb._profileDone;
+    // Red de seguridad: si por lo que sea no se disparó la petición, lánzala (idempotente)
+    // para que el loading siempre resuelva.
+    if(waiting && !S.onb._avatarReq){ setTimeout(function(){ onbFetchAvatar(h); }, 0); }
+    var cta = waiting
+      ? '<button class="btn btn-lg btn-primary onb-cta" disabled aria-busy="true"><span class="mini-spin" style="width:18px;height:18px;border-width:2px"></span> '+L("Analizando tu perfil…","Analyzing your profile…")+'</button>'
+      : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-confirm-yes">'+IC.check+' '+L("Sí, soy yo","Yes, that's me")+'</button>';
     return '<section class="onb-step onb-confirm">'+
       onbBackBtn()+
-      '<div class="onbc-ava-wrap'+((!S.onb.avatar && S.onb._avatarReq && !S.onb._avatarFailed)?' loading':'')+'">'+
+      '<div class="onbc-ava-wrap'+(waiting?' loading':'')+'">'+
         '<span class="onbc-ava-fb">'+ESC(initialsOf(h))+'</span>'+
         (S.onb.avatar?'<img class="onbc-ava on" src="'+ESC(S.onb.avatar)+'" alt=""/>':'')+
         '<span class="onbc-badge">'+IC.ig+'</span>'+
       '</div>'+
       '<h2 class="onb-h">'+L("¿Eres tú, @"+ESC(h)+"?","Is this you, @"+ESC(h)+"?")+'</h2>'+
-      '<p class="onb-sub">'+L("Voy a analizar TU cuenta para que el Cerebro aprenda cómo hablas y clave tu voz en cada guion.","I'll analyze YOUR account so the Brain learns how you talk and nails your voice in every script.")+'</p>'+
+      '<p class="onb-sub">'+(waiting
+          ? L("Estoy trayendo tu foto de Instagram para confirmarlo…","Fetching your Instagram photo to confirm…")
+          : L("Voy a analizar TU cuenta para que el Cerebro aprenda cómo hablas y clave tu voz en cada guion.","I'll analyze YOUR account so the Brain learns how you talk and nails your voice in every script."))+'</p>'+
       onbErr()+
-      '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-confirm-yes">'+IC.check+' '+L("Sí, soy yo","Yes, that's me")+'</button>'+
+      cta+
       '<button class="onb-skip" data-act="onb-confirm-edit">'+L("No, cambiar mi usuario","No, change my handle")+'</button>'+
     '</section>';
   }
@@ -872,8 +883,15 @@
     }
     if(S.onb._avatarReq===h) return;   // idempotente por handle
     S.onb._avatarReq=h; S.onb._avatarFailed=false;
+    // Fallback: si Apify tarda demasiado/cuelga, a los 12s desbloqueamos «Continuar»
+    // (con iniciales) para no dejar al usuario atascado en el loading.
+    try{ clearTimeout(S.onb._avaWait); }catch(e){}
+    S.onb._avaWait=setTimeout(function(){
+      if(S.onb._avatarReq===h && !S.onb._profileDone){ S.onb._profileDone=true; if(!S.onb.avatar) S.onb._avatarFailed=true; render(); }
+    }, 12000);
     apiGet("/api/onboarding/ig-avatar?handle="+encodeURIComponent(h)).then(function(r){
       if(S.onb._avatarReq!==h) return;   // cambió el handle entretanto
+      try{ clearTimeout(S.onb._avaWait); }catch(e){}
       if(r && r.ok && r.d){
         if(r.d.avatar) S.onb.avatar=r.d.avatar; else S.onb._avatarFailed=true;
         if(Array.isArray(r.d.reels)) S.onb.myReels=r.d.reels;   // paso «tus vídeos»
@@ -2692,7 +2710,10 @@
     var locked=isFree();
     var view=S.metricView||"resumen";
     function vtab(k,es,en){ return '<button class="mt-vtab'+(view===k?" on":"")+'" data-act="metric-view" data-k="'+k+'">'+L(es,en)+'</button>'; }
-    var inner = view==="audiencia" ? metAudienciaHTML() : (view==="competidores" ? metCompetidoresHTML() : metResumenHTML());
+    // Free (locked): SIEMPRE pintamos métricas de MUESTRA detrás → el blur del paywall
+    // tiene algo que difuminar (bug Leo 25-jun: antes salía el panel negro liso porque
+    // sin IG conectado `inner` quedaba vacío). Pro/conectado: las vistas reales.
+    var inner = locked ? metSampleHTML() : (view==="audiencia" ? metAudienciaHTML() : (view==="competidores" ? metCompetidoresHTML() : metResumenHTML()));
     var paywall = locked ? ('<div class="mt-wall"><div class="mt-wall-card">'+
         '<div class="mt-wall-ic">'+_icLock+'</div>'+
         '<h2 class="mt-wall-h">'+L("Tus números, a un clic.","Your numbers, one click away.")+'</h2>'+
@@ -2826,6 +2847,41 @@
         '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos para publicar","Best times to post")+'</span><span class="mt-card-meta">'+L("repros · tus publicaciones","plays · your posts")+'</span></div>'+_metBestTime(V)+'</div>'+
       '</div>'+
       '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels que más rinden","Your top-performing reels")+'</span><span class="mt-card-meta">'+V.length+' '+L("reels","reels")+'</span></div>'+topH+'</div>'+
+    '</div>';
+  }
+  // #3 (Leo 25-jun): métricas de MUESTRA, SOLO como fondo BORROSO del paywall del free
+  // («Borrosos a propósito»). El blur(9px) de .mt-charts.locked las hace ilegibles a
+  // propósito; aria-hidden para que lectores de pantalla las ignoren. NUNCA se ven sin
+  // blur ni a un usuario de pago (locked gobierna su uso).
+  function metSampleHTML(){
+    var kpis=[[L("Reproducciones","Plays"),"128.4K"],[L("Interacciones","Interactions"),"9.7K"],[L("Me gusta","Likes"),"7.1K"],
+              [L("Comentarios","Comments"),"1.2K"],[L("Compartidos","Shares"),"1.4K"],[L("Reels analizados","Reels analyzed"),"14"]];
+    var kpiH=kpis.map(function(k){ return '<div class="mt-kpi"><span class="mt-kpi-l">'+k[0]+'</span><div class="mt-kpi-row"><span class="mt-kpi-v">'+k[1]+'</span></div></div>'; }).join("");
+    var vbar=function(arr){ return arr.map(function(d){ return '<div class="mt-dur"><span class="mt-dur-v">'+d[1]+'</span><div class="mt-dur-bar'+(d[2]>=100?" top":"")+'" style="height:'+d[2]+'%"></div><span class="mt-dur-l">'+d[0]+'</span></div>'; }).join(""); };
+    var hbar=function(arr){ return arr.map(function(r){ return '<div class="mt-br"><div class="mt-br-top"><span>'+r[0]+'</span><span class="mt-mono">'+r[1]+'</span></div><div class="mt-br-track"><i style="width:'+r[2]+'%"></i></div></div>'; }).join(""); };
+    var tl=[["1","40K",42],["2","58K",58],["3","35K",35],["4","71K",71],["5","49K",49],["6","88K",88],["7","63K",63],["8","77K",77],["9","52K",52],["10","95K",100],["11","68K",68],["12","81K",81]];
+    var eng=[[L("Me gusta","Likes"),"7.1K",100],[L("Compartidos","Shares"),"1.4K",42],[L("Comentarios","Comments"),"1.2K",34]];
+    var durs=[["0–15s","8.2K",46],["15–30s","14.1K",78],["30–45s","19.0K",100],["45–60s","11.3K",60],["1–2m","6.4K",34],["2m+","3.1K",18]];
+    var hooks=[["“te lo cuento porque…”","32K",100],["“nadie habla de esto…”","24K",75],["“deja de hacer…”","18K",56]];
+    var best=[["Lun","6K",40],["Mar","9K",62],["Mié","13K",90],["Jue","11K",74],["Vie","14K",100],["Sáb","7K",48],["Dom","5K",32]];
+    var tops=[[L("Mi rutina de 5 min","My 5-min routine"),"42K","3.1K","2.4×"],[L("3 errores que cometía","3 mistakes I made"),"31K","2.2K","1.8×"],
+              [L("Lo que nadie te dice","What nobody tells you"),"27K","1.9K","1.6×"],[L("Cómo empecé","How I started"),"19K","1.1K","1.1×"]];
+    var topH=tops.map(function(v,i){ return '<div class="mt-top-row"><span class="mt-top-rank">'+(i+1)+'</span>'+
+      '<div class="mt-top-thumb"></div>'+
+      '<div class="mt-top-title">'+v[0]+'</div>'+
+      '<div class="mt-top-stat"><div class="mt-mono">'+v[1]+'</div><div class="mt-top-k">'+L("repros","plays")+'</div></div>'+
+      '<div class="mt-top-stat"><div class="mt-mono">'+v[2]+'</div><div class="mt-top-k">'+L("interac.","interac.")+'</div></div>'+
+      '<div class="mt-top-stat mt-top-mult"><div class="mt-mult">'+v[3]+'</div><div class="mt-top-k">'+L("explota","explodes")+'</div></div></div>'; }).join("");
+    return '<div class="mt-stack" aria-hidden="true">'+
+      '<div class="mt-kpis">'+kpiH+'</div>'+
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels en el tiempo","Your reels over time")+'</span><span class="mt-card-meta">'+L("repros por reel · por fecha","plays per reel · by date")+'</span></div><div class="mt-durs">'+vbar(tl)+'</div></div>'+
+      '<div class="mt-grid2 mt-grid4">'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Desglose de interacción","Interaction breakdown")+'</span><span class="mt-card-meta">9.7K total</span></div><div class="mt-bars">'+hbar(eng)+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Duración óptima","Optimal length")+'</span><span class="mt-card-meta">'+L("repros medias","avg plays")+'</span></div><div class="mt-durs">'+vbar(durs)+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Ganchos que funcionan","Hooks that work")+'</span><span class="mt-card-meta">'+L("aperturas top","top openers")+'</span></div><div class="mt-bars">'+hbar(hooks)+'</div></div>'+
+        '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Mejores momentos","Best times")+'</span><span class="mt-card-meta">'+L("repros · posts","plays · posts")+'</span></div><div class="mt-durs">'+vbar(best)+'</div></div>'+
+      '</div>'+
+      '<div class="mt-card"><div class="mt-card-head"><span class="mt-card-t">'+L("Tus reels que más rinden","Your top-performing reels")+'</span><span class="mt-card-meta">14 reels</span></div>'+topH+'</div>'+
     '</div>';
   }
   function metAudienciaHTML(){
