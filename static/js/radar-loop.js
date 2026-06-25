@@ -183,7 +183,9 @@
     var handle=(r.creator&&r.creator.ig_username)||r.username||"creador";
     var exp=r.explosion_score!=null?r.explosion_score:(r.explosion!=null?r.explosion:null);
     return { id:r.id, creator_id:r.creator_id||null, creator:{handle:handle, initials:r.initials||initialsOf(handle)},
-      when:r.when||relTime(r.posted_at), explosion:exp,
+      when:r.when||relTime(r.posted_at),
+      postedTs:(function(){ var t=Date.parse(r.posted_at||r.pubAt||r.published_at||""); return isFinite(t)?t:0; })(),   // ts crudo → filtrar a recientes (offer)
+      explosion:exp,
       explosionTxt: exp!=null?(exp>=10?Math.round(exp):(Math.round(exp*10)/10)):null,
       views: typeof r.views==="string"?r.views:fmtNum(r.views),
       likes: typeof r.likes==="string"?r.likes:fmtNum(r.likes),
@@ -1085,7 +1087,12 @@
      enseña el reel más fuerte del nicho y ofrece robarlo → el «aha» con un click.
      Si dice Sí → robo real (con red caption-only si Apify cae). Si No → tour. */
   function onbShowStealOffer(){
-    var top=(S.reels||[])[0];
+    // Ofrecer un reel RECIENTE (no el más explosivo aunque sea de hace meses): entre los
+    // publicados en las últimas ~3 semanas, el de más explosión. Sin recientes → el mejor.
+    var _pool=(S.reels||[]); var _now=Date.now(), _win=21*24*3600*1000;
+    var _byExp=function(a,b){ return (b.explosion||0)-(a.explosion||0); };
+    var _recent=_pool.filter(function(r){ return r.postedTs && (_now-r.postedTs)<=_win; }).sort(_byExp);
+    var top=_recent[0] || _pool.slice().sort(_byExp)[0] || _pool[0];
     if(!top && isDemo()){
       // demo sin reels sembrados → reel de muestra para previsualizar el offer
       top=normReel({id:"onbdemo", username:"antonlofer", views:7104218, likes:84696, explosion_score:8.4,
