@@ -8100,6 +8100,17 @@ def count_active_tracked(user_id: str, project_id: str | None = None,
         return 0
 
 
+# El onboarding bilingüe guarda el nicho en el idioma del usuario ("Tech",
+# "Finance"…), pero la semilla usa los 12 nichos amplios en español. Alias EN→ES
+# para que el match por nicho funcione también para usuarios en inglés.
+_SEED_NICHE_ALIAS = {
+    "tech": "tecnologia", "finance": "finanzas", "cooking": "cocina",
+    "fashion": "moda", "beauty": "belleza", "travel": "viajes",
+    "education": "educacion", "business": "negocios", "health": "salud",
+    "real estate": "inmobiliaria",
+}
+
+
 def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, limit=5):
     """Competidores CURADOS (creators_global.niche_source='seed') del nicho/subnichos
     dados que el usuario aún no sigue. Cold-start del radar SIN grafo de co-ocurrencia
@@ -8111,6 +8122,7 @@ def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, 
     exclude_handles = {(h or "").lstrip("@").lower() for h in (exclude_handles or [])}
     exclude_ids = set(exclude_ids or [])
     pn = _norm_tag(niche or "")
+    pn = _SEED_NICHE_ALIAS.get(pn, pn)
     tags = [t for t in (_norm_tag(s) for s in (subniches or [])) if t]
     if pn and pn not in tags:
         tags.append(pn)
