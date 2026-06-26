@@ -4464,16 +4464,17 @@
   }
   // Ítem 10: FORMATO DE GRABACIÓN sugerido. El LLM clasifica el reel original en uno de
   // estos 5; aquí va la copia "cómo hacerlo" + icono (la clasificación NO se inventa).
+  // Lista CERRADA (display name + «grábalo así») — receta, no etiqueta suelta.
   var REC_FORMATS={
-    selfie:{label:L("Selfie a cámara","Selfie to camera"),how:L("Cámara frontal, tú hablando directo. El hook, a los ojos.","Front camera, talking straight to it. Hook, eye to eye."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'},
-    pizarra:{label:L("Pizarra","Whiteboard"),how:L("Escribe o dibuja la idea mientras la cuentas.","Write or draw the idea as you tell it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'},
-    podcast:{label:L("Podcast","Podcast"),how:L("Plano sentado, micro a la vista, tono conversación.","Seated shot, mic in frame, conversational tone."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>'},
-    escritorio:{label:L("Pantalla / escritorio","Screen / desktop"),how:L("Graba la pantalla mostrando el cómo, tu voz encima.","Screen-record the how-to, voice over it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'},
-    "broll-vo":{label:L("B-roll + voz en off","B-roll + voiceover"),how:L("Imágenes de apoyo + tu voz narrando. Sin salir tú.","Cutaway footage + your narration. No on-camera you."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>'},
-    pov:{label:L("POV + B-rolls","POV + B-rolls"),how:L("Cámara en 1ª persona + texto sobreimpreso en pantalla. Intercala B-rolls.","First-person camera + on-screen text overlay. Cut in B-roll."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'}
+    selfie:{label:L("Selfie hablado","Talking selfie"),how:L("A cámara, tú hablando directo.","To camera, talking straight to it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'},
+    pizarra:{label:L("Pizarra","Whiteboard"),how:L("Escribiendo a mano mientras explicas.","Writing by hand as you explain."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'},
+    escritorio:{label:L("Escritorio / pantalla","Screen / desktop"),how:L("Grabas la pantalla, tu voz encima.","Screen-record, your voice over it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'},
+    podcast:{label:L("Clip de podcast","Podcast clip"),how:L("Cara a cara, formato conversación.","Face to face, conversation format."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>'},
+    "broll-vo":{label:L("B-roll + voz en off","B-roll + voiceover"),how:L("Imágenes de recurso, tú narrando.","Stock/cutaway footage, you narrating."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>'},
+    pov:{label:L("POV + texto","POV + text"),how:L("Plano POV con texto en pantalla.","POV shot with on-screen text."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'}
   };
   function _recFmtDemo(r){ var s=_durSec(r&&r.dur||"")||0; var keys=["selfie","pizarra","podcast","escritorio","broll-vo","pov"];
-    if(s>=90) return "podcast"; if(s>0&&s<=18) return "pov"; return keys[_lbHash((r&&(r.id||r.cap))||"x",0,keys.length)]; }
+    if(s>=90) return "podcast"; if(s>0&&s<=40) return "pov"; return keys[_lbHash((r&&(r.id||r.cap))||"x",0,keys.length)]; }
   // Carga EJEMPLOS reales del pool con el mismo formato (cacheado, sin scrape). 1 vez por formato.
   function loadFormatExamples(fmt){
     if(!fmt) return;
@@ -4499,7 +4500,8 @@
     if(!st||st.loading) return '<div class="recfmt-ex-wait"><span class="rs-ldr"></span> '+L("Buscando referencias…","Finding references…")+'</div>';
     if(!st.examples.length) return '<div class="recfmt-ex-empty">'+L("Aún sin referencias de este formato en tu radar.","No references of this format in your radar yet.")+'</div>';
     var cells=st.examples.slice(0,2).map(function(e){   // 2 vídeos prominentes a la derecha
-      var thumb=e.thumb?('<img src="'+ESC(e.thumb)+'" alt="" loading="lazy">'):('<div class="recfmt-ex-ph">'+_icPlay+'</div>');
+      // onerror: si la miniatura no existe (404), se oculta y queda el placeholder de fondo.
+      var thumb=e.thumb?('<img src="'+ESC(e.thumb)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'):('<div class="recfmt-ex-ph">'+_icPlay+'</div>');
       var mult=(e.explosion!=null)?('<span class="recfmt-ex-mult">'+IC.bolt+' '+ESC(String(e.explosion))+'×</span>'):'';
       var inner='<div class="recfmt-ex-thumb">'+thumb+mult+'<span class="recfmt-ex-play">'+_icPlay+'</span></div><div class="recfmt-ex-h">@'+ESC(e.handle||"")+'</div>';
       return e.url
@@ -4534,7 +4536,10 @@
     try{ localStorage.setItem("rs_first_steal","1"); }catch(e){}
   }
   function scriptRevealHTML(){
-    var r=S.reel,s=r.script||{hook:"",beats:[],close:""};
+    // BUGFIX cruce de reels: el reveal SIEMPRE renderiza el reel cuya generación
+    // completó (S.revealReel), no la global S.reel (que una 2ª generación en vuelo pudo
+    // reasignar). Así guion + «ver original» pertenecen al MISMO reel que se robó.
+    var r=S.revealReel||S.reel,s=r.script||{hook:"",beats:[],close:""};
     var beats=(s.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
     // PRIMER guion → banner héroe + prueba social del reel robado (lo que petó).
     // Solo la 1ª vez (S._firstStealCelebrate, one-shot que pone steal()).
@@ -5398,7 +5403,7 @@
     // con X/Esc/«seguir navegando»), no relanzamos — reabrimos el orbe del que ya
     // corre. Evita guiones duplicados y, en demo, el doble descuento de crédito.
     if(S._stealInFlight===id){ S.reel=r; S.genKind="script"; S._genBg=false; S.view="gen"; render(); return; }
-    S.reel=r; S.genKind="script"; S.done={}; S.view="gen";
+    S.reel=r; S.revealReel=null; S.genKind="script"; S.done={}; S.view="gen";
     // T6: token de generación — si el usuario lanza otro robo o sigue navegando,
     // este robo pasa a "background": guarda el guion y avisa, sin secuestrar la vista.
     S._genSeq=(S._genSeq||0)+1; var tok=S._genSeq;
@@ -5435,6 +5440,13 @@
       if(!isDemo() && r._sid){ var g=guionById(gidNew); if(g) g._sid=r._sid; }
       if(bg){ render(); showToast("Tu guion ya está listo — te espera en Guiones."); }
       else {
+        // SNAPSHOT del reel exacto que generó → el reveal es inmune a que la global
+        // S.reel cambie o a que el objeto-reel se reuse/mute por otro robo.
+        S.revealReel={ id:r.id, creator:r.creator, url:r.url, ig_url:r.ig_url, permalink:r.permalink,
+          ig_reel_id:r.ig_reel_id, views:r.views, likes:r.likes, explosionTxt:r.explosionTxt,
+          thumb:r.thumb, cap:r.cap, dur:r.dur, _sid:r._sid,
+          script:r.script, options:r.options, optIdx:r.optIdx||0, hookIdx:r.hookIdx||0,
+          recFormat:r.recFormat, povText:r.povText };
         S.activeGuionId=gidNew; S.view="script";
         // #2: ¿es su 1er guion robado? → celebración (banner héroe + lluvia al cerebro).
         var _firstSteal=firstStealPending();
@@ -6790,10 +6802,15 @@
     }
     if(act==="onb-steal-no"){ S.onbStealOffer=null; S.onbCofre=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
     if(act==="steal") return steal(id);
-    if(act==="opt-pick"){ if(S.reel){ applyScriptOption(S.reel, parseInt(k,10)||0, 0); render(); } return; }   // elegir opción de guion
-    if(act==="hook-pick"){ if(S.reel){ applyScriptOption(S.reel, S.reel.optIdx||0, parseInt(k,10)||0); render(); } return; }   // elegir gancho
+    if(act==="opt-pick"){ var _rv=S.revealReel||S.reel; if(_rv){ applyScriptOption(_rv, parseInt(k,10)||0, 0); render(); } return; }   // elegir opción de guion
+    if(act==="hook-pick"){ var _rh=S.revealReel||S.reel; if(_rh){ applyScriptOption(_rh, _rh.optIdx||0, parseInt(k,10)||0); render(); } return; }   // elegir gancho
     if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
-    if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.url||_ro.ig_url||_ro.permalink||(_ro.ig_reel_id?("https://www.instagram.com/reel/"+_ro.ig_reel_id+"/"):null); if(_u){ try{ window.open(_u,"_blank","noopener"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
+    if(act==="reel-original"){
+      // En el reveal, «ver original» SIEMPRE es el reel del guion mostrado (S.revealReel),
+      // no la global S.reel — evita abrir el original de otro reel tras un 2º robo.
+      var _ro=(S.view==="script" && S.revealReel && S.revealReel.id===id) ? S.revealReel
+              : ((typeof reelById==="function"?reelById(id):null) || S.revealReel || S.reel || {});
+      var _u=_ro.url||_ro.ig_url||_ro.permalink||(_ro.ig_reel_id?("https://www.instagram.com/reel/"+_ro.ig_reel_id+"/"):null); if(_u){ try{ window.open(_u,"_blank","noopener"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
     if(act==="reel-dismiss") return reelDismiss(id);
     if(act==="undo-dismiss") return undoDismiss();
     if(act==="reel-detail") return openReelDetail(id);

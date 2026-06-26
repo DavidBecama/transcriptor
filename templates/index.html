@@ -26843,7 +26843,12 @@ function skipTour() {
 // House tour: Esc SALTA el tutorial (igual que el botón «Saltar»/X) — decisión David.
 // Se captura en fase de captura para que no caiga a overlays de debajo.
 document.addEventListener("keydown", function (e) {
-  if (e.key === "Escape" && tourActive) { e.preventDefault(); e.stopPropagation(); skipTour(); }
+  // Esc: si hay un overlay de la isla abierto (gen/reveal/…), NO consumimos el evento —
+  // deja que la isla lo cierre primero; un 2º Esc ya salta el tour. (Antes el tour se
+  // tragaba el Esc en fase de captura → el overlay no se cerraba; rompía T3 del harness.)
+  if (e.key === "Escape" && tourActive && !document.querySelector("#radarRoot .overlay")) {
+    e.preventDefault(); e.stopPropagation(); skipTour();
+  }
 }, true);
 
 function endTour() {
@@ -28479,6 +28484,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=151"></script>
+<script src="/static/js/radar-loop.js?v=152"></script>
 </body>
 </html>
