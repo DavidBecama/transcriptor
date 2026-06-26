@@ -1267,6 +1267,22 @@
       }
     });
   }
+  // #5 proactividad anti-churn (David 26-jun): reels que petan en tu nicho de creadores
+  // que AÚN NO SIGUES → «róbalo aunque no sea tu competidor». Carga 1 vez (excluye los tuyos).
+  function loadDiscover(){
+    if(isDemo() || S._discDismissed || S._discLoading || Array.isArray(S.discover)) return;
+    S._discLoading=true;
+    apiGet('/api/niche/discover?limit=6').then(function(r){
+      S._discLoading=false;
+      S.discover=(r && r.ok && r.d && Array.isArray(r.d.reels)) ? r.d.reels.map(normReel) : [];
+      if(S.tab==="dashboard") render();
+    });
+  }
+  // Reel por id buscándolo TAMBIÉN en discover (para robar uno del descubrimiento).
+  function reelById(id){
+    var r=(S.reels||[]).filter(function(x){return x.id===id;})[0];
+    return r || (S.discover||[]).filter(function(x){return x.id===id;})[0] || null;
+  }
   // Real: ranking del nicho por VIEWS medias/reel (no seguidores — el scrape no los
   // trae). Lo carga 1 vez al entrar en el tab. S.lb = {you, rows[], metric}.
   function loadLeaderboard(force){
@@ -1353,6 +1369,7 @@
           '<div class="sugg-h">@'+ESC(c.handle)+' <span class="sugg-x">'+ESC(c.x||"")+'</span></div>'+
           '<div class="sugg-why">'+ESC(whyCap)+'. '+L("Añádelo y sus reels entran en tu radar.","Add them and their reels enter your radar.")+'</div>'+
         '</div>'+
+        (c.reel&&c.reel.thumb?'<div class="sugg-reel" title="'+L("Su reel que está petando","Their reel that's blowing up")+'"><img src="'+ESC(c.reel.thumb)+'" alt="" loading="lazy"/>'+(c.reel.exp?'<span class="sugg-reel-exp">'+IC.bolt+' '+ESC(String(Math.round(c.reel.exp*10)/10))+'×</span>':'')+'</div>':'')+
         '<div class="sugg-actions"><button class="btn btn-sm btn-primary" data-act="add-suggested" data-id="'+ESC(c.handle)+'">'+IC.plus+' '+L("Añadir","Add")+'</button></div>'+
       '</div>';
     }).join("");
@@ -1519,6 +1536,28 @@
     return '<div class="seed-banner">'+IC.spark+
       '<span>'+L("Mientras llenas tu radar, esto está <b>petando en tu nicho</b>. Sigue a tus competidores para que el radar se llene con lo TUYO.","While you fill your radar, this is <b>blowing up in your niche</b>. Follow your competitors so the radar fills with YOUR signals.")+'</span>'+
       '<button class="btn btn-sm btn-secondary" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+    '</div>';
+  }
+  // #5: sección «petando en tu nicho que aún no sigues» — solo cuando YA sigues a
+  // alguien (si no, el radar entero ya es seed). Robar uno auto-sigue al creador.
+  function discoverHTML(){
+    if(isDemo() || S.radarSeed) return '';
+    if(!(Array.isArray(S.tracked) && S.tracked.length>0)) return '';
+    var d=(Array.isArray(S.discover)?S.discover:[]);
+    if(!d.length) return '';
+    var cards=d.slice(0,6).map(function(r){
+      var thumb=r.thumb?'<img class="disc-img" src="'+ESC(r.thumb)+'" alt="" loading="lazy"/>':'<div class="disc-ph">'+IC.bolt+'</div>';
+      var exp=(r.explosionTxt!=null)?'<span class="disc-exp">'+IC.bolt+' '+ESC(String(r.explosionTxt))+'×</span>':'';
+      return '<div class="disc-card">'+
+        '<div class="disc-thumb" data-act="steal" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Robar este reel","Steal this reel")+'">'+thumb+exp+'<span class="disc-play">'+_icPlay+'</span></div>'+
+        '<div class="disc-meta"><span class="disc-h">@'+ESC(r.creator.handle)+'</span>'+(r.views?'<span class="disc-v">'+IC.eye+' '+ESC(r.views)+'</span>':'')+'</div>'+
+        '<button class="btn btn-sm btn-primary disc-steal" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba","Steal")+'</button>'+
+      '</div>';
+    }).join("");
+    return '<div class="disc-sec">'+
+      '<div class="disc-head"><span class="disc-head-t">'+IC.bolt+' '+L("Petando en tu nicho","Blowing up in your niche")+' <span class="disc-tag">'+L("que aún no sigues","you don\'t follow yet")+'</span></span>'+
+        '<button class="sugg-hide" data-act="disc-dismiss">'+L("Ocultar","Hide")+'</button></div>'+
+      '<div class="disc-row">'+cards+'</div>'+
     '</div>';
   }
   function feedReels(){
@@ -2035,6 +2074,7 @@
       (S.reels.length?trackedManageHTML():"")+ // «Tus competidores» con × para quitar (re-añadido: ver/gestionar a quién sigues sin tener que vaciar el radar)
       seedBannerHTML()+           // aviso «esto petó en tu nicho» (solo radar-seed, demo vacío)
       suggestedCompHTML()+        // «Te lo sugiero · Nuevo en tu nicho»               ← SE QUEDA
+      discoverHTML()+             // #5: «petando en tu nicho que aún no sigues» (proactividad)
       (S.reels.length?communityGalleryHTML():"")+   // «Creaciones de la comunidad»    ← SE QUEDA
       // QUITADOS (mockup David / petición usuario): trackedManageHTML (Tus competidores),
       // activationProgressHTML (Activa tu cuenta), voiceOnboardCardHTML (Enséñame tu voz),
@@ -4886,6 +4926,7 @@
     if(S.tab==="brain"){ ensureBrainNet(); ensureBrain3D(); ensureBrainTrain(); } else pauseBrain3D();
     ensureFlashCountdown();   // tic-tac del reloj de la oferta flash si está visible
     if(S.tab==="dashboard") loadSuggestion();   // sugerir competidores (real): carga 1 vez
+    if(S.tab==="dashboard" && Array.isArray(S.tracked) && S.tracked.length>0 && !S.radarSeed) loadDiscover();   // #5 descubrimiento del nicho
     if(S.tab==="leaderboard") loadLeaderboard(); // ranking real por views: carga 1 vez
     // Sección legacy pendiente de la URL (/profile/transcriptions|settings): se abre
     // una vez que #rsLegacy ya existe (primer render). openLegacy consume el flag.
@@ -5256,7 +5297,7 @@
     return head+body;
   }
   function steal(id){
-    var r=S.reels.filter(function(x){return x.id===id;})[0]; if(!r) return;
+    var r=reelById(id); if(!r) return;   // busca en el radar Y en discover (#5)
     // #2 conversión: muro en el PICO de Flow — free sin robos → paywall justo cuando
     // hay deseo (acaba de elegir el reel). En demo lo demostramos aquí; en real lo
     // confirma el backend (free_limit_reached). El muro borroso ya enseña el valor.
@@ -6687,6 +6728,7 @@
       return;
     }
     if(act==="sugg-dismiss"){ S._suggDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
+    if(act==="disc-dismiss"){ S._discDismissed=true; S.discover=[]; return render(); }   // #5 ocultar descubrimiento
     if(act==="versus-start"){
       var opp=btn.getAttribute("data-id")||"rival";
       // oppAvg = media de views del competidor; mine = tu mejor reel.
