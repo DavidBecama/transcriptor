@@ -1143,7 +1143,8 @@
     var isSel=sel===i, dim=sel>=0&&!isSel, h=(r.creator&&r.creator.handle)||"";
     var thumb=r.thumb?'<img class="cofre-card-img" src="'+ESC(r.thumb)+'" alt=""/>':'';
     var ratio=(r.explosionTxt!=null?r.explosionTxt:1);
-    return '<div class="cofre-card'+(isSel?' sel':'')+(dim?' dim':'')+'" style="animation-delay:'+(i*0.11).toFixed(2)+'s" data-act="onb-cofre-steal" data-id="'+ESC(r.id)+'">'+
+    var shown=!!(S.onbCofre&&S.onbCofre._shown);   // ya entraron → no re-animar en re-render (anti-parpadeo)
+    return '<div class="cofre-card'+(isSel?' sel':'')+(dim?' dim':'')+(shown?' shown':'')+'" style="animation-delay:'+(i*0.11).toFixed(2)+'s" data-act="onb-cofre-steal" data-id="'+ESC(r.id)+'">'+
       '<div class="cofre-card-thumb" style="'+(r.thumb?'':'background:'+_cofreGrad(i)+';')+'">'+thumb+
         '<span class="cofre-card-916">9:16</span>'+
         '<span class="cofre-card-ratio">×'+ESC(String(ratio))+'<small>'+L("su media","avg")+'</small></span>'+
@@ -1176,10 +1177,7 @@
           '<p class="cofre-sub">'+L("Roba uno y te lo convierto en <b>TU guion</b>.","Steal one and I'll turn it into <b>YOUR script</b>.")+'</p>'+
         '</div>'+
         '<div class="cofre-cards">'+cards+'</div>'+
-        '<div class="cofre-foot">'+
-          (selR?'<div class="cofre-robbing"><span class="cofre-pip cofre-pip--b"></span>'+L("Robando ","Stealing ")+'<b>@'+ESC((selR.creator&&selR.creator.handle)||"")+'</b>'+L(" — generando tu guion…"," — generating your script…")+'</div>':'')+
-          '<button class="cofre-secondary" data-act="onb-steal-no">'+L("Enséñame a robar","Show me how to steal")+'</button>'+
-        '</div>'+
+        (selR?'<div class="cofre-foot"><div class="cofre-robbing"><span class="cofre-pip cofre-pip--b"></span>'+L("Robando ","Stealing ")+'<b>@'+ESC((selR.creator&&selR.creator.handle)||"")+'</b>'+L(" — generando tu guion…"," — generating your script…")+'</div></div>':'')+
       '</div>';
     }
     return '<div class="cofre"><div class="cofre-glow"></div><canvas id="rsCofreCanvas" class="cofre-canvas"></canvas><div class="cofre-vignette"></div>'+inner+'</div>';
@@ -1189,7 +1187,7 @@
     var cof=S.onbCofre; if(!cof || cof.phase!=='avalanche' || cof._started) return;
     var cv=document.getElementById('rsCofreCanvas'); if(!cv) return;
     cof._started=true;
-    _cofreRunAvalanche(cv, function(){ if(S.onbCofre){ S.onbCofre.phase='choose'; render(); } });
+    _cofreRunAvalanche(cv, function(){ if(S.onbCofre){ S.onbCofre.phase='choose'; render(); setTimeout(function(){ if(S.onbCofre) S.onbCofre._shown=true; }, 760); } });
   }
   function _cofreRunAvalanche(cv, onDone){
     var ctx, W, H, thumbs, span, tw=56, th=100, start, raf;
@@ -4918,6 +4916,11 @@
     // Equipo oculto temporalmente (ver TODO en railHTML): cualquier deep-link a
     // team se normaliza al Radar para no dejar una vista huérfana.
     if(S.tab==="team") S.tab="dashboard";
+    // Mata el house-tour si se coló por timing durante el onboarding/offer/carga (bug:
+    // en incógnito el onboarding monta tarde y el auto-tour de 1500ms arranca encima).
+    if(showOnboarding() || S._onbWaiting || S.onbStealOffer){
+      try{ var _tov=document.querySelector('.tour-overlay'); if(_tov && _tov.style.display!=='none' && typeof window.endTour==="function") window.endTour(); }catch(e){}
+    }
     // A) Onboarding v2 = pantalla dedicada (sin rail/cmd/statbar): el radar vacío
     // (0 rivales · 0 reels) NO se ve detrás. Short-circuit antes de montar la isla.
     if(showOnboarding()){
@@ -4992,8 +4995,28 @@
     // Cerebro 3D: monta/re-ancla al entrar en la pestaña Cerebro, pausa al salir.
     if(S.tab==="brain"){ ensureBrainNet(); ensureBrain3D(); ensureBrainTrain(); } else pauseBrain3D();
     ensureFlashCountdown();   // tic-tac del reloj de la oferta flash si está visible
-    if(S.tab==="dashboard") loadSuggestion();   // sugerir competidores (real): carga 1 vez
-    if(S.tab==="dashboard" && Array.isArray(S.tracked) && S.tracked.length>0 && !S.radarSeed) loadDiscover();   // #5 descubrimiento del nicho
+    // NO disparar durante el onboarding/offer/carga (S.tab ya es "dashboard" ahí): si no,
+    // al resolver hacen render() y reconstruyen el cofre → las cartas parpadean.
+    var _onbBusy=(S._onbWaiting||S.onbStealOffer||showOnboarding());
+    if(S.tab==="dashboard" && !_onbBusy) loadSuggestion();   // sugerir competidores (real): carga 1 vez
+    if(S.tab==="dashboard" && !_onbBusy && Array.isArray(S.tracked) && S.tracked.length>0 && !S.radarSeed) loadDiscover();   // #5 descubrimiento del nicho
+    // House-tour: lo arranca la ISLA la 1ª vez que aterrizas en el dashboard SIN onboarding
+    // (post-cofre, o un usuario que ya onboardeó y no lo ha visto). Robusto: re-chequea los
+    // targets justo antes. Sustituye al auto-start de index.html (que se colaba por timing).
+    if(S.tab==="dashboard" && !_onbBusy && !S._tourArmed){
+      try{
+        var _seen=false; try{ _seen=localStorage.getItem("onboarding_completed")==="true"; }catch(e){}
+        var _tovA=document.querySelector('.tour-overlay');
+        if(!_seen && typeof window.startTour==="function" && (!_tovA || _tovA.style.display==='none')){
+          S._tourArmed=true;
+          setTimeout(function(){
+            if(S.tab==="dashboard" && !S.onbStealOffer && !S._onbWaiting && !document.querySelector('#radarRoot .onb-screen') && document.querySelector('#radarRoot .rail')){
+              try{ window.startTour(); }catch(e){}
+            }
+          }, 900);
+        }
+      }catch(e){}
+    }
     if(S.tab==="leaderboard") loadLeaderboard(); // ranking real por views: carga 1 vez
     // Sección legacy pendiente de la URL (/profile/transcriptions|settings): se abre
     // una vez que #rsLegacy ya existe (primer render). openLegacy consume el flag.
