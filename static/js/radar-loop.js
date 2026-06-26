@@ -1124,19 +1124,49 @@
              mk("cofre2","javi.fit",1100000,6,"Nadie te cuenta esto de las dominadas"),
              mk("cofre3","marta.ahorra",870000,3,"Ahorré 5.000€ sin enterarme") ];
   }
-  function onbShowStealOffer(){
-    // Top 3 reels RECIENTES (≤3 semanas) por explosión; sin recientes → top 3 a secas.
+  // Elige el top-3 de reels (recientes ≤3 sem por explosión; si no, top-3 a secas). En demo
+  // cae a reels de muestra. Devuelve true si hay al menos 1.
+  function _cofrePickReels(){
     var _pool=(S.reels||[]); var _now=Date.now(), _win=21*24*3600*1000;
     var _byExp=function(a,b){ return (b.explosion||0)-(a.explosion||0); };
     var _recent=_pool.filter(function(r){ return r.postedTs && (_now-r.postedTs)<=_win; }).sort(_byExp);
     var three=(_recent.length>=3?_recent:_pool.slice().sort(_byExp)).slice(0,3);
     if(three.length<3 && isDemo()){ three=_cofreDemoReels(); S.reels=three; }
-    if(!three.length){ render(); return onbStartTour(); }   // prod sin reels → tour directo
     S._cofreReels=three;
-    S.onbStealOffer={ids:three.map(function(r){return r.id;})};
+    return three.length>0;
+  }
+  // El COFRE arranca YA: su avalancha ES la carga (Leo 26-jun: fuera la pantalla
+  // «Preparando tu radar»). Los reels del nicho se cargan DURANTE la avalancha; al
+  // terminar (y con reels listos) se pasa a «elegir».
+  function onbShowStealOffer(){
     var reduced=false; try{ reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
-    S.onbCofre={phase:reduced?'choose':'avalanche', selected:-1, _started:false};
+    S.onbStealOffer={}; S._cofreReels=null;
+    S.onbCofre={phase:reduced?'choose':'avalanche', selected:-1, _started:false, _reelsReady:false, _avalancheDone:reduced};
+    if(isDemo() || (S.reels&&S.reels.length)){ _cofrePickReels(); S.onbCofre._reelsReady=true; }
     render();
+    if(!isDemo() && !S.onbCofre._reelsReady) _cofreLoadReels();   // carga reels en 2º plano
+  }
+  // Carga los reels del nicho mientras corre la avalancha (sin pantalla de carga). Cuando
+  // hay reels: si la avalancha ya terminó → «elegir»; si no, espera a que termine.
+  function _cofreLoadReels(){
+    var t0=Date.now(), HARD=18000;
+    var _pq=(S.brandId&&S.brandId!=="default")?("?project_id="+encodeURIComponent(S.brandId)):"";
+    (function loop(){
+      if(!S.onbStealOffer || !S.onbCofre) return;
+      apiGet("/api/tracked-creators/reels"+(_pq?_pq+"&":"?")+"sort=explosion&limit=24").then(function(r){
+        if(!S.onbStealOffer || !S.onbCofre) return;
+        if(r&&r.ok&&r.d&&Array.isArray(r.d.reels)){ S.reels=r.d.reels.map(normReel); S.radarSeed=!!r.d.seed; }
+        var n=(S.reels||[]).length, el=Date.now()-t0;
+        if(n>=3 || el>HARD){
+          var got=_cofrePickReels();
+          if(!got){ S.onbStealOffer=null; S.onbCofre=null; try{ loadTracked(); }catch(e){} return onbStartTour(); }  // sin reels → tour directo
+          S.onbCofre._reelsReady=true; try{ loadTracked(); onbRadarCatchup(); }catch(e){}
+          if(S.onbCofre._avalancheDone){ S.onbCofre.phase='choose'; render(); setTimeout(function(){ if(S.onbCofre) S.onbCofre._shown=true; }, 760); }
+          return;
+        }
+        setTimeout(loop, 2500);
+      });
+    })();
   }
   function _cofreGrad(i){ return ['linear-gradient(155deg,#1d2f6b,#0c1330)','linear-gradient(155deg,#3a2566,#140c2e)','linear-gradient(155deg,#0f3f4a,#08181f)'][i%3]; }
   function _cofreCard(r,i,sel){
@@ -1187,7 +1217,13 @@
     var cof=S.onbCofre; if(!cof || cof.phase!=='avalanche' || cof._started) return;
     var cv=document.getElementById('rsCofreCanvas'); if(!cv) return;
     cof._started=true;
-    _cofreRunAvalanche(cv, function(){ if(S.onbCofre){ S.onbCofre.phase='choose'; render(); setTimeout(function(){ if(S.onbCofre) S.onbCofre._shown=true; }, 760); } });
+    _cofreRunAvalanche(cv, function(){
+      if(!S.onbCofre) return;
+      S.onbCofre._avalancheDone=true;
+      // Pasa a «elegir» SOLO si los reels ya cargaron; si no, se queda en la avalancha
+      // (el loader pasará a «elegir» en cuanto lleguen) → nunca cartas vacías.
+      if(S.onbCofre._reelsReady){ S.onbCofre.phase='choose'; render(); setTimeout(function(){ if(S.onbCofre) S.onbCofre._shown=true; }, 760); }
+    });
   }
   function _cofreRunAvalanche(cv, onDone){
     var ctx, W, H, thumbs, span, tw=56, th=100, start, raf;
@@ -1227,14 +1263,10 @@
       S.onb.skipped=true; S.user.onbV2Done=true;
       try{ var b=brand(); if(b){ b.voice=Math.max(b.voice||0,50); b.level=Math.max(b.level||1,2); } }catch(e){}
       if(typeof seedDemoContent==="function" && !(S.reels||[]).length){ try{ seedDemoContent(); }catch(e){} }
-      // Mostrar la animación de carga del radar ~4.8s (en demo no hay scrape real) ANTES de
-      // aterrizar en el dashboard sembrado → la demo enseña la carga post-onboarding (antes
-      // saltaba directo y se sentía abrupto/roto).
-      var _seeded=S.reels; S.reels=[]; S.radarSeed=false; S._onbWaiting=true; S.tab="dashboard"; render();
-      setTimeout(function(){
-        S._onbWaiting=false; if(_seeded&&_seeded.length) S.reels=_seeded;
-        onbShowStealOffer();   // #6: «¿quieres robar este?» (en demo también, para previsualizar)
-      }, 4800);
+      // Directo al COFRE (Leo 26-jun: fuera la pantalla «Preparando tu radar»; la
+      // avalancha del cofre ES la carga). Demo ya tiene reels sembrados.
+      S.radarSeed=false; S.tab="dashboard";
+      onbShowStealOffer();
       return;
     }
     S.onb.busy=true; render();
@@ -1244,8 +1276,10 @@
       S.onb.busy=false; S.onb.skipped=true; S.user.onbV2Done=true;
       var v=(r.ok&&r.d&&r.d.voice!=null)?r.d.voice:50;
       try{ brand().voice=Math.max(brand().voice||0,v); }catch(e){}
-      // Espera a que lleguen los reels del nicho (descubrimiento Apify) → luego el tour.
-      S._onbWaiting=true; S.radarSeed=false; S.reels=[]; S.tab="dashboard"; render(); onbWaitForNiche();
+      // Directo al COFRE (Leo 26-jun): su avalancha ES la carga. Los reels del nicho se
+      // cargan en 2º plano DURANTE la avalancha (_cofreLoadReels); al terminar → elegir.
+      S.radarSeed=false; S.reels=[]; S.tab="dashboard";
+      onbShowStealOffer();
       showToast(L("Cerebro al "+v+"% · buscando los reels más acertados de tu nicho…","Brain at "+v+"% · finding the most on-point reels for your niche…"));
     });
   }
