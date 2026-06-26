@@ -4430,7 +4430,10 @@
     try{ localStorage.setItem("rs_first_steal","1"); }catch(e){}
   }
   function scriptRevealHTML(){
-    var r=S.reel,s=r.script||{hook:"",beats:[],close:""};
+    // BUGFIX cruce de reels: el reveal SIEMPRE renderiza el reel cuya generación
+    // completó (S.revealReel), no la global S.reel (que una 2ª generación en vuelo pudo
+    // reasignar). Así guion + «ver original» pertenecen al MISMO reel que se robó.
+    var r=S.revealReel||S.reel,s=r.script||{hook:"",beats:[],close:""};
     var beats=(s.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
     // PRIMER guion → banner héroe + prueba social del reel robado (lo que petó).
     // Solo la 1ª vez (S._firstStealCelebrate, one-shot que pone steal()).
@@ -5267,7 +5270,7 @@
     // con X/Esc/«seguir navegando»), no relanzamos — reabrimos el orbe del que ya
     // corre. Evita guiones duplicados y, en demo, el doble descuento de crédito.
     if(S._stealInFlight===id){ S.reel=r; S.genKind="script"; S._genBg=false; S.view="gen"; render(); return; }
-    S.reel=r; S.genKind="script"; S.done={}; S.view="gen";
+    S.reel=r; S.revealReel=null; S.genKind="script"; S.done={}; S.view="gen";
     // T6: token de generación — si el usuario lanza otro robo o sigue navegando,
     // este robo pasa a "background": guarda el guion y avisa, sin secuestrar la vista.
     S._genSeq=(S._genSeq||0)+1; var tok=S._genSeq;
@@ -5304,6 +5307,13 @@
       if(!isDemo() && r._sid){ var g=guionById(gidNew); if(g) g._sid=r._sid; }
       if(bg){ render(); showToast("Tu guion ya está listo — te espera en Guiones."); }
       else {
+        // SNAPSHOT del reel exacto que generó → el reveal es inmune a que la global
+        // S.reel cambie o a que el objeto-reel se reuse/mute por otro robo.
+        S.revealReel={ id:r.id, creator:r.creator, url:r.url, ig_url:r.ig_url, permalink:r.permalink,
+          ig_reel_id:r.ig_reel_id, views:r.views, likes:r.likes, explosionTxt:r.explosionTxt,
+          thumb:r.thumb, cap:r.cap, dur:r.dur, _sid:r._sid,
+          script:r.script, options:r.options, optIdx:r.optIdx||0, hookIdx:r.hookIdx||0,
+          recFormat:r.recFormat, povText:r.povText };
         S.activeGuionId=gidNew; S.view="script";
         // #2: ¿es su 1er guion robado? → celebración (banner héroe + lluvia al cerebro).
         var _firstSteal=firstStealPending();
@@ -6652,10 +6662,15 @@
     }
     if(act==="onb-steal-no"){ S.onbStealOffer=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
     if(act==="steal") return steal(id);
-    if(act==="opt-pick"){ if(S.reel){ applyScriptOption(S.reel, parseInt(k,10)||0, 0); render(); } return; }   // elegir opción de guion
-    if(act==="hook-pick"){ if(S.reel){ applyScriptOption(S.reel, S.reel.optIdx||0, parseInt(k,10)||0); render(); } return; }   // elegir gancho
+    if(act==="opt-pick"){ var _rv=S.revealReel||S.reel; if(_rv){ applyScriptOption(_rv, parseInt(k,10)||0, 0); render(); } return; }   // elegir opción de guion
+    if(act==="hook-pick"){ var _rh=S.revealReel||S.reel; if(_rh){ applyScriptOption(_rh, _rh.optIdx||0, parseInt(k,10)||0); render(); } return; }   // elegir gancho
     if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
-    if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.url||_ro.ig_url||_ro.permalink||(_ro.ig_reel_id?("https://www.instagram.com/reel/"+_ro.ig_reel_id+"/"):null); if(_u){ try{ window.open(_u,"_blank","noopener"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
+    if(act==="reel-original"){
+      // En el reveal, «ver original» SIEMPRE es el reel del guion mostrado (S.revealReel),
+      // no la global S.reel — evita abrir el original de otro reel tras un 2º robo.
+      var _ro=(S.view==="script" && S.revealReel && S.revealReel.id===id) ? S.revealReel
+              : ((typeof reelById==="function"?reelById(id):null) || S.revealReel || S.reel || {});
+      var _u=_ro.url||_ro.ig_url||_ro.permalink||(_ro.ig_reel_id?("https://www.instagram.com/reel/"+_ro.ig_reel_id+"/"):null); if(_u){ try{ window.open(_u,"_blank","noopener"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
     if(act==="reel-dismiss") return reelDismiss(id);
     if(act==="undo-dismiss") return undoDismiss();
     if(act==="reel-detail") return openReelDetail(id);
