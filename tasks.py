@@ -1571,7 +1571,7 @@ _BUILTIN_SCRIPT_STYLES_LOCAL = {"viral", "divertido", "storytelling", "hooks"}
 
 
 @celery_app.task(bind=True, name="tasks.generate_script_competitor")
-def generate_script_competitor_task(self, reel_id, user_id, assistant_id, language=None):
+def generate_script_competitor_task(self, reel_id, user_id, assistant_id, language=None, project_id=None):
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -1835,7 +1835,8 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         try:
             from app import adapt_with_ai, get_voice_profile  # lazy import (rompe circular tasks↔app).
             result = adapt_with_ai(user_content, style_arg, custom_prompt,
-                                   voice=get_voice_profile(user_id), user_id=user_id)  # moat: voz + few-shot
+                                   voice=get_voice_profile(user_id, project_id), user_id=user_id,
+                                   brand_id=project_id)  # moat: voz + few-shot, por MARCA
         except Exception as e:
             logger.exception("gen_script_task LLM failed reel=%s: %s", reel_id, e)
             # v0.15.7.b: mensaje contextual si custom + empty content.
@@ -2286,3 +2287,85 @@ def voice_auto_derive_task(uid, email, project_id):
     return {"ok": True, "confidence": vp.get("confidence"),
             "source_count": len(texts[:_VOICE_AUTO_SAMPLE]), "transcribed_now": transcribed_now,
             "tone": vp.get("tone"), "phrases": vp.get("phrases") or [], "evidence": vp.get("evidence") or []}
+
+
+# Cuántos reels propios scrapear+transcribir al sembrar la voz en el onboarding.
+# ~€0,04/usuario una sola vez (Apify + Groq). Configurable por si se quiere acotar.
+_ONBOARDING_SEED_REELS = int(os.environ.get("ONBOARDING_SEED_REELS", "12"))
+
+
+@celery_app.task(name="tasks.seed_voice_from_handle")
+def seed_voice_from_handle_task(uid, handle, project_id=None):
+    """SEED del Cerebro en el ONBOARDING (parte A del loop): el usuario mete su handle →
+    scrapeamos SU perfil → sus últimos reels → los transcribimos → derivamos la voz Y
+    guardamos las transcripciones como few-shot semilla («así escribe ÉL»), para que el
+    PRIMER guion ya salga con su patrón real, no genérico. Reusa _scrape_ig_reels +
+    download_audio + transcribe_with_groq + derive_voice_profile (todo ya existente).
+    Idempotente: si ya hay una voz REAL (samples/auto_derived), no re-gasta."""
+    import tempfile
+    from datetime import datetime, timezone
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    handle = (handle or "").strip().lstrip("@").lower()
+    if not handle:
+        return {"ok": False, "error": "no_handle"}
+    try:
+        from app import (_scrape_ig_reels, download_audio, transcribe_with_groq,
+                         derive_voice_profile, save_voice_profile, get_voice_profile)
+    except Exception as e:
+        logger.exception("seed_voice_from_handle import failed: %s", e)
+        return {"ok": False, "error": "import"}
+
+    # Idempotencia: si ya hay voz REAL derivada de reels (samples), no re-gastes.
+    try:
+        existing = get_voice_profile(uid, project_id) or {}
+        eraw = existing.get("raw") if isinstance(existing.get("raw"), dict) else {}
+        if eraw.get("samples"):
+            return {"ok": True, "skipped": "already_seeded"}
+    except Exception:
+        pass
+
+    try:
+        reels = _scrape_ig_reels([handle], limit=_ONBOARDING_SEED_REELS)
+    except Exception as e:
+        logger.warning("seed_voice scrape failed handle=%s err=%s", handle, e)
+        return {"ok": False, "error": "scrape_failed"}
+    if not reels:
+        return {"ok": False, "error": "no_reels"}
+
+    texts = []
+    for v in reels:
+        url = v.get("ig_url")
+        if not url:
+            continue
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                audio_path = download_audio(url, tmp, "instagram")
+                txt = transcribe_with_groq(audio_path, None)
+        except Exception as e:
+            logger.warning("seed_voice transcribe failed handle=%s err=%s", handle, e)
+            continue
+        if (txt or "").strip():
+            texts.append(txt.strip())
+        if len(texts) >= _ONBOARDING_SEED_REELS:
+            break
+
+    if not texts:
+        return {"ok": False, "error": "no_transcripts"}
+
+    vp = derive_voice_profile(texts)
+    if not vp:
+        return {"ok": False, "error": "derive_failed"}
+    raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else dict(vp)
+    raw["samples"] = texts[:6]          # few-shot semilla «así escribe él» (inyectado por voice_prompt_block)
+    raw["seed_source"] = "onboarding_handle"
+    raw["auto_derived"] = True
+    vp["raw"] = raw
+    try:
+        save_voice_profile(uid, vp, brand_id=project_id)
+    except Exception as e:
+        logger.exception("seed_voice save failed uid=%s err=%s", uid, e)
+        return {"ok": False, "error": "save_failed"}
+    return {"ok": True, "reels": len(reels), "transcribed": len(texts),
+            "confidence": vp.get("confidence")}

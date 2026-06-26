@@ -5326,7 +5326,7 @@
     if(r.script&&r.script.hook){ setTimeout(function(){cb();},1700); return; }
     if(isDemo()){ r.recFormat=r.recFormat||_recFmtDemo(r); setTimeout(function(){cb();},1700); return; }
     var t0=Date.now();
-    apiPost("/api/competitors/reels/"+encodeURIComponent(r.id)+"/generate-script",{language:(document.documentElement.lang||"es")}).then(function(rr){
+    apiPost("/api/competitors/reels/"+encodeURIComponent(r.id)+"/generate-script",(function(){ var _b={language:(document.documentElement.lang||"es")}; var _p=_pidOf(S.brandId); if(_p) _b.project_id=_p; return _b; })()).then(function(rr){
       // Duplicado reciente (409) → reusamos el guion existente (sin re-cobro). Traemos su texto.
       if(rr.status===409 && rr.d && rr.d.script_id){ return fetchScriptText(rr.d.script_id, r, t0, cb); }
       if(!rr.ok){ var ec=(rr.d&&rr.d.error)||"error"; return setTimeout(function(){ cb(ec); },300); }

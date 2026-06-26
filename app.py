@@ -79,7 +79,7 @@ GROQ_URL              = "https://api.groq.com/openai/v1/audio/transcriptions"
 # OpenRouter — para transformaciones de texto ("Hazlo tuyo")
 OPENROUTER_API_KEY    = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_URL        = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL      = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-pro-preview-03-25")
+OPENROUTER_MODEL      = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
 SUPABASE_URL          = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_KEY", "")
 APIFY_TOKEN           = os.environ.get("APIFY_TOKEN", "")
@@ -3646,6 +3646,20 @@ def voice_prompt_block(vp) -> str:
     ww = raw.get("what_works") or []
     if ww:
         parts.append("LO QUE MÁS FUNCIONA en su cuenta (priorízalo): " + " · ".join(str(w) for w in ww[:4]))
+    # SEED (onboarding/auto-derive): así escribe ÉL de verdad — sus propios reels.
+    samples = raw.get("samples") or []
+    if samples:
+        parts.append("\n=== ASÍ ESCRIBE ÉL (transcripciones de sus reels — imita su cadencia y giros, NO copies) ===\n"
+                     + "\n--- (otro) ---\n".join(str(s)[:600] for s in samples[:2]))
+    # Loop SIN publicar (B): guiones que el usuario VALIDÓ/GRABÓ + hooks que ELIGIÓ.
+    vsamp = raw.get("validated_samples") or []
+    if vsamp:
+        parts.append("\n=== GUIONES QUE ÉL VALIDÓ/GRABÓ (su gusto confirmado — mismo molde) ===\n"
+                     + "\n--- (otro) ---\n".join(str(s)[:600] for s in vsamp[:2]))
+    phooks = raw.get("preferred_hooks") or []
+    if phooks:
+        parts.append("HOOKS QUE ÉL ELIGIÓ (su estilo de gancho — replica el patrón): "
+                     + " · ".join('“' + str(h)[:90] + '”' for h in phooks[:5]))
     return "\n".join(parts)
 
 
@@ -3820,6 +3834,60 @@ def feed_voice_with_metrics(user_id, insights):
     })
 
 
+def refine_voice_from_own_scripts(user_id, brand_id=None):
+    """Cierra el loop del Cerebro SIN depender de publicar en IG. Reúsa la señal que el
+    usuario ya genera al CREAR/EDITAR/VALIDAR guiones (y elegir hooks) y la guarda en el
+    VoiceProfile para que la PRÓXIMA generación la imite. Sin LLM (agregación pura →
+    instantáneo y barato). Best-effort: nunca rompe la request.
+      - recorded/approved → ejemplos validados (más peso) → raw.validated_samples
+      - hook activo de esos guiones + alt_hooks → raw.preferred_hooks (tu estilo de gancho)
+      - cada validación sube un poco la confianza (tope 92)."""
+    try:
+        q = (db.table("scripts")
+               .select("script, hook, alt_hooks, recording_status, approval_status, updated_at")
+               .eq("user_id", user_id))
+        if brand_id:
+            q = q.eq("project_id", brand_id)
+        rows = (q.order("updated_at", desc=True).limit(40).execute()).data or []
+    except Exception:
+        return
+    # Señal: grabados/aprobados primero; nunca los descartados.
+    def _kept(s):
+        return s.get("recording_status") == "recorded" or s.get("approval_status") == "approved"
+    kept = [s for s in rows if _kept(s) and s.get("recording_status") != "discarded"]
+    if not kept:
+        # Sin validados aún: usa los editados recientes (no descartados) como señal blanda.
+        kept = [s for s in rows if s.get("recording_status") != "discarded"][:6]
+    if not kept:
+        return
+    samples, hooks, seen_h = [], [], set()
+    for s in kept:
+        body = (s.get("script") or "").strip()
+        if body and len(samples) < 3:
+            samples.append(body[:700])
+        h = (s.get("hook") or (body.split("\n")[0] if body else "")).strip()
+        if h and h.lower() not in seen_h:
+            seen_h.add(h.lower()); hooks.append(h)
+        for a in (s.get("alt_hooks") or []):
+            a = str(a).strip()
+            if a and a.lower() not in seen_h:
+                seen_h.add(a.lower()); hooks.append(a)
+    try:
+        vp = get_voice_profile(user_id, brand_id) or {}
+        raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else {}
+        raw["validated_samples"] = samples
+        raw["preferred_hooks"] = hooks[:6]
+        n_kept = sum(1 for s in rows if _kept(s))
+        save_voice_profile(user_id, {
+            "tone": vp.get("tone"), "phrases": vp.get("phrases"), "structure": vp.get("structure"),
+            "avg_duration": vp.get("avg_duration"), "avoid": vp.get("avoid"),
+            "confidence": min(92, max(vp.get("confidence") or 0, 50) + min(20, n_kept * 2)),
+            "source_count": vp.get("source_count"), "raw": raw,
+        }, brand_id=brand_id)
+    except Exception:
+        logger.warning("refine_voice_from_own_scripts failed user=%s", user_id, exc_info=True)
+
+
 _REEL_TRANSCRIBE_PER_RUN = 6   # tope de transcripciones NUEVAS por refresco (coste Groq+Apify)
 
 
@@ -3927,7 +3995,7 @@ def underperformers_signal(user_id):
     return ", ".join(sig) if sig else None
 
 
-def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, user_id=None) -> dict:
+def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, user_id=None, brand_id=None) -> dict:
     if style == "custom":
         if not custom_prompt:
             raise ValueError("Escribe tus instrucciones en el campo Custom")
@@ -3956,7 +4024,7 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
         neg = underperformers_signal(user_id)                 # evita lo que te hunde
         if neg:
             ctx += "\n\nEVITA (no te ha funcionado): " + neg
-        ctx += brain_voice_block(user_id)                     # gusto del Brain «Entrenar» (👍/👎 + sugerencias)
+        ctx += brain_voice_block(user_id, brand_id)           # gusto del Brain «Entrenar» (👍/👎 + sugerencias), por MARCA
     if ctx:
         system = (system + ctx +
                   "\n\nIMPORTANTE: lo anterior es CONTEXTO (voz, ejemplos, método). Responde SOLO "
@@ -3986,6 +4054,10 @@ def save_script():
         "script": content,
         "assistant_name": assistant_name,
     }).execute()
+    try:
+        refine_voice_from_own_scripts(user["id"])   # loop sin publicar: crear ya afina
+    except Exception:
+        logger.warning("save_script: refine voice failed", exc_info=True)
     return jsonify({"ok": True})
 
 
@@ -4823,6 +4895,18 @@ def update_script(script_id):
     if not updates:
         return jsonify({"error": "Nothing to update"}), 400
     db.table("scripts").update(updates).eq("id", script_id).eq("user_id", user["id"]).execute()
+    # Loop de aprendizaje SIN publicar: si la edición trae señal real (validar/grabar/
+    # editar/cambiar hooks), re-afina la voz de ESA marca con los guiones que el user
+    # valida/graba. Best-effort, no bloquea la respuesta.
+    if any(k in updates for k in ("recording_status", "approval_status", "script", "hook", "alt_hooks")):
+        try:
+            _bid = updates.get("project_id")
+            if _bid is None:
+                _r = db.table("scripts").select("project_id").eq("id", script_id).eq("user_id", user["id"]).limit(1).execute()
+                _bid = (_r.data or [{}])[0].get("project_id")
+            refine_voice_from_own_scripts(user["id"], _bid)
+        except Exception:
+            logger.warning("update_script: refine voice failed", exc_info=True)
     return jsonify({"ok": True})
 
 
@@ -4909,6 +4993,12 @@ def use_script_hook(script_id):
     db.table("scripts").update(
         {"hook": new_active, "alt_hooks": new_alt}
     ).eq("id", script_id).eq("user_id", user["id"]).execute()
+    # Elegir un hook es la señal de preferencia MÁS fuerte → re-afina la voz.
+    try:
+        _r = db.table("scripts").select("project_id").eq("id", script_id).eq("user_id", user["id"]).limit(1).execute()
+        refine_voice_from_own_scripts(user["id"], (_r.data or [{}])[0].get("project_id"))
+    except Exception:
+        logger.warning("use_script_hook: refine voice failed", exc_info=True)
     return jsonify({"ok": True, "hook": new_active, "alt_hooks": new_alt})
 
 
@@ -8879,6 +8969,7 @@ def onboarding_complete():
     subs = [t for t in (_norm_tag(s) for s in (body.get("subniches") or [])) if t][:8]
     goal = (body.get("goal") or "").strip()[:20]
     skipped = bool(body.get("skipped"))
+    own_handle = (body.get("handle") or "").strip().lstrip("@").lower()
     comps = []
     for c in (body.get("competitors") or [])[:5]:
         h = (c or "").strip().lstrip("@").lower()
@@ -8950,6 +9041,17 @@ def onboarding_complete():
     except Exception:
         logger.warning("[onb2] voice seed failed", exc_info=True)
         voice = 40
+
+    # 4) SEED REAL del Cerebro (parte A del loop): scrape del handle del usuario →
+    #    sus reels → transcribe → deriva voz + guarda «así escribe él» como few-shot.
+    #    Async (no bloquea el onboarding); idempotente; coste ~€0,04 una vez.
+    if own_handle and re.match(r"^[a-z0-9._]{1,30}$", own_handle):
+        try:
+            from tasks import seed_voice_from_handle_task  # noqa: E402
+            seed_voice_from_handle_task.delay(uid, own_handle, project_id)
+            track_event("onboarding_voice_seed_queued", uid, {"handle": own_handle})
+        except Exception:
+            logger.warning("[onb2] seed voice enqueue failed", exc_info=True)
 
     return jsonify({"ok": True, "voice": voice, "tracked": tracked, "subniches": subs}), 200
 
@@ -9360,6 +9462,9 @@ def generate_script_from_competitor_reel(reel_id: str):
     # profiles.lang → es), no en el del competidor.
     _body0 = request.get_json(silent=True) or {}
     out_lang = (_body0.get("language") or profile.get("lang") or "es").lower()[:2]
+    # Voz por MARCA: una agencia genera con la voz de la marca activa, no la por defecto
+    # (igual que /api/metrics/insights). brand_id == project_id; None = marca por defecto.
+    gen_pid = _req_project_id()
 
     # 0. Guard anti doble-cobro: si ya hay un script de este (user, reel) en
     # los últimos 60s, redirigir al existente sin cobrar ni encolar. Cubre
@@ -9641,7 +9746,8 @@ def generate_script_from_competitor_reel(reel_id: str):
 
         # LLM call.
         try:
-            result = adapt_with_ai(user_content, style_arg, custom_prompt, voice=get_voice_profile(uid), user_id=uid)
+            result = adapt_with_ai(user_content, style_arg, custom_prompt,
+                                   voice=get_voice_profile(uid, gen_pid), user_id=uid, brand_id=gen_pid)
         except Exception as e:
             logger.error("generate_script: LLM failed user=%s err=%s", uid, e, exc_info=True)
             _refund()
@@ -9779,7 +9885,7 @@ def generate_script_from_competitor_reel(reel_id: str):
 
     # Encolar task (no cobramos aquí — la task cobra al final si todo OK).
     from tasks import generate_script_competitor_task  # noqa: E402
-    async_result = generate_script_competitor_task.delay(reel["id"], uid, assistant_id, out_lang)
+    async_result = generate_script_competitor_task.delay(reel["id"], uid, assistant_id, out_lang, gen_pid)
     # v0.15.8: anotar task_id en el lock (la task lo libera al final vía try/finally).
     try:
         (db.table("script_generation_locks")
