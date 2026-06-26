@@ -1,9 +1,13 @@
 """Transcriptor — Flask app con Supabase, créditos y Apify."""
 
-# Monkey-patch debe ir ANTES de cualquier import de requests/ssl/socket para que
-# gevent pueda reemplazarlos. Gunicorn gevent worker ya lo aplica, pero añadirlo
-# aquí garantiza cobertura en tests locales y ejecución directa con `python app.py`.
-from gevent import monkey as _gmonkey; _gmonkey.patch_all()
+# Monkey-patch SOLO si ssl aún NO está importado. Si ya lo está (el CELERY WORKER importa
+# requests/yt_dlp en tasks.py ANTES de importar app), parchear ssl AHORA es TARDE → gevent
+# envuelve un ssl ya cargado → RecursionError en TODO HTTPS del worker (descarga + LLM).
+# El web ya lo parchea bien vía gunicorn `--worker-class gevent` (antes de importar app);
+# en runs locales `python app.py` ssl aún no está → se parchea normal.
+import sys as _sys
+if "ssl" not in _sys.modules:
+    from gevent import monkey as _gmonkey; _gmonkey.patch_all()
 
 import json
 import logging
@@ -9043,7 +9047,7 @@ def suggested_competitor():
     baselines = _creator_view_baselines(cand_ids)
     try:
         reels = (db.table("creator_reels_global")
-                   .select("creator_id, views, posted_at")
+                   .select("creator_id, views, posted_at, thumb_url, thumb_b64")
                    .in_("creator_id", cand_ids).eq("is_archived", False)
                    .order("posted_at", desc=True).limit(240).execute()).data or []
     except Exception:
@@ -9054,7 +9058,8 @@ def suggested_competitor():
         exp = _explosion_score(v, baselines.get(cid))
         score = exp if exp is not None else 0
         if cid and (cid not in best or score > best[cid]["score"]):
-            best[cid] = {"views": v, "exp": exp, "score": score}
+            best[cid] = {"views": v, "exp": exp, "score": score,
+                         "thumb": r.get("thumb_b64") or r.get("thumb_url")}  # #4: su reel que petó
     # Orden: primero los que tienen un reel que petó (views>0), luego el resto por
     # co-ocurrencia. ?limit=N (muro de competidores, Bernat 24-jun) → lista de N.
     ordered = [cid for cid, _ in ranked if (best.get(cid) or {}).get("views")]
@@ -9078,7 +9083,11 @@ def suggested_competitor():
             why = f"tiene un reel reciente de {_fmt_views(views)}"; xtag = _fmt_views(views)
         else:
             why = "está creciendo en tu nicho"; xtag = "en alza"
-        return {"handle": handle, "why": why, "x": xtag, "tag": "Lo siguen en tu nicho"}
+        sug = {"handle": handle, "why": why, "x": xtag, "tag": "Lo siguen en tu nicho"}
+        # #4 (David 26-jun): el reel que está PETANDO de ese creador → da ganas de seguirlo.
+        if info.get("thumb") and views:
+            sug["reel"] = {"thumb": info.get("thumb"), "exp": exp, "views": _fmt_views(views)}
+        return sug
 
     suggestions = [s for s in (_mk_suggestion(cid) for cid in ordered) if s]
     # Top-up con la semilla si la co-ocurrencia no llena el muro (cold-start / nicho
@@ -9091,6 +9100,36 @@ def suggested_competitor():
         "suggestion": suggestions[0] if suggestions else None,
         "suggestions": suggestions,
     }), 200
+
+
+@app.route("/api/niche/discover", methods=["GET"])
+@require_auth
+@limiter.limit("60 per hour")
+def niche_discover():
+    """Proactividad anti-churn (David 26-jun): reels que están PETANDO en tu nicho de
+    creadores que AÚN NO SIGUES → «fíjate en esto aunque no sea tu competidor, róbalo».
+    EXCLUYE a tus competidores activos. Reusa _recycled_reels (cero scrape) → siempre
+    hay algo nuevo que robar aunque ya sigas a gente. Cada reel trae creator.ig_username
+    para ofrecer «sigue a @X». Robar uno auto-sigue al creador (es seed-válido)."""
+    user = current_user()
+    uid = user["id"]
+    try:
+        limit = max(1, min(12, int(request.args.get("limit", "6"))))
+    except (TypeError, ValueError):
+        limit = 6
+    project_id = request.args.get("project_id")
+    tq = (db.table("user_tracked_creators").select("creator_id")
+          .eq("user_id", uid).is_("archived_at", "null"))
+    if project_id:
+        tq = tq.eq("project_id", project_id)
+    try:
+        tracked_ids = list({t["creator_id"] for t in (tq.execute().data or [])})
+    except Exception:
+        tracked_ids = []
+    prof = get_profile(uid)
+    reels = _recycled_reels(prof.get("subniches"), prof.get("niche"),
+                            limit=limit, exclude_creator_ids=tracked_ids)
+    return jsonify({"reels": reels, "total": len(reels)}), 200
 
 
 @app.route("/api/onboarding/complete", methods=["POST"])

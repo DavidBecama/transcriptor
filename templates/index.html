@@ -9697,6 +9697,53 @@
       background:radial-gradient(120% 90% at 50% 30%, color-mix(in srgb, var(--brand-500) 9%, transparent), transparent 62%), var(--surface-base); }
     .rs .onb-fs > .scroll { flex:1; display:flex; flex-direction:column; }
     .rs .onb-fs .canvas { margin:auto; max-width:560px; width:100%; min-height:100%; padding:32px 22px 48px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    /* ── COFRE de reels (Claude Design 26-jun): avalancha → 3 cartas → roba una ── */
+    .rs .cofre { position:absolute; inset:0; display:grid; place-items:center; background:var(--surface-base); overflow:hidden; }
+    .rs .cofre-glow { position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 90% at 50% 38%, rgba(79,124,255,.10), rgba(8,9,11,0) 55%), radial-gradient(80% 60% at 50% 120%, rgba(79,124,255,.07), rgba(8,9,11,0) 60%); }
+    .rs .cofre-canvas { position:absolute; inset:0; width:100%; height:100%; filter:blur(.5px); }
+    .rs .cofre-vignette { position:absolute; inset:0; pointer-events:none; background:radial-gradient(70% 50% at 50% 50%, rgba(8,9,11,0) 35%, rgba(8,9,11,.55) 100%); }
+    .rs .cofre-av { position:relative; z-index:3; display:flex; flex-direction:column; align-items:center; text-align:center; gap:22px; padding:24px; }
+    .rs .cofre-eyebrow { font-family:var(--font-mono); font-size:12px; letter-spacing:.28em; color:var(--brand-300); text-transform:uppercase; display:inline-flex; align-items:center; gap:9px; }
+    .rs .cofre-eyebrow--ok { letter-spacing:.26em; }
+    .rs .cofre-pip { width:7px; height:7px; border-radius:50%; background:#34d399; box-shadow:0 0 10px #34d399; flex:none; }
+    .rs .cofre-pip--b { width:9px; height:9px; background:var(--brand-400); box-shadow:0 0 10px var(--brand-400); }
+    .rs .cofre-count { font-family:var(--font-display-2); font-weight:700; font-size:clamp(64px,13vw,150px); letter-spacing:-.03em; color:var(--text-primary); line-height:.9; text-shadow:0 0 50px rgba(79,124,255,.45); }
+    .rs .cofre-av-t { font-family:var(--font-display); font-size:clamp(24px,4vw,38px); line-height:1.1; color:var(--text-primary); max-width:520px; }
+    .rs .cofre-bar { width:min(360px,72vw); height:4px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; }
+    .rs .cofre-bar-fill { height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg,var(--brand-600),var(--brand-300)); box-shadow:0 0 16px rgba(79,124,255,.6); }
+    .rs .cofre-choose { position:relative; z-index:3; width:100%; max-width:1120px; padding:32px 24px; display:flex; flex-direction:column; align-items:center; gap:clamp(20px,4vh,40px); max-height:100%; overflow:auto; }
+    .rs .cofre-head { text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; }
+    .rs .cofre-h1 { margin:0; font-family:var(--font-display); font-weight:400; font-size:clamp(34px,6vw,62px); line-height:1.04; letter-spacing:-.01em; color:var(--text-primary); max-width:16ch; }
+    .rs .cofre-h1 em { font-style:italic; color:var(--brand-300); }
+    .rs .cofre-sub { margin:0; font-size:clamp(15px,2.2vw,19px); color:var(--text-secondary); max-width:46ch; }
+    .rs .cofre-sub b { color:var(--text-primary); font-weight:600; }
+    .rs .cofre-cards { display:flex; flex-wrap:wrap; justify-content:center; gap:clamp(14px,2vw,24px); width:100%; }
+    .rs .cofre-card { flex:1 1 250px; max-width:300px; min-width:210px; cursor:pointer; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:20px; padding:12px; box-shadow:0 20px 55px -30px rgba(0,0,0,.85); opacity:0; transform:translateY(30px) scale(.96); animation:cofre-cardin .6s cubic-bezier(.2,.9,.25,1) both; transition:box-shadow .35s ease, border-color .35s ease, opacity .3s, transform .3s; }
+    @keyframes cofre-cardin { to { opacity:1; transform:none; } }
+    .rs .cofre-card.sel { border-color:var(--brand-500); box-shadow:0 0 0 1.5px var(--brand-400), 0 26px 70px -22px rgba(79,124,255,.6); transform:scale(1.035); }
+    .rs .cofre-card.dim { opacity:.38; }
+    .rs .cofre-card.shown { animation:none; opacity:1; transform:none; }
+    .rs .cofre-card.shown.sel { transform:scale(1.035); }
+    .rs .cofre-card-thumb { position:relative; aspect-ratio:9/16; border-radius:14px; overflow:hidden; background:var(--surface-overlay); }
+    .rs .cofre-card-img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .cofre-card-916 { position:absolute; top:10px; left:10px; font-family:var(--font-mono); font-size:10px; letter-spacing:.12em; color:rgba(255,255,255,.55); background:rgba(0,0,0,.28); padding:3px 7px; border-radius:6px; }
+    .rs .cofre-card-ratio { position:absolute; top:9px; right:9px; display:flex; flex-direction:column; align-items:flex-end; padding:7px 11px 6px; border-radius:11px; background:linear-gradient(180deg,rgba(79,124,255,.95),rgba(59,99,224,.95)); box-shadow:0 6px 20px -6px rgba(79,124,255,.8); font-family:var(--font-display-2); font-weight:700; font-size:24px; line-height:.9; color:#fff; }
+    .rs .cofre-card-ratio small { font-family:var(--font-mono); font-size:8.5px; letter-spacing:.1em; color:rgba(255,255,255,.82); text-transform:uppercase; font-weight:400; }
+    .rs .cofre-card-play { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); width:54px; height:54px; border-radius:50%; background:rgba(8,9,11,.42); border:1px solid rgba(255,255,255,.25); }
+    .rs .cofre-card-play::after { content:""; position:absolute; left:54%; top:50%; transform:translate(-50%,-50%); width:0; height:0; border-style:solid; border-width:9px 0 9px 15px; border-color:transparent transparent transparent rgba(255,255,255,.92); }
+    .rs .cofre-card-cap { position:absolute; left:0; right:0; bottom:0; padding:34px 12px 12px; background:linear-gradient(180deg,rgba(8,9,11,0) 0%, rgba(8,9,11,.82) 70%); display:flex; flex-direction:column; gap:3px; }
+    .rs .cofre-card-cap b { font-family:var(--font-display-2); font-weight:600; font-size:13px; color:#fff; }
+    .rs .cofre-card-cap span { font-size:12px; color:rgba(255,255,255,.72); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rs .cofre-card-views { margin-top:13px; padding:0 2px; font-family:var(--font-mono); font-size:10px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.06em; }
+    .rs .cofre-card-views b { font-family:var(--font-display-2); font-weight:700; font-size:18px; color:#34d399; letter-spacing:0; }
+    .rs .cofre-card-btn { width:100%; margin-top:12px; padding:13px; border-radius:13px; cursor:pointer; font-family:var(--font-display-2); font-weight:600; font-size:15px; border:none; color:#fff; background:linear-gradient(180deg,var(--brand-500),var(--brand-600)); box-shadow:0 10px 26px -10px rgba(79,124,255,.7); transition:filter .2s; }
+    .rs .cofre-card-btn:hover { filter:brightness(1.06); }
+    .rs .cofre-card-btn.sel { color:var(--brand-300); background:rgba(79,124,255,.14); box-shadow:none; }
+    .rs .cofre-foot { display:flex; flex-direction:column; align-items:center; gap:16px; }
+    .rs .cofre-robbing { display:inline-flex; align-items:center; gap:11px; padding:11px 18px; border-radius:99px; background:var(--surface-raised); border:1px solid var(--border-default); font-size:14px; color:var(--text-secondary); }
+    .rs .cofre-robbing b { color:var(--text-primary); font-weight:600; }
+    .rs .cofre-secondary { background:none; border:none; cursor:pointer; font-size:14px; color:var(--text-tertiary); text-decoration:underline; text-underline-offset:3px; padding:4px; }
+    @media (prefers-reduced-motion: reduce){ .rs .cofre-card { animation:none; opacity:1; transform:none; } }
     .rs .onbwait { display:flex; flex-direction:column; align-items:center; text-align:center; padding:64px 24px; max-width:520px; margin:40px auto; }
     .rs .onbwait-orb { position:relative; width:84px; height:84px; border-radius:24px; display:flex; align-items:center; justify-content:center; margin-bottom:26px;
       background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); box-shadow:0 12px 40px rgba(47,91,255,.4); }
@@ -11894,6 +11941,32 @@
     .rs .sugg-hide { background:none; border:none; color:var(--text-tertiary); font-size:12.5px; cursor:pointer; padding:6px 4px; }
     .rs .sugg-hide:hover { color:var(--text-secondary); }
     .rs .sugg-card .sugg-comp:last-of-type { margin-bottom:0; }
+    /* #4: miniatura del reel que está petando del competidor (da ganas de seguirlo) */
+    .rs .sugg-reel { position:relative; flex:none; width:42px; height:64px; border-radius:9px; overflow:hidden; background:var(--surface-overlay); border:1px solid var(--border-subtle); }
+    .rs .sugg-reel img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .sugg-reel-exp { position:absolute; left:2px; bottom:2px; display:inline-flex; align-items:center; gap:2px; font-family:var(--font-mono); font-size:9px; font-weight:700; color:#fff; background:rgba(245,168,61,.95); padding:1px 4px; border-radius:5px; }
+    .rs .sugg-reel-exp svg { width:9px; height:9px; }
+    /* #5: descubrimiento «petando en tu nicho que aún no sigues» */
+    .rs .disc-sec { margin:18px 0; padding:16px 16px 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--brand-500) 24%, transparent); background:linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)), var(--surface-raised)); }
+    .rs .disc-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .rs .disc-head-t { display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:15px; color:var(--text-primary); }
+    .rs .disc-head-t svg { color:var(--brand-400); }
+    .rs .disc-tag { font-family:var(--font-mono); font-size:10.5px; font-weight:600; letter-spacing:.02em; color:var(--brand-300); background:color-mix(in srgb, var(--brand-500) 14%, transparent); padding:2px 8px; border-radius:6px; }
+    .rs .disc-row { display:flex; gap:12px; overflow-x:auto; padding-bottom:4px; scroll-snap-type:x mandatory; }
+    .rs .disc-card { flex:0 0 132px; scroll-snap-align:start; display:flex; flex-direction:column; gap:8px; }
+    .rs .disc-thumb { position:relative; aspect-ratio:9/14; border-radius:12px; overflow:hidden; background:var(--surface-overlay); border:1px solid var(--border-default); cursor:pointer; }
+    .rs .disc-thumb:hover { border-color:var(--brand-400); }
+    .rs .disc-img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .disc-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--brand-300); background:radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, var(--brand-500) 22%, var(--surface-overlay)), var(--surface-overlay)); }
+    .rs .disc-exp { position:absolute; left:6px; bottom:6px; display:inline-flex; align-items:center; gap:3px; font-family:var(--font-mono); font-size:11px; font-weight:800; color:#fff; background:rgba(245,168,61,.95); padding:2px 7px; border-radius:7px; box-shadow:0 4px 12px -4px rgba(245,168,61,.7); }
+    .rs .disc-exp svg { width:11px; height:11px; }
+    .rs .disc-play { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:rgba(255,255,255,.92); opacity:0; transition:opacity .15s; pointer-events:none; }
+    .rs .disc-thumb:hover .disc-play { opacity:1; }
+    .rs .disc-meta { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:12px; }
+    .rs .disc-h { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rs .disc-v { display:inline-flex; align-items:center; gap:3px; color:var(--text-tertiary); font-family:var(--font-mono); font-size:11px; flex:none; }
+    .rs .disc-v svg { width:12px; height:12px; }
+    .rs .disc-steal { width:100%; }
     /* fila bloqueada: avatar/handle difuminados, candado, acción «Desbloquear» */
     .rs .sugg-comp.locked { border-style:dashed; border-color:var(--border-default); background:var(--surface-base); }
     .rs .sugg-ava-wrap { position:relative; flex-shrink:0; }
@@ -26796,12 +26869,10 @@ window.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => { if (document.querySelector('#radarRoot .rail')) startTour(); }, 1500);
     return;
   }
-  if (document.body.classList.contains("workspace") && !localStorage.getItem("onboarding_completed")
-      && !/headless/i.test(navigator.userAgent)) {   // headless (harness) → no auto-tour, no interfiere
-    // No arrancar si el onboarding v2 está en pantalla: el island lo dispara al
-    // terminar (onbStartTour). Reevaluamos a los 1500ms, ya montado el island.
-    setTimeout(() => { if (!document.querySelector(".onb-screen")) startTour(); }, 1500);
-  }
+  // El auto-start del tour lo OWNEA ahora la ISLA (render() lo arranca la 1ª vez que
+  // aterrizas en el dashboard sin onboarding, re-chequeando los targets). Antes vivía
+  // aquí con un setTimeout de 1500ms que en incógnito se colaba ENCIMA del onboarding
+  // (este aún no había montado) → tour + onboarding a la vez. Movido a la isla = robusto.
 });
 
 // ── v0.15.3: Tab Competidores ───────────────────────────────────────────────
@@ -28408,6 +28479,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=150"></script>
+<script src="/static/js/radar-loop.js?v=152"></script>
 </body>
 </html>
