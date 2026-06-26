@@ -5395,21 +5395,35 @@
   function ensureScript(r,cb){
     if(isDemo()){ _demoScriptOptions(r); setTimeout(function(){cb();},1700); return; }
     if(r.options&&r.options.length){ setTimeout(function(){cb();},900); return; }   // ya generado
-    var t0=Date.now();
-    apiPost("/api/competitors/reels/"+encodeURIComponent(r.id)+"/generate-script",(function(){ var _b={language:(document.documentElement.lang||"es")}; var _p=_pidOf(S.brandId); if(_p) _b.project_id=_p; return _b; })()).then(function(rr){
-      // Duplicado reciente (409) → reusamos el guion existente (sin re-cobro). Traemos su texto.
-      if(rr.status===409 && rr.d && rr.d.script_id){ return fetchScriptText(rr.d.script_id, r, t0, cb); }
-      if(!rr.ok){ var ec=(rr.d&&rr.d.error)||"error"; return setTimeout(function(){ cb(ec); },300); }
-      // Sync (200): opciones + formato + POV vienen en la respuesta.
-      if(rr.d && (rr.d.mode==="sync" || rr.d.options || rr.d.script || rr.d.result)){
-        _normScriptOptions(rr.d, r);
-        return setTimeout(function(){cb();},Math.max(0,1500-(Date.now()-t0)));
-      }
-      // Async (202): pollear /task/script/<id> hasta SUCCESS, luego traer el texto.
-      if(rr.d && rr.d.task_id){ return pollScriptTask(rr.d.task_id, r, t0, cb); }
-      // Respuesta inesperada → fallback al caption.
-      r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},600);
-    }).catch(function(){ r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},800); });
+    _postGenerate(r, Date.now(), cb, 0);
+  }
+  function _postGenerate(r, t0, cb, tries){
+    var _b={language:(document.documentElement.lang||"es")}; var _p=_pidOf(S.brandId); if(_p) _b.project_id=_p;
+    apiPost("/api/competitors/reels/"+encodeURIComponent(r.id)+"/generate-script", _b)
+      .then(function(rr){ _handleGenResp(rr, r, t0, cb, tries); })
+      .catch(function(){ r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},800); });
+  }
+  function _handleGenResp(rr, r, t0, cb, tries){
+    // 409 con script_id → dup reciente (60s): reusamos el guion ya generado, SIN re-cobro.
+    if(rr.status===409 && rr.d && rr.d.script_id){ return fetchScriptText(rr.d.script_id, r, t0, cb); }
+    // 409 in_progress → YA hay una generación de ESTE reel en curso. NO es error:
+    //   con task_id → enganchamos a su polling; sin él (sync en vuelo) → esperamos y
+    //   reintentamos (cuando termine, el dup-guard de 60s devuelve script_id → 0 doble cobro).
+    if(rr.status===409 && rr.d && rr.d.error==="in_progress"){
+      if(rr.d.task_id){ return pollScriptTask(rr.d.task_id, r, t0, cb); }
+      if((tries||0)>=8){ return cb("timeout"); }
+      return setTimeout(function(){ _postGenerate(r, t0, cb, (tries||0)+1); }, 2500);
+    }
+    if(!rr.ok){ var ec=(rr.d&&rr.d.error)||"error"; return setTimeout(function(){ cb(ec); },300); }
+    // Sync (200): opciones + formato + POV vienen en la respuesta.
+    if(rr.d && (rr.d.mode==="sync" || rr.d.options || rr.d.script || rr.d.result)){
+      _normScriptOptions(rr.d, r);
+      return setTimeout(function(){cb();},Math.max(0,1500-(Date.now()-t0)));
+    }
+    // Async (202): pollear /task/script/<id> hasta SUCCESS.
+    if(rr.d && rr.d.task_id){ return pollScriptTask(rr.d.task_id, r, t0, cb); }
+    // Respuesta inesperada → fallback al caption.
+    r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},600);
   }
   // Polling del task de generación async (steal cache-miss). Máx ~150s (la transcripción
   // por Apify+Groq puede tardar; 90s se quedaba corto y daba "No pude terminar").
