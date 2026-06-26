@@ -11894,6 +11894,32 @@
     .rs .sugg-hide { background:none; border:none; color:var(--text-tertiary); font-size:12.5px; cursor:pointer; padding:6px 4px; }
     .rs .sugg-hide:hover { color:var(--text-secondary); }
     .rs .sugg-card .sugg-comp:last-of-type { margin-bottom:0; }
+    /* #4: miniatura del reel que está petando del competidor (da ganas de seguirlo) */
+    .rs .sugg-reel { position:relative; flex:none; width:42px; height:64px; border-radius:9px; overflow:hidden; background:var(--surface-overlay); border:1px solid var(--border-subtle); }
+    .rs .sugg-reel img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .sugg-reel-exp { position:absolute; left:2px; bottom:2px; display:inline-flex; align-items:center; gap:2px; font-family:var(--font-mono); font-size:9px; font-weight:700; color:#fff; background:rgba(245,168,61,.95); padding:1px 4px; border-radius:5px; }
+    .rs .sugg-reel-exp svg { width:9px; height:9px; }
+    /* #5: descubrimiento «petando en tu nicho que aún no sigues» */
+    .rs .disc-sec { margin:18px 0; padding:16px 16px 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--brand-500) 24%, transparent); background:linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)), var(--surface-raised)); }
+    .rs .disc-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .rs .disc-head-t { display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:15px; color:var(--text-primary); }
+    .rs .disc-head-t svg { color:var(--brand-400); }
+    .rs .disc-tag { font-family:var(--font-mono); font-size:10.5px; font-weight:600; letter-spacing:.02em; color:var(--brand-300); background:color-mix(in srgb, var(--brand-500) 14%, transparent); padding:2px 8px; border-radius:6px; }
+    .rs .disc-row { display:flex; gap:12px; overflow-x:auto; padding-bottom:4px; scroll-snap-type:x mandatory; }
+    .rs .disc-card { flex:0 0 132px; scroll-snap-align:start; display:flex; flex-direction:column; gap:8px; }
+    .rs .disc-thumb { position:relative; aspect-ratio:9/14; border-radius:12px; overflow:hidden; background:var(--surface-overlay); border:1px solid var(--border-default); cursor:pointer; }
+    .rs .disc-thumb:hover { border-color:var(--brand-400); }
+    .rs .disc-img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .disc-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--brand-300); background:radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, var(--brand-500) 22%, var(--surface-overlay)), var(--surface-overlay)); }
+    .rs .disc-exp { position:absolute; left:6px; bottom:6px; display:inline-flex; align-items:center; gap:3px; font-family:var(--font-mono); font-size:11px; font-weight:800; color:#fff; background:rgba(245,168,61,.95); padding:2px 7px; border-radius:7px; box-shadow:0 4px 12px -4px rgba(245,168,61,.7); }
+    .rs .disc-exp svg { width:11px; height:11px; }
+    .rs .disc-play { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:rgba(255,255,255,.92); opacity:0; transition:opacity .15s; pointer-events:none; }
+    .rs .disc-thumb:hover .disc-play { opacity:1; }
+    .rs .disc-meta { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:12px; }
+    .rs .disc-h { font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rs .disc-v { display:inline-flex; align-items:center; gap:3px; color:var(--text-tertiary); font-family:var(--font-mono); font-size:11px; flex:none; }
+    .rs .disc-v svg { width:12px; height:12px; }
+    .rs .disc-steal { width:100%; }
     /* fila bloqueada: avatar/handle difuminados, candado, acción «Desbloquear» */
     .rs .sugg-comp.locked { border-style:dashed; border-color:var(--border-default); background:var(--surface-base); }
     .rs .sugg-ava-wrap { position:relative; flex-shrink:0; }
@@ -28408,6 +28434,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=148"></script>
+<script src="/static/js/radar-loop.js?v=149"></script>
 </body>
 </html>
