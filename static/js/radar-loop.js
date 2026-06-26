@@ -1113,42 +1113,108 @@
   /* #6 (reunión 24-jun, David): tras la pantalla de carga y ANTES del house tour,
      enseña el reel más fuerte del nicho y ofrece robarlo → el «aha» con un click.
      Si dice Sí → robo real (con red caption-only si Apify cae). Si No → tour. */
+  // ── COFRE DE REELS (Claude Design 26-jun): avalancha de cientos de vídeos cruzando →
+  // ¡pam! quedan 3 → roba uno (estilo cofre Clash Royale / Pokémon starter). Reemplaza
+  // el offer plano de 1 reel. Canvas 2D portado del bundle; 3 reels REALES del radar. ──
+  var COFRE_AV=2.6, COFRE_FL=2.5, COFRE_TARGET=1247;
+  function _cofreReels(){ return Array.isArray(S._cofreReels)?S._cofreReels:[]; }
+  function _cofreDemoReels(){
+    var mk=function(id,u,v,e,cap){ return normReel({id:id,username:u,views:v,explosion_score:e,caption:cap,thumb_url:null}); };
+    return [ mk("cofre1","viral.cocina",2400000,4,"Los 3 errores que cargan tu salsa"),
+             mk("cofre2","javi.fit",1100000,6,"Nadie te cuenta esto de las dominadas"),
+             mk("cofre3","marta.ahorra",870000,3,"Ahorré 5.000€ sin enterarme") ];
+  }
   function onbShowStealOffer(){
-    // Ofrecer un reel RECIENTE (no el más explosivo aunque sea de hace meses): entre los
-    // publicados en las últimas ~3 semanas, el de más explosión. Sin recientes → el mejor.
+    // Top 3 reels RECIENTES (≤3 semanas) por explosión; sin recientes → top 3 a secas.
     var _pool=(S.reels||[]); var _now=Date.now(), _win=21*24*3600*1000;
     var _byExp=function(a,b){ return (b.explosion||0)-(a.explosion||0); };
     var _recent=_pool.filter(function(r){ return r.postedTs && (_now-r.postedTs)<=_win; }).sort(_byExp);
-    var top=_recent[0] || _pool.slice().sort(_byExp)[0] || _pool[0];
-    if(!top && isDemo()){
-      // demo sin reels sembrados → reel de muestra para previsualizar el offer
-      top=normReel({id:"onbdemo", username:"antonlofer", views:7104218, likes:84696, explosion_score:8.4,
-        caption:"El final de Titanic habría sido otra historia con un 40% en gafas… (publi)", thumb_url:null});
-      S.reels=[top];
-    }
-    if(!top){ render(); return onbStartTour(); }   // prod sin reel (descubrimiento vacío) → tour directo
-    S.onbStealOffer={id:top.id};
+    var three=(_recent.length>=3?_recent:_pool.slice().sort(_byExp)).slice(0,3);
+    if(three.length<3 && isDemo()){ three=_cofreDemoReels(); S.reels=three; }
+    if(!three.length){ render(); return onbStartTour(); }   // prod sin reels → tour directo
+    S._cofreReels=three;
+    S.onbStealOffer={ids:three.map(function(r){return r.id;})};
+    var reduced=false; try{ reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    S.onbCofre={phase:reduced?'choose':'avalanche', selected:-1, _started:false};
     render();
   }
+  function _cofreGrad(i){ return ['linear-gradient(155deg,#1d2f6b,#0c1330)','linear-gradient(155deg,#3a2566,#140c2e)','linear-gradient(155deg,#0f3f4a,#08181f)'][i%3]; }
+  function _cofreCard(r,i,sel){
+    var isSel=sel===i, dim=sel>=0&&!isSel, h=(r.creator&&r.creator.handle)||"";
+    var thumb=r.thumb?'<img class="cofre-card-img" src="'+ESC(r.thumb)+'" alt=""/>':'';
+    var ratio=(r.explosionTxt!=null?r.explosionTxt:1);
+    return '<div class="cofre-card'+(isSel?' sel':'')+(dim?' dim':'')+'" style="animation-delay:'+(i*0.11).toFixed(2)+'s" data-act="onb-cofre-steal" data-id="'+ESC(r.id)+'">'+
+      '<div class="cofre-card-thumb" style="'+(r.thumb?'':'background:'+_cofreGrad(i)+';')+'">'+thumb+
+        '<span class="cofre-card-916">9:16</span>'+
+        '<span class="cofre-card-ratio">×'+ESC(String(ratio))+'<small>'+L("su media","avg")+'</small></span>'+
+        '<span class="cofre-card-play"></span>'+
+        '<span class="cofre-card-cap"><b>@'+ESC(h)+'</b><span>'+ESC(String(r.cap||"").slice(0,64))+'</span></span>'+
+      '</div>'+
+      '<div class="cofre-card-views"><b>'+ESC(r.views||"")+'</b> '+L("vistas","views")+'</div>'+
+      '<button class="cofre-card-btn'+(isSel?' sel':'')+'" data-act="onb-cofre-steal" data-id="'+ESC(r.id)+'">'+(isSel?L("Robado","Stolen"):L("Roba la idea","Steal the idea"))+' ⚡</button>'+
+    '</div>';
+  }
   function onbStealOfferHTML(){
-    var o=S.onbStealOffer; if(!o) return "";
-    var r=(S.reels||[]).filter(function(x){return x.id===o.id;})[0]||(S.reels||[])[0]; if(!r) return "";
-    var h=(r.creator&&r.creator.handle)||"";
-    var thumb=r.thumb?'<img class="onbst-thumb" src="'+ESC(r.thumb)+'" alt="" loading="lazy"/>':'<div class="onbst-thumb onbst-ph">'+IC.bolt+'</div>';
-    return '<div class="scroll"><div class="canvas onbst-canvas"><div class="onbst">'+
-      '<div class="onbst-eyebrow"><span class="pip"></span>'+L("HE ANALIZADO TU NICHO","I ANALYZED YOUR NICHE")+'</div>'+
-      '<h2 class="onbst-h">'+L("Esto está petando 🔥","This is blowing up 🔥")+'</h2>'+
-      '<p class="onbst-sub">'+L("¿Quieres robar este?","Want to steal this one?")+'</p>'+
-      '<div class="onbst-card">'+thumb+
-        '<div class="onbst-meta"><div class="onbst-handle">@'+ESC(h)+'</div>'+
-          '<div class="onbst-stats"><span class="onbst-views">'+IC.eye+' '+_numGreen(r.views||"")+'</span>'+(r.likes?'<span>'+IC.heart+' '+ESC(r.likes)+'</span>':'')+(r.explosionTxt?'<span class="onbst-exp">'+IC.bolt+' '+ESC(r.explosionTxt)+'×</span>':'')+'</div>'+
-          (r.cap?'<div class="onbst-cap">'+ESC(String(r.cap).slice(0,120))+'…</div>':'')+
+    if(!S.onbStealOffer) return "";
+    var cof=S.onbCofre||{phase:'choose',selected:-1};
+    var reels=_cofreReels(); if(!reels.length) return "";
+    var inner;
+    if(cof.phase==='avalanche'){
+      inner='<div class="cofre-av">'+
+        '<div class="cofre-eyebrow">'+L("RADAR EN MARCHA","RADAR RUNNING")+'</div>'+
+        '<div class="cofre-count" id="rsCofreCount">0</div>'+
+        '<div class="cofre-av-t">'+L("Comparando vídeos de tu nicho…","Comparing videos across your niche…")+'</div>'+
+        '<div class="cofre-bar"><div class="cofre-bar-fill" id="rsCofreBar"></div></div>'+
+      '</div>';
+    } else {
+      var cards=reels.slice(0,3).map(function(r,i){ return _cofreCard(r,i,cof.selected); }).join("");
+      var selR=cof.selected>=0?reels[cof.selected]:null;
+      inner='<div class="cofre-choose">'+
+        '<div class="cofre-head">'+
+          '<div class="cofre-eyebrow cofre-eyebrow--ok"><span class="cofre-pip"></span>'+L("He visto 1.247 vídeos de tu nicho","I scanned 1,247 videos in your niche")+'</div>'+
+          '<h1 class="cofre-h1">'+L("Estos 3 son los que más están ","These 3 are ")+'<em>'+L("petando","blowing up")+'</em>.</h1>'+
+          '<p class="cofre-sub">'+L("Roba uno y te lo convierto en <b>TU guion</b>.","Steal one and I'll turn it into <b>YOUR script</b>.")+'</p>'+
         '</div>'+
-      '</div>'+
-      '<div class="onbst-actions">'+
-        '<button class="btn btn-lg btn-primary" data-act="onb-steal-no">'+IC.bolt+' '+L("Enséñame a robar","Show me how to steal")+'</button>'+
-      '</div>'+
-    '</div></div></div>';
+        '<div class="cofre-cards">'+cards+'</div>'+
+        '<div class="cofre-foot">'+
+          (selR?'<div class="cofre-robbing"><span class="cofre-pip cofre-pip--b"></span>'+L("Robando ","Stealing ")+'<b>@'+ESC((selR.creator&&selR.creator.handle)||"")+'</b>'+L(" — generando tu guion…"," — generating your script…")+'</div>':'')+
+          '<button class="cofre-secondary" data-act="onb-steal-no">'+L("Enséñame a robar","Show me how to steal")+'</button>'+
+        '</div>'+
+      '</div>';
+    }
+    return '<div class="cofre"><div class="cofre-glow"></div><canvas id="rsCofreCanvas" class="cofre-canvas"></canvas><div class="cofre-vignette"></div>'+inner+'</div>';
+  }
+  // Monta y corre la avalancha del cofre (canvas) UNA vez; al acabar → fase «elegir».
+  function mountCofre(){
+    var cof=S.onbCofre; if(!cof || cof.phase!=='avalanche' || cof._started) return;
+    var cv=document.getElementById('rsCofreCanvas'); if(!cv) return;
+    cof._started=true;
+    _cofreRunAvalanche(cv, function(){ if(S.onbCofre){ S.onbCofre.phase='choose'; render(); } });
+  }
+  function _cofreRunAvalanche(cv, onDone){
+    var ctx, W, H, thumbs, span, tw=56, th=100, start, raf;
+    var _now=function(){ return (window.performance&&performance.now)?performance.now():Date.now(); };
+    function size(){ var r=cv.getBoundingClientRect(); var dpr=Math.min(window.devicePixelRatio||1,2); cv.width=Math.max(1,Math.round(r.width*dpr)); cv.height=Math.max(1,Math.round(r.height*dpr)); ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); W=r.width||1200; H=r.height||800; }
+    function build(){ var hues=[222,250,268,205,234,290], spacing=86, lanes=Math.max(5,Math.round(H/120)); span=W+320; thumbs=[];
+      for(var l=0;l<lanes;l++){ var y=(H/(lanes+1))*(l+1)+(Math.random()-0.5)*40, rot=(Math.random()-0.5)*0.28, dir=(l%2===0?1:-1), speed=dir*(520+Math.random()*360), count=Math.ceil(span/spacing)+2;
+        for(var i=0;i<count;i++){ thumbs.push({y:y,rot:rot,speed:speed,x0:i*spacing+Math.random()*30,hue:hues[(l+i)%hues.length],sc:0.78+Math.random()*0.5,a:0.5+Math.random()*0.5}); } } }
+    function drawThumb(x,y,rot,sc,a,hue){ ctx.save(); ctx.globalAlpha=a; ctx.translate(x,y); ctx.rotate(rot); ctx.scale(sc,sc); ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(-tw/2,-th/2,tw,th,9); else ctx.rect(-tw/2,-th/2,tw,th);
+      var g=ctx.createLinearGradient(0,-th/2,0,th/2); g.addColorStop(0,'hsl('+hue+' 46% 24%)'); g.addColorStop(1,'hsl('+(hue+16)+' 52% 12%)'); ctx.fillStyle=g; ctx.fill();
+      ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.stroke();
+      ctx.globalAlpha=a*0.45; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.moveTo(-4,-7); ctx.lineTo(8,0); ctx.lineTo(-4,7); ctx.closePath(); ctx.fill(); ctx.restore(); }
+    function draw(t){ if(!ctx) return; ctx.clearRect(0,0,W,H);
+      var cntEl=document.getElementById('rsCofreCount'), barEl=document.getElementById('rsCofreBar');
+      if(cntEl){ var p=Math.min(t/2.2,1), e=1-Math.pow(1-p,3); cntEl.textContent=String(Math.round(e*COFRE_TARGET)).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+      if(barEl) barEl.style.width=Math.min(t/2.2,1)*100+'%';
+      var CV=COFRE_AV*0.74; var conv=t<=CV?0:Math.min((t-CV)/(COFRE_AV-CV),1); var ce=conv<0.5?2*conv*conv:1-Math.pow(-2*conv+2,2)/2; var cx=W/2, cy=H/2;
+      for(var k=0;k<thumbs.length;k++){ var tb=thumbs[k]; var x=(((tb.x0+tb.speed*t)%span)+span)%span-160; var px=x+ce*(cx-x), py=tb.y+ce*(cy-tb.y), sc=tb.sc*(1-0.85*ce), a=tb.a*(1-ce*ce); if(a<=0.01) continue; drawThumb(px,py,tb.rot*(1-ce),sc,a,tb.hue); }
+      if(conv>0.15){ var g=ctx.createRadialGradient(cx,cy,0,cx,cy,260*ce); g.addColorStop(0,'rgba(120,150,255,'+(0.5*ce)+')'); g.addColorStop(1,'rgba(120,150,255,0)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+      if(t>COFRE_FL){ var u=t-COFRE_FL, fa=u<0.08?u/0.08:Math.max(0,1-(u-0.08)/0.45); if(fa>0){ var g2=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)*0.7); g2.addColorStop(0,'rgba(255,255,255,'+(0.9*fa)+')'); g2.addColorStop(0.4,'rgba(160,185,255,'+(0.5*fa)+')'); g2.addColorStop(1,'rgba(160,185,255,0)'); ctx.fillStyle=g2; ctx.fillRect(0,0,W,H); } } }
+    try{ size(); build(); }catch(e){ if(onDone) onDone(); return; }
+    start=_now();
+    function loop(){ var t=(_now()-start)/1000; try{ draw(t); }catch(e){} if(t<COFRE_AV+0.4){ raf=requestAnimationFrame(loop); } else if(ctx){ ctx.clearRect(0,0,W,H); } }
+    loop();
+    setTimeout(function(){ try{ if(onDone) onDone(); }catch(e){} }, COFRE_AV*1000+60);
   }
   // CIERRE: ingiere (prod) → Cerebro ~50% + 1er guión; demo simula y siembra panel.
   function onbFinish(){
@@ -4877,6 +4943,7 @@
     if(S._onbWaiting || S.onbStealOffer){
       unmountOnbBrain();
       view.innerHTML='<div class="onb-fs">'+(S._onbWaiting?onbWaitHTML():onbStealOfferHTML())+'</div>';
+      if(S.onbStealOffer) try{ mountCofre(); }catch(e){}   // arranca la avalancha del cofre
       return;
     }
     unmountOnbBrain();   // v=136: fuera del onboarding → destruir el cerebro (mata rAF/RO)
@@ -6691,7 +6758,14 @@
       try{ window.open(url,"_blank","noopener"); }catch(e){ location.href=url; }
       return showToast("Generando el informe del mes…");
     }
-    if(act==="onb-steal-no"){ S.onbStealOffer=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
+    if(act==="onb-cofre-steal"){   // cofre: roba una de las 3 cartas → genera el guion (el «aha»)
+      var _cof=S.onbCofre; if(!_cof || _cof.selected>=0) return;   // ya elegido
+      var _idx=_cofreReels().map(function(x){return x.id;}).indexOf(id); if(_idx<0) return;
+      _cof.selected=_idx; render();   // muestra «Robando @X — generando…»
+      setTimeout(function(){ S.onbStealOffer=null; S.onbCofre=null; steal(id); }, 1100);
+      return;
+    }
+    if(act==="onb-steal-no"){ S.onbStealOffer=null; S.onbCofre=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
     if(act==="steal") return steal(id);
     if(act==="opt-pick"){ if(S.reel){ applyScriptOption(S.reel, parseInt(k,10)||0, 0); render(); } return; }   // elegir opción de guion
     if(act==="hook-pick"){ if(S.reel){ applyScriptOption(S.reel, S.reel.optIdx||0, parseInt(k,10)||0); render(); } return; }   // elegir gancho
