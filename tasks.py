@@ -2001,7 +2001,8 @@ def transcribe_reel_task(self, reel_id):
 
     try:
         reel_r = (db.table("creator_reels_global")
-                    .select("id, ig_reel_id, transcript, transcript_status, transcript_started_at")
+                    .select("id, ig_reel_id, transcript, transcript_status, transcript_started_at, "
+                            "caption, video_duration_sec")
                     .eq("id", reel_id).single().execute())
     except Exception as e:
         logger.exception("transcribe_reel load failed reel=%s: %s", reel_id, e)
@@ -2066,6 +2067,21 @@ def transcribe_reel_task(self, reel_id):
         }).eq("id", reel_id).execute()
     except Exception as e:
         logger.exception("transcribe_reel save failed reel=%s: %s", reel_id, e)
+
+    # FORMATO (referencias visuales): clasifica el reel del pool en background — ya estamos
+    # en una task, no bloquea nada del usuario. Best-effort + degradación segura si la
+    # columna `formato` aún no está migrada en prod.
+    try:
+        from app import classify_reel_format
+        fmt = classify_reel_format(reel.get("caption"), transcript_text, reel.get("video_duration_sec"))
+        if fmt:
+            try:
+                db.table("creator_reels_global").update({"formato": fmt}).eq("id", reel_id).execute()
+            except Exception as e:
+                if "formato" not in str(e).lower():
+                    logger.warning("transcribe_reel formato save failed reel=%s: %s", reel_id, e)
+    except Exception:
+        logger.warning("transcribe_reel classify failed reel=%s", reel_id, exc_info=True)
     return {"ok": True, "transcript": transcript_text}
 
 

@@ -3888,6 +3888,45 @@ def refine_voice_from_own_scripts(user_id, brand_id=None):
         logger.warning("refine_voice_from_own_scripts failed user=%s", user_id, exc_info=True)
 
 
+REC_FORMAT_KEYS = ("selfie", "pizarra", "podcast", "escritorio", "broll-vo")
+
+
+def classify_reel_format(caption, transcript, duration_sec=None):
+    """Clasifica el FORMATO de grabación de un reel del pool en uno del set fijo
+    (selfie/pizarra/podcast/escritorio/broll-vo) a partir de su transcript/caption/
+    duración. Una sola palabra → llamada LLM barata (max_tokens corto). Devuelve la
+    clave o None si no clasifica. Pensado para correr en BACKGROUND (no bloquea)."""
+    text = ((transcript or "").strip()[:1500]) or ((caption or "").strip()[:500])
+    if not text:
+        return None
+    try:
+        dur = "%ss" % int(float(duration_sec)) if duration_sec else "desconocida"
+    except (TypeError, ValueError):
+        dur = "desconocida"
+    system = ("Clasificas el FORMATO de grabación de un reel. Responde SOLO un JSON "
+              '{"formato":"<una de: selfie|pizarra|podcast|escritorio|broll-vo>"}. '
+              "selfie=persona hablando a cámara (talking head). pizarra=explica escribiendo/"
+              "dibujando. podcast=conversación sentada con micrófono a la vista. "
+              "escritorio=grabación de pantalla/tutorial digital. broll-vo=imágenes de apoyo "
+              "con voz en off, sin presentador a cámara.")
+    user = "Duración: %s.\nTranscripción/caption del reel:\n%s" % (dur, text)
+    try:
+        raw = (_call_llm(system, user, temperature=0, max_tokens=40) or "").strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            m = re.search(r"\{[\s\S]*\}", raw)
+            data = json.loads(m.group()) if m else {}
+        v = str((data or {}).get("formato") or "").strip().lower()
+        return v if v in REC_FORMAT_KEYS else None
+    except Exception:
+        logger.warning("classify_reel_format failed", exc_info=True)
+        return None
+
+
 _REEL_TRANSCRIBE_PER_RUN = 6   # tope de transcripciones NUEVAS por refresco (coste Groq+Apify)
 
 
@@ -10430,6 +10469,80 @@ def _explosion_score(views, baseline):
     if not baseline or baseline < 1:
         return None
     return round(float(views or 0) / float(baseline), 2)
+
+
+@app.route("/api/reels/by-format", methods=["GET"])
+@require_auth
+def reels_by_format():
+    """EJEMPLOS reales del pool con un FORMATO dado (tarjeta «Cómo grabarlo»). Reusa lo
+    cacheado (creator_reels_global.formato) — CERO scrape nuevo. Prioriza los reels de
+    los competidores del usuario; si hay pocos, completa con el pool global. Ordena por
+    explosión (views vs media del creador). Estado honesto si no hay ninguno."""
+    user = current_user()
+    uid = user["id"]
+    fmt = (request.args.get("format") or "").strip().lower()
+    if fmt not in REC_FORMAT_KEYS:
+        return jsonify({"error": "bad_format"}), 400
+    exclude = (request.args.get("exclude") or "").strip()
+    project_id = request.args.get("project_id")
+    SEL = ("id, ig_reel_id, creator_id, views, thumb_url, thumb_b64, video_duration_sec, "
+           "creator:creators_global(ig_username)")
+
+    def _pack(rows, baselines):
+        out = []
+        for r in rows:
+            rid = r.get("id")
+            if not rid or rid == exclude:
+                continue
+            sc = r.get("ig_reel_id")
+            cr = r.get("creator") or {}
+            out.append({
+                "id": rid,
+                "ig_reel_id": sc,
+                "handle": cr.get("ig_username") or "",
+                "thumb": r.get("thumb_b64") or r.get("thumb_url"),
+                "url": ("https://www.instagram.com/reel/%s/" % sc) if sc else None,
+                "explosion": _explosion_score(r.get("views"), baselines.get(r.get("creator_id"))),
+            })
+        return out
+
+    try:
+        # 1) competidores del usuario (radar), filtrados por marca si procede.
+        tq = (db.table("user_tracked_creators").select("creator_id")
+                .eq("user_id", uid).is_("archived_at", "null"))
+        if project_id:
+            tq = tq.eq("project_id", project_id)
+        my_cids = list({t["creator_id"] for t in (tq.execute().data or [])})
+
+        picked, seen = [], set()
+        if my_cids:
+            mine = (db.table("creator_reels_global").select(SEL)
+                      .eq("formato", fmt).eq("is_archived", False)
+                      .in_("creator_id", my_cids)
+                      .order("views", desc=True).limit(12).execute()).data or []
+            base = _creator_view_baselines(my_cids)
+            for e in _pack(mine, base):
+                if e["id"] not in seen:
+                    seen.add(e["id"]); picked.append(e)
+
+        # 2) si hay pocos, completa con el pool GLOBAL del mismo formato.
+        if len(picked) < 2:
+            glob = (db.table("creator_reels_global").select(SEL)
+                      .eq("formato", fmt).eq("is_archived", False)
+                      .order("views", desc=True).limit(20).execute()).data or []
+            gbase = _creator_view_baselines(list({r.get("creator_id") for r in glob}))
+            for e in _pack(glob, gbase):
+                if e["id"] not in seen:
+                    seen.add(e["id"]); picked.append(e)
+
+        # explosión desc (None al final), top 4.
+        picked.sort(key=lambda e: (e["explosion"] is not None, e["explosion"] or 0), reverse=True)
+        return jsonify({"format": fmt, "examples": picked[:4]})
+    except Exception as e:
+        # Columna `formato` aún sin migrar u otro fallo → estado honesto (sin ejemplos).
+        if "formato" not in str(e).lower():
+            logger.warning("reels_by_format failed: %s", e, exc_info=True)
+        return jsonify({"format": fmt, "examples": []})
 
 
 def _fmt_views(n):

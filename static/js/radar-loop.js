@@ -4359,11 +4359,47 @@
   };
   function _recFmtDemo(r){ var s=_durSec(r&&r.dur||"")||0; var keys=["selfie","pizarra","podcast","escritorio","broll-vo"];
     if(s>=90) return "podcast"; if(s>0&&s<=18) return "selfie"; return keys[_lbHash((r&&(r.id||r.cap))||"x",0,keys.length)]; }
+  // Carga EJEMPLOS reales del pool con el mismo formato (cacheado, sin scrape). 1 vez por formato.
+  function loadFormatExamples(fmt){
+    if(!fmt) return;
+    if(S._fmtEx && S._fmtEx.fmt===fmt) return;            // ya cargado/en curso para este formato
+    if(isDemo()){
+      // Demo: arma referencias de mentira con reels que ya hay (para que Leo lo vea).
+      var ex=(S.reels||[]).filter(function(x){return x.thumb;}).slice(0,4).map(function(x){
+        return {handle:(x.creator&&x.creator.handle)||"creador", thumb:x.thumb,
+                explosion:(x.explosionTxt!=null?x.explosionTxt:null),
+                url:x.url||(x.ig_reel_id?("https://www.instagram.com/reel/"+x.ig_reel_id+"/"):null)}; });
+      S._fmtEx={fmt:fmt, loading:false, examples:ex}; return;
+    }
+    S._fmtEx={fmt:fmt, loading:true, examples:[]};
+    var _p=_pidOf(S.brandId);
+    apiGet("/api/reels/by-format?format="+encodeURIComponent(fmt)+(_p?("&project_id="+encodeURIComponent(_p)):"")).then(function(rr){
+      var ex=(rr.ok&&rr.d&&Array.isArray(rr.d.examples))?rr.d.examples:[];
+      S._fmtEx={fmt:fmt, loading:false, examples:ex};
+      if(S.view==="script") render();                     // repinta si seguimos en el reveal
+    });
+  }
+  function _fmtExamplesHTML(fmt){
+    var st=(S._fmtEx&&S._fmtEx.fmt===fmt)?S._fmtEx:null;
+    if(!st||st.loading) return '<div class="recfmt-ex-wait"><span class="rs-ldr"></span> '+L("Buscando referencias de este formato…","Finding references for this format…")+'</div>';
+    if(!st.examples.length) return '<div class="recfmt-ex-empty">'+L("Aún sin referencias de este formato en tu radar. Según sigas competidores y se analicen sus reels, aparecerán aquí.","No references of this format in your radar yet. As you follow competitors and their reels get analyzed, they'll show up here.")+'</div>';
+    var cells=st.examples.map(function(e){
+      var thumb=e.thumb?('<img src="'+ESC(e.thumb)+'" alt="" loading="lazy">'):('<div class="recfmt-ex-ph">'+_icPlay+'</div>');
+      var mult=(e.explosion!=null)?('<span class="recfmt-ex-mult">'+IC.bolt+' '+ESC(String(e.explosion))+'×</span>'):'';
+      var inner='<div class="recfmt-ex-thumb">'+thumb+mult+'</div><div class="recfmt-ex-h">@'+ESC(e.handle||"")+'</div>';
+      return e.url
+        ? '<a class="recfmt-ex" href="'+ESC(e.url)+'" target="_blank" rel="noopener noreferrer" title="'+L("Abrir el reel original","Open the original reel")+'">'+inner+'</a>'
+        : '<div class="recfmt-ex">'+inner+'</div>';
+    }).join("");
+    return '<div class="recfmt-ex-lbl">'+L("Ejemplos de este formato que petaron","Examples of this format that blew up")+'</div><div class="recfmt-ex-row">'+cells+'</div>';
+  }
   function recFormatCardHTML(r){
     var k=(r&&r.recFormat)||(isDemo()?_recFmtDemo(r):null); var f=k&&REC_FORMATS[k]; if(!f) return '';
-    return '<div class="recfmt"><div class="recfmt-ic">'+f.ic+'</div>'+
+    loadFormatExamples(k);                                 // dispara la carga de referencias (1 vez)
+    return '<div class="recfmt"><div class="recfmt-head"><div class="recfmt-ic">'+f.ic+'</div>'+
       '<div class="recfmt-tx"><div class="recfmt-k">'+L("Cómo grabarlo","How to record it")+' · <b>'+f.label+'</b></div>'+
-      '<div class="recfmt-d">'+f.how+'</div></div></div>';
+      '<div class="recfmt-d">'+f.how+'</div></div></div>'+
+      '<div class="recfmt-ex-wrap">'+_fmtExamplesHTML(k)+'</div></div>';
   }
   // #2 (Bernat): el PRIMER guion robado es un hito. Lo celebramos una sola vez.
   // Demo NO persiste (flag de sesión) para que Leo lo pueda re-previsualizar recargando.
