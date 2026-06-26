@@ -8735,6 +8735,52 @@ def brain_training_cards():
     return jsonify({"cards": cards}), 200
 
 
+@app.route("/api/brain/levelup-reward", methods=["POST"])
+@require_auth
+@limiter.limit("30 per hour")
+def brain_levelup_reward():
+    """Recompensa al subir de nivel el Cerebro (David 26-jun): +1 crédito gratis la
+    PRIMERA vez que se alcanza cada nivel (2..5) → 4 créditos gratis en total. El
+    nivel vive en el CLIENTE (localStorage), así que para que NO se pueda farmear
+    (resetear localStorage y volver a subir) registramos cada recompensa en
+    brain_ratings (source='brain_levelup_reward', content=str(nivel)) y no repetimos."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    try:
+        level = int(body.get("level") or 0)
+    except (TypeError, ValueError):
+        level = 0
+    if level < 2 or level > 5:
+        return jsonify({"error": "bad_level"}), 400
+    MARKER = "brain_levelup_reward"
+    CREDITS_PER_LEVEL = 1
+    # ¿ya recompensado este nivel alguna vez? (persiste aunque borren localStorage)
+    try:
+        ex = (db.table("brain_ratings").select("id")
+              .eq("user_id", uid).eq("source", MARKER).eq("content", str(level))
+              .limit(1).execute())
+        if ex.data:
+            return jsonify({"ok": True, "already": True, "granted": 0,
+                            "credits": credits_available(get_profile(uid))}), 200
+    except Exception:
+        logger.warning("[levelup-reward] dup check failed uid=%s", uid, exc_info=True)
+    profile = get_profile(uid)
+    new_cents = (profile.get("credits_cents") or 0) + CREDITS_PER_LEVEL * COST_CENTS
+    try:
+        db.table("profiles").update({"credits_cents": new_cents}).eq("id", uid).execute()
+        db.table("brain_ratings").insert({
+            "user_id": uid, "kind": "guion", "content": str(level), "rating": 1,
+            "suggestion": "levelup reward N" + str(level), "source": MARKER,
+        }).execute()
+    except Exception:
+        logger.exception("[levelup-reward] grant failed uid=%s level=%s", uid, level)
+        return jsonify({"error": "internal", "message": "Inténtalo de nuevo."}), 500
+    track_event("brain_levelup_reward", uid, {"level": level, "credits": CREDITS_PER_LEVEL})
+    return jsonify({"ok": True, "granted": CREDITS_PER_LEVEL,
+                    "credits": credits_available(get_profile(uid))}), 200
+
+
 @app.route("/api/brain/rate", methods=["POST"])
 @require_auth
 @limiter.limit("180 per hour")

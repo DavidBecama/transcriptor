@@ -3134,6 +3134,23 @@
     render();
     try{ if(window.RSBrain) window.RSBrain.levelup(); }catch(e){}
     try{ if(S._bnInst) S._bnInst.levelUp(); }catch(e){}   // la red neuronal evoluciona (destello + onda + crece)
+    // David 26-jun: +1 crédito GRATIS la 1ª vez que subes a cada nivel (2..5) → 4 en total.
+    // Recompensa que SE SIENTE (y deja claro que NO es «subir de plan»). Anti-farm en el backend.
+    if(to>=2 && to<=5){
+      if(isDemo()){
+        if(S.levelup) S.levelup.credit=1; render();
+        showToast(L("🎁 +1 crédito gratis por subir de nivel","🎁 +1 free credit for leveling up"));
+      } else {
+        apiPost('/api/brain/levelup-reward',{level:to}).then(function(r){
+          if(r && r.ok && r.d && r.d.granted>0){
+            if(S.levelup) S.levelup.credit=r.d.granted;
+            render();
+            refreshCredits().then(function(){ try{ flashSpark(r.d.granted); }catch(e){} });
+            showToast(L("🎁 +"+r.d.granted+" crédito gratis por subir a "+ecoLevelName(to),"🎁 +"+r.d.granted+" free credit for reaching "+ecoLevelName(to)));
+          }
+        });
+      }
+    }
   }
   function closeLevelup(){ S.levelup=null; render(); }
   // Tema por nivel (color + subtítulo) — animación "una por nivel" (improvisada).
@@ -3187,6 +3204,7 @@
         '<p class="rsx-stage__eyebrow">'+L("Cerebro · Nivel ","Brain · Level ")+lu.to+'</p>'+
         '<h2 class="rsx-stage__title">'+ESC(lu.name)+'</h2>'+
         '<p class="rsx-stage__sub">'+th.sub+'</p>'+
+        (lu.credit?'<div class="rsx-stage__reward" style="margin:4px auto 2px;display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:999px;background:color-mix(in srgb,var(--rsx-accent) 20%,transparent);border:1px solid var(--rsx-accent);color:#fff;font-family:var(--font-mono);font-size:13.5px;font-weight:800">'+IC.spark+' +'+lu.credit+' '+L("crédito"+(lu.credit>1?"s":"")+" gratis","free credit"+(lu.credit>1?"s":""))+'</div>':'')+
         '<button class="rsx-stage__btn" data-act="levelup-done">'+L("Continuar","Continue")+'</button>'+
       '</div>'+
     '</div>';
@@ -3857,7 +3875,6 @@
         '<div class="feed-chips">'+chips+'</div>'+
         '<textarea id="rsFeedMe" class="feedme-input" rows="2" maxlength="600"'+(ready?'':' disabled')+' placeholder="'+ESC(def.ph)+'"></textarea>'+
         '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:13px">'+cta+reward+'</div>'+
-        (_devFlag()?'<button data-act="brain-feed-reset" title="Solo dev: reinicia cooldowns/XP/nivel del cerebro (localStorage) para rehacer los 4 ejercicios" style="margin-top:11px;background:none;border:none;color:var(--text-tertiary);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;opacity:.55">↺ reset alimentar (dev)</button>':'')+
       '</div>'+
     '</div>';
   }
@@ -3895,22 +3912,6 @@
     try{ if(S._bnInst) S._bnInst.feed(_bnFeedType(def.key)); }catch(e){}   // partículas tipadas → la red neuronal las absorbe
     var _ta2=document.getElementById("rsFeedMe"); if(_ta2) try{ _ta2.focus(); }catch(e){}   // listo para el siguiente ejercicio
     showToast(L("+"+def.gain+"% al Cerebro · "+def.label.toLowerCase()+" guardado 🧠","+"+def.gain+"% to your Brain · saved 🧠"));
-  }
-  // Flag DEV (oculto): activa herramientas de prueba para cuentas de dev sin tocar a
-  // usuarios normales. Se enciende visitando la web con ?dev=1 (persiste en localStorage).
-  function _devFlag(){
-    try{ if(typeof location!=="undefined" && location.search && location.search.indexOf("dev=1")>=0) localStorage.setItem("rs_dev","1");
-         return localStorage.getItem("rs_dev")==="1"; }catch(e){ return false; }
-  }
-  // Reset (dev) de «alimentar el cerebro»: borra los cooldowns/XP/nivel (que viven en
-  // localStorage, no en el servidor) para poder rehacer los 4 ejercicios. Equivale al
-  // one-liner de consola, pero a un clic.
-  function brainFeedReset(){
-    try{ Object.keys(localStorage).forEach(function(k){ if(k.indexOf("rs_brain_")===0) localStorage.removeItem(k); }); }catch(e){}
-    S._ceReward=null; S.feedType="guion";
-    if(isDemo()){ S._demoClaimed=0; S._demoDailyXp=0; }
-    render();
-    showToast(L("Cerebro reiniciado (dev) — ya puedes alimentar de nuevo","Brain reset (dev) — feed again"));
   }
   function brainTrainHTML(){
     var mode=brainTrainMode();
@@ -6598,7 +6599,6 @@
     if(act==="levelup-done") return closeLevelup();
     if(act==="brain-feed-pick") return brainFeedPick(k);   // elegir forma de alimentar
     if(act==="brain-feed-me") return brainFeedMe(k);   // #2/#7: alimentar el Cerebro (por tipo)
-    if(act==="brain-feed-reset") return brainFeedReset();   // DEV: reinicia cooldowns/XP/nivel (localStorage)
     if(act==="brain-train-more") return brainTrainMore();
     if(act==="gt-start") return startGuionTinder();
     if(act==="gt-vote") return guionTinderVote(parseInt(btn.getAttribute("data-k"),10)||0);
