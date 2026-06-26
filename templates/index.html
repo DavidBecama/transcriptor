@@ -9722,6 +9722,8 @@
     @keyframes cofre-cardin { to { opacity:1; transform:none; } }
     .rs .cofre-card.sel { border-color:var(--brand-500); box-shadow:0 0 0 1.5px var(--brand-400), 0 26px 70px -22px rgba(79,124,255,.6); transform:scale(1.035); }
     .rs .cofre-card.dim { opacity:.38; }
+    .rs .cofre-card.shown { animation:none; opacity:1; transform:none; }
+    .rs .cofre-card.shown.sel { transform:scale(1.035); }
     .rs .cofre-card-thumb { position:relative; aspect-ratio:9/16; border-radius:14px; overflow:hidden; background:var(--surface-overlay); }
     .rs .cofre-card-img { width:100%; height:100%; object-fit:cover; display:block; }
     .rs .cofre-card-916 { position:absolute; top:10px; left:10px; font-family:var(--font-mono); font-size:10px; letter-spacing:.12em; color:rgba(255,255,255,.55); background:rgba(0,0,0,.28); padding:3px 7px; border-radius:6px; }
@@ -26867,12 +26869,10 @@ window.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => { if (document.querySelector('#radarRoot .rail')) startTour(); }, 1500);
     return;
   }
-  if (document.body.classList.contains("workspace") && !localStorage.getItem("onboarding_completed")
-      && !/headless/i.test(navigator.userAgent)) {   // headless (harness) → no auto-tour, no interfiere
-    // No arrancar si el onboarding v2 está en pantalla: el island lo dispara al
-    // terminar (onbStartTour). Reevaluamos a los 1500ms, ya montado el island.
-    setTimeout(() => { if (!document.querySelector(".onb-screen")) startTour(); }, 1500);
-  }
+  // El auto-start del tour lo OWNEA ahora la ISLA (render() lo arranca la 1ª vez que
+  // aterrizas en el dashboard sin onboarding, re-chequeando los targets). Antes vivía
+  // aquí con un setTimeout de 1500ms que en incógnito se colaba ENCIMA del onboarding
+  // (este aún no había montado) → tour + onboarding a la vez. Movido a la isla = robusto.
 });
 
 // ── v0.15.3: Tab Competidores ───────────────────────────────────────────────
@@ -28479,6 +28479,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=150"></script>
+<script src="/static/js/radar-loop.js?v=151"></script>
 </body>
 </html>
