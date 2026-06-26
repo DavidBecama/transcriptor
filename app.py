@@ -1459,11 +1459,23 @@ def auth_callback():
         session["user"] = {"id": user["id"], "email": user.get("email", "")}
 
         # Ensure profile exists
-        prof = db.table("profiles").select("id").eq("id", user["id"]).execute()
+        prof = db.table("profiles").select("id, credits_cents").eq("id", user["id"]).execute()
+        prow = (prof.data or [{}])[0]
         is_new_signup = not prof.data
         if is_new_signup:
             db.table("profiles").insert({"id": user["id"]}).execute()
-            # v0.14.24: trigger email activation flow solo en nuevo signup
+        # Welcome (30 créditos) + emails de signup. ROBUSTO ante el trigger de Supabase que
+        # PRE-CREA el perfil: si lo gateáramos solo en is_new_signup, los signups de Google
+        # (perfil ya existe → is_new_signup=False) se quedaban con 0 créditos y NO podían
+        # robar (bug 2026-06-26). Concede también si el perfil existe SIN saldo y la CUENTA
+        # de auth es RECIENTE (created_at ≤ 1 día) → cubre el signup nuevo de Google sin
+        # tocar a usuarios viejos (created_at antiguo) ni ser farmeable (created_at es fijo).
+        _grant = is_new_signup
+        if not _grant and not prow.get("credits_cents"):
+            _ca = _parse_ts(user.get("created_at"))
+            if _ca and (datetime.now(timezone.utc) - _ca).total_seconds() < 86400:
+                _grant = True
+        if _grant:
             _on_signup_complete(user["id"], _resolve_lang())
 
         return jsonify({"ok": True, "email": user.get("email", "")})
