@@ -3875,9 +3875,15 @@
     brainAddXp(def.gain); _bfTsSet(def.key);   // +gain% a la barra del nivel · CD 24h de ESTE tipo
     if(ta) ta.value="";
     S._ceReward=L("+"+def.gain+"% · voy aprendiendo tu voz","+"+def.gain+"% · learning your voice")+" 🧠";   // reward inline animado en la card
+    // Auto-avanza al SIGUIENTE ejercicio no hecho, en orden (guion→hook→muletilla→
+    // estilo), para que el cliente encadene los 4 sin elegir chip a mano. Si ya están
+    // todos hechos hoy, se queda en el actual (CTA «hecho hoy»).
+    var _ci=-1; for(var _i=0;_i<BRAIN_FEED_TYPES.length;_i++){ if(BRAIN_FEED_TYPES[_i].key===key){ _ci=_i; break; } }
+    for(var _j=1;_j<=BRAIN_FEED_TYPES.length;_j++){ var _nt=BRAIN_FEED_TYPES[(_ci+_j)%BRAIN_FEED_TYPES.length]; if(_nt.key!==key && brainFeedReady(_nt.key)){ S.feedType=_nt.key; break; } }
     brainLevelPulse();   // por si llegó al 100% (NO auto-sube: el nivel se reclama con el botón de arriba)
     render();
     try{ if(S._bnInst) S._bnInst.feed(_bnFeedType(def.key)); }catch(e){}   // partículas tipadas → la red neuronal las absorbe
+    var _ta2=document.getElementById("rsFeedMe"); if(_ta2) try{ _ta2.focus(); }catch(e){}   // listo para el siguiente ejercicio
     showToast(L("+"+def.gain+"% al Cerebro · "+def.label.toLowerCase()+" guardado 🧠","+"+def.gain+"% to your Brain · saved 🧠"));
   }
   function brainTrainHTML(){
