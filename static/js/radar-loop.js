@@ -533,12 +533,21 @@
       onbErr()+
       '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-handle-next">'+IC.arr+' '+L("Continuar","Continue")+'</button>');
   }
+  // Emoji por nicho (David 26-jun: «la M de moda es genérica, que tengan emoji»). Key
+  // por _norm (sin acentos, minúsculas), cubre ES y EN. Fallback a la inicial si no hay.
+  var NICHE_EMOJI={
+    fitness:"💪", finanzas:"💰", finance:"💰", marketing:"📈", cocina:"🍳", cooking:"🍳",
+    moda:"👗", fashion:"👗", belleza:"💄", beauty:"💄", viajes:"✈️", travel:"✈️",
+    tecnologia:"💻", tech:"💻", educacion:"📚", education:"📚", inmobiliaria:"🏠", "real estate":"🏠",
+    salud:"🩺", health:"🩺", negocios:"💼", business:"💼", onlyfans:"🌶️", "only fans":"🌶️"
+  };
+  function _nicheEmoji(n){ return NICHE_EMOJI[_norm(n)] || ""; }
   // Paso 2 — nicho (OBLIGATORIO): chips amplios + texto libre.
   function onbNicheHTML(){
     var _nc=nicheChips();
-    // v3 (mockup David): grid de icon-cards (icono = inicial del nicho) en vez de pills.
-    var chips=_nc.map(function(n){ var on=_norm(S.onb.niche)===_norm(n);
-      return '<button class="onb-ncard'+(on?" on":"")+'" data-act="onb-pick-niche" data-k="'+ESC(n)+'"><span class="onb-ncard-ic">'+ESC(n.charAt(0).toUpperCase())+'</span><span class="onb-ncard-l">'+ESC(n)+'</span></button>'; }).join("");
+    // v3 (mockup David): grid de icon-cards. Icono = emoji del nicho (o inicial si no hay).
+    var chips=_nc.map(function(n){ var on=_norm(S.onb.niche)===_norm(n); var em=_nicheEmoji(n);
+      return '<button class="onb-ncard'+(on?" on":"")+'" data-act="onb-pick-niche" data-k="'+ESC(n)+'"><span class="onb-ncard-ic'+(em?" onb-ncard-ic--em":"")+'">'+(em||ESC(n.charAt(0).toUpperCase()))+'</span><span class="onb-ncard-l">'+ESC(n)+'</span></button>'; }).join("");
     var custom=(_nc.some(function(n){return _norm(n)===_norm(S.onb.niche);})||!S.onb.niche)?"":S.onb.niche;
     return onbCardWrap(onbEyebrow(L("tu terreno","your turf")),L("¿De qué va tu contenido?","What's your content about?"),
       L("Elige el que más se acerque. Afinamos en el siguiente paso.","Pick the closest one. We refine it in the next step."),
