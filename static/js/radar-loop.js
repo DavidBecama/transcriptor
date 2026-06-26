@@ -4360,14 +4360,15 @@
   // Ítem 10: FORMATO DE GRABACIÓN sugerido. El LLM clasifica el reel original en uno de
   // estos 5; aquí va la copia "cómo hacerlo" + icono (la clasificación NO se inventa).
   var REC_FORMATS={
-    selfie:{label:L("Selfie · a cámara","Selfie · to camera"),how:L("Cámara frontal, tú hablando directo. El hook, a los ojos.","Front camera, talking straight to it. Hook, eye to eye."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'},
-    pizarra:{label:L("Pizarra · explicador","Whiteboard · explainer"),how:L("Escribe o dibuja la idea mientras la cuentas.","Write or draw the idea as you tell it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'},
-    podcast:{label:L("Podcast · clip","Podcast · clip"),how:L("Plano sentado, micro a la vista, tono conversación.","Seated shot, mic in frame, conversational tone."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>'},
-    escritorio:{label:L("Pantalla · escritorio","Screen · desktop"),how:L("Graba la pantalla mostrando el cómo, tu voz encima.","Screen-record the how-to, voice over it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'},
-    "broll-vo":{label:L("B-roll + voz en off","B-roll + voiceover"),how:L("Imágenes de apoyo + tu voz narrando. Sin salir tú.","Cutaway footage + your narration. No on-camera you."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>'}
+    selfie:{label:L("Selfie a cámara","Selfie to camera"),how:L("Cámara frontal, tú hablando directo. El hook, a los ojos.","Front camera, talking straight to it. Hook, eye to eye."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'},
+    pizarra:{label:L("Pizarra","Whiteboard"),how:L("Escribe o dibuja la idea mientras la cuentas.","Write or draw the idea as you tell it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'},
+    podcast:{label:L("Podcast","Podcast"),how:L("Plano sentado, micro a la vista, tono conversación.","Seated shot, mic in frame, conversational tone."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>'},
+    escritorio:{label:L("Pantalla / escritorio","Screen / desktop"),how:L("Graba la pantalla mostrando el cómo, tu voz encima.","Screen-record the how-to, voice over it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'},
+    "broll-vo":{label:L("B-roll + voz en off","B-roll + voiceover"),how:L("Imágenes de apoyo + tu voz narrando. Sin salir tú.","Cutaway footage + your narration. No on-camera you."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>'},
+    pov:{label:L("POV + B-rolls","POV + B-rolls"),how:L("Cámara en 1ª persona + texto sobreimpreso en pantalla. Intercala B-rolls.","First-person camera + on-screen text overlay. Cut in B-roll."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'}
   };
-  function _recFmtDemo(r){ var s=_durSec(r&&r.dur||"")||0; var keys=["selfie","pizarra","podcast","escritorio","broll-vo"];
-    if(s>=90) return "podcast"; if(s>0&&s<=18) return "selfie"; return keys[_lbHash((r&&(r.id||r.cap))||"x",0,keys.length)]; }
+  function _recFmtDemo(r){ var s=_durSec(r&&r.dur||"")||0; var keys=["selfie","pizarra","podcast","escritorio","broll-vo","pov"];
+    if(s>=90) return "podcast"; if(s>0&&s<=18) return "pov"; return keys[_lbHash((r&&(r.id||r.cap))||"x",0,keys.length)]; }
   // Carga EJEMPLOS reales del pool con el mismo formato (cacheado, sin scrape). 1 vez por formato.
   function loadFormatExamples(fmt){
     if(!fmt) return;
@@ -4390,25 +4391,32 @@
   }
   function _fmtExamplesHTML(fmt){
     var st=(S._fmtEx&&S._fmtEx.fmt===fmt)?S._fmtEx:null;
-    if(!st||st.loading) return '<div class="recfmt-ex-wait"><span class="rs-ldr"></span> '+L("Buscando referencias de este formato…","Finding references for this format…")+'</div>';
-    if(!st.examples.length) return '<div class="recfmt-ex-empty">'+L("Aún sin referencias de este formato en tu radar. Según sigas competidores y se analicen sus reels, aparecerán aquí.","No references of this format in your radar yet. As you follow competitors and their reels get analyzed, they'll show up here.")+'</div>';
-    var cells=st.examples.map(function(e){
+    if(!st||st.loading) return '<div class="recfmt-ex-wait"><span class="rs-ldr"></span> '+L("Buscando referencias…","Finding references…")+'</div>';
+    if(!st.examples.length) return '<div class="recfmt-ex-empty">'+L("Aún sin referencias de este formato en tu radar.","No references of this format in your radar yet.")+'</div>';
+    var cells=st.examples.slice(0,2).map(function(e){   // 2 vídeos prominentes a la derecha
       var thumb=e.thumb?('<img src="'+ESC(e.thumb)+'" alt="" loading="lazy">'):('<div class="recfmt-ex-ph">'+_icPlay+'</div>');
       var mult=(e.explosion!=null)?('<span class="recfmt-ex-mult">'+IC.bolt+' '+ESC(String(e.explosion))+'×</span>'):'';
-      var inner='<div class="recfmt-ex-thumb">'+thumb+mult+'</div><div class="recfmt-ex-h">@'+ESC(e.handle||"")+'</div>';
+      var inner='<div class="recfmt-ex-thumb">'+thumb+mult+'<span class="recfmt-ex-play">'+_icPlay+'</span></div><div class="recfmt-ex-h">@'+ESC(e.handle||"")+'</div>';
       return e.url
         ? '<a class="recfmt-ex" href="'+ESC(e.url)+'" target="_blank" rel="noopener noreferrer" title="'+L("Abrir el reel original","Open the original reel")+'">'+inner+'</a>'
         : '<div class="recfmt-ex">'+inner+'</div>';
     }).join("");
-    return '<div class="recfmt-ex-lbl">'+L("Ejemplos de este formato que petaron","Examples of this format that blew up")+'</div><div class="recfmt-ex-row">'+cells+'</div>';
+    return '<div class="recfmt-ex-lbl">'+L("Grábalo así","Record it like this")+'</div><div class="recfmt-ex-row">'+cells+'</div>';
   }
   function recFormatCardHTML(r){
     var k=(r&&r.recFormat)||(isDemo()?_recFmtDemo(r):null); var f=k&&REC_FORMATS[k]; if(!f) return '';
     loadFormatExamples(k);                                 // dispara la carga de referencias (1 vez)
-    return '<div class="recfmt"><div class="recfmt-head"><div class="recfmt-ic">'+f.ic+'</div>'+
-      '<div class="recfmt-tx"><div class="recfmt-k">'+L("Cómo grabarlo","How to record it")+' · <b>'+f.label+'</b></div>'+
-      '<div class="recfmt-d">'+f.how+'</div></div></div>'+
-      '<div class="recfmt-ex-wrap">'+_fmtExamplesHTML(k)+'</div></div>';
+    var pov=(k==="pov" && r.povText)
+      ? '<div class="recfmt-pov"><span class="recfmt-pov-lbl">'+L("TEXTO EN PANTALLA (POV)","ON-SCREEN TEXT (POV)")+'</span>'+
+        '<div class="recfmt-pov-tx">'+(String(r.povText).split("/").map(function(t){ t=t.trim(); return t?'<span>'+ESC(t)+'</span>':''; }).filter(Boolean).join(''))+'</div></div>'
+      : '';
+    return '<div class="recfmt">'+
+      '<div class="recfmt-k">'+L("FORMATO SUGERIDO","SUGGESTED FORMAT")+'</div>'+
+      '<div class="recfmt-row">'+
+        '<div class="recfmt-left"><div class="recfmt-ic">'+f.ic+'</div>'+
+          '<div class="recfmt-tx"><div class="recfmt-name">'+f.label+'</div><div class="recfmt-d">'+f.how+'</div></div></div>'+
+        '<div class="recfmt-right">'+_fmtExamplesHTML(k)+'</div>'+
+      '</div>'+pov+'</div>';
   }
   // #2 (Bernat): el PRIMER guion robado es un hito. Lo celebramos una sola vez.
   // Demo NO persiste (flag de sesión) para que Leo lo pueda re-previsualizar recargando.
@@ -4436,9 +4444,25 @@
         (_proof?'<div class="reveal-hero-proof">'+L("Robado de un reel que hizo","Stolen from a reel that did")+' '+_proof+'</div>':'')+
       '</div>';
     }
+    // Switcher de OPCIONES de guion (2) — el usuario elige.
+    var opts=r.options||[]; var oi=r.optIdx||0;
+    var optTabs = opts.length>1
+      ? '<div class="opt-tabs">'+opts.map(function(o,i){
+          return '<button class="opt-tab'+(i===oi?" on":"")+'" data-act="opt-pick" data-k="'+i+'">'+L("Opción ","Option ")+(i+1)+'</button>'; }).join("")+
+        '<span class="opt-tabs-hint">'+L("elige el que más te suene","pick the one that sounds most like you")+'</span></div>'
+      : '';
+    // Selector de HOOKS (2-3) de la opción activa.
+    var hooks=(opts[oi]&&opts[oi].hooks)||[s.hook]; var hi=r.hookIdx||0;
+    var hooksH = hooks.length>1
+      ? '<div class="hook-pick"><div class="hook-pick-lbl">'+L("Elige tu gancho","Pick your hook")+'</div>'+
+        hooks.map(function(h,i){
+          return '<button class="hook-opt'+(i===hi?" on":"")+'" data-act="hook-pick" data-k="'+i+'"><span class="hook-opt-n">'+(i+1)+'</span><span class="hook-opt-t">'+ESC(h)+'</span>'+(i===hi?'<span class="hook-opt-on">'+IC.check+'</span>':'')+'</button>'; }).join("")+
+        '</div>'
+      : '';
     return '<div class="script-wrap fade-in">'+hero+'<div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div><div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
       '<div class="script-acts"><button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>'+
         '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
+      optTabs+hooksH+
       '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+recFormatCardHTML(r)+conveyorHTML()+'</div>';
   }
   /* v3 (mockup David · «Editor de guion»): overlay a pantalla completa con barra
@@ -5368,17 +5392,16 @@
               L("Ver planes","See plans"), "open-plans");
   }
   function ensureScript(r,cb){
-    if(r.script&&r.script.hook){ setTimeout(function(){cb();},1700); return; }
-    if(isDemo()){ r.recFormat=r.recFormat||_recFmtDemo(r); setTimeout(function(){cb();},1700); return; }
+    if(isDemo()){ _demoScriptOptions(r); setTimeout(function(){cb();},1700); return; }
+    if(r.options&&r.options.length){ setTimeout(function(){cb();},900); return; }   // ya generado
     var t0=Date.now();
     apiPost("/api/competitors/reels/"+encodeURIComponent(r.id)+"/generate-script",(function(){ var _b={language:(document.documentElement.lang||"es")}; var _p=_pidOf(S.brandId); if(_p) _b.project_id=_p; return _b; })()).then(function(rr){
       // Duplicado reciente (409) → reusamos el guion existente (sin re-cobro). Traemos su texto.
       if(rr.status===409 && rr.d && rr.d.script_id){ return fetchScriptText(rr.d.script_id, r, t0, cb); }
       if(!rr.ok){ var ec=(rr.d&&rr.d.error)||"error"; return setTimeout(function(){ cb(ec); },300); }
-      // Sync (200): el script viene en la respuesta.
-      if(rr.d && (rr.d.mode==="sync" || rr.d.script || rr.d.result)){
-        r._sid=rr.d.script_id||r._sid; r.script=parseScript(rr.d.script||rr.d.result,r);
-        if(rr.d.recording_format) r.recFormat=rr.d.recording_format;   // ítem 10
+      // Sync (200): opciones + formato + POV vienen en la respuesta.
+      if(rr.d && (rr.d.mode==="sync" || rr.d.options || rr.d.script || rr.d.result)){
+        _normScriptOptions(rr.d, r);
         return setTimeout(function(){cb();},Math.max(0,1500-(Date.now()-t0)));
       }
       // Async (202): pollear /task/script/<id> hasta SUCCESS, luego traer el texto.
@@ -5395,7 +5418,10 @@
       tries++;
       apiGet("/task/script/"+encodeURIComponent(taskId)).then(function(rr){
         var d=rr.d||{};
-        if(d.state==="success"){ return fetchScriptText(d.script_id, r, t0, cb); }
+        if(d.state==="success"){
+          if(d.options&&d.options.length){ _normScriptOptions(d, r); return setTimeout(cb, Math.max(0,1200-(Date.now()-t0))); }
+          return fetchScriptText(d.script_id, r, t0, cb);
+        }
         if(d.state==="failed"){ return cb(d.error||"error"); }
         if(tries>=MAX){ return cb("timeout"); }
         setTimeout(loop, 2000);
@@ -5409,11 +5435,55 @@
       var rows=Array.isArray(rr.d)?rr.d:[];
       var row=rows.filter(function(s){return s.id===sid;})[0];
       r._sid=sid;
-      r.script=row?scriptToParts(row.script):{hook:r.cap,beats:[],close:""};
+      var p=row?scriptToParts(row.script):{hook:r.cap,beats:[],close:""};
+      r.script=p;
+      r.options=r.options||[{title:(row&&row.title)||"",hooks:[p.hook],body:p.beats||[],closing:p.close||"",script:(row&&row.script)||""}];
+      if(row&&row.recording_format) r.recFormat=row.recording_format;
+      applyScriptOption(r,0,0);
       setTimeout(function(){cb();},Math.max(0,1200-(Date.now()-t0)));
     }).catch(function(){ r.script=r.script||{hook:r.cap,beats:[],close:""}; cb(); });
   }
   function parseScript(sc,r){ if(sc&&typeof sc==="object"&&sc.hook) return sc; if(typeof sc==="string"){ var l=sc.split(/\n+/).map(function(s){return s.replace(/^▸\s*/,"").trim();}).filter(Boolean); return {hook:l[0]||r.cap,beats:l.slice(1,-1),close:l.length>1?l[l.length-1]:""}; } return {hook:r.cap,beats:[],close:""}; }
+  // Fija la opción + hook activos y deriva r.script (lo que ven editor/teleprompter).
+  function applyScriptOption(r, oi, hi){
+    var opts=r.options||[]; oi=Math.max(0,Math.min(oi||0,opts.length-1)); hi=hi||0;
+    r.optIdx=oi; r.hookIdx=hi;
+    var o=opts[oi]; if(!o){ return; }
+    var hooks=o.hooks||[]; var hook=hooks[hi]||hooks[0]||((o.script||"").split("\n")[0])||r.cap;
+    r.script={ hook:hook, beats:o.body||[], close:o.closing||"" };
+  }
+  // Normaliza la respuesta (sync o async) con opciones/formato/POV → estado del reel.
+  function _normScriptOptions(d, r){
+    var opts=Array.isArray(d.options)?d.options.filter(function(o){return o&&(o.script||o.hooks);}):[];
+    if(opts.length){ r.options=opts; }
+    else { // sin opciones (compat) → 1 opción derivada del texto plano
+      var p=parseScript(d.script||d.result||"",r);
+      r.options=[{title:d.title||"",hooks:[p.hook],body:p.beats||[],closing:p.close||"",script:d.script||d.result||""}];
+    }
+    if(d.recording_format) r.recFormat=d.recording_format;
+    if(d.pov_text) r.povText=d.pov_text;
+    r._sid=d.script_id||r._sid;
+    applyScriptOption(r,0,0);
+  }
+  // Demo: 2 opciones + 3 hooks + formato (+ POV) para previsualizar la UX sin LLM real.
+  function _demoScriptOptions(r){
+    if(r.options&&r.options.length) return;
+    var base=(r.script&&r.script.hook)?r.script:parseScript(r.cap||"Tu idea",r);
+    var cap=(r.cap||base.hook||"esto").replace(/\.$/,"");
+    var mk=function(hooks,beats,close){ return {title:hooks[0].slice(0,60),hooks:hooks,body:beats,closing:close,
+      script:hooks[0]+"\n"+beats.join("\n")+"\n"+close}; };
+    r.options=[
+      mk([cap+".","Nadie te cuenta esto sobre "+cap.toLowerCase()+".","Hice esto durante 30 días y cambió todo."],
+         (base.beats&&base.beats.length?base.beats:["Te lo cuento en 3 pasos.","Paso uno: lo que casi nadie hace.","Paso dos: el detalle que lo cambia todo.","Paso tres: cómo lo cierras."]),
+         (base.close||"Guárdate esto y cuéntame qué tal. / Comenta «GUION» y te paso la plantilla.")),
+      mk(["Esto es lo que yo haría en tu lugar.","Para de hacer "+cap.toLowerCase()+" así.","La forma fácil vs la forma que funciona."],
+         ["Empieza por el final: qué quieres que recuerden.","Quita la mitad de lo que ibas a decir.","Mete UN dato concreto, no tres vagos.","Cierra con una acción, no con un resumen."],
+         "Si te sirvió, sígueme para el resto. / Mándaselo a quien lo necesita.")
+    ];
+    r.recFormat=r.recFormat||_recFmtDemo(r);
+    if(r.recFormat==="pov" && !r.povText) r.povText="POV: por fin entiendes "+cap.toLowerCase()+" / lo que nadie te dijo / guárdalo";
+    applyScriptOption(r,0,0);
+  }
   // record = real (teleprompter, gratis). El resto es TEATRO demo (contenido
   // hardcodeado + spend local): en prod ni se renderizan (conveyorHTML filtra
   // por real) ni pueden ejecutarse — este guard cubre cualquier disparo residual.
@@ -6568,6 +6638,8 @@
     }
     if(act==="onb-steal-no"){ S.onbStealOffer=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
     if(act==="steal") return steal(id);
+    if(act==="opt-pick"){ if(S.reel){ applyScriptOption(S.reel, parseInt(k,10)||0, 0); render(); } return; }   // elegir opción de guion
+    if(act==="hook-pick"){ if(S.reel){ applyScriptOption(S.reel, S.reel.optIdx||0, parseInt(k,10)||0); render(); } return; }   // elegir gancho
     if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
     if(act==="reel-original"){ var _ro=(typeof reelById==="function"?reelById(id):null)||S.reel||{}; var _u=_ro.url||_ro.ig_url||_ro.permalink||(_ro.ig_reel_id?("https://www.instagram.com/reel/"+_ro.ig_reel_id+"/"):null); if(_u){ try{ window.open(_u,"_blank","noopener"); }catch(e){} } else { showToast(L("El original es de @"+((_ro.creator&&_ro.creator.handle)||"tu rival")+" en Instagram.","Original is @"+((_ro.creator&&_ro.creator.handle)||"your rival")+"'s on Instagram.")); } return; }
     if(act==="reel-dismiss") return reelDismiss(id);

@@ -1833,10 +1833,9 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             return _fail("assistant_too_short", msg)
 
         try:
-            from app import adapt_with_ai, get_voice_profile  # lazy import (rompe circular tasks↔app).
-            result = adapt_with_ai(user_content, style_arg, custom_prompt,
-                                   voice=get_voice_profile(user_id, project_id), user_id=user_id,
-                                   brand_id=project_id)  # moat: voz + few-shot, por MARCA
+            # 2 OPCIONES en paralelo (modelo de generación = pro), por MARCA.
+            from app import _generate_script_options, _shape_script_option  # lazy import (circular).
+            raw_opts = _generate_script_options(user_content, style_arg, custom_prompt, user_id, project_id, n=2)
         except Exception as e:
             logger.exception("gen_script_task LLM failed reel=%s: %s", reel_id, e)
             # v0.15.7.b: mensaje contextual si custom + empty content.
@@ -1848,26 +1847,12 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                 )
             return _fail("llm_error", "No se pudo generar el guion. Inténtalo de nuevo.")
 
-        llm_title = ""
-        _alt_hooks = None   # 3 hooks (device distinto): persistimos los 2 alternativos.
-        _rec_fmt = None     # ítem 10: formato de grabación clasificado por el LLM.
-        if isinstance(result, dict):
-            if result.get("title"):
-                llm_title = str(result["title"]).strip()[:80]
-            _ah = result.get("alt_hooks")
-            if isinstance(_ah, list):
-                _alt_hooks = [str(h).strip() for h in _ah if str(h or "").strip()][:4] or None
-            _rec_fmt = result.get("recording_format") or None
-        if isinstance(result, dict) and "hook" in result:
-            flat = (result["hook"] + "\n" +
-                    "\n".join(result.get("body", [])) + "\n" +
-                    result.get("closing", ""))
-            result = flat.strip()
-        elif isinstance(result, dict) and isinstance(result.get("hooks"), list):
-            result = "\n".join(h.get("text", "") for h in result["hooks"]
-                               if isinstance(h, dict) and h.get("text")).strip()
-        elif not isinstance(result, str):
-            result = str(result)
+        options = [_shape_script_option(r) for r in raw_opts]
+        _rec_fmt = raw_opts[0].get("recording_format") or None     # ítem 10
+        _pov_text = raw_opts[0].get("pov_text") or None
+        _alt_hooks = (options[0]["hooks"][1:] or None)             # los 2 hooks alternativos de la A
+        llm_title = options[0]["title"]
+        result = options[0]["script"]                              # se guarda la opción A
 
         today_short = datetime.now(timezone.utc).strftime("%d %b %Y").lower()
         script_title = llm_title or ("Guion desde @" + ig_username + " · " + today_short)
@@ -1979,6 +1964,9 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             "script_id": script_id,
             "title": script_title,
             "from_competitor_username": ig_username,
+            "recording_format": _rec_fmt,
+            "pov_text": _pov_text,
+            "options": options,            # 2 opciones (cada una con 2-3 hooks)
         }
     finally:
         _release_lock()
