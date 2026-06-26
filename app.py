@@ -80,6 +80,9 @@ GROQ_URL              = "https://api.groq.com/openai/v1/audio/transcriptions"
 OPENROUTER_API_KEY    = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_URL        = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL      = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+# Modelo SOLO para la GENERACIÓN del guion (calidad > coste: ~€0,04/guion; el gasto gordo
+# es el scraping). La clasificación de formato y el resto siguen en OPENROUTER_MODEL (flash).
+GENERATION_MODEL      = os.environ.get("GENERATION_MODEL", "google/gemini-2.5-pro")
 SUPABASE_URL          = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_KEY", "")
 APIFY_TOKEN           = os.environ.get("APIFY_TOKEN", "")
@@ -3108,8 +3111,11 @@ _JSON_SCRIPT_SCHEMA = (
     '"closing": "DOS cierres separados por  /  (variante 1 / variante 2; p.ej. un comment-CTA y un cierre suave)", '
     # Ítem 10: formato de grabación CLASIFICADO del reel original (por su transcript/
     # caption/duración) — exactamente UNO de estos valores, en minúscula, sin más texto.
-    '"recording_format": "uno EXACTO de: selfie | pizarra | podcast | escritorio | broll-vo '
-    '(el formato con el que está grabado el reel original y con el que este guion rendiría)"}. '
+    '"recording_format": "uno EXACTO de: selfie | pizarra | podcast | escritorio | broll-vo | pov '
+    '(el formato con el que está grabado el reel original y con el que este guion rendiría)", '
+    # Si el formato es POV, además el TEXTO EN PANTALLA (overlay) del POV; "" si no aplica.
+    '"pov_text": "SOLO si recording_format es pov: el texto que va SOBRESCRITO en pantalla '
+    '(corto, frases sueltas separadas por  /  ; el gancho visual del POV). Si no es pov, cadena vacía"}. '
     'Reglas de salida: los 3 hooks (hook + los 2 de alt_hooks) usan 3 devices DISTINTOS. '
     'body = frase a frase (cada elemento del array es UNA frase, se renderiza con ▸). '
     'Sin markdown, sin ```json, sin texto antes ni después. Solo el JSON.'
@@ -3446,18 +3452,22 @@ def _parse_ai_json(raw: str, style: str) -> dict:
         data.setdefault("closing", "")
         # Ítem 10: normaliza recording_format al set fijo (o None si no clasifica).
         _fmt = str(data.get("recording_format") or "").strip().lower()
-        data["recording_format"] = _fmt if _fmt in ("selfie", "pizarra", "podcast", "escritorio", "broll-vo") else None
+        data["recording_format"] = _fmt if _fmt in REC_FORMAT_KEYS else None
+        # POV: el texto en pantalla solo se conserva si el formato es pov.
+        _pov = str(data.get("pov_text") or "").strip()
+        data["pov_text"] = _pov if (data["recording_format"] == "pov" and _pov) else None
 
     return data
 
 
 def _llm_call_provider(provider: str, system: str, user_content: str,
-                       temperature: float, max_tokens: int) -> str:
-    """Una llamada a UN proveedor (openrouter | groq). Devuelve texto crudo o levanta."""
+                       temperature: float, max_tokens: int, model: str = None) -> str:
+    """Una llamada a UN proveedor (openrouter | groq). Devuelve texto crudo o levanta.
+    `model` overridea el modelo de OpenRouter (p.ej. pro para generación); Groq usa el suyo."""
     if provider == "openrouter":
         api_key = OPENROUTER_API_KEY
         url = OPENROUTER_URL
-        model = OPENROUTER_MODEL
+        model = model or OPENROUTER_MODEL
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -3522,7 +3532,7 @@ def _llm_call_provider(provider: str, system: str, user_content: str,
     return content.strip()
 
 
-def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_tokens: int = 20000) -> str:
+def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_tokens: int = 20000, model: str = None) -> str:
     """Genera con el LLM principal (OpenRouter) y, si falla, CAE A GROQ.
 
     Motivo (2026-06): OpenRouter se queda sin saldo y las peticiones grandes
@@ -3540,7 +3550,7 @@ def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_toke
     last_err = None
     for i, prov in enumerate(providers):
         try:
-            return _llm_call_provider(prov, system, user_content, temperature, max_tokens)
+            return _llm_call_provider(prov, system, user_content, temperature, max_tokens, model)
         except Exception as e:
             last_err = e
             has_more = i + 1 < len(providers)
@@ -3888,7 +3898,7 @@ def refine_voice_from_own_scripts(user_id, brand_id=None):
         logger.warning("refine_voice_from_own_scripts failed user=%s", user_id, exc_info=True)
 
 
-REC_FORMAT_KEYS = ("selfie", "pizarra", "podcast", "escritorio", "broll-vo")
+REC_FORMAT_KEYS = ("selfie", "pizarra", "podcast", "escritorio", "broll-vo", "pov")
 
 
 def classify_reel_format(caption, transcript, duration_sec=None):
@@ -3904,11 +3914,12 @@ def classify_reel_format(caption, transcript, duration_sec=None):
     except (TypeError, ValueError):
         dur = "desconocida"
     system = ("Clasificas el FORMATO de grabación de un reel. Responde SOLO un JSON "
-              '{"formato":"<una de: selfie|pizarra|podcast|escritorio|broll-vo>"}. '
+              '{"formato":"<una de: selfie|pizarra|podcast|escritorio|broll-vo|pov>"}. '
               "selfie=persona hablando a cámara (talking head). pizarra=explica escribiendo/"
               "dibujando. podcast=conversación sentada con micrófono a la vista. "
               "escritorio=grabación de pantalla/tutorial digital. broll-vo=imágenes de apoyo "
-              "con voz en off, sin presentador a cámara.")
+              "con voz en off, sin presentador a cámara. pov=primera persona/cámara subjetiva "
+              "con texto sobreimpreso en pantalla (el clásico «POV: ...»).")
     user = "Duración: %s.\nTranscripción/caption del reel:\n%s" % (dur, text)
     try:
         raw = (_call_llm(system, user, temperature=0, max_tokens=40) or "").strip()
@@ -4034,7 +4045,8 @@ def underperformers_signal(user_id):
     return ", ".join(sig) if sig else None
 
 
-def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, user_id=None, brand_id=None) -> dict:
+def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, user_id=None, brand_id=None,
+                  model: str = None, temperature: float = 0.8, extra_directive: str = "") -> dict:
     if style == "custom":
         if not custom_prompt:
             raise ValueError("Escribe tus instrucciones en el campo Custom")
@@ -4068,9 +4080,52 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
         system = (system + ctx +
                   "\n\nIMPORTANTE: lo anterior es CONTEXTO (voz, ejemplos, método). Responde SOLO "
                   "con el JSON pedido. No copies los ejemplos literalmente: imita el PATRÓN.")
+    if extra_directive:
+        system += "\n\n" + extra_directive
 
-    raw = _call_llm(system, text)
+    raw = _call_llm(system, text, temperature=temperature, model=model)
     return _parse_ai_json(raw, style)
+
+
+def _shape_script_option(res):
+    """De un dict de adapt_with_ai → opción para la UI: hooks (2-3), body, cierre, texto
+    plano (lo que se guarda) + título."""
+    hooks = [res.get("hook")] + list(res.get("alt_hooks") or [])
+    hooks = [str(h).strip() for h in hooks if h and str(h).strip()][:3]
+    body = res.get("body") or []
+    closing = res.get("closing") or ""
+    flat = (str(res.get("hook") or "") + "\n" + "\n".join(str(x) for x in body) +
+            ("\n" + closing if closing else "")).strip()
+    return {"title": str(res.get("title") or "")[:80], "hooks": hooks,
+            "body": [str(x) for x in body], "closing": str(closing), "script": flat}
+
+
+def _generate_script_options(user_content, style_arg, custom_prompt, uid, brand_id, n=2):
+    """Genera N opciones de guion COMPLETAS en PARALELO (modelo de generación = pro),
+    reusando método + voz + few-shot. La opción B pide un ángulo/estructura distintos.
+    recording_format + pov_text se toman de la opción A. Wall-time ≈ una sola llamada.
+    Si B falla, degrada a 1 opción. La voz se lee UNA vez y se comparte (menos DB)."""
+    import concurrent.futures
+    voice = get_voice_profile(uid, brand_id)
+    def _gen(temp, directive):
+        return adapt_with_ai(user_content, style_arg, custom_prompt, voice=voice,
+                             user_id=uid, brand_id=brand_id, model=GENERATION_MODEL,
+                             temperature=temp, extra_directive=directive)
+    dirB = ("Esta es la OPCIÓN B (alternativa para que el usuario elija): usa un ÁNGULO de "
+            "entrada y una ESTRUCTURA claramente DISTINTOS a una versión estándar — otro tipo "
+            "de gancho, otro desarrollo — igual de potente. No repitas la versión obvia.")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(2, n)) as ex:
+        fA = ex.submit(_gen, 0.8, "")
+        fB = ex.submit(_gen, 0.95, dirB) if n >= 2 else None
+        a = fA.result()                     # si A falla, propaga → el caller hace refund
+        b = None
+        if fB is not None:
+            try:
+                b = fB.result()
+            except Exception as e:
+                logger.warning("_generate_script_options: opción B falló (degrada a 1): %s", e)
+    raw_opts = [a] + ([b] if b else [])
+    return raw_opts
 
 
 @app.route("/save-script", methods=["POST"])
@@ -9829,10 +9884,9 @@ def generate_script_from_competitor_reel(reel_id: str):
             except Exception as e:
                 logger.error("generate_script: refund failed user=%s err=%s", uid, e)
 
-        # LLM call.
+        # LLM call — 2 OPCIONES de guion (el usuario elige), modelo de generación = pro.
         try:
-            result = adapt_with_ai(user_content, style_arg, custom_prompt,
-                                   voice=get_voice_profile(uid, gen_pid), user_id=uid, brand_id=gen_pid)
+            raw_opts = _generate_script_options(user_content, style_arg, custom_prompt, uid, gen_pid, n=2)
         except Exception as e:
             logger.error("generate_script: LLM failed user=%s err=%s", uid, e, exc_info=True)
             _refund()
@@ -9850,22 +9904,12 @@ def generate_script_from_competitor_reel(reel_id: str):
             return jsonify({"error": "llm_error",
                             "message": "No se pudo generar el guion. Inténtalo de nuevo."}), 502
 
-        # Flatten + título (mismo patrón que transcription_to_script).
-        llm_title = ""
-        rec_fmt = result.get("recording_format") if isinstance(result, dict) else None  # ítem 10
-        if isinstance(result, dict) and result.get("title"):
-            llm_title = str(result["title"]).strip()[:80]
-        if isinstance(result, dict) and "hook" in result:
-            flat = (result["hook"] + "\n" +
-                    "\n".join(result.get("body", [])) + "\n" +
-                    result.get("closing", ""))
-            result = flat.strip()
-        elif isinstance(result, dict) and isinstance(result.get("hooks"), list):
-            result = "\n".join(h.get("text", "") for h in result["hooks"]
-                               if isinstance(h, dict) and h.get("text")).strip()
-        elif not isinstance(result, str):
-            result = str(result)
-
+        # Estructura: opciones para la UI + formato/POV de la opción A. Se guarda la A.
+        options = [_shape_script_option(r) for r in raw_opts]
+        rec_fmt = raw_opts[0].get("recording_format") if isinstance(raw_opts[0], dict) else None  # ítem 10
+        pov_text = raw_opts[0].get("pov_text") if isinstance(raw_opts[0], dict) else None
+        llm_title = options[0]["title"]
+        result = options[0]["script"]
         today_short = _dt.now(timezone.utc).strftime("%d %b %Y").lower()
         script_title = llm_title or f"Guion desde @{ig_username} · {today_short}"
         script_id = None
@@ -9948,6 +9992,8 @@ def generate_script_from_competitor_reel(reel_id: str):
             "title": script_title,
             "from_competitor_username": ig_username,
             "recording_format": rec_fmt,   # ítem 10: formato sugerido para grabarlo
+            "pov_text": pov_text,          # texto en pantalla si el formato es POV
+            "options": options,            # 2 opciones de guion (cada una con 2-3 hooks)
         }), 200
 
     # ── Flow asíncrono ─────────────────────────────────────────────────
@@ -10069,6 +10115,9 @@ def task_script_status(task_id: str):
                 "script_id": result.get("script_id"),
                 "title": result.get("title"),
                 "from_competitor_username": result.get("from_competitor_username"),
+                "recording_format": result.get("recording_format"),
+                "pov_text": result.get("pov_text"),
+                "options": result.get("options"),
             })
         # ok=False → task terminó con error controlado.
         return jsonify({
