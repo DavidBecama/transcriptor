@@ -124,6 +124,13 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.send_growth_nudges",
         "schedule": crontab(day_of_week=3, hour=10, minute=0),
     },
+    # Backfill del FORMATO de los reels scrapeados antes de la columna (formato IS NULL):
+    # los clasifica por lotes (caption/transcript, flash) para que la tarjeta «FORMATO
+    # SUGERIDO» tenga referencias del pool. Cada 12 min hasta vaciar; luego no-op.
+    "backfill-reel-formats": {
+        "task": "tasks.backfill_reel_formats",
+        "schedule": crontab(minute="*/12"),
+    },
 }
 celery_app.conf.timezone = "UTC"
 
@@ -1659,8 +1666,9 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                 else:
                     is_stale = True
 
+            have_lock = False
             if transcript_status != "transcribing" or is_stale:
-                # Adquirir lock (UPDATE simple — race trivial aceptable).
+                # Adquirir lock (UPDATE simple — race trivial aceptable). NOSOTROS transcribimos.
                 now_iso = datetime.now(timezone.utc).isoformat()
                 try:
                     db.table("creator_reels_global").update({
@@ -1668,14 +1676,16 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                         "transcript_started_at": now_iso,
                         "transcript_error": None,
                     }).eq("id", reel_id).execute()
+                    have_lock = True
                 except Exception as e:
                     logger.exception("gen_script_task lock UPDATE failed reel=%s: %s", reel_id, e)
                     return _fail("db_error", "Error preparando la transcripción.")
                 transcript_text = ""
             else:
-                # Otra task fresca está transcribiendo → poll BD hasta 'ok' o 'failed'.
+                # Otra task fresca está transcribiendo → poll BD hasta 'ok'. Si la otra falla
+                # o agotamos el poll, NO volvemos a descargar (evita doble coste): caemos al
+                # fallback de caption (gate al final). have_lock=False → no descarga.
                 self.update_state(state="PROGRESS", meta={"step": "waiting_other"})
-                polled = False
                 for _ in range(_TRANSCRIBE_POLL_MAX_SEC // 5):
                     time.sleep(5)
                     try:
@@ -1686,17 +1696,14 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                                   .execute())
                         if re_r.data and re_r.data.get("transcript_status") == "ok":
                             transcript_text = (re_r.data.get("transcript") or "").strip()
-                            polled = True
                             break
                         if re_r.data and re_r.data.get("transcript_status") == "failed":
-                            return _fail("transcribe_failed", "No se pudo procesar este reel.")
+                            break
                     except Exception:
                         pass
-                if not polled:
-                    return _fail("transcribe_timeout", "La transcripción tardó demasiado. Inténtalo de nuevo.")
 
-            # Si tenemos el lock, transcribir.
-            if not transcript_text:
+            # Solo descarga+transcribe quien tiene el lock y aún no tiene texto.
+            if have_lock and not transcript_text:
                 self.update_state(state="PROGRESS", meta={"step": "transcribing"})
                 url = "https://www.instagram.com/reel/{}/".format(reel["ig_reel_id"])
                 try:
@@ -1719,20 +1726,9 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                         }).eq("id", reel_id).execute()
                     except Exception:
                         pass
-                    # RESILIENCIA (2026-06-24): si no se pudo BAJAR/transcribir el audio
-                    # (p.ej. Apify sin saldo → 403, o Instagram bloquea yt-dlp) PERO el reel
-                    # tiene un caption con sustancia, generamos el guion SOLO con el caption
-                    # en vez de fallar. Antes esto devolvía error y "robar no funcionaba"
-                    # cada vez que Apify estaba caído. transcript_text="" → bloque caption-only.
-                    _cap = (reel.get("caption") or "").strip()
-                    if len(_cap) >= 40:
-                        logger.warning("gen_script_task: transcripción falló reel=%s → fallback a caption-only (%d chars)", reel_id, len(_cap))
-                        transcript_text = ""
-                    else:
-                        return _fail("transcribe_error", "No se pudo procesar este reel.")
+                    transcript_text = ""   # → fallback a caption (gate único más abajo)
 
-                # Guardar transcript en cache (SOLO si lo conseguimos; en fallback a
-                # caption-only transcript_text="" → no pisar el status 'failed' con un 'ok' vacío).
+                # Guardar transcript en cache SOLO si lo conseguimos.
                 if transcript_text:
                     try:
                         db.table("creator_reels_global").update({
@@ -1742,6 +1738,16 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                         }).eq("id", reel_id).execute()
                     except Exception as e:
                         logger.exception("gen_script_task save transcript failed reel=%s: %s", reel_id, e)
+
+        # GATE ÚNICO (bug «videos antiguos no se pueden robar»): toda ruta sin transcript
+        # converge aquí. Si hay caption con sustancia → caption-only; si no hay nada
+        # transcribible NI caption usable → fallo honesto (única vía de _fail).
+        if not transcript_text:
+            _cap_g = (reel.get("caption") or "").strip()
+            if len(_cap_g) >= 25:
+                logger.warning("gen_script_task: sin transcript reel=%s → caption-only (%d chars)", reel_id, len(_cap_g))
+            else:
+                return _fail("transcribe_error", "Este reel no tiene audio transcribible ni texto suficiente para generar.")
 
         # 4. Generar guion vía adapt_with_ai (lazy import).
         self.update_state(state="PROGRESS", meta={"step": "generating_script"})
@@ -2071,6 +2077,64 @@ def transcribe_reel_task(self, reel_id):
     except Exception:
         logger.warning("transcribe_reel classify failed reel=%s", reel_id, exc_info=True)
     return {"ok": True, "transcript": transcript_text}
+
+
+_BACKFILL_FORMAT_BATCH = int(os.environ.get("BACKFILL_FORMAT_BATCH", "60"))
+
+
+@celery_app.task(name="tasks.backfill_reel_formats")
+def backfill_reel_formats():
+    """Backfill del FORMATO de reels scrapeados antes de la columna (formato IS NULL).
+    Clasifica por lotes (caption + transcript si lo hay, modelo flash) para que la
+    tarjeta «FORMATO SUGERIDO» tenga referencias del pool global. Idempotente:
+    cuando ya no quedan NULL con texto, es no-op. Best-effort por reel."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        rows = (db.table("creator_reels_global")
+                  .select("id, caption, transcript, video_duration_sec")
+                  .is_("formato", "null").eq("is_archived", False)
+                  .order("views", desc=True)            # los más vistos primero (mejores referencias)
+                  .limit(_BACKFILL_FORMAT_BATCH).execute()).data or []
+    except Exception as e:
+        # Columna sin migrar u otro fallo → no-op silencioso.
+        if "formato" not in str(e).lower():
+            logger.warning("backfill_reel_formats select failed: %s", e)
+        return {"ok": False, "classified": 0}
+    if not rows:
+        return {"ok": True, "classified": 0, "done": True}
+
+    try:
+        from app import classify_reel_format
+    except Exception as e:
+        logger.exception("backfill_reel_formats import failed: %s", e)
+        return {"ok": False, "classified": 0}
+
+    classified = 0
+    for r in rows:
+        cap = (r.get("caption") or "").strip()
+        tx = (r.get("transcript") or "").strip()
+        if not cap and not tx:
+            # Sin texto que clasificar → marca 'desconocido' para no reintentar siempre.
+            try:
+                db.table("creator_reels_global").update({"formato": "desconocido"}).eq("id", r["id"]).execute()
+            except Exception:
+                pass
+            continue
+        try:
+            fmt = classify_reel_format(cap, tx, r.get("video_duration_sec"))
+        except Exception:
+            fmt = None
+        try:
+            db.table("creator_reels_global").update(
+                {"formato": fmt or "desconocido"}).eq("id", r["id"]).execute()
+            if fmt:
+                classified += 1
+        except Exception as e:
+            logger.warning("backfill_reel_formats update failed reel=%s: %s", r.get("id"), e)
+    logger.info("backfill_reel_formats: lote de %d, clasificados=%d", len(rows), classified)
+    return {"ok": True, "classified": classified, "batch": len(rows)}
 
 
 # Limpia 2 estados huérfanos cada 5min vía Celery beat:

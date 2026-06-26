@@ -10620,11 +10620,13 @@ def reels_by_format():
                 if e["id"] not in seen:
                     seen.add(e["id"]); picked.append(e)
 
-        # 2) si hay pocos, completa con el pool GLOBAL del mismo formato.
-        if len(picked) < 2:
+        # 2) completa SIEMPRE con el pool GLOBAL del mismo formato (todos los reels
+        #    clasificados, no solo los competidores del usuario) → así siempre hay
+        #    ejemplos de cada formato aunque siga a pocos competidores.
+        if len(picked) < 4:
             glob = (db.table("creator_reels_global").select(SEL)
                       .eq("formato", fmt).eq("is_archived", False)
-                      .order("views", desc=True).limit(20).execute()).data or []
+                      .order("views", desc=True).limit(40).execute()).data or []
             gbase = _creator_view_baselines(list({r.get("creator_id") for r in glob}))
             for e in _pack(glob, gbase):
                 if e["id"] not in seen:
