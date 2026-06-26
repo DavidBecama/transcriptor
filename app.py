@@ -701,6 +701,20 @@ except Exception as _e:
 limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["200 per hour"], storage_uri=_RATE_STORE)
 
 
+def _user_rate_key():
+    """Clave de rate-limit POR USUARIO (no por IP) para endpoints autenticados: varios
+    usuarios tras la MISMA IP (oficinas/CGNAT/móvil, o testeo con varias cuentas) no se
+    pisan el cupo (antes un 429 por IP bloqueaba a todos). El abuso real lo frena la
+    economía (free = 3 guiones/día + créditos), no este límite. Cae a IP si no hay sesión."""
+    try:
+        u = current_user()
+        if u and u.get("id"):
+            return "u:" + u["id"]
+    except Exception:
+        pass
+    return get_remote_address()
+
+
 def acquire_credit_lock(uid: str, ttl: int = 8, wait_s: float = 4.0):
     """Lock distribuido por-usuario para serializar el gasto de créditos entre
     workers (evita doble-gasto en la carrera read-then-write). Devuelve un token
@@ -9630,7 +9644,7 @@ def leaderboard():
 
 @app.route("/api/competitors/reels/<reel_id>/generate-script", methods=["POST"])
 @require_auth
-@limiter.limit("5 per minute;20 per day")
+@limiter.limit("5 per minute;20 per day", key_func=_user_rate_key)   # por USUARIO, no por IP
 def generate_script_from_competitor_reel(reel_id: str):
     """Genera un guion ejecutable a partir de un reel de un competidor del
     usuario. Híbrido sync/async:
