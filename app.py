@@ -1,9 +1,13 @@
 """Transcriptor — Flask app con Supabase, créditos y Apify."""
 
-# Monkey-patch debe ir ANTES de cualquier import de requests/ssl/socket para que
-# gevent pueda reemplazarlos. Gunicorn gevent worker ya lo aplica, pero añadirlo
-# aquí garantiza cobertura en tests locales y ejecución directa con `python app.py`.
-from gevent import monkey as _gmonkey; _gmonkey.patch_all()
+# Monkey-patch SOLO si ssl aún NO está importado. Si ya lo está (el CELERY WORKER importa
+# requests/yt_dlp en tasks.py ANTES de importar app), parchear ssl AHORA es TARDE → gevent
+# envuelve un ssl ya cargado → RecursionError en TODO HTTPS del worker (descarga + LLM).
+# El web ya lo parchea bien vía gunicorn `--worker-class gevent` (antes de importar app);
+# en runs locales `python app.py` ssl aún no está → se parchea normal.
+import sys as _sys
+if "ssl" not in _sys.modules:
+    from gevent import monkey as _gmonkey; _gmonkey.patch_all()
 
 import json
 import logging
