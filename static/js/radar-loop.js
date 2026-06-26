@@ -4360,16 +4360,17 @@
   }
   // Ítem 10: FORMATO DE GRABACIÓN sugerido. El LLM clasifica el reel original en uno de
   // estos 5; aquí va la copia "cómo hacerlo" + icono (la clasificación NO se inventa).
+  // Lista CERRADA (display name + «grábalo así») — receta, no etiqueta suelta.
   var REC_FORMATS={
-    selfie:{label:L("Selfie a cámara","Selfie to camera"),how:L("Cámara frontal, tú hablando directo. El hook, a los ojos.","Front camera, talking straight to it. Hook, eye to eye."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'},
-    pizarra:{label:L("Pizarra","Whiteboard"),how:L("Escribe o dibuja la idea mientras la cuentas.","Write or draw the idea as you tell it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'},
-    podcast:{label:L("Podcast","Podcast"),how:L("Plano sentado, micro a la vista, tono conversación.","Seated shot, mic in frame, conversational tone."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>'},
-    escritorio:{label:L("Pantalla / escritorio","Screen / desktop"),how:L("Graba la pantalla mostrando el cómo, tu voz encima.","Screen-record the how-to, voice over it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'},
-    "broll-vo":{label:L("B-roll + voz en off","B-roll + voiceover"),how:L("Imágenes de apoyo + tu voz narrando. Sin salir tú.","Cutaway footage + your narration. No on-camera you."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>'},
-    pov:{label:L("POV + B-rolls","POV + B-rolls"),how:L("Cámara en 1ª persona + texto sobreimpreso en pantalla. Intercala B-rolls.","First-person camera + on-screen text overlay. Cut in B-roll."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'}
+    selfie:{label:L("Selfie hablado","Talking selfie"),how:L("A cámara, tú hablando directo.","To camera, talking straight to it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'},
+    pizarra:{label:L("Pizarra","Whiteboard"),how:L("Escribiendo a mano mientras explicas.","Writing by hand as you explain."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'},
+    escritorio:{label:L("Escritorio / pantalla","Screen / desktop"),how:L("Grabas la pantalla, tu voz encima.","Screen-record, your voice over it."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'},
+    podcast:{label:L("Clip de podcast","Podcast clip"),how:L("Cara a cara, formato conversación.","Face to face, conversation format."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>'},
+    "broll-vo":{label:L("B-roll + voz en off","B-roll + voiceover"),how:L("Imágenes de recurso, tú narrando.","Stock/cutaway footage, you narrating."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>'},
+    pov:{label:L("POV + texto","POV + text"),how:L("Plano POV con texto en pantalla.","POV shot with on-screen text."),ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'}
   };
   function _recFmtDemo(r){ var s=_durSec(r&&r.dur||"")||0; var keys=["selfie","pizarra","podcast","escritorio","broll-vo","pov"];
-    if(s>=90) return "podcast"; if(s>0&&s<=18) return "pov"; return keys[_lbHash((r&&(r.id||r.cap))||"x",0,keys.length)]; }
+    if(s>=90) return "podcast"; if(s>0&&s<=40) return "pov"; return keys[_lbHash((r&&(r.id||r.cap))||"x",0,keys.length)]; }
   // Carga EJEMPLOS reales del pool con el mismo formato (cacheado, sin scrape). 1 vez por formato.
   function loadFormatExamples(fmt){
     if(!fmt) return;
@@ -4395,7 +4396,8 @@
     if(!st||st.loading) return '<div class="recfmt-ex-wait"><span class="rs-ldr"></span> '+L("Buscando referencias…","Finding references…")+'</div>';
     if(!st.examples.length) return '<div class="recfmt-ex-empty">'+L("Aún sin referencias de este formato en tu radar.","No references of this format in your radar yet.")+'</div>';
     var cells=st.examples.slice(0,2).map(function(e){   // 2 vídeos prominentes a la derecha
-      var thumb=e.thumb?('<img src="'+ESC(e.thumb)+'" alt="" loading="lazy">'):('<div class="recfmt-ex-ph">'+_icPlay+'</div>');
+      // onerror: si la miniatura no existe (404), se oculta y queda el placeholder de fondo.
+      var thumb=e.thumb?('<img src="'+ESC(e.thumb)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'):('<div class="recfmt-ex-ph">'+_icPlay+'</div>');
       var mult=(e.explosion!=null)?('<span class="recfmt-ex-mult">'+IC.bolt+' '+ESC(String(e.explosion))+'×</span>'):'';
       var inner='<div class="recfmt-ex-thumb">'+thumb+mult+'<span class="recfmt-ex-play">'+_icPlay+'</span></div><div class="recfmt-ex-h">@'+ESC(e.handle||"")+'</div>';
       return e.url

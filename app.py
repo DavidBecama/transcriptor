@@ -10566,6 +10566,31 @@ def _explosion_score(views, baseline):
     return round(float(views or 0) / float(baseline), 2)
 
 
+@app.route("/img/reel/<reel_id>")
+def reel_thumb(reel_id):
+    """Sirve la MINIATURA de un reel SIEMPRE desde reelscript.net (nunca hotlink al CDN
+    de IG, cuyas URLs firmadas caducan → ERR_CONNECTION_TIMED_OUT). Lee el data-URI
+    cacheado (creator_reels_global.thumb_b64), lo decodifica y lo entrega como imagen
+    con cache largo. 404 si no hay miniatura (el front muestra placeholder)."""
+    try:
+        r = db.table("creator_reels_global").select("thumb_b64").eq("id", reel_id).single().execute()
+        b64 = ((r.data or {}).get("thumb_b64") or "")
+    except Exception:
+        b64 = ""
+    if not b64.startswith("data:image"):
+        return "", 404
+    try:
+        import base64 as _b64
+        header, payload = b64.split(",", 1)
+        raw = _b64.b64decode(payload)
+        mime = header.split(";")[0].split(":", 1)[1] or "image/jpeg"
+    except Exception:
+        return "", 404
+    resp = app.response_class(raw, mimetype=mime)
+    resp.headers["Cache-Control"] = "public, max-age=604800, immutable"   # 7 días
+    return resp
+
+
 @app.route("/api/reels/by-format", methods=["GET"])
 @require_auth
 def reels_by_format():
@@ -10580,7 +10605,8 @@ def reels_by_format():
         return jsonify({"error": "bad_format"}), 400
     exclude = (request.args.get("exclude") or "").strip()
     project_id = request.args.get("project_id")
-    SEL = ("id, ig_reel_id, creator_id, views, thumb_url, thumb_b64, video_duration_sec, "
+    # SEL ligero: NO traemos thumb_b64 (pesado); la miniatura se sirve por /img/reel/<id>.
+    SEL = ("id, ig_reel_id, creator_id, views, video_duration_sec, "
            "creator:creators_global(ig_username)")
 
     def _pack(rows, baselines):
@@ -10595,7 +10621,8 @@ def reels_by_format():
                 "id": rid,
                 "ig_reel_id": sc,
                 "handle": cr.get("ig_username") or "",
-                "thumb": r.get("thumb_b64") or r.get("thumb_url"),
+                # SIEMPRE desde reelscript.net (nunca hotlink IG). 404 → placeholder en el front.
+                "thumb": "/img/reel/%s" % rid,
                 "url": ("https://www.instagram.com/reel/%s/" % sc) if sc else None,
                 "explosion": _explosion_score(r.get("views"), baselines.get(r.get("creator_id"))),
             })
