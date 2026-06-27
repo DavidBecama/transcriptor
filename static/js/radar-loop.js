@@ -1665,60 +1665,53 @@
     else a.sort(function(x,y){return (y.explosion||0)-(x.explosion||0);});
     return a;
   }
-  // FEED MIXTO (v1): un solo feed que intercala (a) reels de competidores que sigues +
-  // (b) descubrimiento del nicho que NO sigues + (c) tarjetas de sugerencia de creador.
-  // El ORDEN de los reels lo rota el backend a diario; aquí solo intercalamos por patrón
-  // determinista (descubrimiento cada 4º, sugerencia cada 7º). Dedup de descubrimiento
-  // por creador vs lo ya presente. Si un stream se agota, el hueco cae al otro.
-  function mixedFeed(limit){
-    limit=limit||12;
-    var reels=feedReels();
-    var disc=(Array.isArray(S.discover)?S.discover:[]).slice();
-    var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
-      return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
-    var sugg=suggestedList().filter(function(c){ return tracked.indexOf(String(c.handle||"").toLowerCase())<0; });
-    var seen={}; reels.forEach(function(r){ var h=r.creator&&r.creator.handle; if(h) seen[h.toLowerCase()]=1; });
-    disc=disc.filter(function(r){ var h=r.creator&&r.creator.handle; if(!h) return true; var k=h.toLowerCase(); if(seen[k]) return false; seen[k]=1; return true; });
-    var out=[], ri=0, di=0, si=0, i=0;
-    while(out.length<limit && (ri<reels.length || di<disc.length || si<sugg.length)){
-      if(i%7===6 && si<sugg.length) out.push({kind:"sugg", s:sugg[si++]});
-      else if(i%4===3 && di<disc.length) out.push({kind:"disc", r:disc[di++]});
-      else if(ri<reels.length) out.push({kind:"reel", r:reels[ri++]});
-      else if(di<disc.length) out.push({kind:"disc", r:disc[di++]});
-      else if(si<sugg.length) out.push({kind:"sugg", s:sugg[si++]});
-      else break;
-      i++;
-    }
-    return out;
+  // «Sugerencias de hoy»: sección PROPIA (no en el feed) con creadores NUEVOS del nicho
+  // que petan y el user no sigue. Carga 1 vez (real; demo no la muestra). Excluye seguidos
+  // y descartados en backend; el front re-filtra seguidos por si acaba de añadir uno.
+  function loadSuggestionsToday(){
+    if(isDemo() || S._stDismissed || S._stLoading || Array.isArray(S._suggToday)) return;
+    S._stLoading=true;
+    var _p=_pidOf(S.brandId);
+    apiGet("/api/radar/suggestions?limit=12"+(_p?("&project_id="+encodeURIComponent(_p)):"")).then(function(r){
+      S._stLoading=false;
+      S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions))?r.d.suggestions:[];
+      if(S.tab==="dashboard") render();
+    });
   }
-  // Reel de DESCUBRIMIENTO: misma card que un competidor + badge «no lo sigues» (robarlo
-  // auto-sigue al creador, igual que en el descubrimiento standalone).
-  function discReelCardHTML(r, thumb){
-    return '<div class="crd-disc">'+
-      '<span class="crd-disc-tag">'+IC.bolt+' '+L("Petando · no lo sigues","Blowing up · not followed")+'</span>'+
-      competitorReelCardHTML(r, thumb)+
-    '</div>';
-  }
-  // Tarjeta de SUGERENCIA en el feed: «este aún no lo sigues, añádelo» + descartar.
-  function suggCardHTML(c){
+  // Tarjeta de creador sugerido (vertical, para el carrusel): miniatura de su reel que peta
+  // + @handle + por qué + «Añadir al radar» + descartar. Layout limpio (no se rompe).
+  function suggTodayCardHTML(c){
     if(!c||!c.handle) return '';
-    var why=c.why||L(c.why_es,c.why_en); var tag=c.tag||L(c.tag_es,c.tag_en);
-    var whyCap=why?(why.charAt(0).toUpperCase()+why.slice(1)):"";
-    return '<div class="crd crd--sugg">'+
-      '<div class="sugg-comp sugg-comp--feed">'+
-        onbAvatar(c.handle)+
-        '<div class="sugg-body">'+
-          '<div class="sugg-tag">'+IC.spark+' '+L("Aún no lo sigues","Not followed yet")+(tag?' · '+ESC(tag):'')+'</div>'+
-          '<div class="sugg-h">@'+ESC(c.handle)+' <span class="sugg-x">'+ESC(c.x||"")+'</span></div>'+
-          '<div class="sugg-why">'+(whyCap?ESC(whyCap)+'. ':'')+L("Añádelo y sus reels entran en tu radar.","Add them and their reels enter your radar.")+'</div>'+
-        '</div>'+
-        (c.reel&&c.reel.thumb?'<div class="sugg-reel" title="'+L("Su reel que está petando","Their reel that's blowing up")+'"><img src="'+ESC(c.reel.thumb)+'" alt="" loading="lazy"/>'+(c.reel.exp?'<span class="sugg-reel-exp">'+IC.bolt+' '+ESC(String(Math.round(c.reel.exp*10)/10))+'×</span>':'')+'</div>':'')+
-        '<div class="sugg-actions">'+
-          '<button class="btn btn-sm btn-secondary" data-act="add-suggested" data-id="'+ESC(c.handle)+'">'+IC.plus+' '+L("Añadir","Add")+'</button>'+
-          '<button class="crd-btn sugg-x-btn" data-act="sugg-dismiss-one" data-id="'+ESC(c.handle)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
+    var why=c.why||L(c.why_es,c.why_en); var whyCap=why?(why.charAt(0).toUpperCase()+why.slice(1)):"";
+    var thumb=c.reel&&c.reel.thumb, exp=c.reel&&c.reel.exp;
+    var media=thumb?('<img src="'+ESC(thumb)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'):'';
+    return '<article class="stday-card">'+
+      '<div class="stday-thumb" style="background:'+_galGrad(c.handle)+'">'+media+
+        (exp?'<span class="stday-exp">'+IC.bolt+' '+ESC(String(Math.round(exp*10)/10))+'×</span>':'')+
+        '<span class="stday-at">@'+ESC(c.handle)+'</span>'+
+      '</div>'+
+      '<div class="stday-body">'+
+        '<div class="stday-why">'+ESC(whyCap)+'</div>'+
+        '<div class="stday-acts">'+
+          '<button class="btn btn-sm btn-primary stday-add" data-act="add-suggested" data-id="'+ESC(c.handle)+'">'+IC.plus+' '+L("Añadir al radar","Add to radar")+'</button>'+
+          '<button class="stday-x" data-act="sugg-dismiss-one" data-id="'+ESC(c.handle)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
         '</div>'+
       '</div>'+
-    '</div>';
+    '</article>';
+  }
+  // Sección «Sugerencias de hoy» (fila/carrusel). Vacía/oculta en demo y si no hay nada.
+  function suggestionsTodayHTML(){
+    if(isDemo() || S._stDismissed) return '';
+    var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
+      return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
+    var list=(Array.isArray(S._suggToday)?S._suggToday:[]).filter(function(c){ return tracked.indexOf(String(c.handle||"").toLowerCase())<0; });
+    if(!list.length) return '';
+    var cards=list.slice(0,12).map(suggTodayCardHTML).join("");
+    return '<section class="stday-sec">'+
+      '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+' <span class="stday-tag">'+L("creadores nuevos que están petando","new creators blowing up right now")+'</span></span>'+
+        '<button class="sugg-hide" data-act="st-dismiss-all">'+L("Ocultar","Hide")+'</button></div>'+
+      '<div class="stday-row">'+cards+'</div>'+
+    '</section>';
   }
 
   // ── GALERÍAS de miniaturas + modal Comunidad (port de Leonard, restylado v3) ──
@@ -1851,15 +1844,10 @@
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
     '</div>';
-    // Sin filtro de competidor → FEED MIXTO (competidor + descubrimiento + sugerencia).
-    // Con filtro activo → solo reels de ese competidor (sin intercalar).
-    var items=active ? reels.slice(0,12).map(function(r){ return {kind:"reel", r:r}; }) : mixedFeed(12);
-    var body = items.length
-      ? '<div class="rgal-track crd-track">'+items.map(function(it,i){
-          if(it.kind==="sugg") return suggCardHTML(it.s);
-          if(it.kind==="disc") return discReelCardHTML(it.r, imgs?imgs[i%imgs.length]:null);
-          return competitorReelCardHTML(it.r, imgs?imgs[i%imgs.length]:null);
-        }).join("")+'</div>'
+    // El feed principal = SOLO reels de competidores que sigues. El descubrimiento y las
+    // sugerencias viven en su sección propia «Sugerencias de hoy» (suggestionsTodayHTML).
+    var body = reels.length
+      ? '<div class="rgal-track crd-track">'+reels.slice(0,12).map(function(r,i){ return competitorReelCardHTML(r, imgs?imgs[i%imgs.length]:null); }).join("")+'</div>'
       : '<div class="rgal-empty"><span class="rgal-empty-h">'+L("Nada que robar aquí… todavía","Nothing to steal here… yet")+'</span><span class="rgal-empty-s">'+L("Este competidor no tiene reels explosivos esta semana.","This competitor has no explosive reels this week.")+'</span></div>';
     return '<section class="rgal">'+
       '<div class="rgal-comps-head"><span class="rgal-comps-t">'+L("Competidores en el radar","Competitors on the radar")+'</span>'+
@@ -2226,6 +2214,7 @@
       dashboardNextStepHTML()+   // #8 PROACTIVIDAD: «HAZ ESTO AHORA» — la acción más útil ya
       opportunityCarouselHTML(heroN)+   // OPORTUNIDAD justo tras el hero (acción sobre el fold)
       (S.reels.length?competitorGalleryHTML():"")+   // competidores (chips) + galería (mockup David)
+      suggestionsTodayHTML()+    // «Sugerencias de hoy»: creadores NUEVOS del nicho que petan (sección propia)
       radarCerebroRowHTML()+     // progreso/cerebro (nivel + barra + Crear guion)
       (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+   // llena mi semana
       // ── bloques bajo la espina (recortados por decisión del usuario) ──
@@ -2233,9 +2222,9 @@
       (S.reels.length?radarAddBarHTML():"")+   // añadir competidor/reel + actualizar  ← SE QUEDA
       (S.reels.length?trackedManageHTML():"")+ // «Tus competidores» con × para quitar (re-añadido: ver/gestionar a quién sigues sin tener que vaciar el radar)
       seedBannerHTML()+           // aviso «esto petó en tu nicho» (solo radar-seed, demo vacío)
-      // v1 feed mixto: el descubrimiento y las sugerencias de creador ya van INTERCALADOS
-      // en la galería (mixedFeed) → las secciones standalone se retiran para no duplicar.
-      // El muro free de competidores sigue activo al INTENTAR añadir (handler add-suggested).
+      // v2: el feed principal = solo competidores; el descubrimiento de creadores nuevos
+      // vive arriba en «Sugerencias de hoy» (suggestionsTodayHTML). El cap free sigue al
+      // INTENTAR añadir (handler add-suggested).
       (S.reels.length?communityGalleryHTML():"")+   // «Creaciones de la comunidad»    ← SE QUEDA
       // QUITADOS (mockup David / petición usuario): trackedManageHTML (Tus competidores),
       // activationProgressHTML (Activa tu cuenta), voiceOnboardCardHTML (Enséñame tu voz),
@@ -5142,8 +5131,10 @@
     // NO disparar durante el onboarding/offer/carga (S.tab ya es "dashboard" ahí): si no,
     // al resolver hacen render() y reconstruyen el cofre → las cartas parpadean.
     var _onbBusy=(S._onbWaiting||S.onbStealOffer||showOnboarding());
-    if(S.tab==="dashboard" && !_onbBusy) loadSuggestion();   // sugerir competidores (real): carga 1 vez
-    if(S.tab==="dashboard" && !_onbBusy && Array.isArray(S.tracked) && S.tracked.length>0 && !S.radarSeed) loadDiscover();   // #5 descubrimiento del nicho
+    // «Sugerencias de hoy» (sección propia): creadores nuevos del nicho que petan. Carga 1
+    // vez cuando ya sigues a alguien (si no, el radar entero es seed). Reemplaza el viejo
+    // descubrimiento/sugerencia intercalado en el feed.
+    if(S.tab==="dashboard" && !_onbBusy && Array.isArray(S.tracked) && S.tracked.length>0 && !S.radarSeed) loadSuggestionsToday();
     // House-tour: lo arranca la ISLA la 1ª vez que aterrizas en el dashboard SIN onboarding
     // (post-cofre, o un usuario que ya onboardeó y no lo ha visto). Robusto: re-chequea los
     // targets justo antes. Sustituye al auto-start de index.html (que se colaba por timing).
@@ -6982,14 +6973,16 @@
     }
     if(act==="sugg-dismiss"){ S._suggDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
     if(act==="disc-dismiss"){ S._discDismissed=true; S.discover=[]; return render(); }   // #5 ocultar descubrimiento
-    if(act==="sugg-dismiss-one"){   // v1 feed: descartar UNA sugerencia (anti-repetición persistente)
+    if(act==="sugg-dismiss-one"){   // descartar UNA sugerencia (anti-repetición persistente)
       var dh=(btn.getAttribute("data-id")||"").toLowerCase();
+      if(Array.isArray(S._suggToday)) S._suggToday=S._suggToday.filter(function(c){ return String(c.handle||"").toLowerCase()!==dh; });
       if(Array.isArray(S._suggList)) S._suggList=S._suggList.filter(function(c){ return String(c.handle||"").toLowerCase()!==dh; });
       if(S._suggReal && String(S._suggReal.handle||"").toLowerCase()===dh) S._suggReal=null;
       render();
       if(!isDemo()){ var _pd=_pidOf(S.brandId); apiPost("/api/radar/suggestions/dismiss", _pd?{handle:dh, project_id:_pd}:{handle:dh}); }
       return;
     }
+    if(act==="st-dismiss-all"){ S._stDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
     if(act==="versus-start"){
       var opp=btn.getAttribute("data-id")||"rival";
       // oppAvg = media de views del competidor; mine = tu mejor reel.

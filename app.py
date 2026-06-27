@@ -9190,6 +9190,134 @@ def niche_discover():
     return jsonify({"reels": reels, "total": len(reels)}), 200
 
 
+def _niche_creator_suggestions(subniches, niche=None, exclude_creator_ids=None, limit=12):
+    """«Sugerencias de hoy»: CREADORES del nicho que el user NO sigue ni descartó, con un
+    reel PETANDO. Volumen objetivo ~8-12: empieza por subnicho, AMPLÍA por nicho amplio si
+    da pocos, y RELAJA el umbral de explosión si aún hay pocos. Reusa el pool YA scrapeado
+    (cero scrape). Devuelve [{creator_id, handle, why, x, tag, reel:{id,thumb,exp,views}}]."""
+    subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:8]
+    if not subs and niche:
+        subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(niche)) if t][:8]
+    exclude = set(exclude_creator_ids or [])
+    uname = {}
+    try:
+        if subs:
+            for c in (db.table("creators_global").select("id, ig_username")
+                        .overlaps("subniches", subs).limit(300).execute()).data or []:
+                if c.get("id"):
+                    uname[c["id"]] = c.get("ig_username") or ""
+    except Exception:
+        logger.warning("[sugg] subniche overlap failed (¿migración subniches?)")
+    # AMPLÍA por nicho amplio si el subnicho da pocos candidatos (volumen).
+    pn = _SEED_NICHE_ALIAS.get(_norm_tag(niche or ""), _norm_tag(niche or ""))
+    if pn and len([c for c in uname if c not in exclude]) < limit * 3:
+        try:
+            for c in (db.table("creators_global").select("id, ig_username")
+                        .eq("niche", pn).limit(300).execute()).data or []:
+                if c.get("id"):
+                    uname.setdefault(c["id"], c.get("ig_username") or "")
+        except Exception:
+            pass
+    cids = [c for c in uname if c not in exclude]
+    if not cids:
+        return []
+    baselines = _creator_view_baselines(cids)
+    try:
+        rr = (db.table("creator_reels_global")
+                .select("id, creator_id, views, posted_at")
+                .in_("creator_id", cids).eq("is_archived", False)
+                .order("views", desc=True).limit(max(limit * 10, 200)).execute()).data or []
+    except Exception:
+        rr = []
+    best = {}
+    for r in rr:
+        cid = r.get("creator_id"); v = int(r.get("views") or 0)
+        exp = _explosion_score(v, baselines.get(cid)) or 0.0
+        if cid and (cid not in best or exp > best[cid]["exp"]):
+            best[cid] = {"exp": exp, "views": v, "id": r.get("id")}
+    ranked = sorted(best.items(), key=lambda kv: -kv[1]["exp"])
+    EXPLODE_SOFT = 1.5
+    strong = [(c, i) for c, i in ranked if i["exp"] >= EXPLODE_SOFT]
+    chosen = strong if len(strong) >= limit else ranked   # relaja el umbral si hay pocos
+    out = []
+    for cid, info in chosen[:limit]:
+        h = (uname.get(cid) or "").lstrip("@")
+        if not h:
+            continue
+        exp = info["exp"]; views = info["views"]
+        if exp and exp >= 2:
+            why = "se pegó un reel de %s (×%g su media)" % (_fmt_views(views), exp); xtag = "×%g" % exp
+        elif views:
+            why = "tiene un reel reciente de %s" % _fmt_views(views); xtag = _fmt_views(views)
+        else:
+            why = "está creciendo en tu nicho"; xtag = "en alza"
+        reel = ({"id": info["id"], "thumb": "/img/reel/%s" % info["id"],
+                 "exp": round(exp, 1), "views": _fmt_views(views)} if info.get("id") and views else None)
+        out.append({"creator_id": cid, "handle": h, "why": why, "x": xtag,
+                    "tag": "Petando en tu nicho", "reel": reel})
+
+    # TOP-UP de volumen (objetivo ~8-12): si el nicho da pocos creadores con reels en el
+    # pool, completa con los que MÁS petan globalmente (no seguidos/descartados/ya incluidos).
+    if len(out) < limit:
+        have = {o["creator_id"] for o in out} | exclude
+        try:
+            gl = (db.table("creator_reels_global")
+                    .select("id, creator_id, views, creator:creators_global(ig_username)")
+                    .eq("is_archived", False).order("views", desc=True)
+                    .limit(500).execute()).data or []
+        except Exception:
+            gl = []
+        # Rankea el top-up por VIEWS (popularidad real), no por ratio de explosión: los
+        # creadores con 1-2 reels dan explosiones-artefacto (×1000) con baseline mínima.
+        gbest = {}
+        for r in gl:   # gl ya viene ordenado por views desc → el 1º por creador es su mejor reel
+            cid = r.get("creator_id")
+            if not cid or cid in have or cid in gbest:
+                continue
+            gbest[cid] = {"views": int(r.get("views") or 0), "id": r.get("id"),
+                          "handle": ((r.get("creator") or {}).get("ig_username") or "").lstrip("@")}
+        for cid, info in sorted(gbest.items(), key=lambda kv: -kv[1]["views"]):
+            if len(out) >= limit:
+                break
+            if not info["handle"]:
+                continue
+            views = info["views"]
+            why = ("tiene un reel de %s views" % _fmt_views(views)) if views else "está creciendo fuerte"
+            xtag = _fmt_views(views) if views else "en alza"
+            reel = ({"id": info["id"], "thumb": "/img/reel/%s" % info["id"],
+                     "views": _fmt_views(views)} if info.get("id") and views else None)
+            out.append({"creator_id": cid, "handle": info["handle"], "why": why, "x": xtag,
+                        "tag": "Petando ahora", "reel": reel})
+    return out
+
+
+@app.route("/api/radar/suggestions", methods=["GET"])
+@require_auth
+@limiter.limit("60 per hour")
+def radar_suggestions():
+    """«Sugerencias de hoy» (sección propia, carrusel): CREADORES del nicho que NO sigues
+    ni descartaste, con un reel petando → «+ Añadir al radar». Cero scrape (pool cacheado)."""
+    user = current_user()
+    uid = user["id"]
+    project_id = request.args.get("project_id")
+    try:
+        limit = max(1, min(20, int(request.args.get("limit", "12"))))
+    except (TypeError, ValueError):
+        limit = 12
+    tq = (db.table("user_tracked_creators").select("creator_id")
+            .eq("user_id", uid).is_("archived_at", "null"))
+    if project_id:
+        tq = tq.eq("project_id", project_id)
+    try:
+        tracked = {t["creator_id"] for t in (tq.execute().data or [])}
+    except Exception:
+        tracked = set()
+    exclude = tracked | _dismissed_creator_ids(uid, project_id)
+    prof = get_profile(uid)
+    cards = _niche_creator_suggestions(prof.get("subniches"), prof.get("niche"), exclude, limit)
+    return jsonify({"suggestions": cards, "total": len(cards)}), 200
+
+
 @app.route("/api/onboarding/complete", methods=["POST"])
 @require_auth
 @limiter.limit("10 per hour;30 per day")
