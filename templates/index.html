@@ -11962,6 +11962,14 @@
     .rs .sugg-reel img { width:100%; height:100%; object-fit:cover; display:block; }
     .rs .sugg-reel-exp { position:absolute; left:2px; bottom:2px; display:inline-flex; align-items:center; gap:2px; font-family:var(--font-mono); font-size:9px; font-weight:700; color:#fff; background:rgba(245,168,61,.95); padding:1px 4px; border-radius:5px; }
     .rs .sugg-reel-exp svg { width:9px; height:9px; }
+    /* v1 feed mixto: tarjetas de descubrimiento + sugerencia INTERCALADAS en la galería */
+    .rs .crd-disc { position:relative; }
+    .rs .crd-disc-tag { position:absolute; top:8px; left:8px; z-index:3; display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:#fff; background:rgba(245,168,61,.95); padding:2px 7px; border-radius:6px; pointer-events:none; }
+    .rs .crd-disc-tag svg { width:10px; height:10px; }
+    .rs .crd--sugg { display:flex; align-items:stretch; }
+    .rs .crd--sugg .sugg-comp--feed { margin:0; width:100%; align-items:center; }
+    .rs .sugg-x-btn { padding:6px 9px; flex:none; }
+    .rs .sugg-x-btn svg { width:14px; height:14px; }
     /* #5: descubrimiento «petando en tu nicho que aún no sigues» */
     .rs .disc-sec { margin:18px 0; padding:16px 16px 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--brand-500) 24%, transparent); background:linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)), var(--surface-raised)); }
     .rs .disc-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }

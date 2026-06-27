@@ -7,7 +7,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 import requests
 import yt_dlp
-from celery import Celery
+from celery import Celery, chord, group
 from celery.schedules import crontab
 from dotenv import load_dotenv
 from supabase import create_client
@@ -105,6 +105,12 @@ celery_app.conf.beat_schedule = {
     "refresh-radar-daily": {
         "task": "tasks.refresh_radar_daily",
         "schedule": crontab(hour=6, minute=0),
+    },
+    # v1 feed diario: RE-RANK gratis del feed (CERO scrape) a las 07:00 UTC — DESPUÉS del
+    # re-scrape de las 06:00, para calentar la caché con lo recién traído. Solo re-rankea.
+    "rerank-radar-daily": {
+        "task": "tasks.rerank_radar_daily",
+        "schedule": crontab(hour=7, minute=0),
     },
     # Fathom 18/06: AUTO-SCRAPE del perfil propio 2×/semana (lunes y jueves 07:00 UTC).
     "scrape-user-profiles": {
@@ -1096,6 +1102,33 @@ def scrape_creator_task(creator_id: str) -> dict:
     except Exception as e:
         logger.exception("scrape_creator final update failed for %s: %s", ig_username, e)
 
+    # Feed v1: si entraron reels nuevos, invalida la caché del feed (día) de TODOS los
+    # usuarios que siguen a este creador → sus reels aparecen el mismo día (no esperan a la
+    # TTL de 26h ni al rerank). Sin esto, «añado competidor → veo sus reels» falla en el día.
+    if reels_count:
+        try:
+            import redis as _r_lib
+            _rds = _r_lib.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
+            day = datetime.now(timezone.utc).strftime("%Y%m%d")
+            fr = (db.table("user_tracked_creators").select("user_id, project_id")
+                    .eq("creator_id", creator_id).is_("archived_at", "null")
+                    .limit(5000).execute()).data or []
+            seen = set()
+            for row in fr:
+                u = row.get("user_id")
+                if not u:
+                    continue
+                key = "feedcache:%s:%s:%s" % (u, row.get("project_id") or "_", day)
+                if key in seen:
+                    continue
+                seen.add(key)
+                try:
+                    _rds.delete(key)
+                except Exception:
+                    pass
+        except Exception:
+            logger.warning("scrape_creator: feed cache invalidate failed creator=%s", creator_id)
+
     # SPEC #4 — PRE-TRANSCRIPCIÓN top-N (Fathom 18/06, N=3): al primer scrape, encola
     # la transcripción de los 3 reels con más views → el primer «Roba la idea» es
     # cache-hit (instantáneo). Solo primer scrape (acota coste). transcribe_reel_task
@@ -1198,6 +1231,107 @@ def refresh_radar_daily():
     queued, cand = _enqueue_if_stale(db, creator_ids, stale_hours=20, cap=_RADAR_DAILY_CAP)
     logger.info("refresh_radar_daily: queued=%d candidates=%d", queued, cand)
     return {"queued": queued, "candidates": cand}
+
+
+_RADAR_RERANK_CAP = int(os.environ.get("RADAR_RERANK_CAP", "3000"))
+
+
+@celery_app.task(name="tasks.rerank_radar_daily")
+def rerank_radar_daily():
+    """v1 FEED DIARIO (GRATIS, CERO scrape): cada mañana CALIENTA la caché Redis del feed
+    de cada usuario activo re-rankeando el pool YA scrapeado. NO scrapea — a propósito
+    separado de refresh_radar_daily (que SÍ scrapea). Si no corriera, el feed igual rota
+    por el date-seed al abrir la app; este job solo evita el primer cómputo en caliente."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    _db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        tr = (_db.table("user_tracked_creators").select("user_id, creator_id, project_id")
+                .is_("archived_at", "null").limit(20000).execute())
+        rows = tr.data or []
+    except Exception:
+        logger.exception("rerank_radar_daily: tracked read failed")
+        return {"status": "error"}
+    groups = {}
+    for r in rows:
+        uid = r.get("user_id"); cid = r.get("creator_id")
+        if not uid or not cid:
+            continue
+        groups.setdefault((uid, r.get("project_id")), []).append(cid)
+    try:
+        from app import _radar_feed_order   # lazy (rompe circular); computa + cachea
+    except Exception:
+        logger.exception("rerank_radar_daily: import failed")
+        return {"status": "error"}
+    warmed = 0
+    for (uid, pid), cids in list(groups.items())[:_RADAR_RERANK_CAP]:
+        try:
+            _radar_feed_order(uid, pid, cids)   # NO scrape: solo re-rank del pool
+            warmed += 1
+        except Exception:
+            logger.warning("rerank_radar_daily: warm failed uid=%s", uid)
+    logger.info("rerank_radar_daily: warmed=%d groups=%d", warmed, len(groups))
+    return {"warmed": warmed, "groups": len(groups)}
+
+
+@celery_app.task(name="tasks.finalize_manual_refresh")
+def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_unlimited, charge_id=None):
+    """Callback del chord del refresco manual de PAGO. `results` = lista de dicts de
+    scrape_creator_task. Reembolsa SOLO si TODO fue fallo duro (failed/creator_not_found);
+    ok/private/not_found/in_progress = trabajo hecho → NO reembolsa. Siempre invalida la
+    caché del feed (entran reels nuevos). Idempotente por COBRO (guard frfinal:<charge_id>,
+    no por-día → un 2º cobro fallido el mismo día también se reembolsa). NO limpia el
+    cooldown en fallo: el scrape sí golpeó Apify; el cooldown cap­a ese coste (el reembolso
+    ya cumple «si falla, no cobra»)."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    _db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    statuses = [(_r or {}).get("status") for _r in (results or []) if isinstance(_r, dict)]
+    hard_fail = {"failed", "creator_not_found"}
+    all_failed = bool(statuses) and all(s in hard_fail for s in statuses)
+    pid = project_id or "_"
+    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    try:
+        import redis as _r_lib
+        _rds = _r_lib.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
+    except Exception:
+        _rds = None
+    # SIEMPRE: invalidar la caché del feed del día (idempotente).
+    if _rds is not None:
+        try:
+            _rds.delete("feedcache:%s:%s:%s" % (uid, pid, day))
+        except Exception:
+            pass
+    refunded = False
+    if charged_amount and all_failed:
+        # Guard de idempotencia POR COBRO (no por-día): cada cobro tiene su nonce → dos
+        # fallos totales el mismo día se reembolsan ambos. Si falta charge_id (compat),
+        # cae a la clave por-día (comportamiento previo).
+        guard = "frfinal:%s" % charge_id if charge_id else "frfinal:%s:%s:%s" % (uid, pid, day)
+        do_refund = True
+        if _rds is not None:
+            try:
+                do_refund = bool(_rds.set(guard, "1", nx=True, ex=86400))
+            except Exception:
+                do_refund = True
+        if do_refund:
+            try:
+                prof = (_db.table("profiles").select("credits_cents, monthly_usage")
+                          .eq("id", uid).single().execute()).data or {}
+                if is_paid_unlimited:
+                    _db.table("profiles").update({
+                        "monthly_usage": max(0, (prof.get("monthly_usage") or 0) - charged_amount)
+                    }).eq("id", uid).execute()
+                else:
+                    _db.table("profiles").update({
+                        "credits_cents": (prof.get("credits_cents") or 0) + charged_amount
+                    }).eq("id", uid).execute()
+                refunded = True
+            except Exception:
+                logger.warning("finalize_manual_refresh: refund failed uid=%s", uid)
+            # NO se limpia el cooldown: el scrape golpeó Apify; mantenerlo capa ese coste.
+    logger.info("finalize_manual_refresh uid=%s statuses=%s refunded=%s", uid, statuses, refunded)
+    return {"refunded": refunded, "statuses": statuses}
 
 
 @celery_app.task(name="tasks.scrape_user_profiles")

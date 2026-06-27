@@ -138,6 +138,26 @@ VOICE_FREE_REELS      = 5    # primeros reels de voz gratis (llegar al aha sin f
 VOICE_REEL_UNITS      = 2    # por reel de voz transcrito tras el cupo gratis
 AGENCY_EXTRA_BRAND_CREDITS = 96   # +96 cr/mes por marca extra de Agencia (+10€/marca)
 
+# ── Feed diario del radar (v1, 2026-06-27) ────────────────────────────────────
+# Re-rank BARATO del pool YA scrapeado (cero scrape nuevo → protege margen). El feed
+# rota cada día: score = explosión × frescura × jitter(reel+uid+fecha). La frescura
+# sube lo recién explotado y decae los tops de ayer; el jitter sembrado por fecha
+# rota la banda media. Cache Redis del ORDEN (ids) por día (TTL ~26h), sin schema.
+RADAR_FEED_HALF_LIFE_DAYS = 3        # vida media de la frescura (días)
+RADAR_FEED_EXPLODE_MIN    = 2.0      # umbral "está petando" para el descubrimiento del nicho
+RADAR_FEED_CACHE_TTL      = 26 * 3600
+# Rotación día-a-día: la frescura sola es un desplazamiento UNIFORME (no reordena) y el
+# jitter es débil. El motor real de rotación es penalizar los reels SERVIDOS ayer → hoy
+# bajan y suben los del siguiente tramo. served_n = top servidos que se penalizan mañana.
+RADAR_FEED_SERVED_N    = 24
+RADAR_FEED_SEEN_PENALTY = 0.45       # ×score a los reels servidos ayer (los desbanca)
+RADAR_FEED_SEEN_TTL     = 3 * 86400
+# Refresco manual de PAGO (única vía de scrape on-demand). Parametrizable (doc economía).
+REFRESH_NOW_UNITS         = int(os.environ.get("REFRESH_NOW_UNITS", "5"))   # ~5 créditos
+REFRESH_NOW_COST          = REFRESH_NOW_UNITS * COST_CENTS
+REFRESH_NOW_COOLDOWN_S    = int(os.environ.get("REFRESH_NOW_COOLDOWN_S", str(8 * 3600)))  # 8h
+PER_USER_REFRESH_CAP      = int(os.environ.get("PER_USER_REFRESH_CAP", "10"))  # cap Apify/refresh
+
 # Flash por-usuario (economia-creditos.md §4): tras chocar el PRIMER muro, el Pack 300
 # baja a TOPUP_FLASH_EUR € (vs 49 €) durante TOPUP_FLASH_HOURS h. Urgencia + ancla.
 # El price del checkout a 29 € lo crea David en Whop → env WHOP_TOPUP_300_FLASH_*; si no
@@ -9040,8 +9060,12 @@ def suggested_competitor():
         mine = {r["creator_id"] for r in (mine_r.data or []) if r.get("creator_id")}
     except Exception:
         mine = set()
+    # Anti-repetición: no sugerir creadores que el usuario DESCARTÓ. exclude_ids cubre
+    # seguidos + descartados (los peers se buscan con `mine` real, no con descartados).
+    dismissed = _dismissed_creator_ids(uid, request.args.get("project_id"))
+    exclude_ids = mine | dismissed
     if not mine:
-        seeds = _seed_shaped(set(), set(), limit)
+        seeds = _seed_shaped(exclude_ids, set(), limit)
         return jsonify({"suggestion": seeds[0] if seeds else None, "suggestions": seeds}), 200
     # 2. Peers que siguen a alguno de mis competidores.
     peer_ids = set()
@@ -9064,12 +9088,12 @@ def suggested_competitor():
                     .limit(5000).execute())
             for r in (cr.data or []):
                 cid = r.get("creator_id")
-                if cid and cid not in mine:
+                if cid and cid not in exclude_ids:
                     counts[cid] = counts.get(cid, 0) + 1
         except Exception:
             pass
     if not counts:
-        seeds = _seed_shaped(mine, set(), limit)
+        seeds = _seed_shaped(exclude_ids, set(), limit)
         return jsonify({"suggestion": seeds[0] if seeds else None, "suggestions": seeds}), 200
     ranked = sorted(counts.items(), key=lambda kv: -kv[1])[:8]
     cand_ids = [c for c, _ in ranked]
@@ -9124,7 +9148,7 @@ def suggested_competitor():
     # poco poblado). Excluye lo que ya sigo y lo ya sugerido.
     if len(suggestions) < limit:
         have = {(s["handle"] or "").lower() for s in suggestions}
-        suggestions += _seed_shaped(mine, have, limit - len(suggestions))
+        suggestions += _seed_shaped(exclude_ids, have, limit - len(suggestions))
     suggestions = suggestions[:limit]
     return jsonify({
         "suggestion": suggestions[0] if suggestions else None,
@@ -9156,9 +9180,13 @@ def niche_discover():
         tracked_ids = list({t["creator_id"] for t in (tq.execute().data or [])})
     except Exception:
         tracked_ids = []
+    # Descubrimiento = lo que PETA en tu nicho (no solo lo más visto) de gente que NO
+    # sigues NI descartaste. rank="explosion" + umbral RADAR_FEED_EXPLODE_MIN.
+    exclude = list(set(tracked_ids) | _dismissed_creator_ids(uid, project_id))
     prof = get_profile(uid)
     reels = _recycled_reels(prof.get("subniches"), prof.get("niche"),
-                            limit=limit, exclude_creator_ids=tracked_ids)
+                            limit=limit, exclude_creator_ids=exclude,
+                            rank="explosion", min_explosion=RADAR_FEED_EXPLODE_MIN)
     return jsonify({"reels": reels, "total": len(reels)}), 200
 
 
@@ -9437,6 +9465,10 @@ def post_tracked_creator():
         logger.info("[scrape] reuse cache for %s (creator=%s, reason=%s)",
                     ig_username, creator_id, _reason)
 
+    # Feed v1: invalida la caché del día → el nuevo competidor entra ya en el re-rank
+    # (sus reels al completar el scrape los mete scrape_creator_task, que también invalida).
+    _radar_feed_invalidate(user["id"], tracking_row.get("project_id"))
+
     return jsonify({
         "tracking": {
             "id": tracking_row["id"],
@@ -9540,6 +9572,7 @@ def delete_tracked_creator(tracking_id: str):
              .execute())
     if not res.data:
         return jsonify({"error": "tc.error.tracking_not_found"}), 404
+    _radar_feed_invalidate(user["id"], (res.data[0] or {}).get("project_id"))  # feed v1: re-rank sin el quitado
     return "", 204
 
 
@@ -10635,6 +10668,108 @@ def _explosion_score(views, baseline):
     return round(float(views or 0) / float(baseline), 2)
 
 
+def _unit_hash(s: str) -> float:
+    """Hash determinista [0,1) (estable entre workers, a diferencia de hash())."""
+    import hashlib
+    return int(hashlib.sha1(str(s).encode()).hexdigest()[:8], 16) / float(0xFFFFFFFF)
+
+
+def _radar_feed_order(uid, project_id, creator_ids, day_str=None, use_cache=True):
+    """ORDEN rankeado y ROTATIVO por día del feed del radar, del pool YA scrapeado
+    (CERO scrape — solo re-rank). score = explosión × frescura × jitter(reel+uid+día):
+    la frescura sube lo recién explotado y decae los tops de ayer; el jitter sembrado
+    por fecha rota la banda media → el feed cambia cada mañana sin guardar estado en BD.
+    Cachea el ORDEN (lista ligera de ids) en Redis por (uid,marca,día); degrada a
+    cómputo directo si Redis cae. use_cache=False (p.ej. filtro por 1 creador) computa
+    fresco sin leer/escribir la caché del feed completo (evita envenenarla). Devuelve
+    [{'id','creator_id'}] ordenado."""
+    day_str = day_str or datetime.now(timezone.utc).strftime("%Y%m%d")
+    ckey = "feedcache:%s:%s:%s" % (uid, project_id or "_", day_str)
+    if use_cache and rds is not None:
+        try:
+            cached = rds.get(ckey)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
+    creator_ids = [c for c in (creator_ids or []) if c]
+    if not creator_ids:
+        return []
+    try:
+        cand = (db.table("creator_reels_global")
+                  .select("id, creator_id, views, posted_at")
+                  .eq("is_archived", False)
+                  .in_("creator_id", creator_ids)
+                  .order("posted_at", desc=True)
+                  .limit(300).execute()).data or []
+    except Exception:
+        logger.warning("[feed] candidate read failed uid=%s", uid)
+        return []
+    # Penaliza los reels SERVIDOS ayer → rotación real (suben los del siguiente tramo).
+    yday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")
+    seen = set()
+    if rds is not None:
+        try:
+            seen = {m.decode() if isinstance(m, bytes) else m
+                    for m in (rds.smembers("feedserved:%s:%s:%s" % (uid, project_id or "_", yday)) or [])}
+        except Exception:
+            seen = set()
+    baselines = _creator_view_baselines(creator_ids)
+    now = datetime.now(timezone.utc)
+    scored = []
+    for r in cand:
+        exp = _explosion_score(r.get("views"), baselines.get(r.get("creator_id"))) or 0.0
+        ts = _parse_ts(r.get("posted_at"))
+        age_days = ((now - ts).total_seconds() / 86400.0) if ts else 30.0
+        fresh = 0.5 ** (max(0.0, age_days) / RADAR_FEED_HALF_LIFE_DAYS)
+        # jitter FUERTE sembrado por día (multiplicador [0.4,1.0]): baraja de verdad la
+        # banda de mérito similar → el TOP cambia cada día (lo que pide "no repite los
+        # mismos tops"), sin que un reel mediocre supere a uno muy explosivo.
+        jit = 0.4 + 0.6 * _unit_hash("%s:%s:%s" % (r.get("id"), uid, day_str))
+        score = exp * fresh * jit
+        if r.get("id") in seen:
+            score *= RADAR_FEED_SEEN_PENALTY
+        scored.append((score, {"id": r.get("id"), "creator_id": r.get("creator_id")}))
+    scored.sort(key=lambda s: s[0], reverse=True)
+    order = [s[1] for s in scored]
+    # NO cachear orden vacío: si los competidores aún no tienen reels (scrape async en
+    # curso), cachear [] fijaría el feed a SEED toda la TTL → el primer scrape no entraría.
+    if use_cache and rds is not None and order:
+        try:
+            rds.set(ckey, json.dumps(order), ex=RADAR_FEED_CACHE_TTL)
+            served = [o["id"] for o in order[:RADAR_FEED_SERVED_N] if o.get("id")]
+            if served:
+                tkey = "feedserved:%s:%s:%s" % (uid, project_id or "_", day_str)
+                rds.sadd(tkey, *served)
+                rds.expire(tkey, RADAR_FEED_SEEN_TTL)
+        except Exception:
+            pass
+    return order
+
+
+def _radar_feed_invalidate(uid, project_id=None, day_str=None):
+    """Invalida la caché del feed del día (tras un refresco manual que trae reels nuevos)."""
+    if rds is None:
+        return
+    day_str = day_str or datetime.now(timezone.utc).strftime("%Y%m%d")
+    try:
+        rds.delete("feedcache:%s:%s:%s" % (uid, project_id or "_", day_str))
+    except Exception:
+        pass
+
+
+def _dismissed_creator_ids(uid, project_id=None):
+    """creator_ids que el usuario DESCARTÓ de las sugerencias del feed → no volver a
+    sugerir. Aísla por marca si procede. Degrada a set() si falta la migración."""
+    try:
+        q = db.table("user_dismissed_creators").select("creator_id").eq("user_id", uid)
+        if project_id:
+            q = q.eq("project_id", project_id)
+        return {r["creator_id"] for r in (q.execute().data or []) if r.get("creator_id")}
+    except Exception:
+        return set()
+
+
 @app.route("/img/reel/<reel_id>")
 def reel_thumb(reel_id):
     """Sirve la MINIATURA de un reel SIEMPRE desde reelscript.net (nunca hotlink al CDN
@@ -10845,7 +10980,8 @@ def _build_brand_report(user_id, project_id):
     return {"reels": reels, "scripts": scripts, "competitors": len(cids)}
 
 
-def _recycled_reels(subniches, niche=None, limit=20, exclude_creator_ids=None):
+def _recycled_reels(subniches, niche=None, limit=20, exclude_creator_ids=None,
+                    rank="views", min_explosion=None):
     """SEED ALGORÍTMICO del Radar (SPEC-fase-accion-radar #3, Fathom 18/06):
     reels que YA petaron de creadores tageados con el subnicho del user — SIN
     scrape (cero coste/latencia). Reusa creators_global + creator_reels_global,
@@ -10868,21 +11004,29 @@ def _recycled_reels(subniches, niche=None, limit=20, exclude_creator_ids=None):
     cids = [c for c in uname if c not in exclude]
     if not cids:
         return []
+    # rank="explosion" (descubrimiento "lo que PETA") necesita ventana amplia para
+    # ordenar por explosión post-query; "views" (seed/fallback) basta con menos.
+    window = max(limit * 4, 60) if rank == "explosion" else max(limit * 2, 30)
     try:
         rr = (db.table("creator_reels_global")
                 .select("id, ig_reel_id, creator_id, caption, views, likes, comments, "
                         "posted_at, thumb_url, thumb_b64, video_duration_sec")
                 .in_("creator_id", cids).eq("is_archived", False)
-                .order("views", desc=True).limit(max(limit * 2, 30)).execute()).data or []
+                .order("views", desc=True).limit(window).execute()).data or []
     except Exception:
         logger.warning("[seed] creator_reels_global read failed")
         return []
     baselines = _creator_view_baselines(cids)
+    for r in rr:
+        r["explosion_score"] = _explosion_score(r.get("views"), baselines.get(r.get("creator_id")))
+    if rank == "explosion":
+        rr.sort(key=lambda r: (r.get("explosion_score") or 0), reverse=True)
+    if min_explosion is not None:
+        rr = [r for r in rr if (r.get("explosion_score") or 0) >= min_explosion]
     out = []
     for r in rr[:limit]:
         r["creator"] = {"ig_username": uname.get(r.get("creator_id"), "")}
         r["is_favorite"] = False
-        r["explosion_score"] = _explosion_score(r.get("views"), baselines.get(r.get("creator_id")))
         r["source"] = "seed"   # el front muestra microcopy honesto «mientras llenas tu radar»
         out.append(r)
     return out
@@ -11044,27 +11188,29 @@ def get_tracked_creators_reels():
         _attach_shares(reels)
         return reels
 
-    # 7a. Orden por explosión: ventana amplia + sort/paginación en Python
-    #     (el score se calcula post-query, no se puede ordenar en DB).
+    # 7a. Orden por explosión = feed diario ROTATIVO (score = explosión × frescura ×
+    #     jitter por día). El orden se cachea por día en Redis (CERO scrape). Servimos
+    #     solo la página pedida (ids cacheados → fetch ligero, no 200 filas pesadas).
     if explosion_sort and not favorites_only:
-        cand = (db.table("creator_reels_global")
-                  .select(SEL)
-                  .eq("is_archived", False)
-                  .in_("creator_id", creator_ids)
-                  .order("posted_at", desc=True)
-                  .limit(200)
-                  .execute()).data or []
-        if not cand and offset == 0:
+        # Filtro por 1 creador (creator_id=X) NO debe leer/escribir la caché del feed
+        # completo (compartirían slot y se envenenarían). use_cache=False computa fresco.
+        order = _radar_feed_order(uid, project_id, creator_ids, use_cache=not filter_creator_id)
+        if not order and offset == 0:
             # Competidores aún sin reels (scrape async pendiente) o sin reels → seed,
             # para no dejar el radar (ni el house tour) vacío en el first-run.
             seed = _seed_response()
             if seed:
                 return jsonify({"reels": seed, "total": len(seed),
                                 "has_more": False, "seed": True})
-        _annotate(cand)
-        cand.sort(key=lambda r: (r.get("explosion_score") or 0), reverse=True)
-        total = len(cand)
-        page = cand[offset:offset + limit]
+        total = len(order)
+        page_ids = [o["id"] for o in order[offset:offset + limit] if o.get("id")]
+        if not page_ids:
+            return jsonify({"reels": [], "total": total, "has_more": False})
+        rows = (db.table("creator_reels_global").select(SEL)
+                  .in_("id", page_ids).execute()).data or []
+        by_id = {r.get("id"): r for r in rows}
+        page = [by_id[i] for i in page_ids if i in by_id]   # preserva el orden cacheado
+        _annotate(page)
         has_more = (offset + len(page)) < total
         return jsonify({"reels": page, "total": total, "has_more": has_more})
 
@@ -11250,42 +11396,222 @@ def radar_stats():
     })
 
 
+def _fmt_cooldown(seconds) -> str:
+    s = int(seconds or 0)
+    if s >= 3600:
+        return "%dh" % max(1, round(s / 3600))
+    return "%d min" % max(1, round(s / 60))
+
+
+def _refresh_now_refund(uid, amount, is_paid_unlimited, cd_key=None):
+    """Reembolsa el cobro del refresco manual (units o cents según rail) y limpia el
+    cooldown. Se usa si el scrape no llega a lanzarse; el reembolso por 'todo falló'
+    lo hace finalize_manual_refresh en el worker."""
+    if amount:
+        try:
+            p = get_profile(uid)
+            if is_paid_unlimited:
+                db.table("profiles").update({
+                    "monthly_usage": max(0, (p.get("monthly_usage") or 0) - amount)
+                }).eq("id", uid).execute()
+            else:
+                db.table("profiles").update({
+                    "credits_cents": (p.get("credits_cents") or 0) + amount
+                }).eq("id", uid).execute()
+        except Exception:
+            logger.warning("refresh_now refund failed uid=%s", uid)
+    if cd_key and rds is not None:
+        try:
+            rds.delete(cd_key)
+        except Exception:
+            pass
+
+
 @app.route("/api/radar/refresh", methods=["POST"])
 @require_auth
-@limiter.limit("6 per minute")
+@limiter.limit("12 per minute")
 def radar_refresh():
-    """FIX2 · "Actualizar radar" a demanda: re-scrapea los competidores de la MARCA
-    activa que estén stale (>6h), reusando caché (los frescos se saltan; los privados/
-    inexistentes/en-curso también). Async (encola scrape_creator_task) → el front recarga
-    al cabo de unos segundos y entran los reels nuevos. Aísla por project_id."""
+    """v1 feed diario: "re-rank" GRATIS (CERO scrape). Antes encolaba scrape on-demand;
+    ahora ese scrape vive SOLO en /api/radar/refresh-now (de pago) → "el manual es la
+    única vía de scrape on-demand" (protege el cap de Apify). Aquí solo invalidamos la
+    caché del día: el siguiente load re-rankea el pool YA scrapeado. Aísla por marca."""
     user = current_user()
     uid = user["id"]
     body = request.get_json(silent=True) or {}
     project_id = body.get("project_id") or None
+    _radar_feed_invalidate(uid, project_id)
+    track_event("radar_rerank", uid, {"project_id": project_id})
+    return jsonify({"ok": True, "queued": 0, "message": "Radar al día."})
 
+
+@app.route("/api/radar/refresh-now", methods=["POST"])
+@require_auth
+@limiter.limit("6 per minute")
+def radar_refresh_now():
+    """Refresco manual de PAGO — ÚNICA vía de scrape on-demand. Fuerza scrape fresco de
+    los competidores de la marca (ignora staleness), cuesta REFRESH_NOW_UNITS créditos,
+    con COOLDOWN por usuario+marca (anti-abuso / cap de coste Apify). Cobra solo si el
+    scrape se LANZA; si TODO falla, finalize_manual_refresh reembolsa. El re-rank diario
+    sigue gratis. Dev (UNLIMITED_EMAILS) gratis y sin cooldown."""
+    user = current_user()
+    uid = user["id"]
+    email = (user.get("email") or "").lower()
+    body = request.get_json(silent=True) or {}
+    project_id = body.get("project_id") or None
+    pid = project_id or "_"
+    is_courtesy = email in UNLIMITED_EMAILS
+    cd_key = "manualrefresh:%s:%s" % (uid, pid)
+
+    # competidores activos de la marca
     q = (db.table("user_tracked_creators").select("creator_id")
            .eq("user_id", uid).is_("archived_at", "null"))
     if project_id:
         q = q.eq("project_id", project_id)
     try:
-        rows = q.execute().data or []
-    except Exception as e:
-        logger.warning("radar_refresh: tracked read failed uid=%s: %s", uid, e)
-        rows = []
-    cids = [r.get("creator_id") for r in rows if r.get("creator_id")]
+        cids = list({r["creator_id"] for r in (q.execute().data or []) if r.get("creator_id")})
+    except Exception:
+        cids = []
     if not cids:
-        return jsonify({"ok": True, "queued": 0, "tracked": 0,
+        return jsonify({"ok": True, "queued": 0, "charged": False,
                         "message": "Aún no sigues a ningún competidor."})
+
+    # 1) COOLDOWN primero (antes de cobrar nada). Cortesía lo salta.
+    if not is_courtesy and rds is not None:
+        try:
+            ttl = rds.ttl(cd_key)
+        except Exception:
+            ttl = -2
+        if ttl and ttl > 0:
+            return jsonify({"ok": False, "cooldown": True, "retry_after_s": int(ttl),
+                            "message": "Acabas de refrescar. Vuelve en %s." % _fmt_cooldown(ttl)}), 429
+
+    # 2) Elegibles: ignora staleness, descarta private/not_found/scraping, cap Apify.
+    eligible = []
     try:
-        from tasks import _enqueue_if_stale
-        queued, candidates = _enqueue_if_stale(db, cids, stale_hours=6, cap=20)
+        rows = []
+        for i in range(0, len(cids), 100):
+            r = (db.table("creators_global").select("id, scrape_status")
+                   .in_("id", cids[i:i + 100]).execute())
+            rows.extend(r.data or [])
+        for cr in rows:
+            if cr.get("scrape_status") in ("private", "not_found", "scraping"):
+                continue
+            eligible.append(cr["id"])
+            if len(eligible) >= PER_USER_REFRESH_CAP:
+                break
+    except Exception:
+        logger.warning("refresh_now: eligible read failed uid=%s", uid)
+        eligible = cids[:PER_USER_REFRESH_CAP]
+    if not eligible:
+        # nada scrapeable (todos privados/inexistentes/en-curso) → ni cobro ni cooldown.
+        return jsonify({"ok": True, "queued": 0, "charged": False,
+                        "message": "Tu radar ya está al día."})
+
+    # 3) Cobro dual-rail (salvo cortesía). Bajo lock de créditos (evita doble-gasto).
+    profile = get_profile(uid)
+    plan = profile.get("plan", "free")
+    is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
+    charged_amount = 0
+    charge_id = _uuid.uuid4().hex   # nonce por-cobro → idempotencia del reembolso (frfinal:<id>)
+    if not is_courtesy:
+        if not is_paid_unlimited and (profile.get("credits_cents") or 0) < REFRESH_NOW_COST:
+            return jsonify({"error": "no_credits",
+                            "message": "Necesitas %d créditos para refrescar ahora." % REFRESH_NOW_UNITS}), 402
+        tok = acquire_credit_lock(uid)
+        if tok is None:
+            return jsonify({"error": "busy", "message": "Otra operación en curso. Inténtalo de nuevo."}), 409
+        try:
+            profile = get_profile(uid)   # re-lee bajo lock
+            # Saldo ANTES de tomar el cooldown (no bloquear 8h sin cobrar).
+            if not is_paid_unlimited and (profile.get("credits_cents") or 0) < REFRESH_NOW_COST:
+                return jsonify({"error": "no_credits", "message": "Sin créditos suficientes."}), 402
+            # COOLDOWN ATÓMICO bajo el lock (SET NX): vence la carrera TOCTOU (doble-click /
+            # 2 pestañas) — el ttl pre-lock de arriba es solo fast-path. Si otro request ya lo
+            # tomó → 429 sin cobrar. Sin Redis (degradado) no hay dedup, como el resto del código.
+            if rds is not None:
+                try:
+                    got = rds.set(cd_key, "1", nx=True, ex=REFRESH_NOW_COOLDOWN_S)
+                except Exception:
+                    got = True
+                if not got:
+                    return jsonify({"ok": False, "cooldown": True, "retry_after_s": REFRESH_NOW_COOLDOWN_S,
+                                    "message": "Acabas de refrescar. Vuelve en %s." % _fmt_cooldown(REFRESH_NOW_COOLDOWN_S)}), 429
+            try:
+                if is_paid_unlimited:
+                    db.table("profiles").update({
+                        "monthly_usage": (profile.get("monthly_usage") or 0) + REFRESH_NOW_UNITS
+                    }).eq("id", uid).execute()
+                    charged_amount = REFRESH_NOW_UNITS
+                else:
+                    db.table("profiles").update({
+                        "credits_cents": (profile.get("credits_cents") or 0) - REFRESH_NOW_COST
+                    }).eq("id", uid).execute()
+                    charged_amount = REFRESH_NOW_COST
+            except Exception as e:
+                logger.error("refresh_now: charge failed uid=%s: %s", uid, e, exc_info=True)
+                if rds is not None:   # cobro falló → libera el cooldown (no cobramos)
+                    try:
+                        rds.delete(cd_key)
+                    except Exception:
+                        pass
+                return jsonify({"ok": False, "message": "No pude cobrar. Inténtalo de nuevo."}), 500
+        finally:
+            release_credit_lock(uid, tok)
+
+    # 4) Chord: scrape forzado de cada elegible + finalize (reembolsa si TODO falla,
+    #    invalida la caché del feed para que entren los reels nuevos). charge_id → idempotencia.
+    try:
+        from tasks import scrape_creator_task, finalize_manual_refresh
+        from celery import chord, group
+        chord(group(scrape_creator_task.s(c) for c in eligible))(
+            finalize_manual_refresh.s(uid, project_id, charged_amount, is_paid_unlimited, charge_id))
     except Exception as e:
-        logger.error("radar_refresh enqueue failed uid=%s: %s", uid, e, exc_info=True)
-        return jsonify({"ok": False, "message": "No pude actualizar el radar. Inténtalo de nuevo."}), 500
-    track_event("radar_refresh", uid, {"queued": queued, "tracked": len(cids), "project_id": project_id})
-    return jsonify({"ok": True, "queued": queued, "tracked": len(cids),
-                    "message": ("Buscando lo nuevo de tus competidores…" if queued
-                                else "Tu radar ya está al día.")})
+        logger.error("refresh_now: chord enqueue failed uid=%s: %s", uid, e, exc_info=True)
+        _refresh_now_refund(uid, charged_amount, is_paid_unlimited, cd_key)  # no se lanzó → no cobramos
+        return jsonify({"ok": False, "message": "No pude lanzar el refresco. Inténtalo de nuevo."}), 500
+
+    track_event("radar_refresh_now", uid,
+                {"queued": len(eligible), "charged": charged_amount, "project_id": project_id})
+    return jsonify({"ok": True, "queued": len(eligible), "charged": bool(charged_amount),
+                    "retry_after_s": (0 if is_courtesy else REFRESH_NOW_COOLDOWN_S),
+                    "message": "Trayendo lo nuevo de tus competidores…"}), 202
+
+
+@app.route("/api/radar/suggestions/dismiss", methods=["POST"])
+@require_auth
+@limiter.limit("60 per minute")
+def radar_suggestion_dismiss():
+    """Descarta una sugerencia de competidor → no volver a sugerirla (anti-repetición).
+    Inserta en user_dismissed_creators. Acepta creator_id o handle. Aísla por marca."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    creator_id = body.get("creator_id")
+    handle = (body.get("handle") or "").strip().lstrip("@").lower()
+    project_id = body.get("project_id") or None
+    if not creator_id and handle:
+        try:
+            r = db.table("creators_global").select("id").eq("ig_username", handle).single().execute()
+            creator_id = (r.data or {}).get("id")
+        except Exception:
+            creator_id = None
+    if not creator_id:
+        return jsonify({"error": "bad_request", "message": "Falta creator_id."}), 400
+    try:
+        # check-then-insert (evita pile-up de duplicados con project_id NULL, que el
+        # ON CONFLICT no casa porque Postgres trata NULL como distinto).
+        chk = (db.table("user_dismissed_creators").select("creator_id")
+                 .eq("user_id", uid).eq("creator_id", creator_id))
+        chk = chk.eq("project_id", project_id) if project_id else chk.is_("project_id", "null")
+        if not (chk.limit(1).execute().data or []):
+            db.table("user_dismissed_creators").insert(
+                {"user_id": uid, "creator_id": creator_id, "project_id": project_id}).execute()
+    except Exception as e:
+        logger.warning("suggestion dismiss failed uid=%s creator=%s: %s", uid, creator_id, e)
+        return jsonify({"ok": False, "message": "No pude descartar. Inténtalo de nuevo."}), 500
+    _radar_feed_invalidate(uid, project_id)
+    track_event("radar_suggestion_dismiss", uid, {"creator_id": creator_id, "project_id": project_id})
+    return jsonify({"ok": True}), 200
 
 
 @app.route("/api/radar/fill-week/candidates", methods=["GET"])

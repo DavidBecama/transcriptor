@@ -1622,7 +1622,7 @@
       '<button class="fchip ghost" data-act="analyze-reel" title="'+L("Transcribe un reel suelto sin seguir a su autor","Transcribe a single reel without following its author")+'">'+IC.doc+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
       '<span style="flex:1"></span>'+
       // Forzar refresh ya (ítem 7): el job diario renueva solo; este botón lo fuerza.
-      '<button class="fchip addbar-refresh" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores ahora (se renueva solo cada día)","Pull what's new from your competitors now (auto-refreshes daily)")+'">'+IC.repeat+' '+L("Actualizar radar","Refresh radar")+'</button>'+
+      '<button class="fchip addbar-refresh" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora","Refresh now")+'</button>'+
     '</div>';
     return bar+addCompInlineHTML()+analyzingBannerHTML();
   }
@@ -1664,6 +1664,61 @@
     else if(S.filter==="recent"){}
     else a.sort(function(x,y){return (y.explosion||0)-(x.explosion||0);});
     return a;
+  }
+  // FEED MIXTO (v1): un solo feed que intercala (a) reels de competidores que sigues +
+  // (b) descubrimiento del nicho que NO sigues + (c) tarjetas de sugerencia de creador.
+  // El ORDEN de los reels lo rota el backend a diario; aquí solo intercalamos por patrón
+  // determinista (descubrimiento cada 4º, sugerencia cada 7º). Dedup de descubrimiento
+  // por creador vs lo ya presente. Si un stream se agota, el hueco cae al otro.
+  function mixedFeed(limit){
+    limit=limit||12;
+    var reels=feedReels();
+    var disc=(Array.isArray(S.discover)?S.discover:[]).slice();
+    var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
+      return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
+    var sugg=suggestedList().filter(function(c){ return tracked.indexOf(String(c.handle||"").toLowerCase())<0; });
+    var seen={}; reels.forEach(function(r){ var h=r.creator&&r.creator.handle; if(h) seen[h.toLowerCase()]=1; });
+    disc=disc.filter(function(r){ var h=r.creator&&r.creator.handle; if(!h) return true; var k=h.toLowerCase(); if(seen[k]) return false; seen[k]=1; return true; });
+    var out=[], ri=0, di=0, si=0, i=0;
+    while(out.length<limit && (ri<reels.length || di<disc.length || si<sugg.length)){
+      if(i%7===6 && si<sugg.length) out.push({kind:"sugg", s:sugg[si++]});
+      else if(i%4===3 && di<disc.length) out.push({kind:"disc", r:disc[di++]});
+      else if(ri<reels.length) out.push({kind:"reel", r:reels[ri++]});
+      else if(di<disc.length) out.push({kind:"disc", r:disc[di++]});
+      else if(si<sugg.length) out.push({kind:"sugg", s:sugg[si++]});
+      else break;
+      i++;
+    }
+    return out;
+  }
+  // Reel de DESCUBRIMIENTO: misma card que un competidor + badge «no lo sigues» (robarlo
+  // auto-sigue al creador, igual que en el descubrimiento standalone).
+  function discReelCardHTML(r, thumb){
+    return '<div class="crd-disc">'+
+      '<span class="crd-disc-tag">'+IC.bolt+' '+L("Petando · no lo sigues","Blowing up · not followed")+'</span>'+
+      competitorReelCardHTML(r, thumb)+
+    '</div>';
+  }
+  // Tarjeta de SUGERENCIA en el feed: «este aún no lo sigues, añádelo» + descartar.
+  function suggCardHTML(c){
+    if(!c||!c.handle) return '';
+    var why=c.why||L(c.why_es,c.why_en); var tag=c.tag||L(c.tag_es,c.tag_en);
+    var whyCap=why?(why.charAt(0).toUpperCase()+why.slice(1)):"";
+    return '<div class="crd crd--sugg">'+
+      '<div class="sugg-comp sugg-comp--feed">'+
+        onbAvatar(c.handle)+
+        '<div class="sugg-body">'+
+          '<div class="sugg-tag">'+IC.spark+' '+L("Aún no lo sigues","Not followed yet")+(tag?' · '+ESC(tag):'')+'</div>'+
+          '<div class="sugg-h">@'+ESC(c.handle)+' <span class="sugg-x">'+ESC(c.x||"")+'</span></div>'+
+          '<div class="sugg-why">'+(whyCap?ESC(whyCap)+'. ':'')+L("Añádelo y sus reels entran en tu radar.","Add them and their reels enter your radar.")+'</div>'+
+        '</div>'+
+        (c.reel&&c.reel.thumb?'<div class="sugg-reel" title="'+L("Su reel que está petando","Their reel that's blowing up")+'"><img src="'+ESC(c.reel.thumb)+'" alt="" loading="lazy"/>'+(c.reel.exp?'<span class="sugg-reel-exp">'+IC.bolt+' '+ESC(String(Math.round(c.reel.exp*10)/10))+'×</span>':'')+'</div>':'')+
+        '<div class="sugg-actions">'+
+          '<button class="btn btn-sm btn-secondary" data-act="add-suggested" data-id="'+ESC(c.handle)+'">'+IC.plus+' '+L("Añadir","Add")+'</button>'+
+          '<button class="crd-btn sugg-x-btn" data-act="sugg-dismiss-one" data-id="'+ESC(c.handle)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
   }
 
   // ── GALERÍAS de miniaturas + modal Comunidad (port de Leonard, restylado v3) ──
@@ -1796,8 +1851,15 @@
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
     '</div>';
-    var body = reels.length
-      ? '<div class="rgal-track crd-track">'+reels.slice(0,12).map(function(r,i){ return competitorReelCardHTML(r, imgs?imgs[i%imgs.length]:null); }).join("")+'</div>'
+    // Sin filtro de competidor → FEED MIXTO (competidor + descubrimiento + sugerencia).
+    // Con filtro activo → solo reels de ese competidor (sin intercalar).
+    var items=active ? reels.slice(0,12).map(function(r){ return {kind:"reel", r:r}; }) : mixedFeed(12);
+    var body = items.length
+      ? '<div class="rgal-track crd-track">'+items.map(function(it,i){
+          if(it.kind==="sugg") return suggCardHTML(it.s);
+          if(it.kind==="disc") return discReelCardHTML(it.r, imgs?imgs[i%imgs.length]:null);
+          return competitorReelCardHTML(it.r, imgs?imgs[i%imgs.length]:null);
+        }).join("")+'</div>'
       : '<div class="rgal-empty"><span class="rgal-empty-h">'+L("Nada que robar aquí… todavía","Nothing to steal here… yet")+'</span><span class="rgal-empty-s">'+L("Este competidor no tiene reels explosivos esta semana.","This competitor has no explosive reels this week.")+'</span></div>';
     return '<section class="rgal">'+
       '<div class="rgal-comps-head"><span class="rgal-comps-t">'+L("Competidores en el radar","Competitors on the radar")+'</span>'+
@@ -2171,8 +2233,9 @@
       (S.reels.length?radarAddBarHTML():"")+   // añadir competidor/reel + actualizar  ← SE QUEDA
       (S.reels.length?trackedManageHTML():"")+ // «Tus competidores» con × para quitar (re-añadido: ver/gestionar a quién sigues sin tener que vaciar el radar)
       seedBannerHTML()+           // aviso «esto petó en tu nicho» (solo radar-seed, demo vacío)
-      suggestedCompHTML()+        // «Te lo sugiero · Nuevo en tu nicho»               ← SE QUEDA
-      discoverHTML()+             // #5: «petando en tu nicho que aún no sigues» (proactividad)
+      // v1 feed mixto: el descubrimiento y las sugerencias de creador ya van INTERCALADOS
+      // en la galería (mixedFeed) → las secciones standalone se retiran para no duplicar.
+      // El muro free de competidores sigue activo al INTENTAR añadir (handler add-suggested).
       (S.reels.length?communityGalleryHTML():"")+   // «Creaciones de la comunidad»    ← SE QUEDA
       // QUITADOS (mockup David / petición usuario): trackedManageHTML (Tus competidores),
       // activationProgressHTML (Activa tu cuenta), voiceOnboardCardHTML (Enséñame tu voz),
@@ -3771,16 +3834,36 @@
       });
     }, 3000);
   }
+  // Refresco manual de PAGO (v1): ÚNICA vía de scrape on-demand. Cuesta créditos y tiene
+  // cooldown (429) por usuario+marca. El re-rank diario sigue siendo gratis y automático.
   function refreshRadar(){
     if(isDemo()){ if(typeof applyDemoBrand==="function") applyDemoBrand(); render(); return showToast(L("Radar actualizado.","Radar refreshed.")); }
-    showToast(L("Actualizando el radar…","Refreshing the radar…"));
     var _pid=_pidOf(S.brandId);
-    apiPost("/api/radar/refresh", _pid?{project_id:_pid}:{}).then(function(r){
-      if(!r.ok){ return showError((r.d&&r.d.message)||L("No pude actualizar el radar.","Couldn't refresh the radar.")); }
-      var n=(r.d&&r.d.queued)||0;
-      showToast((r.d&&r.d.message)||L("Radar al día.","Radar up to date."));
-      setTimeout(loadBrandData, n?4500:300);   // da tiempo al scrape; reusa caché si nada stale
-    });
+    var go=function(){
+      showToast(L("Trayendo lo nuevo de tus competidores…","Pulling what's new from your competitors…"));
+      apiPost("/api/radar/refresh-now", _pid?{project_id:_pid}:{}).then(function(r){
+        if(r.status===429){ return showError((r.d&&r.d.message)||L("Acabas de refrescar. Prueba más tarde.","You just refreshed. Try again later.")); }
+        if(r.status===402){
+          showError((r.d&&r.d.message)||L("Necesitas créditos para refrescar ahora.","You need credits to refresh now."));
+          try{ if(typeof window.openUpgradeModal==="function") window.openUpgradeModal("credits"); }catch(e){}
+          return;
+        }
+        if(!r.ok){ return showError((r.d&&r.d.message)||L("No pude refrescar el radar.","Couldn't refresh the radar.")); }
+        var n=(r.d&&r.d.queued)||0;
+        showToast((r.d&&r.d.message)||L("Trayendo lo nuevo…","Pulling what's new…"));
+        if(n){ try{ refreshCredits(); }catch(e){} }
+        setTimeout(loadBrandData, n?5000:300);   // da tiempo al scrape; entra lo nuevo
+      });
+    };
+    // Confirm de coste (idiom confirmModal). ~REFRESH_NOW_UNITS créditos (server-side).
+    if(typeof window.confirmModal==="function"){
+      window.confirmModal({
+        title:L("Refrescar ahora","Refresh now"),
+        body:L("Traigo lo último de tus competidores en vivo (scrape). Cuesta ~5 créditos. El radar se renueva solo cada día gratis.",
+               "I pull your competitors' latest live (scrape). Costs ~5 credits. The radar auto-refreshes daily for free."),
+        confirmText:L("Sí, refrescar","Yes, refresh"), cancelText:L("Ahora no","Not now")
+      }).then(function(ok){ if(ok) go(); });
+    } else { go(); }
   }
   /* ── Cerebro 3D (WebGL, lazy) ──────────────────────────────────────────────
      Three.js (vendado) + brain3d.js se cargan SOLO al abrir Cerebro. Si no es
@@ -6899,6 +6982,14 @@
     }
     if(act==="sugg-dismiss"){ S._suggDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
     if(act==="disc-dismiss"){ S._discDismissed=true; S.discover=[]; return render(); }   // #5 ocultar descubrimiento
+    if(act==="sugg-dismiss-one"){   // v1 feed: descartar UNA sugerencia (anti-repetición persistente)
+      var dh=(btn.getAttribute("data-id")||"").toLowerCase();
+      if(Array.isArray(S._suggList)) S._suggList=S._suggList.filter(function(c){ return String(c.handle||"").toLowerCase()!==dh; });
+      if(S._suggReal && String(S._suggReal.handle||"").toLowerCase()===dh) S._suggReal=null;
+      render();
+      if(!isDemo()){ var _pd=_pidOf(S.brandId); apiPost("/api/radar/suggestions/dismiss", _pd?{handle:dh, project_id:_pd}:{handle:dh}); }
+      return;
+    }
     if(act==="versus-start"){
       var opp=btn.getAttribute("data-id")||"rival";
       // oppAvg = media de views del competidor; mine = tu mejor reel.
