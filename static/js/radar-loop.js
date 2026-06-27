@@ -4543,7 +4543,7 @@
   function _fmtExamplesHTML(fmt){
     var st=(S._fmtEx&&S._fmtEx.fmt===fmt)?S._fmtEx:null;
     if(!st||st.loading) return '<div class="recfmt-ex-wait"><span class="rs-ldr"></span> '+L("Buscando referencias…","Finding references…")+'</div>';
-    if(!st.examples.length) return '<div class="recfmt-ex-empty">'+L("Aún sin referencias de este formato en tu radar.","No references of this format in your radar yet.")+'</div>';
+    if(!st.examples.length) return '<div class="recfmt-ex-empty">'+L("Aún sin referencias de este formato.","No references for this format yet.")+'</div>';
     var cells=st.examples.slice(0,2).map(function(e){   // 2 vídeos prominentes a la derecha
       // onerror: si la miniatura no existe (404), se oculta y queda el placeholder de fondo.
       var thumb=e.thumb?('<img src="'+ESC(e.thumb)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'):('<div class="recfmt-ex-ph">'+_icPlay+'</div>');
