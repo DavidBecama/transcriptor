@@ -4515,7 +4515,18 @@
     if(S._fmtEx && S._fmtEx.fmt===fmt) return;            // ya cargado/en curso para este formato
     if(isDemo()){
       // Demo: arma referencias de mentira con reels que ya hay (para que Leo lo vea).
-      var ex=(S.reels||[]).filter(function(x){return x.thumb;}).slice(0,4).map(function(x){
+      var src=(S.reels||[]).filter(function(x){return x.thumb;});
+      // Si los reels del radar no traen miniatura (p.ej. cofre demo con thumb null),
+      // sembramos desde __DEMO_THUMBS__ para que el sidebar NO salga vacío en el túnel.
+      if(src.length<2){
+        var dt=_demoThumbs()||[]; var hs=["marcos.crea","ia_con_ana","nico.edita","sara.vende"]; var ml=[14,9,6,4];
+        for(var i=src.length;i<2 && i<dt.length;i++){
+          var rl=(S.reels||[])[i]||{};
+          src.push({creator:{handle:(rl.creator&&rl.creator.handle)||hs[i]||"creador"}, thumb:dt[i%dt.length],
+                    explosionTxt:(rl.explosionTxt!=null?rl.explosionTxt:ml[i]), url:rl.url||null});
+        }
+      }
+      var ex=src.slice(0,4).map(function(x){
         return {handle:(x.creator&&x.creator.handle)||"creador", thumb:x.thumb,
                 explosion:(x.explosionTxt!=null?x.explosionTxt:null),
                 url:x.url||(x.ig_reel_id?("https://www.instagram.com/reel/"+x.ig_reel_id+"/"):null)}; });
@@ -4603,11 +4614,22 @@
           return '<button class="hook-opt'+(i===hi?" on":"")+'" data-act="hook-pick" data-k="'+i+'"><span class="hook-opt-n">'+(i+1)+'</span><span class="hook-opt-t">'+ESC(h)+'</span>'+(i===hi?'<span class="hook-opt-on">'+IC.check+'</span>':'')+'</button>'; }).join("")+
         '</div>'
       : '';
-    return '<div class="script-wrap fade-in">'+hero+'<div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div><div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
+    // LAYOUT: en desktop son 2 columnas (CSS grid sobre .script-wrap):
+    //   .script-main = el guion (hero, opciones, hooks, cuerpo)
+    //   .script-side = sidebar derecho (FORMATO SUGERIDO + ¿Y ahora?)
+    // En móvil .script-wrap vuelve a block → las dos cajas se apilan.
+    var mainHTML = hero+
+      '<div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div>'+
+      '<div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
       '<div class="script-acts"><button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>'+
         '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
       optTabs+hooksH+
-      '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+recFormatCardHTML(r)+conveyorHTML()+'</div>';
+      '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'');
+    var sideHTML = recFormatCardHTML(r)+conveyorHTML();
+    return '<div class="script-wrap fade-in">'+
+      '<div class="script-main">'+mainHTML+'</div>'+
+      '<aside class="script-side">'+sideHTML+'</aside>'+
+    '</div>';
   }
   /* v3 (mockup David · «Editor de guion»): overlay a pantalla completa con barra
      propia (‹ Guiones · /editor · estado guardado · Copiar · Marcar grabado) y dos
