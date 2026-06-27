@@ -7113,8 +7113,12 @@ def index_en():
 @app.route("/app")
 @require_auth_html
 def workspace():
-    # v0.14.5a: dashboard intermedio eliminado. /app entra directo a Resumen.
-    return redirect("/profile/overview", code=302)
+    # v0.16.x: la home pasa a ser el Radar (isla). /app → /profile/radar para que
+    # TODO entry-point post-auth (login email, OAuth, botón «Ir a mi app», fallback
+    # ?next) caiga en la isla. En /profile/radar, refreshMe enruta seg=radar →
+    # coincide con el profTab("radar") que openProfile ya fuerza → SIN la race
+    # overview↔radar que dejaba al usuario en un panel legacy vacío.
+    return redirect("/profile/radar", code=302)
 
 
 @app.route("/settings")
