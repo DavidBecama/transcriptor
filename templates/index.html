@@ -10058,7 +10058,23 @@
     .rs .gen .gen-bg-hint { font-size:12.5px; color:var(--text-tertiary); max-width:340px; line-height:1.45; }
     /* script reveal */
     .rs .script-wrap { padding:24px 22px 28px; }
-    .rs--desktop .script-wrap { max-width:720px; margin:0 auto; padding:36px 24px; }
+    /* ── reveal en 2 columnas (desktop): guion · sidebar (FORMATO SUGERIDO + ¿Y ahora?) ── */
+    .rs .script-side { display:flex; flex-direction:column; gap:22px; margin-top:28px; }
+    .rs .script-side .recfmt, .rs .script-side .belt { margin-top:0; }   /* el gap del contenedor manda el espaciado */
+    .rs--desktop .script-wrap { max-width:1160px; margin:0 auto; padding:36px 32px;
+      display:grid; grid-template-columns:minmax(0,1fr) 372px; gap:44px; align-items:start; }
+    .rs--desktop .script-main { min-width:0; }
+    .rs--desktop .script-side { margin-top:0; position:sticky; top:20px; }
+    .rs--desktop .script-side .recfmt-row { flex-direction:column; gap:14px; }   /* receta arriba, 2 vídeos grandes debajo */
+    .rs--desktop .script-side .recfmt-left { width:100%; }
+    .rs--desktop .script-side .recfmt-right { width:100%; }
+    .rs--desktop .script-side .recfmt-ex-lbl { text-align:left; }
+    .rs--desktop .script-side .recfmt-ex-row { gap:12px; }
+    .rs--desktop .script-side .recfmt-ex { flex:1 1 0; min-width:0; }
+    .rs--desktop .script-side .recfmt-ex-thumb { width:100%; }
+    .rs--desktop .script-side .recfmt-ex-h { max-width:none; }
+    .rs--desktop .script-side .recfmt-ex-empty { max-width:none; }
+    .rs--desktop .script-side .belt-grid { grid-template-columns:1fr; }   /* el sidebar es estrecho → ¿Y ahora? en 1 columna */
     .rs .script-src { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-tertiary); margin-bottom:16px; flex-wrap:wrap; }
     .rs .script-src .ava { width:22px; height:22px; font-size:10px; }
     .rs .voice-tag { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:99px; background:var(--brand-100); color:var(--brand-700); font-size:11.5px; font-weight:600; }
@@ -28484,6 +28500,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=153"></script>
+<script src="/static/js/radar-loop.js?v=154"></script>
 </body>
 </html>
