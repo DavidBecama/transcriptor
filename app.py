@@ -10660,9 +10660,11 @@ def reel_thumb(reel_id):
 @require_auth
 def reels_by_format():
     """EJEMPLOS reales del pool con un FORMATO dado (tarjeta «Cómo grabarlo»). Reusa lo
-    cacheado (creator_reels_global.formato) — CERO scrape nuevo. Prioriza los reels de
-    los competidores del usuario; si hay pocos, completa con el pool global. Ordena por
-    explosión (views vs media del creador). Estado honesto si no hay ninguno."""
+    cacheado (creator_reels_global.formato) — CERO scrape nuevo. DESCUBRIMIENTO: EXCLUYE a
+    los creadores que el usuario YA sigue en su radar → las 2 referencias vienen de OTROS
+    creadores del pool global (no de su propia competencia). Prioriza mismo nicho/subnicho
+    (gente que NO sigue); si no hay suficientes fuera del radar, completa con el pool global
+    (siempre fuera del radar primero). Ordena por explosión. Estado honesto si no hay nada."""
     user = current_user()
     uid = user["id"]
     fmt = (request.args.get("format") or "").strip().lower()
@@ -10685,6 +10687,7 @@ def reels_by_format():
             out.append({
                 "id": rid,
                 "ig_reel_id": sc,
+                "creator_id": r.get("creator_id"),   # interno: dedup por creador (se elimina antes de responder)
                 "handle": cr.get("ig_username") or "",
                 # SIEMPRE desde reelscript.net (nunca hotlink IG). 404 → placeholder en el front.
                 "thumb": "/img/reel/%s" % rid,
@@ -10693,40 +10696,69 @@ def reels_by_format():
             })
         return out
 
+    picked, seen = [], set()
+
+    def _consume(rows, drop_cids):
+        """Filtra los creadores del radar (drop_cids), puntúa y acumula sin duplicar reels."""
+        rows = [r for r in (rows or []) if r.get("creator_id") not in drop_cids]
+        if not rows:
+            return
+        base = _creator_view_baselines(list({r.get("creator_id") for r in rows}))
+        for e in _pack(rows, base):
+            if e["id"] not in seen:
+                seen.add(e["id"]); picked.append(e)
+
     try:
-        # 1) competidores del usuario (radar), filtrados por marca si procede.
+        # 0) creadores que el usuario YA sigue (radar) → EXCLUIDOS de las referencias.
+        #    Filtrado por marca si procede (cada proyecto tiene su propio radar).
         tq = (db.table("user_tracked_creators").select("creator_id")
                 .eq("user_id", uid).is_("archived_at", "null"))
         if project_id:
             tq = tq.eq("project_id", project_id)
-        my_cids = list({t["creator_id"] for t in (tq.execute().data or [])})
+        my_cids = {t["creator_id"] for t in (tq.execute().data or [])}
 
-        picked, seen = [], set()
-        if my_cids:
-            mine = (db.table("creator_reels_global").select(SEL)
-                      .eq("formato", fmt).eq("is_archived", False)
-                      .in_("creator_id", my_cids)
-                      .order("views", desc=True).limit(12).execute()).data or []
-            base = _creator_view_baselines(my_cids)
-            for e in _pack(mine, base):
-                if e["id"] not in seen:
-                    seen.add(e["id"]); picked.append(e)
+        # 1) DESCUBRIMIENTO por nicho: creadores del MISMO subnicho que el usuario que
+        #    NO sigue. Así la referencia se siente «descubrimiento», no reciclar su radar.
+        try:
+            prof = (db.table("profiles").select("niche,subniches")
+                      .eq("id", uid).single().execute()).data or {}
+            subs = [t for t in (_norm_tag(s) for s in (prof.get("subniches") or [])) if t][:8]
+            if not subs and prof.get("niche"):
+                subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(prof["niche"])) if t][:8]
+            if subs:
+                cg = (db.table("creators_global").select("id")
+                        .overlaps("subniches", subs).limit(120).execute()).data or []
+                niche_cids = [c["id"] for c in cg if c.get("id") and c["id"] not in my_cids]
+                if niche_cids:
+                    nrows = (db.table("creator_reels_global").select(SEL)
+                               .eq("formato", fmt).eq("is_archived", False)
+                               .in_("creator_id", niche_cids)
+                               .order("views", desc=True).limit(24).execute()).data or []
+                    _consume(nrows, my_cids)
+        except Exception:
+            logger.warning("[by-format] niche discovery failed (¿migración subniches?)")
 
-        # 2) completa SIEMPRE con el pool GLOBAL del mismo formato (todos los reels
-        #    clasificados, no solo los competidores del usuario) → así siempre hay
-        #    ejemplos de cada formato aunque siga a pocos competidores.
+        # 2) completa con el pool GLOBAL del mismo formato — SIEMPRE excluyendo el radar,
+        #    para que las referencias nunca sean de creadores que el usuario ya sigue.
         if len(picked) < 4:
             glob = (db.table("creator_reels_global").select(SEL)
                       .eq("formato", fmt).eq("is_archived", False)
-                      .order("views", desc=True).limit(40).execute()).data or []
-            gbase = _creator_view_baselines(list({r.get("creator_id") for r in glob}))
-            for e in _pack(glob, gbase):
-                if e["id"] not in seen:
-                    seen.add(e["id"]); picked.append(e)
+                      .order("views", desc=True).limit(60).execute()).data or []
+            _consume(glob, my_cids)
 
         # explosión desc (None al final), top 4.
         picked.sort(key=lambda e: (e["explosion"] is not None, e["explosion"] or 0), reverse=True)
-        return jsonify({"format": fmt, "examples": picked[:4]})
+        # DEDUP POR CREADOR: como mucho 1 reel por creador (su mejor explosión, ya ordenado)
+        #   → 2 ejemplos = 2 creadores distintos = descubrimiento real, no la misma persona 2×.
+        out, used = [], set()
+        for e in picked:
+            cid = e.pop("creator_id", None)
+            if cid in used:
+                continue
+            used.add(cid); out.append(e)
+            if len(out) >= 4:
+                break
+        return jsonify({"format": fmt, "examples": out})
     except Exception as e:
         # Columna `formato` aún sin migrar u otro fallo → estado honesto (sin ejemplos).
         if "formato" not in str(e).lower():
