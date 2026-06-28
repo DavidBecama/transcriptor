@@ -11986,6 +11986,13 @@
     .rs .stday-at { position:absolute; left:8px; right:8px; bottom:7px; z-index:2; font-weight:700; font-size:.82rem; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.65); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rs .stday-body { display:flex; flex-direction:column; gap:8px; padding:10px 11px 11px; }
     .rs .stday-cap { font-size:.76rem; line-height:1.34; color:var(--text-secondary); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.05em; }
+    /* v5: fila de métricas (×explosión · views · antigüedad) + «Por qué robarlo» */
+    .rs .stday-mets { display:flex; align-items:center; flex-wrap:wrap; gap:4px 9px; font-family:var(--font-mono); font-size:10.5px; font-weight:600; color:var(--text-tertiary); }
+    .rs .stday-met { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+    .rs .stday-met svg { width:11px; height:11px; }
+    .rs .stday-met--exp { color:var(--brand-500); }
+    .rs .stday-why2 { font-size:.76rem; line-height:1.34; color:var(--text-secondary); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .rs .stday-why2 b { color:var(--text); font-weight:700; }
     .rs .stday-acts { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
     .rs .stday-rob { flex:1 1 auto; white-space:nowrap; }
     .rs .stday-follow { flex:1 1 100%; display:inline-flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; font-size:.74rem; font-weight:600; padding:7px 9px; border:1px solid var(--border-subtle); border-radius:9px; background:transparent; color:var(--text-secondary); cursor:pointer; }

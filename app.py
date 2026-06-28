@@ -152,6 +152,7 @@ RADAR_FEED_CACHE_TTL      = 26 * 3600
 RADAR_FEED_SERVED_N    = 24
 RADAR_FEED_SEEN_PENALTY = 0.45       # ×score a los reels servidos ayer (los desbanca)
 RADAR_FEED_SEEN_TTL     = 3 * 86400
+RADAR_SUGG_MAX_AGE_DAYS = 30         # frescura: «Sugerencias de hoy» solo reels ≤30 días
 # Refresco manual de PAGO (única vía de scrape on-demand). Parametrizable (doc economía).
 REFRESH_NOW_UNITS         = int(os.environ.get("REFRESH_NOW_UNITS", "5"))   # ~5 créditos
 REFRESH_NOW_COST          = REFRESH_NOW_UNITS * COST_CENTS
@@ -9209,6 +9210,27 @@ def _brand_niche_subniches(profile, tracked_ids):
     return [s for s in subs][:16]
 
 
+_FORMATO_SHORT = {
+    "selfie": "selfie a cámara", "pizarra": "pizarra", "podcast": "clip de podcast",
+    "escritorio": "pantalla/escritorio", "broll-vo": "B-roll + voz en off", "pov": "POV + texto",
+}
+
+
+def _suggestion_reason(exp, formato, age_days):
+    """«Por qué robarlo» DETERMINISTA (cero coste, sin LLM, sin caché): se deriva de señales
+    que ya tenemos (explosión + formato + nicho/frescura). P.ej.
+    «×46 sobre su media · formato POV + texto · pega en tu nicho»."""
+    parts = ["×%g sobre su media" % round(exp, 1)]
+    fl = _FORMATO_SHORT.get(formato)
+    if fl:
+        parts.append("formato %s" % fl)
+    if age_days is not None and age_days <= 4:
+        parts.append("recién publicado")
+    else:
+        parts.append("pega en tu nicho")
+    return " · ".join(parts)
+
+
 def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, limit=15):
     """«Sugerencias de hoy» orientado a REELS: reels que PETAN en el nicho de creadores que
     el user NO sigue ni descartó. Cada reel es ROBABLE sin seguir al creador. `worth_follow`
@@ -9242,11 +9264,14 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
     if not cids:
         return []
     baselines = _creator_view_baselines(cids)
+    # FRESCURA: solo reels de ≤30 días (mejor pocas recientes que rellenar con viejos).
+    fresh_cutoff = (datetime.now(timezone.utc) - timedelta(days=RADAR_SUGG_MAX_AGE_DAYS)).isoformat()
     try:
         rr = (db.table("creator_reels_global")
                 .select("id, ig_reel_id, creator_id, caption, views, likes, comments, "
-                        "posted_at, video_duration_sec")
+                        "posted_at, video_duration_sec, formato")
                 .in_("creator_id", cids).eq("is_archived", False)
+                .gte("posted_at", fresh_cutoff)
                 .order("views", desc=True).limit(max(limit * 15, 360)).execute()).data or []
     except Exception:
         rr = []
@@ -9269,10 +9294,13 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
             if (r.get("_exp") or 0.0) >= REEL_FLOOR:
                 chosen.append((r.get("_exp") or 0.0, r, wf))
     chosen.sort(key=lambda x: -x[0])
+    now = datetime.now(timezone.utc)
     out = []
     for exp, r, wf in chosen[:limit]:
         cid = r.get("creator_id"); sc = r.get("ig_reel_id")
         h = (uname.get(cid) or "").lstrip("@")
+        ts = _parse_ts(r.get("posted_at"))
+        age_days = int((now - ts).total_seconds() // 86400) if ts else None
         out.append({
             "id": r.get("id"), "ig_reel_id": sc, "creator_id": cid,
             "creator": {"ig_username": h},
@@ -9281,7 +9309,8 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
             "caption": (r.get("caption") or "")[:600],
             "views": r.get("views"), "likes": r.get("likes"), "comments": r.get("comments"),
             "posted_at": r.get("posted_at"), "video_duration_sec": r.get("video_duration_sec"),
-            "explosion_score": round(exp, 2),
+            "explosion_score": round(exp, 2), "formato": r.get("formato"),
+            "why": _suggestion_reason(exp, r.get("formato"), age_days),
             "worth_follow": bool(wf), "source": "suggestion",
         })
     return out

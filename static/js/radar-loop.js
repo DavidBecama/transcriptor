@@ -1677,7 +1677,7 @@
       // Son REELS (normReel-compat): los normalizo y marco suggestion=true (para robar SIN
       // seguir vía no_follow) + worthFollow (para ofrecer «+ Añadir competidor» solo en esos).
       S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions))
-        ? r.d.suggestions.map(function(raw){ var n=normReel(raw); n.worthFollow=!!raw.worth_follow; n.suggestion=true; return n; })
+        ? r.d.suggestions.map(function(raw){ var n=normReel(raw); n.worthFollow=!!raw.worth_follow; n.why=raw.why||""; n.suggestion=true; return n; })
         : [];
       if(S.tab==="dashboard") render();
     });
@@ -1693,15 +1693,22 @@
     var follow=r.worthFollow
       ? '<button class="stday-follow" data-act="add-suggested" data-id="'+ESC(h)+'" title="'+L("Añadir a tu radar","Add to your radar")+'">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'
       : '';
+    // Métricas en la tarjeta (diferencia del feed: aquí van en una FILA, no solo badge):
+    // ×explosión · views · antigüedad. La explosión NO va de badge en el thumb (la lleva la fila).
+    var mets='<div class="stday-mets">'+
+      (r.explosionTxt!=null?'<span class="stday-met stday-met--exp">'+IC.bolt+' '+ESC(String(r.explosionTxt))+'×</span>':'')+
+      '<span class="stday-met">'+IC.eye+' '+ESC(r.views)+'</span>'+
+      (r.when?'<span class="stday-met stday-met--age">'+ESC(r.when)+'</span>':'')+
+    '</div>';
     return '<article class="stday-card">'+
       '<div class="stday-thumb" style="background:'+_galGrad(r.id||h)+'" data-act="steal" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Robar este reel","Steal this reel")+'">'+media+
-        (r.explosionTxt!=null?'<span class="stday-exp">'+IC.bolt+' '+ESC(String(r.explosionTxt))+'×</span>':'')+
         (r.dur?'<span class="stday-dur">'+ESC(r.dur)+'</span>':'')+
         '<span class="stday-play">'+_icPlay+'</span>'+
         '<span class="stday-at">@'+ESC(h)+'</span>'+
       '</div>'+
       '<div class="stday-body">'+
-        (r.cap?'<div class="stday-cap">'+ESC(r.cap)+'</div>':'')+
+        mets+
+        (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
         '<div class="stday-acts">'+
           '<button class="btn btn-sm btn-primary stday-rob" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Robar","Steal")+'</button>'+
           '<button class="stday-x" data-act="sugg-dismiss-one" data-id="'+ESC(h)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
