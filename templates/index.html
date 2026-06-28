@@ -10283,6 +10283,10 @@
     .rs .rdr-sub { font-size:18px; line-height:1.5; color:var(--text-secondary); margin:0; max-width:520px; }
     .rs .rdr-sub b { color:var(--text-primary); font-weight:600; }
     .rs .rdr-stats { display:flex; align-items:flex-end; gap:32px; margin-top:8px; flex-wrap:wrap; }
+    /* Refresco manual VISIBLE en el hero (antes enterrado en la addbar al fondo) */
+    .rs .rdr-refresh-cta { align-self:flex-start; display:inline-flex; align-items:center; gap:7px; margin-top:6px; font-size:.86rem; font-weight:600; padding:9px 15px; border-radius:11px; border:1px solid var(--brand-500); background:color-mix(in srgb, var(--brand-500) 10%, transparent); color:var(--brand-500); cursor:pointer; transition:background .15s; }
+    .rs .rdr-refresh-cta:hover { background:color-mix(in srgb, var(--brand-500) 18%, transparent); }
+    .rs .rdr-refresh-cta svg { width:15px; height:15px; }
     .rs .rdr-stat { display:flex; flex-direction:column; gap:5px; }
     .rs .rdr-stat-v { font-family:var(--font-display); font-weight:800; font-size:34px; line-height:1; font-variant-numeric:tabular-nums; }
     .rs .rdr-stat-l { font-size:13.5px; color:var(--text-secondary); display:inline-flex; align-items:center; gap:7px; }
@@ -11284,6 +11288,13 @@
     .rs .gui-card.is-rec { opacity:.75; }
     .rs .saved-tag { display:inline-flex; align-items:center; gap:4px; color:var(--success-fg); font-weight:600; }
     .rs .saved-tag svg { width:12px; height:12px; }
+    .rs .saved-tag--pending { color:var(--brand-500); }
+    /* Guardar la opción/gancho/formato elegidos */
+    .rs .script-save-row { margin:18px 0 4px; display:flex; align-items:center; }
+    .rs .script-save-btn { display:inline-flex; align-items:center; gap:7px; }
+    .rs .script-save-btn svg { width:16px; height:16px; }
+    .rs .script-saved-ok { display:inline-flex; align-items:center; gap:6px; font-size:.9rem; font-weight:600; color:var(--success-fg); }
+    .rs .script-saved-ok svg { width:15px; height:15px; }
 
     /* ── Ideas: contador + plegar bloque + estado guardado ── */
     .rs .idea-count { flex-shrink:0; font-size:12px; font-weight:600; color:var(--text-tertiary); font-family:var(--font-mono); margin-right:2px; }
