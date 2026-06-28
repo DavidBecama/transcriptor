@@ -1622,7 +1622,7 @@
       '<button class="fchip ghost" data-act="analyze-reel" title="'+L("Transcribe un reel suelto sin seguir a su autor","Transcribe a single reel without following its author")+'">'+IC.doc+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
       '<span style="flex:1"></span>'+
       // Forzar refresh ya (ítem 7): el job diario renueva solo; este botón lo fuerza.
-      '<button class="fchip addbar-refresh" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora","Refresh now")+'</button>'+
+      '<button class="fchip addbar-refresh" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora · 5 créditos","Refresh now · 5 credits")+'</button>'+
     '</div>';
     return bar+addCompInlineHTML()+analyzingBannerHTML();
   }
@@ -2199,7 +2199,7 @@
         '<div class="rdr-stats">'+statsH+'</div>'+
         // Refresco manual VISIBLE (antes enterrado en la addbar al fondo). El job diario
         // renueva gratis; este fuerza scrape en vivo de tus competidores (cuesta créditos).
-        '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora","Refresh now")+'</button>'+
+        '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora · 5 créditos","Refresh now · 5 credits")+'</button>'+
       '</div>'+
       '<div class="rdr-hero-r">'+radarScopeHTML()+
         '<div class="rdr-cap"><span class="rdr-cap-dot"></span><span class="rdr-cap-t">'+ESC(cap)+'</span></div>'+
