@@ -9190,30 +9190,49 @@ def niche_discover():
     return jsonify({"reels": reels, "total": len(reels)}), 200
 
 
+def _brand_niche_subniches(profile, tracked_ids):
+    """Señal de nicho POR MARCA: subniches del PERFIL + subniches de los competidores que
+    ESTA marca sigue (su radar). Distintas marcas → distintos competidores → distintos
+    subnichos → distintas sugerencias, todo ON-NICHE (no se sale del nicho)."""
+    subs = {t for t in (_norm_tag(s) for s in (profile.get("subniches") or [])) if t}
+    if not subs and profile.get("niche"):
+        subs = {t for t in (_norm_tag(s) for s in _subniche_suggestions(profile["niche"])) if t}
+    ids = [c for c in (tracked_ids or []) if c]
+    if ids:
+        try:
+            for i in range(0, len(ids), 100):
+                for r in (db.table("creators_global").select("subniches")
+                            .in_("id", ids[i:i + 100]).execute()).data or []:
+                    subs |= {t for t in (_norm_tag(s) for s in (r.get("subniches") or [])) if t}
+        except Exception:
+            logger.warning("[sugg] brand subniches read failed")
+    return [s for s in subs][:16]
+
+
 def _niche_creator_suggestions(subniches, niche=None, exclude_creator_ids=None, limit=12):
-    """«Sugerencias de hoy»: CREADORES del nicho que el user NO sigue ni descartó, con un
-    reel PETANDO. Volumen objetivo ~8-12: empieza por subnicho, AMPLÍA por nicho amplio si
-    da pocos, y RELAJA el umbral de explosión si aún hay pocos. Reusa el pool YA scrapeado
+    """«Sugerencias de hoy»: CREADORES del NICHO (subnicho/nicho) que el user NO sigue ni
+    descartó, con un reel PETANDO. SOLO on-niche: prioriza relevancia → si el nicho da
+    pocos, muestra MENOS (NO rellena con globales off-niche). Reusa el pool YA scrapeado
     (cero scrape). Devuelve [{creator_id, handle, why, x, tag, reel:{id,thumb,exp,views}}]."""
-    subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:8]
+    subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:16]
     if not subs and niche:
-        subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(niche)) if t][:8]
+        subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(niche)) if t][:16]
     exclude = set(exclude_creator_ids or [])
     uname = {}
     try:
         if subs:
             for c in (db.table("creators_global").select("id, ig_username")
-                        .overlaps("subniches", subs).limit(300).execute()).data or []:
+                        .overlaps("subniches", subs).limit(400).execute()).data or []:
                 if c.get("id"):
                     uname[c["id"]] = c.get("ig_username") or ""
     except Exception:
         logger.warning("[sugg] subniche overlap failed (¿migración subniches?)")
-    # AMPLÍA por nicho amplio si el subnicho da pocos candidatos (volumen).
+    # AMPLÍA por nicho amplio (mismo nicho, otro subnicho) — sigue siendo ON-NICHE.
     pn = _SEED_NICHE_ALIAS.get(_norm_tag(niche or ""), _norm_tag(niche or ""))
-    if pn and len([c for c in uname if c not in exclude]) < limit * 3:
+    if pn:
         try:
             for c in (db.table("creators_global").select("id, ig_username")
-                        .eq("niche", pn).limit(300).execute()).data or []:
+                        .eq("niche", pn).limit(400).execute()).data or []:
                 if c.get("id"):
                     uname.setdefault(c["id"], c.get("ig_username") or "")
         except Exception:
@@ -9226,7 +9245,7 @@ def _niche_creator_suggestions(subniches, niche=None, exclude_creator_ids=None, 
         rr = (db.table("creator_reels_global")
                 .select("id, creator_id, views, posted_at")
                 .in_("creator_id", cids).eq("is_archived", False)
-                .order("views", desc=True).limit(max(limit * 10, 200)).execute()).data or []
+                .order("views", desc=True).limit(max(limit * 12, 240)).execute()).data or []
     except Exception:
         rr = []
     best = {}
@@ -9235,59 +9254,21 @@ def _niche_creator_suggestions(subniches, niche=None, exclude_creator_ids=None, 
         exp = _explosion_score(v, baselines.get(cid)) or 0.0
         if cid and (cid not in best or exp > best[cid]["exp"]):
             best[cid] = {"exp": exp, "views": v, "id": r.get("id")}
-    ranked = sorted(best.items(), key=lambda kv: -kv[1]["exp"])
+    # SOLO "petando" (exp >= umbral). On-niche y de calidad → si hay pocos, MENOS, no relleno.
     EXPLODE_SOFT = 1.5
-    strong = [(c, i) for c, i in ranked if i["exp"] >= EXPLODE_SOFT]
-    chosen = strong if len(strong) >= limit else ranked   # relaja el umbral si hay pocos
+    qualifying = [(c, i) for c, i in sorted(best.items(), key=lambda kv: -kv[1]["exp"])
+                  if i["exp"] >= EXPLODE_SOFT]
     out = []
-    for cid, info in chosen[:limit]:
+    for cid, info in qualifying[:limit]:
         h = (uname.get(cid) or "").lstrip("@")
         if not h:
             continue
         exp = info["exp"]; views = info["views"]
-        if exp and exp >= 2:
-            why = "se pegó un reel de %s (×%g su media)" % (_fmt_views(views), exp); xtag = "×%g" % exp
-        elif views:
-            why = "tiene un reel reciente de %s" % _fmt_views(views); xtag = _fmt_views(views)
-        else:
-            why = "está creciendo en tu nicho"; xtag = "en alza"
+        why = "se pegó un reel de %s (×%g su media)" % (_fmt_views(views), exp)
         reel = ({"id": info["id"], "thumb": "/img/reel/%s" % info["id"],
                  "exp": round(exp, 1), "views": _fmt_views(views)} if info.get("id") and views else None)
-        out.append({"creator_id": cid, "handle": h, "why": why, "x": xtag,
+        out.append({"creator_id": cid, "handle": h, "why": why, "x": "×%g" % exp,
                     "tag": "Petando en tu nicho", "reel": reel})
-
-    # TOP-UP de volumen (objetivo ~8-12): si el nicho da pocos creadores con reels en el
-    # pool, completa con los que MÁS petan globalmente (no seguidos/descartados/ya incluidos).
-    if len(out) < limit:
-        have = {o["creator_id"] for o in out} | exclude
-        try:
-            gl = (db.table("creator_reels_global")
-                    .select("id, creator_id, views, creator:creators_global(ig_username)")
-                    .eq("is_archived", False).order("views", desc=True)
-                    .limit(500).execute()).data or []
-        except Exception:
-            gl = []
-        # Rankea el top-up por VIEWS (popularidad real), no por ratio de explosión: los
-        # creadores con 1-2 reels dan explosiones-artefacto (×1000) con baseline mínima.
-        gbest = {}
-        for r in gl:   # gl ya viene ordenado por views desc → el 1º por creador es su mejor reel
-            cid = r.get("creator_id")
-            if not cid or cid in have or cid in gbest:
-                continue
-            gbest[cid] = {"views": int(r.get("views") or 0), "id": r.get("id"),
-                          "handle": ((r.get("creator") or {}).get("ig_username") or "").lstrip("@")}
-        for cid, info in sorted(gbest.items(), key=lambda kv: -kv[1]["views"]):
-            if len(out) >= limit:
-                break
-            if not info["handle"]:
-                continue
-            views = info["views"]
-            why = ("tiene un reel de %s views" % _fmt_views(views)) if views else "está creciendo fuerte"
-            xtag = _fmt_views(views) if views else "en alza"
-            reel = ({"id": info["id"], "thumb": "/img/reel/%s" % info["id"],
-                     "views": _fmt_views(views)} if info.get("id") and views else None)
-            out.append({"creator_id": cid, "handle": info["handle"], "why": why, "x": xtag,
-                        "tag": "Petando ahora", "reel": reel})
     return out
 
 
@@ -9314,7 +9295,11 @@ def radar_suggestions():
         tracked = set()
     exclude = tracked | _dismissed_creator_ids(uid, project_id)
     prof = get_profile(uid)
-    cards = _niche_creator_suggestions(prof.get("subniches"), prof.get("niche"), exclude, limit)
+    # POR MARCA: la señal de nicho sale de los competidores de ESTA marca + el perfil →
+    # marcas distintas (radares distintos) dan sugerencias distintas. El descarte ya es por
+    # marca (project_id arriba). Excluye también los seguidos de la marca.
+    subs = _brand_niche_subniches(prof, tracked)
+    cards = _niche_creator_suggestions(subs, prof.get("niche"), exclude, limit)
     return jsonify({"suggestions": cards, "total": len(cards)}), 200
 
 
