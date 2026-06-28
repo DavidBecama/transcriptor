@@ -9360,7 +9360,14 @@ def radar_suggestions():
         psubs = [t for t in (_norm_tag(s) for s in (proj.get("subniches") or [])) if t]
         pn = (proj.get("niche") or "").strip()
         if not psubs and not pn:
-            return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
+            # HERENCIA: un proyecto sin nicho propio hereda el del onboarding (perfil) →
+            # las marcas pre-#223 siguen on-niche sin pedir nada. Solo needs_niche si el
+            # usuario NO tiene nicho en NINGÚN sitio (ni proyecto ni onboarding).
+            prof = get_profile(uid)
+            pn = (prof.get("niche") or "").strip()
+            psubs = [t for t in (_norm_tag(s) for s in (prof.get("subniches") or [])) if t]
+            if not psubs and not pn:
+                return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
         niche, subs = pn, psubs
     else:
         prof = get_profile(uid)
