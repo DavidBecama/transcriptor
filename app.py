@@ -152,6 +152,7 @@ RADAR_FEED_CACHE_TTL      = 26 * 3600
 RADAR_FEED_SERVED_N    = 24
 RADAR_FEED_SEEN_PENALTY = 0.45       # ×score a los reels servidos ayer (los desbanca)
 RADAR_FEED_SEEN_TTL     = 3 * 86400
+RADAR_SUGG_MAX_AGE_DAYS = 30         # frescura: «Sugerencias de hoy» solo reels ≤30 días
 # Refresco manual de PAGO (única vía de scrape on-demand). Parametrizable (doc economía).
 REFRESH_NOW_UNITS         = int(os.environ.get("REFRESH_NOW_UNITS", "5"))   # ~5 créditos
 REFRESH_NOW_COST          = REFRESH_NOW_UNITS * COST_CENTS
@@ -9190,30 +9191,71 @@ def niche_discover():
     return jsonify({"reels": reels, "total": len(reels)}), 200
 
 
-def _niche_creator_suggestions(subniches, niche=None, exclude_creator_ids=None, limit=12):
-    """«Sugerencias de hoy»: CREADORES del nicho que el user NO sigue ni descartó, con un
-    reel PETANDO. Volumen objetivo ~8-12: empieza por subnicho, AMPLÍA por nicho amplio si
-    da pocos, y RELAJA el umbral de explosión si aún hay pocos. Reusa el pool YA scrapeado
-    (cero scrape). Devuelve [{creator_id, handle, why, x, tag, reel:{id,thumb,exp,views}}]."""
-    subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:8]
+def _brand_niche_subniches(profile, tracked_ids):
+    """Señal de nicho POR MARCA: subniches del PERFIL + subniches de los competidores que
+    ESTA marca sigue (su radar). Distintas marcas → distintos competidores → distintos
+    subnichos → distintas sugerencias, todo ON-NICHE (no se sale del nicho)."""
+    subs = {t for t in (_norm_tag(s) for s in (profile.get("subniches") or [])) if t}
+    if not subs and profile.get("niche"):
+        subs = {t for t in (_norm_tag(s) for s in _subniche_suggestions(profile["niche"])) if t}
+    ids = [c for c in (tracked_ids or []) if c]
+    if ids:
+        try:
+            for i in range(0, len(ids), 100):
+                for r in (db.table("creators_global").select("subniches")
+                            .in_("id", ids[i:i + 100]).execute()).data or []:
+                    subs |= {t for t in (_norm_tag(s) for s in (r.get("subniches") or [])) if t}
+        except Exception:
+            logger.warning("[sugg] brand subniches read failed")
+    return [s for s in subs][:16]
+
+
+_FORMATO_SHORT = {
+    "selfie": "selfie a cámara", "pizarra": "pizarra", "podcast": "clip de podcast",
+    "escritorio": "pantalla/escritorio", "broll-vo": "B-roll + voz en off", "pov": "POV + texto",
+}
+
+
+def _suggestion_reason(exp, formato, age_days):
+    """«Por qué robarlo» DETERMINISTA (cero coste, sin LLM, sin caché): se deriva de señales
+    que ya tenemos (explosión + formato + nicho/frescura). P.ej.
+    «×46 sobre su media · formato POV + texto · pega en tu nicho»."""
+    parts = ["×%g sobre su media" % round(exp, 1)]
+    fl = _FORMATO_SHORT.get(formato)
+    if fl:
+        parts.append("formato %s" % fl)
+    if age_days is not None and age_days <= 4:
+        parts.append("recién publicado")
+    else:
+        parts.append("pega en tu nicho")
+    return " · ".join(parts)
+
+
+def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, limit=15):
+    """«Sugerencias de hoy» orientado a REELS: reels que PETAN en el nicho de creadores que
+    el user NO sigue ni descartó. Cada reel es ROBABLE sin seguir al creador. `worth_follow`
+    marca a los creadores que MERECE seguir (listón alto) → la 2ª acción «+ Añadir competidor»
+    solo se ofrece en esos (menos sugerencias de seguir, más curadas). SOLO on-niche; cero
+    scrape (pool cacheado). Devuelve reels en forma de feed (normReel-compatibles)+worth_follow."""
+    subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:16]
     if not subs and niche:
-        subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(niche)) if t][:8]
+        subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(niche)) if t][:16]
     exclude = set(exclude_creator_ids or [])
     uname = {}
     try:
         if subs:
             for c in (db.table("creators_global").select("id, ig_username")
-                        .overlaps("subniches", subs).limit(300).execute()).data or []:
+                        .overlaps("subniches", subs).limit(400).execute()).data or []:
                 if c.get("id"):
                     uname[c["id"]] = c.get("ig_username") or ""
     except Exception:
         logger.warning("[sugg] subniche overlap failed (¿migración subniches?)")
-    # AMPLÍA por nicho amplio si el subnicho da pocos candidatos (volumen).
+    # AMPLÍA por nicho amplio (mismo nicho, otro subnicho) — sigue siendo ON-NICHE.
     pn = _SEED_NICHE_ALIAS.get(_norm_tag(niche or ""), _norm_tag(niche or ""))
-    if pn and len([c for c in uname if c not in exclude]) < limit * 3:
+    if pn:
         try:
             for c in (db.table("creators_global").select("id, ig_username")
-                        .eq("niche", pn).limit(300).execute()).data or []:
+                        .eq("niche", pn).limit(400).execute()).data or []:
                 if c.get("id"):
                     uname.setdefault(c["id"], c.get("ig_username") or "")
         except Exception:
@@ -9222,72 +9264,55 @@ def _niche_creator_suggestions(subniches, niche=None, exclude_creator_ids=None, 
     if not cids:
         return []
     baselines = _creator_view_baselines(cids)
+    # FRESCURA: solo reels de ≤30 días (mejor pocas recientes que rellenar con viejos).
+    fresh_cutoff = (datetime.now(timezone.utc) - timedelta(days=RADAR_SUGG_MAX_AGE_DAYS)).isoformat()
     try:
         rr = (db.table("creator_reels_global")
-                .select("id, creator_id, views, posted_at")
+                .select("id, ig_reel_id, creator_id, caption, views, likes, comments, "
+                        "posted_at, video_duration_sec, formato")
                 .in_("creator_id", cids).eq("is_archived", False)
-                .order("views", desc=True).limit(max(limit * 10, 200)).execute()).data or []
+                .gte("posted_at", fresh_cutoff)
+                .order("views", desc=True).limit(max(limit * 15, 360)).execute()).data or []
     except Exception:
         rr = []
-    best = {}
+    # explosión por reel.
+    by_creator = {}
     for r in rr:
         cid = r.get("creator_id"); v = int(r.get("views") or 0)
-        exp = _explosion_score(v, baselines.get(cid)) or 0.0
-        if cid and (cid not in best or exp > best[cid]["exp"]):
-            best[cid] = {"exp": exp, "views": v, "id": r.get("id")}
-    ranked = sorted(best.items(), key=lambda kv: -kv[1]["exp"])
-    EXPLODE_SOFT = 1.5
-    strong = [(c, i) for c, i in ranked if i["exp"] >= EXPLODE_SOFT]
-    chosen = strong if len(strong) >= limit else ranked   # relaja el umbral si hay pocos
+        r["_exp"] = _explosion_score(v, baselines.get(cid)) or 0.0
+        by_creator.setdefault(cid, []).append(r)
+    REEL_FLOOR = 1.2      # MÁS reels: umbral bajo para que un reel APAREZCA
+    FOLLOW_MIN_EXP = 2.0  # «petando» a efectos de seguir
+    FOLLOW_MIN_HITS = 2   # CURACIÓN: «+ Añadir competidor» solo si el creador peta de FORMA
+                          # CONSISTENTE (≥2 reels petando), no un único viral de chiripa.
+    PER_CREATOR = 2       # hasta 2 reels por creador → más volumen sin que uno domine
+    chosen = []
+    for cid, lst in by_creator.items():
+        lst.sort(key=lambda r: -(r.get("_exp") or 0.0))
+        wf = sum(1 for x in lst if (x.get("_exp") or 0.0) >= FOLLOW_MIN_EXP) >= FOLLOW_MIN_HITS
+        for r in lst[:PER_CREATOR]:
+            if (r.get("_exp") or 0.0) >= REEL_FLOOR:
+                chosen.append((r.get("_exp") or 0.0, r, wf))
+    chosen.sort(key=lambda x: -x[0])
+    now = datetime.now(timezone.utc)
     out = []
-    for cid, info in chosen[:limit]:
+    for exp, r, wf in chosen[:limit]:
+        cid = r.get("creator_id"); sc = r.get("ig_reel_id")
         h = (uname.get(cid) or "").lstrip("@")
-        if not h:
-            continue
-        exp = info["exp"]; views = info["views"]
-        if exp and exp >= 2:
-            why = "se pegó un reel de %s (×%g su media)" % (_fmt_views(views), exp); xtag = "×%g" % exp
-        elif views:
-            why = "tiene un reel reciente de %s" % _fmt_views(views); xtag = _fmt_views(views)
-        else:
-            why = "está creciendo en tu nicho"; xtag = "en alza"
-        reel = ({"id": info["id"], "thumb": "/img/reel/%s" % info["id"],
-                 "exp": round(exp, 1), "views": _fmt_views(views)} if info.get("id") and views else None)
-        out.append({"creator_id": cid, "handle": h, "why": why, "x": xtag,
-                    "tag": "Petando en tu nicho", "reel": reel})
-
-    # TOP-UP de volumen (objetivo ~8-12): si el nicho da pocos creadores con reels en el
-    # pool, completa con los que MÁS petan globalmente (no seguidos/descartados/ya incluidos).
-    if len(out) < limit:
-        have = {o["creator_id"] for o in out} | exclude
-        try:
-            gl = (db.table("creator_reels_global")
-                    .select("id, creator_id, views, creator:creators_global(ig_username)")
-                    .eq("is_archived", False).order("views", desc=True)
-                    .limit(500).execute()).data or []
-        except Exception:
-            gl = []
-        # Rankea el top-up por VIEWS (popularidad real), no por ratio de explosión: los
-        # creadores con 1-2 reels dan explosiones-artefacto (×1000) con baseline mínima.
-        gbest = {}
-        for r in gl:   # gl ya viene ordenado por views desc → el 1º por creador es su mejor reel
-            cid = r.get("creator_id")
-            if not cid or cid in have or cid in gbest:
-                continue
-            gbest[cid] = {"views": int(r.get("views") or 0), "id": r.get("id"),
-                          "handle": ((r.get("creator") or {}).get("ig_username") or "").lstrip("@")}
-        for cid, info in sorted(gbest.items(), key=lambda kv: -kv[1]["views"]):
-            if len(out) >= limit:
-                break
-            if not info["handle"]:
-                continue
-            views = info["views"]
-            why = ("tiene un reel de %s views" % _fmt_views(views)) if views else "está creciendo fuerte"
-            xtag = _fmt_views(views) if views else "en alza"
-            reel = ({"id": info["id"], "thumb": "/img/reel/%s" % info["id"],
-                     "views": _fmt_views(views)} if info.get("id") and views else None)
-            out.append({"creator_id": cid, "handle": info["handle"], "why": why, "x": xtag,
-                        "tag": "Petando ahora", "reel": reel})
+        ts = _parse_ts(r.get("posted_at"))
+        age_days = int((now - ts).total_seconds() // 86400) if ts else None
+        out.append({
+            "id": r.get("id"), "ig_reel_id": sc, "creator_id": cid,
+            "creator": {"ig_username": h},
+            "thumb_url": "/img/reel/%s" % r.get("id"),
+            "url": ("https://www.instagram.com/reel/%s/" % sc) if sc else None,
+            "caption": (r.get("caption") or "")[:600],
+            "views": r.get("views"), "likes": r.get("likes"), "comments": r.get("comments"),
+            "posted_at": r.get("posted_at"), "video_duration_sec": r.get("video_duration_sec"),
+            "explosion_score": round(exp, 2), "formato": r.get("formato"),
+            "why": _suggestion_reason(exp, r.get("formato"), age_days),
+            "worth_follow": bool(wf), "source": "suggestion",
+        })
     return out
 
 
@@ -9295,15 +9320,16 @@ def _niche_creator_suggestions(subniches, niche=None, exclude_creator_ids=None, 
 @require_auth
 @limiter.limit("60 per hour")
 def radar_suggestions():
-    """«Sugerencias de hoy» (sección propia, carrusel): CREADORES del nicho que NO sigues
-    ni descartaste, con un reel petando → «+ Añadir al radar». Cero scrape (pool cacheado)."""
+    """«Sugerencias de hoy» (carrusel de REELS): reels que PETAN en el nicho de creadores
+    que NO sigues ni descartaste. Cada reel se ROBA sin seguir; worth_follow ofrece «+
+    Añadir competidor» solo en los que merece. Cero scrape (pool cacheado)."""
     user = current_user()
     uid = user["id"]
     project_id = request.args.get("project_id")
     try:
-        limit = max(1, min(20, int(request.args.get("limit", "12"))))
+        limit = max(1, min(24, int(request.args.get("limit", "15"))))
     except (TypeError, ValueError):
-        limit = 12
+        limit = 15
     tq = (db.table("user_tracked_creators").select("creator_id")
             .eq("user_id", uid).is_("archived_at", "null"))
     if project_id:
@@ -9314,8 +9340,12 @@ def radar_suggestions():
         tracked = set()
     exclude = tracked | _dismissed_creator_ids(uid, project_id)
     prof = get_profile(uid)
-    cards = _niche_creator_suggestions(prof.get("subniches"), prof.get("niche"), exclude, limit)
-    return jsonify({"suggestions": cards, "total": len(cards)}), 200
+    # POR MARCA: la señal de nicho sale de los competidores de ESTA marca + el perfil →
+    # marcas distintas (radares distintos) dan sugerencias distintas. El descarte ya es por
+    # marca (project_id arriba). Excluye también los seguidos de la marca.
+    subs = _brand_niche_subniches(prof, tracked)
+    reels = _niche_suggestion_reels(subs, prof.get("niche"), exclude, limit)
+    return jsonify({"suggestions": reels, "total": len(reels)}), 200
 
 
 @app.route("/api/onboarding/complete", methods=["POST"])
@@ -9922,12 +9952,17 @@ def generate_script_from_competitor_reel(reel_id: str):
                .limit(1)
                .execute())
     if not own_r.data:
+        # «Sugerencias de hoy» (no_follow): a veces al user le gusta el REEL pero NO quiere
+        # seguir al creador → roba el guion directamente, SIN auto-seguir (cuesta lo mismo).
+        # El front solo manda no_follow desde esa sección (reels on-niche).
+        if _body0.get("no_follow"):
+            pass  # robar sin seguir: no ownership, no auto-follow
         # SEED (SPEC #3, Fathom 18/06): el user puede robar un reel del SEED de su
         # nicho aunque aún no siga al creador. Si el reel es seed-válido (creador
         # tageado con su subnicho) y le quedan huecos de competidor, lo AUTO-SEGUIMOS
         # y continuamos — convierte el seed en una relación real (activación). Si no
         # encaja o no hay hueco → 404 (igual que antes).
-        if not _autotrack_seed_creator(uid, profile, creator_id):
+        elif not _autotrack_seed_creator(uid, profile, creator_id):
             return jsonify({"error": "reel_not_found"}), 404
 
     # 4. Resolver asistente (body > profile.default).

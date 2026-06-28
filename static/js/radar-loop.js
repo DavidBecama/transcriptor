@@ -1672,43 +1672,66 @@
     if(isDemo() || S._stDismissed || S._stLoading || Array.isArray(S._suggToday)) return;
     S._stLoading=true;
     var _p=_pidOf(S.brandId);
-    apiGet("/api/radar/suggestions?limit=12"+(_p?("&project_id="+encodeURIComponent(_p)):"")).then(function(r){
+    apiGet("/api/radar/suggestions?limit=15"+(_p?("&project_id="+encodeURIComponent(_p)):"")).then(function(r){
       S._stLoading=false;
-      S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions))?r.d.suggestions:[];
+      // Son REELS (normReel-compat): los normalizo y marco suggestion=true (para robar SIN
+      // seguir vía no_follow) + worthFollow (para ofrecer «+ Añadir competidor» solo en esos).
+      S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions))
+        ? r.d.suggestions.map(function(raw){ var n=normReel(raw); n.worthFollow=!!raw.worth_follow; n.why=raw.why||""; n.suggestion=true; return n; })
+        : [];
       if(S.tab==="dashboard") render();
     });
   }
   // Tarjeta de creador sugerido (vertical, para el carrusel): miniatura de su reel que peta
   // + @handle + por qué + «Añadir al radar» + descartar. Layout limpio (no se rompe).
-  function suggTodayCardHTML(c){
-    if(!c||!c.handle) return '';
-    var why=c.why||L(c.why_es,c.why_en); var whyCap=why?(why.charAt(0).toUpperCase()+why.slice(1)):"";
-    var thumb=c.reel&&c.reel.thumb, exp=c.reel&&c.reel.exp;
-    var media=thumb?('<img src="'+ESC(thumb)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'):'';
+  // Tarjeta de REEL sugerido: miniatura del reel que peta (robable AL CLIC) + @creador +
+  // «Robar» (primaria, sin seguir) + «+ Añadir competidor» (secundaria, solo si worthFollow).
+  function suggTodayCardHTML(r){
+    if(!r||!r.id) return '';
+    var h=(r.creator&&r.creator.handle)||"";
+    var media=r.thumb?('<img src="'+ESC(r.thumb)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'):'';
+    var follow=r.worthFollow
+      ? '<button class="stday-follow" data-act="add-suggested" data-id="'+ESC(h)+'" title="'+L("Añadir a tu radar","Add to your radar")+'">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'
+      : '';
+    // Métricas en la tarjeta (diferencia del feed: aquí van en una FILA, no solo badge):
+    // ×explosión · views · antigüedad. La explosión NO va de badge en el thumb (la lleva la fila).
+    var mets='<div class="stday-mets">'+
+      (r.explosionTxt!=null?'<span class="stday-met stday-met--exp">'+IC.bolt+' '+ESC(String(r.explosionTxt))+'×</span>':'')+
+      '<span class="stday-met">'+IC.eye+' '+ESC(r.views)+'</span>'+
+      (r.when?'<span class="stday-met stday-met--age">'+ESC(r.when)+'</span>':'')+
+    '</div>';
     return '<article class="stday-card">'+
-      '<div class="stday-thumb" style="background:'+_galGrad(c.handle)+'">'+media+
-        (exp?'<span class="stday-exp">'+IC.bolt+' '+ESC(String(Math.round(exp*10)/10))+'×</span>':'')+
-        '<span class="stday-at">@'+ESC(c.handle)+'</span>'+
+      '<div class="stday-thumb" style="background:'+_galGrad(r.id||h)+'" data-act="steal" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Robar este reel","Steal this reel")+'">'+media+
+        (r.dur?'<span class="stday-dur">'+ESC(r.dur)+'</span>':'')+
+        '<span class="stday-play">'+_icPlay+'</span>'+
+        '<span class="stday-at">@'+ESC(h)+'</span>'+
       '</div>'+
       '<div class="stday-body">'+
-        '<div class="stday-why">'+ESC(whyCap)+'</div>'+
+        mets+
+        (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
         '<div class="stday-acts">'+
-          '<button class="btn btn-sm btn-primary stday-add" data-act="add-suggested" data-id="'+ESC(c.handle)+'">'+IC.plus+' '+L("Añadir al radar","Add to radar")+'</button>'+
-          '<button class="stday-x" data-act="sugg-dismiss-one" data-id="'+ESC(c.handle)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
+          '<button class="btn btn-sm btn-primary stday-rob" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Robar","Steal")+'</button>'+
+          '<button class="stday-x" data-act="sugg-dismiss-one" data-id="'+ESC(h)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
+          follow+
         '</div>'+
       '</div>'+
     '</article>';
   }
-  // Sección «Sugerencias de hoy» (fila/carrusel). Vacía/oculta en demo y si no hay nada.
+  // Sección «Sugerencias de hoy» (carrusel de REELS con flechas ←/→). Oculta en demo/vacío.
   function suggestionsTodayHTML(){
     if(isDemo() || S._stDismissed) return '';
     var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
       return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
-    var list=(Array.isArray(S._suggToday)?S._suggToday:[]).filter(function(c){ return tracked.indexOf(String(c.handle||"").toLowerCase())<0; });
+    var list=(Array.isArray(S._suggToday)?S._suggToday:[]).filter(function(r){ return tracked.indexOf(String((r.creator&&r.creator.handle)||"").toLowerCase())<0; });
     if(!list.length) return '';
-    var cards=list.slice(0,12).map(suggTodayCardHTML).join("");
+    var cards=list.slice(0,15).map(suggTodayCardHTML).join("");
+    var arrows='<div class="stday-arrows">'+
+      '<button class="stday-arrow" data-act="stday-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
+      '<button class="stday-arrow" data-act="stday-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
+    '</div>';
     return '<section class="stday-sec">'+
-      '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+' <span class="stday-tag">'+L("creadores nuevos que están petando","new creators blowing up right now")+'</span></span>'+
+      '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+' <span class="stday-tag">'+L("reels que petan en tu nicho","reels blowing up in your niche")+'</span></span>'+
+        arrows+
         '<button class="sugg-hide" data-act="st-dismiss-all">'+L("Ocultar","Hide")+'</button></div>'+
       '<div class="stday-row">'+cards+'</div>'+
     '</section>';
@@ -5402,6 +5425,7 @@
   function reelById(id){
     var r=S.reels.filter(function(x){return x.id===id;})[0];
     if(!r && Array.isArray(S.creatorReels)) r=S.creatorReels.filter(function(x){return x.id===id;})[0];
+    if(!r && Array.isArray(S._suggToday)) r=S._suggToday.filter(function(x){return x.id===id;})[0];   // «Sugerencias de hoy»: robable sin seguir
     return r;
   }
   function reelDetailHTML(r){
@@ -5672,6 +5696,7 @@
   }
   function _postGenerate(r, t0, cb, tries){
     var _b={language:(document.documentElement.lang||"es")}; var _p=_pidOf(S.brandId); if(_p) _b.project_id=_p;
+    if(r&&r.suggestion) _b.no_follow=true;   // «Sugerencias de hoy»: roba el guion SIN seguir al creador
     apiPost("/api/competitors/reels/"+encodeURIComponent(r.id)+"/generate-script", _b)
       .then(function(rr){ _handleGenResp(rr, r, t0, cb, tries); })
       .catch(function(){ r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},800); });
@@ -6973,9 +6998,10 @@
     }
     if(act==="sugg-dismiss"){ S._suggDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
     if(act==="disc-dismiss"){ S._discDismissed=true; S.discover=[]; return render(); }   // #5 ocultar descubrimiento
-    if(act==="sugg-dismiss-one"){   // descartar UNA sugerencia (anti-repetición persistente)
+    if(act==="sugg-dismiss-one"){   // descartar al CREADOR de una sugerencia (anti-repetición persistente)
       var dh=(btn.getAttribute("data-id")||"").toLowerCase();
-      if(Array.isArray(S._suggToday)) S._suggToday=S._suggToday.filter(function(c){ return String(c.handle||"").toLowerCase()!==dh; });
+      // S._suggToday son REELS → filtra por creator.handle (quita todos los reels de ese creador).
+      if(Array.isArray(S._suggToday)) S._suggToday=S._suggToday.filter(function(r){ return String((r.creator&&r.creator.handle)||"").toLowerCase()!==dh; });
       if(Array.isArray(S._suggList)) S._suggList=S._suggList.filter(function(c){ return String(c.handle||"").toLowerCase()!==dh; });
       if(S._suggReal && String(S._suggReal.handle||"").toLowerCase()===dh) S._suggReal=null;
       render();
@@ -6983,6 +7009,11 @@
       return;
     }
     if(act==="st-dismiss-all"){ S._stDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
+    if(act==="stday-scroll"){   // flechas ←/→ del carrusel «Sugerencias de hoy»
+      var _ss=btn.closest&&btn.closest(".stday-sec"); var _st=_ss&&_ss.querySelector(".stday-row");
+      if(_st){ var _sd=(btn.getAttribute("data-dir")==="next")?1:-1; _st.scrollBy({left:_sd*Math.round(_st.clientWidth*0.82), behavior:"smooth"}); }
+      return;
+    }
     if(act==="versus-start"){
       var opp=btn.getAttribute("data-id")||"rival";
       // oppAvg = media de views del competidor; mine = tu mejor reel.
@@ -7307,6 +7338,7 @@
     try{ window.RS_reloadRadar=loadBrandData; }catch(e){}   // puente: el chrome legacy recarga el Radar tras añadir competidor
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: al cambiar de marca no arrastres la vista de otro competidor
     S._lbReal=null;   // ranking por-marca: fuerza recarga de /api/leaderboard de ESTA marca (no caché de la anterior)
+    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false;   // sugerencias POR MARCA: recarga para el nicho/radar de ESTA marca
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");   // grid rail+work YA en el skeleton (si no, el rail sale centrado sobre negro)
     el.innerHTML=skeletonHTML();
     var q=S.brandId?("?brand="+encodeURIComponent(S.brandId)):"";
