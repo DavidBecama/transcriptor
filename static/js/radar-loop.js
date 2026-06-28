@@ -1676,6 +1676,9 @@
     var _p=_pidOf(S.brandId);
     apiGet("/api/radar/suggestions?limit=15"+(_p?("&project_id="+encodeURIComponent(_p)):"")).then(function(r){
       S._stLoading=false;
+      // needs_niche: la marca no tiene nicho propio fijado → en vez de sacar genérico/off-niche,
+      // el front pide definirlo (CTA → editor de proyecto).
+      S._suggNeedsNiche=!!(r&&r.d&&r.d.needs_niche);
       // Son REELS (normReel-compat): los normalizo y marco suggestion=true (para robar SIN
       // seguir vía no_follow) + worthFollow (para ofrecer «+ Añadir competidor» solo en esos).
       S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions))
@@ -1722,6 +1725,16 @@
   // Sección «Sugerencias de hoy» (carrusel de REELS con flechas ←/→). Oculta en demo/vacío.
   function suggestionsTodayHTML(){
     if(isDemo() || S._stDismissed) return '';
+    // La marca no tiene nicho propio fijado → pedir definirlo (en vez de off-niche/genérico).
+    if(S._suggNeedsNiche){
+      return '<section class="stday-sec stday-niche-prompt">'+
+        '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span></div>'+
+        '<div class="stday-niche-cta">'+
+          '<div class="stday-niche-tx">'+L("Esta marca aún no tiene nicho. Defínelo para ver reels que petan EN SU nicho (no de otras marcas).","This brand has no niche yet. Set it to see reels blowing up in ITS niche (not other brands').")+'</div>'+
+          '<button class="stday-niche-btn" data-act="set-brand-niche">'+IC.spark+' '+L("Definir el nicho de la marca","Set the brand niche")+'</button>'+
+        '</div>'+
+      '</section>';
+    }
     var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
       return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
     var list=(Array.isArray(S._suggToday)?S._suggToday:[]).filter(function(r){ return tracked.indexOf(String((r.creator&&r.creator.handle)||"").toLowerCase())<0; });
@@ -7048,6 +7061,12 @@
       if(_st){ var _sd=(btn.getAttribute("data-dir")==="next")?1:-1; _st.scrollBy({left:_sd*Math.round(_st.clientWidth*0.82), behavior:"smooth"}); }
       return;
     }
+    if(act==="set-brand-niche"){   // marca sin nicho → abre el editor del proyecto en su nicho
+      var _bp=_pidOf(S.brandId);
+      if(_bp && typeof window.openProjectEditor==="function"){ try{ window.openProjectEditor(_bp); }catch(e){} }
+      else showToast(L("Define el nicho desde los ajustes de la marca.","Set the niche from the brand settings."));
+      return;
+    }
     if(act==="versus-start"){
       var opp=btn.getAttribute("data-id")||"rival";
       // oppAvg = media de views del competidor; mine = tu mejor reel.
@@ -7372,7 +7391,7 @@
     try{ window.RS_reloadRadar=loadBrandData; }catch(e){}   // puente: el chrome legacy recarga el Radar tras añadir competidor
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: al cambiar de marca no arrastres la vista de otro competidor
     S._lbReal=null;   // ranking por-marca: fuerza recarga de /api/leaderboard de ESTA marca (no caché de la anterior)
-    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false;   // sugerencias POR MARCA: recarga para el nicho/radar de ESTA marca
+    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");   // grid rail+work YA en el skeleton (si no, el rail sale centrado sobre negro)
     el.innerHTML=skeletonHTML();
     var q=S.brandId?("?brand="+encodeURIComponent(S.brandId)):"";

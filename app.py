@@ -4961,6 +4961,9 @@ def create_project():
         "name": body.get("name", "Sin nombre"),
         "style_prompt": body.get("style_prompt", ""),
         "color": norm_color,
+        # Nicho EXPLÍCITO de la marca (fijado al crear) → «Sugerencias de hoy» on-niche.
+        "niche": ((body.get("niche") or "").strip()[:80] or None),
+        "subniches": [t for t in (_norm_tag(s) for s in (body.get("subniches") or [])) if t][:8],
     }
     row = db.table("projects").insert(payload).execute()
     return jsonify(row.data[0] if row.data else {"ok": True})
@@ -5018,6 +5021,10 @@ def update_project(project_id):
         if not ok_color:
             return jsonify({"error": "Invalid color (expected hex #rrggbb)"}), 400
         updates["color"] = norm_color
+    if "niche" in body:   # nicho EXPLÍCITO de la marca (editable en ajustes)
+        updates["niche"] = (body.get("niche") or "").strip()[:80] or None
+    if "subniches" in body:
+        updates["subniches"] = [t for t in (_norm_tag(s) for s in (body.get("subniches") or [])) if t][:8]
     if not updates:
         return jsonify({"error": "Nothing to update"}), 400
     db.table("projects").update(updates).eq("id", project_id).eq("user_id", user["id"]).execute()
@@ -9240,27 +9247,28 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
     subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:16]
     if not subs and niche:
         subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(niche)) if t][:16]
+    if not subs:
+        return []
+    subs_set = set(subs)
+    # ENDURECIDO on-niche: una SOLA subniche genérica compartida (p.ej. Ibai tagueado solo
+    # "ia") NO basta para colar a un creador. Pedimos ≥2 subnichos solapados cuando el nicho
+    # tiene ≥2 tags. Y se ELIMINA el match amplio por `niche` (era la fuga off-niche: el
+    # `creators_global.niche == perfil.niche` arrastraba a todo el nicho del perfil).
+    min_overlap = 2 if len(subs_set) >= 2 else 1
     exclude = set(exclude_creator_ids or [])
     uname = {}
     try:
-        if subs:
-            for c in (db.table("creators_global").select("id, ig_username")
-                        .overlaps("subniches", subs).limit(400).execute()).data or []:
-                if c.get("id"):
-                    uname[c["id"]] = c.get("ig_username") or ""
+        for c in (db.table("creators_global").select("id, ig_username, subniches")
+                    .overlaps("subniches", subs).limit(600).execute()).data or []:
+            cid = c.get("id")
+            if not cid or cid in exclude:
+                continue
+            csubs = {_norm_tag(s) for s in (c.get("subniches") or []) if s}
+            if len(csubs & subs_set) >= min_overlap:   # solape FUERTE → on-niche de verdad
+                uname[cid] = c.get("ig_username") or ""
     except Exception:
         logger.warning("[sugg] subniche overlap failed (¿migración subniches?)")
-    # AMPLÍA por nicho amplio (mismo nicho, otro subnicho) — sigue siendo ON-NICHE.
-    pn = _SEED_NICHE_ALIAS.get(_norm_tag(niche or ""), _norm_tag(niche or ""))
-    if pn:
-        try:
-            for c in (db.table("creators_global").select("id, ig_username")
-                        .eq("niche", pn).limit(400).execute()).data or []:
-                if c.get("id"):
-                    uname.setdefault(c["id"], c.get("ig_username") or "")
-        except Exception:
-            pass
-    cids = [c for c in uname if c not in exclude]
+    cids = list(uname.keys())
     if not cids:
         return []
     baselines = _creator_view_baselines(cids)
@@ -9339,13 +9347,37 @@ def radar_suggestions():
     except Exception:
         tracked = set()
     exclude = tracked | _dismissed_creator_ids(uid, project_id)
-    prof = get_profile(uid)
-    # POR MARCA: la señal de nicho sale de los competidores de ESTA marca + el perfil →
-    # marcas distintas (radares distintos) dan sugerencias distintas. El descarte ya es por
-    # marca (project_id arriba). Excluye también los seguidos de la marca.
-    subs = _brand_niche_subniches(prof, tracked)
-    reels = _niche_suggestion_reels(subs, prof.get("niche"), exclude, limit)
+    # NICHO EXPLÍCITO POR PROYECTO (no derivado de competidores ni del perfil compartido):
+    #   · Marca con project_id → usa projects.niche/subniches. Si la marca NO tiene nicho →
+    #     needs_niche:true (el front pide fijarlo) en vez de sacar genérico/off-niche.
+    #   · Marca "default" (sin project_id) → nicho del PERFIL (el del onboarding del usuario).
+    if project_id:
+        try:
+            proj = (db.table("projects").select("niche, subniches")
+                      .eq("id", project_id).eq("user_id", uid).single().execute()).data or {}
+        except Exception:
+            proj = {}
+        psubs = [t for t in (_norm_tag(s) for s in (proj.get("subniches") or [])) if t]
+        pn = (proj.get("niche") or "").strip()
+        if not psubs and not pn:
+            return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
+        niche, subs = pn, psubs
+    else:
+        prof = get_profile(uid)
+        niche = prof.get("niche") or ""
+        subs = [t for t in (_norm_tag(s) for s in (prof.get("subniches") or [])) if t]
+    reels = _niche_suggestion_reels(subs, niche, exclude, limit)
     return jsonify({"suggestions": reels, "total": len(reels)}), 200
+
+
+@app.route("/api/niche/subniche-suggestions", methods=["GET"])
+@require_auth
+@limiter.limit("120 per hour")
+def niche_subniche_suggestions():
+    """Sugerencias de subniche-tags para un nicho dado (picker de nicho del proyecto).
+    Reusa NICHE_SUBNICHE_SEED (cero coste)."""
+    niche = (request.args.get("niche") or "").strip()
+    return jsonify({"suggestions": (_subniche_suggestions(niche) if niche else [])}), 200
 
 
 @app.route("/api/onboarding/complete", methods=["POST"])

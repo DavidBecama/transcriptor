@@ -7717,6 +7717,12 @@
       display: flex; flex-wrap: wrap; gap: 10px;
       align-items: center;
     }
+    /* Picker de nicho/subnichos del proyecto (modal de marca) */
+    .proj-niche-hint { font-size: .78rem; color: var(--text3); margin-top: 8px; line-height: 1.4; }
+    .proj-subniche-suggs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+    .proj-subniche-lbl { font-size: .76rem; color: var(--text3); margin-right: 2px; }
+    .proj-subniche-chip { font-size: .78rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text2); cursor: pointer; }
+    .proj-subniche-chip:hover { border-color: var(--brand-500); color: var(--text); }
     .proj-color-swatch {
       width: 28px; height: 28px;
       border-radius: 50%;
@@ -12012,6 +12018,12 @@
     .rs .stday-x { flex:none; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--border-subtle); border-radius:9px; background:transparent; color:var(--text-tertiary); cursor:pointer; }
     .rs .stday-x:hover { color:var(--text); border-color:var(--border-default); }
     .rs .stday-x svg { width:15px; height:15px; }
+    /* CTA «define el nicho de la marca» cuando el proyecto no tiene nicho propio */
+    .rs .stday-niche-cta { border:1px dashed color-mix(in srgb, var(--brand-500) 40%, transparent); border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:12px; align-items:flex-start; background:color-mix(in srgb, var(--brand-500) 5%, var(--surface-raised)); }
+    .rs .stday-niche-tx { font-size:.9rem; line-height:1.45; color:var(--text-secondary); max-width:520px; }
+    .rs .stday-niche-btn { display:inline-flex; align-items:center; gap:7px; font-size:.9rem; font-weight:600; padding:10px 17px; border-radius:11px; border:none; background:var(--brand-500); color:#fff; cursor:pointer; }
+    .rs .stday-niche-btn svg { width:15px; height:15px; }
+    .rs .stday-niche-btn:hover { filter:brightness(1.06); }
     /* #5: descubrimiento «petando en tu nicho que aún no sigues» */
     .rs .disc-sec { margin:18px 0; padding:16px 16px 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--brand-500) 24%, transparent); background:linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)), var(--surface-raised)); }
     .rs .disc-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
@@ -15667,6 +15679,13 @@
     <div class="field">
       <label data-i18n="proj.name_label">Project name</label>
       <input type="text" id="newProjName" placeholder="e.g. Instagram Content" />
+    </div>
+    <div class="field">
+      <label><span data-i18n-es="Nicho de la marca" data-i18n-en="Brand niche">Nicho de la marca</span></label>
+      <input type="text" id="newProjNiche" placeholder="ej. inteligencia artificial" oninput="projNicheSuggest()" />
+      <div class="proj-niche-hint" data-i18n-es="Subnichos (separa por comas) — definen las «Sugerencias de hoy» de esta marca." data-i18n-en="Sub-niches (comma-separated) — define this brand's «Today's suggestions».">Subnichos (separa por comas) — definen las «Sugerencias de hoy» de esta marca.</div>
+      <input type="text" id="newProjSubniches" placeholder="ej. agentes ia, automatización, prompts" style="margin-top:6px" />
+      <div class="proj-subniche-suggs" id="newProjSubnicheSuggs"></div>
     </div>
     <div class="field">
       <label><span data-i18n-es="Color" data-i18n-en="Color">Color</span></label>
@@ -21671,7 +21690,11 @@ function openProjectEditor(projectId) {
   const p = projectId ? (projectsCache || []).find(x => x.id === projectId) : null;
   document.getElementById("newProjName").value = p ? (p.name || "") : "";
   document.getElementById("newProjStyle").value = p ? (p.style_prompt || "") : "";
+  document.getElementById("newProjNiche").value = p ? (p.niche || "") : "";
+  document.getElementById("newProjSubniches").value = (p && Array.isArray(p.subniches)) ? p.subniches.join(", ") : "";
+  document.getElementById("newProjSubnicheSuggs").innerHTML = "";
   document.getElementById("newProjErr").classList.remove("on");
+  projNicheSuggest();   // chips de subnichos sugeridos para el nicho actual
   _projEditorColor = p && p.color ? p.color : PROJ_COLOR_FALLBACK;
   _renderProjColorPalette(_projEditorColor);
   _populateProjAssistantSelect(p ? p.assistant_id : null);
@@ -21693,9 +21716,42 @@ function openProjectEditor(projectId) {
 // Backwards-compat alias
 function openNewProjectModal() { openProjectEditor(null); }
 
+// Picker de subnichos del proyecto: al teclear el nicho, sugiere subniche-tags clicables.
+let _projNicheTimer = null;
+function projNicheSuggest() {
+  const niche = (document.getElementById("newProjNiche").value || "").trim();
+  const box = document.getElementById("newProjSubnicheSuggs");
+  if (!box) return;
+  if (!niche) { box.innerHTML = ""; return; }
+  clearTimeout(_projNicheTimer);
+  _projNicheTimer = setTimeout(function () {
+    const lang = (document.documentElement.lang || "es").toLowerCase();
+    fetch("/api/niche/subniche-suggestions?niche=" + encodeURIComponent(niche), { credentials: "same-origin" })
+      .then(function (r) { return r.json(); }).then(function (d) {
+        const sugg = (d && Array.isArray(d.suggestions)) ? d.suggestions : [];
+        box.innerHTML = sugg.length
+          ? '<span class="proj-subniche-lbl">' + (lang === "en" ? "Suggested:" : "Sugeridos:") + '</span>' + sugg.map(function (s) {
+              const safe = String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+              return '<button type="button" class="proj-subniche-chip" data-tag="' + safe + '" onclick="projAddSubnicheTag(this.dataset.tag)">+ ' + safe + '</button>';
+            }).join("")
+          : "";
+      }).catch(function () {});
+  }, 350);
+}
+function projAddSubnicheTag(tag) {
+  tag = (tag || "").trim(); if (!tag) return;
+  const inp = document.getElementById("newProjSubniches");
+  const cur = inp.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+  if (cur.map(function (s) { return s.toLowerCase(); }).indexOf(tag.toLowerCase()) >= 0) return;
+  if (cur.length >= 8) return;
+  cur.push(tag); inp.value = cur.join(", ");
+}
+
 async function submitProjectEditor() {
   const name = document.getElementById("newProjName").value.trim();
   const style = document.getElementById("newProjStyle").value.trim();
+  const niche = document.getElementById("newProjNiche").value.trim();
+  const subniches = document.getElementById("newProjSubniches").value.split(",").map(s => s.trim()).filter(Boolean).slice(0, 8);
   const color = _projEditorColor || null;
   const assistant_id = document.getElementById("newProjAssistant").value || null;
   const err = document.getElementById("newProjErr");
@@ -21707,19 +21763,20 @@ async function submitProjectEditor() {
   if (_projEditorId) {
     const res = await fetch(`/projects/${_projEditorId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, style_prompt: style, color, assistant_id }),
+      body: JSON.stringify({ name, style_prompt: style, color, assistant_id, niche, subniches }),
     });
     if (!res.ok) { const d = await res.json().catch(() => ({})); err.textContent = d.error || "Error"; err.classList.add("on"); return; }
     try { window.track && window.track.featureUsed({ feature: "projects", action: "edit" }); } catch(e){}
     closeModal("newProjectOverlay");
     showToast(lang === "en" ? "Project updated" : "Proyecto actualizado");
     await loadProjects();
+    try { if (window.RS_reloadRadar) window.RS_reloadRadar(); } catch (e) {}   // refresca «Sugerencias de hoy» con el nicho nuevo
     return;
   }
 
   const res = await fetch("/projects", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, style_prompt: style, color }),
+    body: JSON.stringify({ name, style_prompt: style, color, niche, subniches }),
   });
   if (!res.ok) { const d = await res.json().catch(() => ({})); err.textContent = d.error || "Error creating project"; err.classList.add("on"); return; }
   const created = await res.json().catch(() => null);
@@ -21736,6 +21793,7 @@ async function submitProjectEditor() {
   closeModal("newProjectOverlay");
   showToast(t("toast.project_created"));
   await loadProjects();
+  try { if (window.RS_reloadRadar) window.RS_reloadRadar(); } catch (e) {}   // refresca «Sugerencias de hoy» con el nicho nuevo
 }
 
 // Legacy alias kept for any old callers.
