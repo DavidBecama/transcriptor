@@ -11962,6 +11962,26 @@
     .rs .sugg-reel img { width:100%; height:100%; object-fit:cover; display:block; }
     .rs .sugg-reel-exp { position:absolute; left:2px; bottom:2px; display:inline-flex; align-items:center; gap:2px; font-family:var(--font-mono); font-size:9px; font-weight:700; color:#fff; background:rgba(245,168,61,.95); padding:1px 4px; border-radius:5px; }
     .rs .sugg-reel-exp svg { width:9px; height:9px; }
+    /* v2: «Sugerencias de hoy» — carrusel de creadores nuevos del nicho que petan */
+    .rs .stday-sec { margin:18px 0; }
+    .rs .stday-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .rs .stday-t { display:inline-flex; align-items:center; gap:7px; font-weight:700; font-size:.95rem; color:var(--text); }
+    .rs .stday-t svg { width:16px; height:16px; color:var(--brand-500); flex:none; }
+    .rs .stday-tag { font-weight:600; font-size:.72rem; color:var(--text-tertiary); }
+    .rs .stday-row { display:flex; gap:12px; overflow-x:auto; padding:2px 2px 8px; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
+    .rs .stday-card { flex:0 0 178px; width:178px; scroll-snap-align:start; display:flex; flex-direction:column; border:1px solid var(--border-subtle); border-radius:14px; overflow:hidden; background:var(--surface-raised); }
+    .rs .stday-thumb { position:relative; aspect-ratio:3/4; width:100%; overflow:hidden; }
+    .rs .stday-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .stday-exp { position:absolute; top:7px; left:7px; display:inline-flex; align-items:center; gap:3px; font-family:var(--font-mono); font-size:10px; font-weight:700; color:#fff; background:rgba(245,168,61,.96); padding:2px 6px; border-radius:6px; }
+    .rs .stday-exp svg { width:10px; height:10px; }
+    .rs .stday-at { position:absolute; left:8px; right:8px; bottom:7px; font-weight:700; font-size:.82rem; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.65); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rs .stday-body { display:flex; flex-direction:column; gap:8px; padding:10px 11px 11px; }
+    .rs .stday-why { font-size:.78rem; line-height:1.35; color:var(--text-secondary); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.1em; }
+    .rs .stday-acts { display:flex; align-items:center; gap:7px; }
+    .rs .stday-add { flex:1; white-space:nowrap; }
+    .rs .stday-x { flex:none; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--border-subtle); border-radius:9px; background:transparent; color:var(--text-tertiary); cursor:pointer; }
+    .rs .stday-x:hover { color:var(--text); border-color:var(--border-default); }
+    .rs .stday-x svg { width:15px; height:15px; }
     /* #5: descubrimiento «petando en tu nicho que aún no sigues» */
     .rs .disc-sec { margin:18px 0; padding:16px 16px 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--brand-500) 24%, transparent); background:linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)), var(--surface-raised)); }
     .rs .disc-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
