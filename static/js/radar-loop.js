@@ -1660,9 +1660,11 @@
   }
   function feedReels(){
     var a=S.reels.slice();
-    if(S.filter==="fav") a=a.filter(function(r){return S.favs[r.id];});
-    else if(S.filter==="recent"){}
-    else a.sort(function(x,y){return (y.explosion||0)-(x.explosion||0);});
+    if(S.filter==="fav") return a.filter(function(r){return S.favs[r.id];});
+    if(S.filter==="recent") return a.sort(function(x,y){return (y.postedTs||0)-(x.postedTs||0);});   // recientes DE VERDAD (lo recién subido arriba)
+    // "explotando"/default: RESPETA el orden del backend, que ya viene rankeado con
+    // explosión × frescura × jitter y ROTADO a diario. Antes re-ordenábamos por explosión
+    // cruda aquí → deshacía la rotación y la frescura → el feed quedaba estático.
     return a;
   }
   // «Sugerencias de hoy»: sección PROPIA (no en el feed) con creadores NUEVOS del nicho
@@ -2182,6 +2184,9 @@
         '<h1 class="rdr-title">'+L("Señales de hoy","Today's signals")+'</h1>'+
         '<p class="rdr-sub">'+line+'</p>'+
         '<div class="rdr-stats">'+statsH+'</div>'+
+        // Refresco manual VISIBLE (antes enterrado en la addbar al fondo). El job diario
+        // renueva gratis; este fuerza scrape en vivo de tus competidores (cuesta créditos).
+        '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora","Refresh now")+'</button>'+
       '</div>'+
       '<div class="rdr-hero-r">'+radarScopeHTML()+
         '<div class="rdr-cap"><span class="rdr-cap-dot"></span><span class="rdr-cap-t">'+ESC(cap)+'</span></div>'+
@@ -4713,13 +4718,24 @@
     //   .script-main = el guion (hero, opciones, hooks, cuerpo)
     //   .script-side = sidebar derecho (FORMATO SUGERIDO + ¿Y ahora?)
     // En móvil .script-wrap vuelve a block → las dos cajas se apilan.
+    // Badge HONESTO: el borrador se auto-guarda (opción 0), pero al cambiar opción/gancho la
+    // elección queda SIN guardar hasta pulsar «Guardar guion». r._saved refleja ese estado.
+    var savedBadge = r._saved
+      ? '<span class="saved-tag">'+IC.check+' '+L("Guardado en Guiones","Saved to Scripts")+'</span>'
+      : '<span class="saved-tag saved-tag--pending">'+IC.spark+' '+L("Elección sin guardar","Unsaved choice")+'</span>';
     var mainHTML = hero+
       '<div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div>'+
-      '<div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span><span class="saved-tag">'+IC.check+' Guardado en Guiones</span></div>'+
+      '<div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span>'+savedBadge+'</div>'+
       '<div class="script-acts"><button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>'+
         '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
       optTabs+hooksH+
-      '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'');
+      '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+
+      // GUARDAR la opción/gancho/formato ELEGIDOS (antes solo se persistía la opción 0).
+      '<div class="script-save-row">'+
+        (r._saved
+          ? '<span class="script-saved-ok">'+IC.check+' '+L("Guardado en Guiones — opción "+((r.optIdx||0)+1),"Saved to Scripts — option "+((r.optIdx||0)+1))+'</span>'
+          : '<button class="btn btn-md btn-primary script-save-btn" data-act="save-script-choice">'+IC.check+' '+L("Guardar guion","Save script")+'</button>')+
+      '</div>';
     var sideHTML = recFormatCardHTML(r)+conveyorHTML();
     return '<div class="script-wrap fade-in">'+
       '<div class="script-main">'+mainHTML+'</div>'+
@@ -5598,9 +5614,9 @@
         // S.reel cambie o a que el objeto-reel se reuse/mute por otro robo.
         S.revealReel={ id:r.id, creator:r.creator, url:r.url, ig_url:r.ig_url, permalink:r.permalink,
           ig_reel_id:r.ig_reel_id, views:r.views, likes:r.likes, explosionTxt:r.explosionTxt,
-          thumb:r.thumb, cap:r.cap, dur:r.dur, _sid:r._sid,
+          thumb:r.thumb, cap:r.cap, dur:r.dur, _sid:r._sid, _gid:gidNew,
           script:r.script, options:r.options, optIdx:r.optIdx||0, hookIdx:r.hookIdx||0,
-          recFormat:r.recFormat, povText:r.povText };
+          recFormat:r.recFormat, povText:r.povText, _saved:true };   // opción 0 ya auto-guardada
         S.activeGuionId=gidNew; S.view="script";
         // #2: ¿es su 1er guion robado? → celebración (banner héroe + lluvia al cerebro).
         var _firstSteal=firstStealPending();
@@ -5764,6 +5780,23 @@
     var o=opts[oi]; if(!o){ return; }
     var hooks=o.hooks||[]; var hook=hooks[hi]||hooks[0]||((o.script||"").split("\n")[0])||r.cap;
     r.script={ hook:hook, beats:o.body||[], close:o.closing||"" };
+  }
+  // GUARDAR la opción/gancho/formato ELEGIDOS (antes solo se persistía la opción 0): actualiza
+  // el guion local y, en prod, hace PATCH del script ya creado (mismo texto plano que el backend).
+  function saveScriptChoice(){
+    var r=S.revealReel||S.reel; if(!r) return;
+    var s=r.script||{};
+    var g=guionById(r._gid||S.activeGuionId);
+    if(g){ g.title=s.hook||g.title; g.hook=s.hook||g.hook; if(s.beats) g.beats=s.beats; if(s.close!=null) g.close=s.close; if(r.recFormat) g.recFormat=r.recFormat; }
+    r._saved=true; render();
+    if(isDemo()){ return showToast(L("Guion guardado en Guiones.","Script saved to your Scripts.")); }
+    var sid=r._sid||(g&&g._sid);
+    if(sid){
+      var flat=[s.hook].concat(s.beats||[]).concat(s.close?[s.close]:[]).filter(Boolean).join("\n");
+      apiPatch("/scripts/"+encodeURIComponent(sid), {title:(s.hook||"").slice(0,80), script:flat, recording_format:r.recFormat||null})
+        .then(function(rr){ if(!rr||!rr.ok){ r._saved=false; render(); showError(L("No pude guardar el guion. Inténtalo de nuevo.","Couldn't save the script. Try again.")); } });
+    }
+    showToast(L("Guion guardado en Guiones.","Script saved to your Scripts."));
   }
   // Normaliza la respuesta (sync o async) con opciones/formato/POV → estado del reel.
   function _normScriptOptions(d, r){
@@ -6957,8 +6990,9 @@
     }
     if(act==="onb-steal-no"){ S.onbStealOffer=null; S.onbCofre=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
     if(act==="steal") return steal(id);
-    if(act==="opt-pick"){ var _rv=S.revealReel||S.reel; if(_rv){ applyScriptOption(_rv, parseInt(k,10)||0, 0); render(); } return; }   // elegir opción de guion
-    if(act==="hook-pick"){ var _rh=S.revealReel||S.reel; if(_rh){ applyScriptOption(_rh, _rh.optIdx||0, parseInt(k,10)||0); render(); } return; }   // elegir gancho
+    if(act==="opt-pick"){ var _rv=S.revealReel||S.reel; if(_rv){ applyScriptOption(_rv, parseInt(k,10)||0, 0); _rv._saved=false; render(); } return; }   // elegir opción de guion → sin guardar
+    if(act==="hook-pick"){ var _rh=S.revealReel||S.reel; if(_rh){ applyScriptOption(_rh, _rh.optIdx||0, parseInt(k,10)||0); _rh._saved=false; render(); } return; }   // elegir gancho → sin guardar
+    if(act==="save-script-choice") return saveScriptChoice();
     if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
     if(act==="reel-original"){
       // En el reveal, «ver original» SIEMPRE es el reel del guion mostrado (S.revealReel),
