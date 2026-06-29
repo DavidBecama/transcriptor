@@ -900,13 +900,21 @@
     }, 12000);
     apiGet("/api/onboarding/ig-avatar?handle="+encodeURIComponent(h)).then(function(r){
       if(S.onb._avatarReq!==h) return;   // cambió el handle entretanto
-      try{ clearTimeout(S.onb._avaWait); }catch(e){}
-      if(r && r.ok && r.d){
-        if(r.d.avatar) S.onb.avatar=r.d.avatar; else S.onb._avatarFailed=true;
-        if(Array.isArray(r.d.reels)) S.onb.myReels=r.d.reels;   // paso «tus vídeos»
-      } else { S.onb._avatarFailed=true; }
-      S.onb._profileDone=true;
-      render();
+      if(r && r.ok && r.d && Array.isArray(r.d.reels)) S.onb.myReels=r.d.reels;   // paso «tus vídeos»
+      var av=(r && r.ok && r.d && r.d.avatar)?r.d.avatar:null;
+      if(av){
+        // PRECARGA la foto: NO habilitar «Sí, soy yo» cuando responde la petición, sino
+        // cuando la imagen está REALMENTE pintada. Antes el botón se activaba al resolver
+        // la petición pero la <img> tardaba unos segundos más → se podía avanzar sin ver la
+        // foto (bug Leo 29-jun). El timeout de 12s sigue como red de seguridad.
+        var im=new Image();
+        im.onload=function(){ if(S.onb._avatarReq!==h) return; try{ clearTimeout(S.onb._avaWait); }catch(e){} S.onb.avatar=av; S.onb._profileDone=true; render(); };
+        im.onerror=function(){ if(S.onb._avatarReq!==h) return; try{ clearTimeout(S.onb._avaWait); }catch(e){} S.onb._avatarFailed=true; S.onb._profileDone=true; render(); };
+        im.src=av;
+      } else {
+        try{ clearTimeout(S.onb._avaWait); }catch(e){}
+        S.onb._avatarFailed=true; S.onb._profileDone=true; render();
+      }
     });
   }
   function onbPickNiche(n){
@@ -1244,11 +1252,17 @@
       for(var k=0;k<thumbs.length;k++){ var tb=thumbs[k]; var x=(((tb.x0+tb.speed*t)%span)+span)%span-160; var px=x+ce*(cx-x), py=tb.y+ce*(cy-tb.y), sc=tb.sc*(1-0.85*ce), a=tb.a*(1-ce*ce); if(a<=0.01) continue; drawThumb(px,py,tb.rot*(1-ce),sc,a,tb.hue); }
       if(conv>0.15){ var g=ctx.createRadialGradient(cx,cy,0,cx,cy,260*ce); g.addColorStop(0,'rgba(120,150,255,'+(0.5*ce)+')'); g.addColorStop(1,'rgba(120,150,255,0)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
       if(t>COFRE_FL){ var u=t-COFRE_FL, fa=u<0.08?u/0.08:Math.max(0,1-(u-0.08)/0.45); if(fa>0){ var g2=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)*0.7); g2.addColorStop(0,'rgba(255,255,255,'+(0.9*fa)+')'); g2.addColorStop(0.4,'rgba(160,185,255,'+(0.5*fa)+')'); g2.addColorStop(1,'rgba(160,185,255,0)'); ctx.fillStyle=g2; ctx.fillRect(0,0,W,H); } } }
-    try{ size(); build(); }catch(e){ if(onDone) onDone(); return; }
-    start=_now();
     function loop(){ var t=(_now()-start)/1000; try{ draw(t); }catch(e){} if(t<COFRE_AV+0.4){ raf=requestAnimationFrame(loop); } else if(ctx){ ctx.clearRect(0,0,W,H); } }
-    loop();
-    setTimeout(function(){ try{ if(onDone) onDone(); }catch(e){} }, COFRE_AV*1000+60);
+    function begin(){
+      try{ size(); build(); }catch(e){ if(onDone) onDone(); return; }
+      start=_now(); loop();
+      setTimeout(function(){ try{ if(onDone) onDone(); }catch(e){} }, COFRE_AV*1000+60);
+    }
+    // Diferir un frame si el canvas aún mide 0: mountCofre corre justo tras meter el
+    // innerHTML, cuando el canvas puede no estar maquetado → su backing store quedaría en
+    // 1px y la avalancha (los reels de fondo) se dibujaría en la nada, aunque los números
+    // (DOM) sí animaran. Esperar al 1er frame garantiza tamaño real. Bug Leo 29-jun.
+    if(cv.getBoundingClientRect().width<2){ requestAnimationFrame(begin); } else { begin(); }
   }
   // CIERRE: ingiere (prod) → Cerebro ~50% + 1er guión; demo simula y siembra panel.
   function onbFinish(){
