@@ -12027,6 +12027,8 @@
     .rs .stday-niche-btn { display:inline-flex; align-items:center; gap:7px; font-size:.9rem; font-weight:600; padding:10px 17px; border-radius:11px; border:none; background:var(--brand-500); color:#fff; cursor:pointer; }
     .rs .stday-niche-btn svg { width:15px; height:15px; }
     .rs .stday-niche-btn:hover { filter:brightness(1.06); }
+    /* empty-state «hoy no hay reels nuevos en tu nicho» (no ocultar en silencio) */
+    .rs .stday-empty { font-size:.9rem; line-height:1.5; color:var(--text-secondary); padding:16px 18px; border:1px dashed var(--border-subtle); border-radius:14px; background:var(--surface-raised); }
     /* #5: descubrimiento «petando en tu nicho que aún no sigues» */
     .rs .disc-sec { margin:18px 0; padding:16px 16px 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--brand-500) 24%, transparent); background:linear-gradient(135deg, color-mix(in srgb, var(--brand-500) 7%, var(--surface-raised)), var(--surface-raised)); }
     .rs .disc-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
@@ -28690,6 +28692,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=157"></script>
+<script src="/static/js/radar-loop.js?v=158"></script>
 </body>
 </html>
