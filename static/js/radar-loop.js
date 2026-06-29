@@ -1725,13 +1725,21 @@
   // Sección «Sugerencias de hoy» (carrusel de REELS con flechas ←/→). Oculta en demo/vacío.
   function suggestionsTodayHTML(){
     if(isDemo() || S._stDismissed) return '';
-    // La marca no tiene nicho propio fijado → pedir definirlo (en vez de off-niche/genérico).
+    // Sin nicho (ni en perfil ni en proyecto) → pedir definirlo en vez de quedarse vacío.
+    // El texto/acción se adaptan: marca con proyecto → su nicho; marca default → tu nicho.
     if(S._suggNeedsNiche){
+      var _hasProj=!!_pidOf(S.brandId);
+      var _tx=_hasProj
+        ? L("Esta marca aún no tiene nicho. Defínelo para ver reels que petan EN SU nicho (no de otras marcas).","This brand has no niche yet. Set it to see reels blowing up in ITS niche (not other brands').")
+        : L("Aún no tienes nicho. Defínelo para ver cada día los reels que petan EN TU nicho.","You haven't set your niche yet. Set it to see the reels blowing up IN YOUR niche every day.");
+      var _bt=_hasProj
+        ? L("Definir el nicho de la marca","Set the brand niche")
+        : L("Define tu nicho","Set your niche");
       return '<section class="stday-sec stday-niche-prompt">'+
         '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span></div>'+
         '<div class="stday-niche-cta">'+
-          '<div class="stday-niche-tx">'+L("Esta marca aún no tiene nicho. Defínelo para ver reels que petan EN SU nicho (no de otras marcas).","This brand has no niche yet. Set it to see reels blowing up in ITS niche (not other brands').")+'</div>'+
-          '<button class="stday-niche-btn" data-act="set-brand-niche">'+IC.spark+' '+L("Definir el nicho de la marca","Set the brand niche")+'</button>'+
+          '<div class="stday-niche-tx">'+_tx+'</div>'+
+          '<button class="stday-niche-btn" data-act="set-brand-niche">'+IC.spark+' '+_bt+'</button>'+
         '</div>'+
       '</section>';
     }
@@ -7061,10 +7069,11 @@
       if(_st){ var _sd=(btn.getAttribute("data-dir")==="next")?1:-1; _st.scrollBy({left:_sd*Math.round(_st.clientWidth*0.82), behavior:"smooth"}); }
       return;
     }
-    if(act==="set-brand-niche"){   // marca sin nicho → abre el editor del proyecto en su nicho
+    if(act==="set-brand-niche"){   // sin nicho → editor del proyecto (marca) o modal de nicho de usuario
       var _bp=_pidOf(S.brandId);
       if(_bp && typeof window.openProjectEditor==="function"){ try{ window.openProjectEditor(_bp); }catch(e){} }
-      else showToast(L("Define el nicho desde los ajustes de la marca.","Set the niche from the brand settings."));
+      else if(typeof window.openNicheSetup==="function"){ try{ window.openNicheSetup(); }catch(e){} }
+      else showToast(L("Define tu nicho desde los ajustes.","Set your niche from settings."));
       return;
     }
     if(act==="versus-start"){
