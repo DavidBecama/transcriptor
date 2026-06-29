@@ -7331,17 +7331,20 @@
      CARGA DE DATOS
      ════════════════════════════════════════════════════════════════ */
   function setDevice(){ S.device=window.matchMedia("(max-width:720px)").matches?"mobile":"desktop"; }
-  function skeletonHTML(){ return railHTML()+'<div class="work">'+cmdHTML()+'<div class="scroll"><div class="canvas">'+
-      '<div class="rs-boot">'+
-        '<div class="rs-boot-orb">'+
-          '<div class="rs-boot-core">'+IC.bolt+'</div>'+
-          '<svg class="rs-boot-ring" viewBox="0 0 100 100" fill="none" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="var(--brand-500)" stroke-width="4" stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="220"></circle></svg>'+
-        '</div>'+
-        '<div class="rs-boot-tt"><span class="rs-boot-label">'+L("Cargando Reelscript","Loading Reelscript")+'</span>'+
-          '<div class="rs-boot-dots" aria-hidden="true"><span></span><span></span><span></span></div>'+
-        '</div>'+
+  function _bootInnerHTML(){ return '<div class="rs-boot">'+
+      '<div class="rs-boot-orb">'+
+        '<div class="rs-boot-core">'+IC.bolt+'</div>'+
+        '<svg class="rs-boot-ring" viewBox="0 0 100 100" fill="none" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="var(--brand-500)" stroke-width="4" stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="220"></circle></svg>'+
       '</div>'+
-    '</div></div></div>'; }
+      '<div class="rs-boot-tt"><span class="rs-boot-label">'+L("Cargando Reelscript","Loading Reelscript")+'</span>'+
+        '<div class="rs-boot-dots" aria-hidden="true"><span></span><span></span><span></span></div>'+
+      '</div>'+
+    '</div>'; }
+  function skeletonHTML(){ return railHTML()+'<div class="work">'+cmdHTML()+'<div class="scroll"><div class="canvas">'+_bootInnerHTML()+'</div></div></div>'; }
+  // Boot a PANTALLA COMPLETA limpia (sin rail/cmd): para el primer arranque y para
+  // usuarios que aún no han pasado el onboarding — así NO se ve "la app" detrás antes
+  // de que aparezca el onboarding (reusa el lienzo full-screen de .onb-fs).
+  function bootFullHTML(){ return '<div class="onb-fs rs-boot-fs">'+_bootInnerHTML()+'</div>'; }
 
   // DEMO MVP: siembra guiones (con HOOKS agrupados + métricas de publicación) y un
   // perfil de métricas con reels VINCULADOS a sus guiones — para ver el loop completo.
@@ -7393,7 +7396,9 @@
     S._lbReal=null;   // ranking por-marca: fuerza recarga de /api/leaderboard de ESTA marca (no caché de la anterior)
     S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");   // grid rail+work YA en el skeleton (si no, el rail sale centrado sobre negro)
-    el.innerHTML=skeletonHTML();
+    // Onboarding pendiente (o demo ?onb=1) → loader full-screen limpio, sin que asome la
+    // chrome de la app antes de montar el onboarding. Si ya pasó el onboarding → skeleton normal.
+    el.innerHTML=((!isDemo() && !S.user.onbV2Done) || (isDemo() && S.onb && S.onb._force)) ? bootFullHTML() : skeletonHTML();
     var q=S.brandId?("?brand="+encodeURIComponent(S.brandId)):"";
     // P0 aislamiento: el backend filtra por project_id ("brand" lo ignoraba) —
     // stats y feed de señales salían mezclados entre marcas. "default" → sin filtro.
@@ -7476,7 +7481,7 @@
     setDevice();
     var el=root(); if(!el) return;
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");   // grid rail+work YA en el skeleton de arranque (si no, rail centrado sobre negro)
-    el.innerHTML=skeletonHTML();
+    el.innerHTML=bootFullHTML();   // primer arranque: loader full-screen LIMPIO (sin chrome) hasta saber si es onboarding
     Promise.all([
       fetch("/auth/me",{credentials:"same-origin"}).then(function(r){return r.json();}).catch(function(){return{};}),
       fetch("/api/brands",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():{brands:[]};}).catch(function(){return{brands:[]};})
