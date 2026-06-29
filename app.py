@@ -9348,31 +9348,27 @@ def radar_suggestions():
         tracked = set()
     exclude = tracked | _dismissed_creator_ids(uid, project_id)
     # NICHO EXPLÍCITO POR PROYECTO (no derivado de competidores ni del perfil compartido):
-    #   · Marca con project_id → usa projects.niche/subniches. Si la marca NO tiene nicho →
-    #     needs_niche:true (el front pide fijarlo) en vez de sacar genérico/off-niche.
+    #   · Marca con project_id → usa projects.niche/subniches; si la marca no tiene nicho,
+    #     HEREDA el del onboarding (perfil).
     #   · Marca "default" (sin project_id) → nicho del PERFIL (el del onboarding del usuario).
+    #   · Sin nicho en NINGÚN sitio (ni proyecto ni onboarding) → needs_niche:true para que la
+    #     UI pida definirlo, NUNCA {suggestions:[]} en silencio (el usuario lo lee como roto).
+    niche, subs = "", []
     if project_id:
         try:
             proj = (db.table("projects").select("niche, subniches")
                       .eq("id", project_id).eq("user_id", uid).single().execute()).data or {}
         except Exception:
             proj = {}
-        psubs = [t for t in (_norm_tag(s) for s in (proj.get("subniches") or [])) if t]
-        pn = (proj.get("niche") or "").strip()
-        if not psubs and not pn:
-            # HERENCIA: un proyecto sin nicho propio hereda el del onboarding (perfil) →
-            # las marcas pre-#223 siguen on-niche sin pedir nada. Solo needs_niche si el
-            # usuario NO tiene nicho en NINGÚN sitio (ni proyecto ni onboarding).
-            prof = get_profile(uid)
-            pn = (prof.get("niche") or "").strip()
-            psubs = [t for t in (_norm_tag(s) for s in (prof.get("subniches") or [])) if t]
-            if not psubs and not pn:
-                return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
-        niche, subs = pn, psubs
-    else:
+        subs = [t for t in (_norm_tag(s) for s in (proj.get("subniches") or [])) if t]
+        niche = (proj.get("niche") or "").strip()
+    if not subs and not niche:
+        # Herencia (proyecto sin nicho) o marca default → nicho del perfil.
         prof = get_profile(uid)
-        niche = prof.get("niche") or ""
+        niche = (prof.get("niche") or "").strip()
         subs = [t for t in (_norm_tag(s) for s in (prof.get("subniches") or [])) if t]
+    if not subs and not niche:
+        return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
     reels = _niche_suggestion_reels(subs, niche, exclude, limit)
     return jsonify({"suggestions": reels, "total": len(reels)}), 200
 
@@ -9385,6 +9381,28 @@ def niche_subniche_suggestions():
     Reusa NICHE_SUBNICHE_SEED (cero coste)."""
     niche = (request.args.get("niche") or "").strip()
     return jsonify({"suggestions": (_subniche_suggestions(niche) if niche else [])}), 200
+
+
+@app.route("/api/profile/niche", methods=["POST"])
+@require_auth
+@limiter.limit("20 per hour")
+def set_profile_niche():
+    """Fija el nicho/subnichos del PERFIL desde el CTA «Define tu nicho» (cuando el usuario
+    no tiene nicho ni en perfil ni en proyecto → marca default/free). Solo escribe
+    niche/subniches; NO cierra el onboarding ni encola scrapes."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json() or {}
+    niche = (body.get("niche") or "").strip()[:80]
+    subs = [t for t in (_norm_tag(s) for s in (body.get("subniches") or [])) if t][:8]
+    if not niche and not subs:
+        return jsonify({"error": "empty", "message": "Escribe tu nicho."}), 400
+    try:
+        db.table("profiles").update({"niche": niche or None, "subniches": subs}).eq("id", uid).execute()
+    except Exception:
+        logger.warning("[niche] profile niche update failed", exc_info=True)
+        return jsonify({"error": "save_failed", "message": "No se pudo guardar el nicho."}), 500
+    return jsonify({"ok": True, "niche": niche, "subniches": subs}), 200
 
 
 @app.route("/api/onboarding/complete", methods=["POST"])

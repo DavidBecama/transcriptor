@@ -15710,6 +15710,24 @@
   </div>
 </div>
 
+<!-- Define tu nicho (CTA «Sugerencias de hoy» cuando no hay nicho en perfil ni proyecto) -->
+<div class="overlay" id="nicheSetupOverlay" onclick="if(event.target===this)closeModal('nicheSetupOverlay')">
+  <div class="modal" style="max-width:480px">
+    <button class="modal-x" onclick="closeModal('nicheSetupOverlay')">✕</button>
+    <h2><span data-i18n-es="Define tu nicho" data-i18n-en="Set your niche">Define tu nicho</span></h2>
+    <p><span data-i18n-es="Lo usamos para mostrarte cada día los reels que petan EN TU nicho." data-i18n-en="We use it to show you the reels blowing up IN YOUR niche every day.">Lo usamos para mostrarte cada día los reels que petan EN TU nicho.</span></p>
+    <div class="field">
+      <label><span data-i18n-es="Tu nicho" data-i18n-en="Your niche">Tu nicho</span></label>
+      <input type="text" id="nicheSetupInput" placeholder="ej. inteligencia artificial" oninput="nicheSetupSuggest()" />
+      <div class="proj-niche-hint" data-i18n-es="Subnichos (separa por comas) — afinan tus sugerencias." data-i18n-en="Sub-niches (comma-separated) — sharpen your suggestions.">Subnichos (separa por comas) — afinan tus sugerencias.</div>
+      <input type="text" id="nicheSetupSubs" placeholder="ej. agentes ia, automatización, prompts" style="margin-top:6px" />
+      <div class="proj-subniche-suggs" id="nicheSetupSuggs"></div>
+    </div>
+    <div class="form-err" id="nicheSetupErr"></div>
+    <button class="btn-full" id="nicheSetupSubmitBtn" onclick="submitNicheSetup()"><span data-i18n-es="Guardar nicho" data-i18n-en="Save niche">Guardar nicho</span></button>
+  </div>
+</div>
+
 <!-- Edit script modal -->
 <div class="overlay" id="scrEditOverlay" onclick="if(event.target===this)closeModal('scrEditOverlay')">
   <div class="modal">
@@ -21748,6 +21766,67 @@ function projAddSubnicheTag(tag) {
   if (cur.map(function (s) { return s.toLowerCase(); }).indexOf(tag.toLowerCase()) >= 0) return;
   if (cur.length >= 8) return;
   cur.push(tag); inp.value = cur.join(", ");
+}
+
+// ── «Define tu nicho»: modal del nicho de USUARIO (marca default/free sin proyecto).
+// Lo abre el CTA de «Sugerencias de hoy» (set-brand-niche) cuando no hay nicho en ningún sitio.
+window.openNicheSetup = function openNicheSetup() {
+  const inp = document.getElementById("nicheSetupInput");
+  const subs = document.getElementById("nicheSetupSubs");
+  const err = document.getElementById("nicheSetupErr");
+  if (inp) inp.value = "";
+  if (subs) subs.value = "";
+  document.getElementById("nicheSetupSuggs").innerHTML = "";
+  if (err) { err.textContent = ""; err.classList.remove("on"); }
+  openModal("nicheSetupOverlay");
+  setTimeout(() => inp && inp.focus(), 100);
+};
+let _nicheSetupTimer = null;
+function nicheSetupSuggest() {
+  const niche = (document.getElementById("nicheSetupInput").value || "").trim();
+  const box = document.getElementById("nicheSetupSuggs");
+  if (!box) return;
+  if (!niche) { box.innerHTML = ""; return; }
+  clearTimeout(_nicheSetupTimer);
+  _nicheSetupTimer = setTimeout(function () {
+    const lang = (document.documentElement.lang || "es").toLowerCase();
+    fetch("/api/niche/subniche-suggestions?niche=" + encodeURIComponent(niche), { credentials: "same-origin" })
+      .then(function (r) { return r.json(); }).then(function (d) {
+        const sugg = (d && Array.isArray(d.suggestions)) ? d.suggestions : [];
+        box.innerHTML = sugg.length
+          ? '<span class="proj-subniche-lbl">' + (lang === "en" ? "Suggested:" : "Sugeridos:") + '</span>' + sugg.map(function (s) {
+              const safe = String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+              return '<button type="button" class="proj-subniche-chip" data-tag="' + safe + '" onclick="nicheSetupAddTag(this.dataset.tag)">+ ' + safe + '</button>';
+            }).join("")
+          : "";
+      }).catch(function () {});
+  }, 350);
+}
+function nicheSetupAddTag(tag) {
+  tag = (tag || "").trim(); if (!tag) return;
+  const inp = document.getElementById("nicheSetupSubs");
+  const cur = inp.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+  if (cur.map(function (s) { return s.toLowerCase(); }).indexOf(tag.toLowerCase()) >= 0) return;
+  if (cur.length >= 8) return;
+  cur.push(tag); inp.value = cur.join(", ");
+}
+async function submitNicheSetup() {
+  const lang = (document.documentElement.lang || "es").toLowerCase();
+  const niche = document.getElementById("nicheSetupInput").value.trim();
+  const subniches = document.getElementById("nicheSetupSubs").value.split(",").map(s => s.trim()).filter(Boolean).slice(0, 8);
+  const err = document.getElementById("nicheSetupErr");
+  if (!niche && !subniches.length) {
+    err.textContent = lang === "en" ? "Type your niche." : "Escribe tu nicho.";
+    err.classList.add("on"); return;
+  }
+  const res = await fetch("/api/profile/niche", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ niche, subniches }),
+  });
+  if (!res.ok) { const d = await res.json().catch(() => ({})); err.textContent = d.message || "Error"; err.classList.add("on"); return; }
+  closeModal("nicheSetupOverlay");
+  showToast(lang === "en" ? "Niche saved" : "Nicho guardado");
+  try { if (window.RS_reloadRadar) window.RS_reloadRadar(); } catch (e) {}
 }
 
 async function submitProjectEditor() {
