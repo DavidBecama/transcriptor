@@ -8356,6 +8356,33 @@ _SEED_NICHE_ALIAS = {
     "real estate": "inmobiliaria",
 }
 
+# Mapa de nicho de TEXTO LIBRE → nicho canónico del pool (creators_global.niche). El
+# onboarding y el modal dejan nichos libres ("inteligencia artificial", "marketing
+# digital", "meditacion"…) que NO casan exacto con la taxonomía del pool → 0 sugerencias.
+# Este alias los lleva a su nicho canónico para el FALLBACK por nicho amplio.
+_POOL_NICHE_ALIAS = {
+    "ia": "tecnologia", "ai": "tecnologia", "inteligencia artificial": "tecnologia",
+    "automatizacion": "tecnologia", "no-code": "tecnologia", "nocode": "tecnologia",
+    "programacion": "tecnologia", "software": "tecnologia", "saas": "negocios",
+    "marketing digital": "marketing", "growth": "marketing", "ads": "marketing",
+    "publicidad": "marketing", "copywriting": "marketing", "redes sociales": "marketing",
+    "creacion de contenido": "marketing", "creador de contenido": "marketing",
+    "emprendimiento": "negocios", "emprender": "negocios", "ecommerce": "negocios", "ventas": "negocios",
+    "meditacion": "espiritualidad y mindfulness", "mindfulness": "espiritualidad y mindfulness",
+    "nutricion": "salud", "psicologia": "salud", "bienestar": "salud",
+}
+
+
+def _pool_niche_canon(niche):
+    """Nicho del usuario (texto libre) → nicho canónico de creators_global, para el
+    fallback por nicho amplio. Devuelve "" si no hay nicho."""
+    n = _norm_tag(niche or "")
+    if not n:
+        return ""
+    if n in _POOL_NICHE_ALIAS:
+        return _POOL_NICHE_ALIAS[n]
+    return _SEED_NICHE_ALIAS.get(n, n)
+
 
 def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, limit=5):
     """Competidores CURADOS (creators_global.niche_source='seed') del nicho/subnichos
@@ -9245,6 +9272,13 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
     solo se ofrece en esos (menos sugerencias de seguir, más curadas). SOLO on-niche; cero
     scrape (pool cacheado). Devuelve reels en forma de feed (normReel-compatibles)+worth_follow."""
     subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:16]
+    # El propio nicho normalizado suele ser un SUBNICHE válido en la taxonomía rica de
+    # creators_global ("inteligencia artificial", "marketing digital", "espiritualidad y
+    # mindfulness"…). Inclúyelo como candidato de overlap → recupera nichos de texto libre
+    # con subnichos vacíos/genéricos (antes derivaban "consejos/tutoriales" → 0 overlap).
+    nnorm = _norm_tag(niche or "")
+    if nnorm and nnorm not in subs:
+        subs = ([nnorm] + subs)[:16]
     if not subs and niche:
         subs = [t for t in (_norm_tag(s) for s in _subniche_suggestions(niche)) if t][:16]
     if not subs:
@@ -9252,8 +9286,7 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
     subs_set = set(subs)
     # ENDURECIDO on-niche: una SOLA subniche genérica compartida (p.ej. Ibai tagueado solo
     # "ia") NO basta para colar a un creador. Pedimos ≥2 subnichos solapados cuando el nicho
-    # tiene ≥2 tags. Y se ELIMINA el match amplio por `niche` (era la fuga off-niche: el
-    # `creators_global.niche == perfil.niche` arrastraba a todo el nicho del perfil).
+    # tiene ≥2 tags.
     min_overlap = 2 if len(subs_set) >= 2 else 1
     exclude = set(exclude_creator_ids or [])
     uname = {}
@@ -9268,6 +9301,20 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
                 uname[cid] = c.get("ig_username") or ""
     except Exception:
         logger.warning("[sugg] subniche overlap failed (¿migración subniches?)")
+    # FALLBACK por NICHE AMPLIO: si el overlap fuerte no encontró a NADIE (nicho con pocos/0
+    # subnichos en el pool), casa por nicho canónico en vez de devolver 0. Solo como red de
+    # seguridad (no como widener permanente) → no reintroduce la fuga off-niche del caso normal.
+    if not uname:
+        pn = _pool_niche_canon(niche)
+        if pn:
+            try:
+                for c in (db.table("creators_global").select("id, ig_username")
+                            .eq("niche", pn).limit(600).execute()).data or []:
+                    cid = c.get("id")
+                    if cid and cid not in exclude:
+                        uname[cid] = c.get("ig_username") or ""
+            except Exception:
+                pass
     cids = list(uname.keys())
     if not cids:
         return []

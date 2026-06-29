@@ -1760,7 +1760,19 @@
     var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
       return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
     var list=(Array.isArray(S._suggToday)?S._suggToday:[]).filter(function(r){ return tracked.indexOf(String((r.creator&&r.creator.handle)||"").toLowerCase())<0; });
-    if(!list.length) return '';
+    if(!list.length){
+      // EMPTY-STATE honesto: ya cargó (S._suggToday es array) y hay nicho fijado pero 0 reels
+      // frescos en el pool → mensaje, NO ocultar en silencio (parecía roto). Mientras carga
+      // (S._suggToday undefined) sí se oculta. El pool se renueva con el job diario, no a mano.
+      if(Array.isArray(S._suggToday)){
+        return '<section class="stday-sec stday-empty-sec">'+
+          '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span>'+
+            '<button class="sugg-hide" data-act="st-dismiss-all">'+L("Ocultar","Hide")+'</button></div>'+
+          '<div class="stday-empty">'+L("Hoy no hay reels nuevos petando en tu nicho. El radar se renueva solo cada día — vuelve mañana.","No new reels blowing up in your niche today. The radar refreshes on its own daily — check back tomorrow.")+'</div>'+
+        '</section>';
+      }
+      return '';
+    }
     var cards=list.slice(0,15).map(suggTodayCardHTML).join("");
     var arrows='<div class="stday-arrows">'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
