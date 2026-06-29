@@ -557,6 +557,19 @@ WHOP_FLASH_TOPUP_IDS = {_pp(f"WHOP_TOPUP_300_FLASH_{_c}") for _c in ("EUR", "USD
 WHOP_ALL_PLAN_IDS = set(WHOP_PLAN_TO_PLAN.keys()) | set(WHOP_TOPUP_PLANS.keys()) | WHOP_FLASH_TOPUP_IDS
 
 db: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+# GUARD anti-cuelgue: el httpx del cliente Supabase trae timeout 120s por defecto → un fallo de
+# red/pool deja la request colgada 2 min (= "pending para siempre" bajo gevent). Lo bajamos a
+# 15s en postgrest/auth/storage → ninguna query cuelga indefinidamente; falla rápido y responde.
+try:
+    import httpx as _httpx
+    _SB_TIMEOUT = _httpx.Timeout(15.0)
+    for _sb_sub in ("postgrest", "auth", "storage"):
+        _c = getattr(db, _sb_sub, None)
+        _sess = getattr(_c, "session", None)
+        if isinstance(_sess, _httpx.Client):
+            _sess.timeout = _SB_TIMEOUT
+except Exception:
+    logger.warning("[supabase] no pude fijar el timeout del cliente", exc_info=True)
 
 
 # ── Config DB-driven (planes / topups / settings) con caché TTL + fallback ────
@@ -9434,18 +9447,24 @@ def radar_suggestions():
     user = current_user()
     uid = user["id"]
     project_id = request.args.get("project_id")
-    exclude = _sugg_exclude(uid, project_id)
-    niche, subs = _resolve_brand_niche(uid, project_id)
-    if not subs and not niche:
-        # Sin nicho en NINGÚN sitio → needs_niche (la UI pide definirlo, no vacío en silencio).
-        return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
-    sseed = _reshuffle_nonce(uid, project_id)
-    # +1 para saber si hay material más allá de la ventana gratis (sin un 2º query).
-    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_FREE_N + 1, shuffle_seed=sseed)
-    has_more = len(batch) > SUGG_FREE_N
-    return jsonify({"suggestions": batch[:SUGG_FREE_N], "total": len(batch[:SUGG_FREE_N]),
-                    "free_n": SUGG_FREE_N, "has_more": has_more, "more_units": SUGG_MORE_UNITS,
-                    "more_batch": SUGG_MORE_BATCH}), 200
+    # HOTFIX cuelgue prod (#231): orden DETERMINISTA por explosión (sin shuffle/nonce en el GET).
+    # El re-baraja de sugerencias se hará client-side (cero round-trip → no puede colgar). Todo
+    # el cómputo va dentro de try/except → el endpoint NUNCA cuelga ni 500: peor caso, [].
+    try:
+        exclude = _sugg_exclude(uid, project_id)
+        niche, subs = _resolve_brand_niche(uid, project_id)
+        if not subs and not niche:
+            # Sin nicho en NINGÚN sitio → needs_niche (la UI pide definirlo, no vacío en silencio).
+            return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
+        # +1 para saber si hay material más allá de la ventana gratis (sin un 2º query).
+        batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_FREE_N + 1)
+        has_more = len(batch) > SUGG_FREE_N
+        return jsonify({"suggestions": batch[:SUGG_FREE_N], "total": len(batch[:SUGG_FREE_N]),
+                        "free_n": SUGG_FREE_N, "has_more": has_more, "more_units": SUGG_MORE_UNITS,
+                        "more_batch": SUGG_MORE_BATCH}), 200
+    except Exception:
+        logger.warning("[sugg] radar_suggestions falló uid=%s pid=%s", uid, project_id, exc_info=True)
+        return jsonify({"suggestions": [], "total": 0, "error": True}), 200
 
 
 @app.route("/api/radar/reshuffle", methods=["POST"])
@@ -9487,10 +9506,8 @@ def radar_suggestions_more():
     if not subs and not niche:
         return jsonify({"ok": False, "error": "no_niche"}), 400
     exclude = _sugg_exclude(uid, project_id)
-    sseed = _reshuffle_nonce(uid, project_id)
-    # +1 para has_more sin 2º query. Cobramos ANTES solo si confirmamos que hay tanda nueva.
-    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1,
-                                    shuffle_seed=sseed, offset=offset)
+    # Orden DETERMINISTA (sin shuffle) → el paginado por offset es estable entre tandas.
+    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1, offset=offset)
     reels = batch[:SUGG_MORE_BATCH]
     if not reels:
         return jsonify({"ok": True, "suggestions": [], "has_more": False, "charged": False}), 200
@@ -11052,21 +11069,20 @@ def _radar_feed_order(uid, project_id, creator_ids, day_str=None, use_cache=True
     fresco sin leer/escribir la caché del feed completo (evita envenenarla). Devuelve
     [{'id','creator_id'}] ordenado."""
     day_str = day_str or datetime.now(timezone.utc).strftime("%Y%m%d")
-    # nonce de re-baraja: el botón «↻ otras» (gratis) lo sube → el siguiente cómputo varía el
-    # orden del MISMO pool, sin scrape. Entra en el jitter (no en la ckey: el reshuffle ya
-    # invalida la caché del día, así que el recómputo escribe el nuevo orden en la misma key).
-    rerank_nonce = _reshuffle_nonce(uid, project_id)
     ckey = "feedcache:%s:%s:%s" % (uid, project_id or "_", day_str)
     if use_cache and rds is not None:
         try:
             cached = rds.get(ckey)
             if cached:
-                return json.loads(cached)
+                return json.loads(cached)   # cache-hit: ni nonce ni cómputo (path caliente)
         except Exception:
             pass
     creator_ids = [c for c in (creator_ids or []) if c]
     if not creator_ids:
         return []
+    # nonce de re-baraja SOLO en el cómputo fresco (tras un cache-miss; el reshuffle invalida la
+    # caché → este recómputo lee el nuevo nonce y escribe el nuevo orden). Fuera del path caliente.
+    rerank_nonce = _reshuffle_nonce(uid, project_id)
     try:
         cand = (db.table("creator_reels_global")
                   .select("id, creator_id, views, posted_at")
