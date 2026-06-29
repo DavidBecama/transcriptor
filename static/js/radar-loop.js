@@ -7110,15 +7110,16 @@
       return;
     }
     if(act==="st-dismiss-all"){ S._stDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
-    if(act==="reshuffle-sugg"){   // «↻ otras» GRATIS: re-baraja el pool (sin scrape) y recarga
-      if(isDemo()) return;
-      var _rp=_pidOf(S.brandId);
-      showToast(L("Barajando otras…","Shuffling others…"));
-      apiPost("/api/radar/reshuffle", _rp?{project_id:_rp}:{}).then(function(){
-        S._suggToday=undefined; S._stLoading=false;   // fuerza recarga con el nuevo orden
-        loadSuggestionsToday();
-      });
-      return;
+    if(act==="reshuffle-sugg"){   // «↻ otras» GRATIS: re-baraja CLIENT-SIDE (cero round-trip,
+      // NO puede colgar). Reordena la ventana ya cargada (Fisher-Yates). El re-fetch al server
+      // se quitó: causaba peticiones apiladas que colgaban el endpoint en prod (#231).
+      var _a=Array.isArray(S._suggToday)?S._suggToday:[];
+      if(_a.length>1){
+        _a=_a.slice();
+        for(var _i=_a.length-1;_i>0;_i--){ var _j=Math.floor(Math.random()*(_i+1)); var _t=_a[_i]; _a[_i]=_a[_j]; _a[_j]=_t; }
+        S._suggToday=_a;
+      }
+      return render();
     }
     if(act==="sugg-more"){   // «Ver más» de PAGO: confirma coste → cobra → añade la tanda
       if(isDemo()) return;
