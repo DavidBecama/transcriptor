@@ -1684,20 +1684,22 @@
   // «Sugerencias de hoy»: sección PROPIA (no en el feed) con creadores NUEVOS del nicho
   // que petan y el user no sigue. Carga 1 vez (real; demo no la muestra). Excluye seguidos
   // y descartados en backend; el front re-filtra seguidos por si acaba de añadir uno.
+  function _normSugg(raw){ var n=normReel(raw); n.worthFollow=!!raw.worth_follow; n.why=raw.why||""; n.suggestion=true; return n; }
   function loadSuggestionsToday(){
     if(isDemo() || S._stDismissed || S._stLoading || Array.isArray(S._suggToday)) return;
     S._stLoading=true;
     var _p=_pidOf(S.brandId);
-    apiGet("/api/radar/suggestions?limit=15"+(_p?("&project_id="+encodeURIComponent(_p)):"")).then(function(r){
+    apiGet("/api/radar/suggestions"+(_p?("?project_id="+encodeURIComponent(_p)):"")).then(function(r){
       S._stLoading=false;
       // needs_niche: la marca no tiene nicho propio fijado → en vez de sacar genérico/off-niche,
       // el front pide definirlo (CTA → editor de proyecto).
       S._suggNeedsNiche=!!(r&&r.d&&r.d.needs_niche);
+      S._suggHasMore=!!(r&&r.d&&r.d.has_more);                 // ¿hay tandas de pago tras las gratis?
+      S._suggMoreUnits=(r&&r.d&&r.d.more_units)||3;            // coste por tanda (créditos)
+      S._suggMoreBatch=(r&&r.d&&r.d.more_batch)||4;
       // Son REELS (normReel-compat): los normalizo y marco suggestion=true (para robar SIN
       // seguir vía no_follow) + worthFollow (para ofrecer «+ Añadir competidor» solo en esos).
-      S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions))
-        ? r.d.suggestions.map(function(raw){ var n=normReel(raw); n.worthFollow=!!raw.worth_follow; n.why=raw.why||""; n.suggestion=true; return n; })
-        : [];
+      S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions)) ? r.d.suggestions.map(_normSugg) : [];
       if(S.tab==="dashboard") render();
     });
   }
@@ -1767,23 +1769,37 @@
       if(Array.isArray(S._suggToday)){
         return '<section class="stday-sec stday-empty-sec">'+
           '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span>'+
-            '<button class="sugg-hide" data-act="st-dismiss-all">'+L("Ocultar","Hide")+'</button></div>'+
-          '<div class="stday-empty">'+L("Hoy no hay reels nuevos petando en tu nicho. El radar se renueva solo cada día — vuelve mañana.","No new reels blowing up in your niche today. The radar refreshes on its own daily — check back tomorrow.")+'</div>'+
+            _stdayMiniActs()+'</div>'+
+          '<div class="stday-empty">'+L("Hoy no hay reels nuevos petando en tu nicho. El radar se renueva solo cada día — vuelve mañana. ¿Nicho mal puesto? Edítalo arriba.","No new reels blowing up in your niche today. The radar refreshes on its own daily — check back tomorrow. Wrong niche? Edit it above.")+'</div>'+
         '</section>';
       }
       return '';
     }
-    var cards=list.slice(0,15).map(suggTodayCardHTML).join("");
+    var cards=list.slice(0,16).map(suggTodayCardHTML).join("");
+    // «Ver más» de PAGO: tras la ventana gratis (8), cada tanda cuesta créditos (sin scrape).
+    var moreCard=S._suggHasMore
+      ? '<button class="stday-card stday-morecard" data-act="sugg-more" data-offset="'+list.length+'">'+
+          '<span class="stday-more-ic">'+IC.bolt+'</span>'+
+          '<span class="stday-more-t">'+L("Ver más","See more")+'</span>'+
+          '<span class="stday-more-c">'+(S._suggMoreUnits||3)+' '+L("créditos","credits")+'</span>'+
+        '</button>'
+      : '';
     var arrows='<div class="stday-arrows">'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
     '</div>';
     return '<section class="stday-sec">'+
       '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+' <span class="stday-tag">'+L("reels que petan en tu nicho","reels blowing up in your niche")+'</span></span>'+
-        arrows+
-        '<button class="sugg-hide" data-act="st-dismiss-all">'+L("Ocultar","Hide")+'</button></div>'+
-      '<div class="stday-row">'+cards+'</div>'+
+        arrows+_stdayMiniActs()+'</div>'+
+      '<div class="stday-row">'+cards+moreCard+'</div>'+
     '</section>';
+  }
+  // Acciones de cabecera de «Sugerencias de hoy»: «↻ otras» (re-baraja GRATIS, sin scrape) +
+  // «✎ nicho» (editar nicho de la marca SIEMPRE) + «Ocultar». Compartidas por los 3 estados.
+  function _stdayMiniActs(){
+    return '<button class="stday-mini" data-act="reshuffle-sugg" title="'+L("Baraja otras del mismo nicho — gratis, sin scrape","Shuffle others from the same niche — free, no scrape")+'">'+IC.repeat+' '+L("otras","others")+'</button>'+
+      '<button class="stday-mini" data-act="set-brand-niche" title="'+L("Editar el nicho de esta marca","Edit this brand\'s niche")+'">'+IC.gear+' '+L("nicho","niche")+'</button>'+
+      '<button class="sugg-hide" data-act="st-dismiss-all">'+L("Ocultar","Hide")+'</button>';
   }
 
   // ── GALERÍAS de miniaturas + modal Comunidad (port de Leonard, restylado v3) ──
@@ -2231,9 +2247,13 @@
         '<h1 class="rdr-title">'+L("Señales de hoy","Today's signals")+'</h1>'+
         '<p class="rdr-sub">'+line+'</p>'+
         '<div class="rdr-stats">'+statsH+'</div>'+
-        // Refresco manual VISIBLE (antes enterrado en la addbar al fondo). El job diario
-        // renueva gratis; este fuerza scrape en vivo de tus competidores (cuesta créditos).
-        '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora · 5 créditos","Refresh now · 5 credits")+'</button>'+
+        // Dos refrescos BIEN diferenciados: «↻ otras» GRATIS (re-baraja el pool, sin scrape) y
+        // «Refrescar ahora · 5 cr» (scrape en vivo de competidores, de pago). El job diario
+        // renueva gratis también.
+        '<div class="rdr-refresh-row">'+
+          '<button class="rdr-reshuffle-cta" data-act="reshuffle-feed" title="'+L("Baraja otras del pool que ya tienes — gratis, sin scrape","Shuffle others from the pool you already have — free, no scrape")+'">'+IC.repeat+' '+L("Otras · gratis","Others · free")+'</button>'+
+          '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora · 5 créditos","Refresh now · 5 credits")+'</button>'+
+        '</div>'+
       '</div>'+
       '<div class="rdr-hero-r">'+radarScopeHTML()+
         '<div class="rdr-cap"><span class="rdr-cap-dot"></span><span class="rdr-cap-t">'+ESC(cap)+'</span></div>'+
@@ -7090,6 +7110,47 @@
       return;
     }
     if(act==="st-dismiss-all"){ S._stDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
+    if(act==="reshuffle-sugg"){   // «↻ otras» GRATIS: re-baraja el pool (sin scrape) y recarga
+      if(isDemo()) return;
+      var _rp=_pidOf(S.brandId);
+      showToast(L("Barajando otras…","Shuffling others…"));
+      apiPost("/api/radar/reshuffle", _rp?{project_id:_rp}:{}).then(function(){
+        S._suggToday=undefined; S._stLoading=false;   // fuerza recarga con el nuevo orden
+        loadSuggestionsToday();
+      });
+      return;
+    }
+    if(act==="sugg-more"){   // «Ver más» de PAGO: confirma coste → cobra → añade la tanda
+      if(isDemo()) return;
+      var _mp=_pidOf(S.brandId), _off=parseInt(btn.getAttribute("data-offset")||"8",10)||8;
+      var _units=S._suggMoreUnits||3;
+      var _go=function(){
+        showToast(L("Trayendo más…","Loading more…"));
+        apiPost("/api/radar/suggestions/more", _mp?{project_id:_mp, offset:_off}:{offset:_off}).then(function(r){
+          if(r.status===402){ showError((r.d&&r.d.message)||L("Necesitas créditos para ver más.","You need credits to see more.")); try{ if(window.openUpgradeModal) window.openUpgradeModal("credits"); }catch(e){} return; }
+          if(!r.ok||!r.d){ return showError(L("No pude traer más.","Couldn't load more.")); }
+          var got=(Array.isArray(r.d.suggestions)?r.d.suggestions:[]).map(_normSugg);
+          if(got.length){ S._suggToday=(Array.isArray(S._suggToday)?S._suggToday:[]).concat(got); }
+          S._suggHasMore=!!r.d.has_more;
+          if(r.d.charged){ try{ refreshCredits(); }catch(e){} }
+          render();
+          if(!got.length) showToast(L("No hay más por ahora.","No more for now."));
+        });
+      };
+      if(typeof window.confirmModal==="function"){
+        window.confirmModal({ title:L("Ver más sugerencias","See more suggestions"),
+          body:L("Te traigo "+(S._suggMoreBatch||4)+" reels más de tu nicho. Cuesta "+_units+" créditos (no scrapea nada nuevo, son del pool).","I'll bring "+(S._suggMoreBatch||4)+" more reels from your niche. Costs "+_units+" credits (no new scrape, from the pool)."),
+          confirmText:L("Ver más · "+_units+" cr","See more · "+_units+" cr"), cancelText:L("Ahora no","Not now") }).then(function(ok){ if(ok) _go(); });
+      } else { _go(); }
+      return;
+    }
+    if(act==="reshuffle-feed"){   // «↻ otras» GRATIS del feed del radar: re-baraja sin scrape
+      if(isDemo()) return;
+      var _fp=_pidOf(S.brandId);
+      showToast(L("Barajando el radar…","Shuffling the radar…"));
+      apiPost("/api/radar/reshuffle", _fp?{project_id:_fp}:{}).then(function(){ loadBrandData(); });
+      return;
+    }
     if(act==="stday-scroll"){   // flechas ←/→ del carrusel «Sugerencias de hoy»
       var _ss=btn.closest&&btn.closest(".stday-sec"); var _st=_ss&&_ss.querySelector(".stday-row");
       if(_st){ var _sd=(btn.getAttribute("data-dir")==="next")?1:-1; _st.scrollBy({left:_sd*Math.round(_st.clientWidth*0.82), behavior:"smooth"}); }
