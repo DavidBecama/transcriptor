@@ -158,6 +158,13 @@ REFRESH_NOW_UNITS         = int(os.environ.get("REFRESH_NOW_UNITS", "5"))   # ~5
 REFRESH_NOW_COST          = REFRESH_NOW_UNITS * COST_CENTS
 REFRESH_NOW_COOLDOWN_S    = int(os.environ.get("REFRESH_NOW_COOLDOWN_S", str(8 * 3600)))  # 8h
 PER_USER_REFRESH_CAP      = int(os.environ.get("PER_USER_REFRESH_CAP", "10"))  # cap Apify/refresh
+# «Sugerencias de hoy»: paginado del carrusel. Primeras SUGG_FREE_N gratis (2 tandas de 4);
+# a partir de ahí «ver más» CUESTA créditos (monetización, CERO scrape — el pool ya está).
+SUGG_FREE_N               = int(os.environ.get("SUGG_FREE_N", "8"))    # reels gratis (2×4)
+SUGG_MORE_BATCH           = int(os.environ.get("SUGG_MORE_BATCH", "4"))  # tanda de «ver más»
+SUGG_MORE_UNITS           = int(os.environ.get("SUGG_MORE_UNITS", "3"))  # ~3 créditos/tanda
+SUGG_MORE_COST            = SUGG_MORE_UNITS * COST_CENTS
+SUGG_MAX_TOTAL            = int(os.environ.get("SUGG_MAX_TOTAL", "40"))  # techo absoluto del carrusel
 
 # Flash por-usuario (economia-creditos.md §4): tras chocar el PRIMER muro, el Pack 300
 # baja a TOPUP_FLASH_EUR € (vs 49 €) durante TOPUP_FLASH_HOURS h. Urgencia + ancla.
@@ -9265,12 +9272,14 @@ def _suggestion_reason(exp, formato, age_days):
     return " · ".join(parts)
 
 
-def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, limit=15):
+def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, limit=15,
+                            shuffle_seed=None, offset=0):
     """«Sugerencias de hoy» orientado a REELS: reels que PETAN en el nicho de creadores que
     el user NO sigue ni descartó. Cada reel es ROBABLE sin seguir al creador. `worth_follow`
     marca a los creadores que MERECE seguir (listón alto) → la 2ª acción «+ Añadir competidor»
     solo se ofrece en esos (menos sugerencias de seguir, más curadas). SOLO on-niche; cero
-    scrape (pool cacheado). Devuelve reels en forma de feed (normReel-compatibles)+worth_follow."""
+    scrape (pool cacheado). `shuffle_seed` re-baraja el orden (botón «↻ otras» GRATIS, sin
+    scrape); `offset` pagina (tandas del carrusel). Devuelve reels normReel-compat+worth_follow."""
     subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:16]
     # El propio nicho normalizado suele ser un SUBNICHE válido en la taxonomía rica de
     # creators_global ("inteligencia artificial", "marketing digital", "espiritualidad y
@@ -9341,21 +9350,31 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
     FOLLOW_MIN_HITS = 2   # CURACIÓN: «+ Añadir competidor» solo si el creador peta de FORMA
                           # CONSISTENTE (≥2 reels petando), no un único viral de chiripa.
     PER_CREATOR = 2       # hasta 2 reels por creador → más volumen sin que uno domine
+    sseed = str(shuffle_seed) if shuffle_seed else None
     chosen = []
     for cid, lst in by_creator.items():
         lst.sort(key=lambda r: -(r.get("_exp") or 0.0))
         wf = sum(1 for x in lst if (x.get("_exp") or 0.0) >= FOLLOW_MIN_EXP) >= FOLLOW_MIN_HITS
         for r in lst[:PER_CREATOR]:
             if (r.get("_exp") or 0.0) >= REEL_FLOOR:
-                chosen.append((r.get("_exp") or 0.0, r, wf))
+                # 1ª vista (sseed=None) → orden por explosión (lo que MÁS peta primero).
+                # «↻ otras» (sseed) → baraja FUERTE (hash puro): todos ya pasan REEL_FLOOR
+                # (petan), así que variar el orden trae otros reels on-niche, sin scrape. El
+                # offset (paginado de «ver más») es estable mientras no se rebaraje.
+                if sseed:
+                    score = _unit_hash("%s:%s" % (r.get("id"), sseed))
+                else:
+                    score = r.get("_exp") or 0.0
+                chosen.append((score, r, wf))
     chosen.sort(key=lambda x: -x[0])
     now = datetime.now(timezone.utc)
     out = []
-    for exp, r, wf in chosen[:limit]:
+    for _score, r, wf in chosen[offset:offset + limit]:
         cid = r.get("creator_id"); sc = r.get("ig_reel_id")
         h = (uname.get(cid) or "").lstrip("@")
         ts = _parse_ts(r.get("posted_at"))
         age_days = int((now - ts).total_seconds() // 86400) if ts else None
+        rexp = r.get("_exp") or 0.0   # explosión REAL para mostrar (no el score barajado)
         out.append({
             "id": r.get("id"), "ig_reel_id": sc, "creator_id": cid,
             "creator": {"ig_username": h},
@@ -9364,42 +9383,17 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
             "caption": (r.get("caption") or "")[:600],
             "views": r.get("views"), "likes": r.get("likes"), "comments": r.get("comments"),
             "posted_at": r.get("posted_at"), "video_duration_sec": r.get("video_duration_sec"),
-            "explosion_score": round(exp, 2), "formato": r.get("formato"),
-            "why": _suggestion_reason(exp, r.get("formato"), age_days),
+            "explosion_score": round(rexp, 2), "formato": r.get("formato"),
+            "why": _suggestion_reason(rexp, r.get("formato"), age_days),
             "worth_follow": bool(wf), "source": "suggestion",
         })
     return out
 
 
-@app.route("/api/radar/suggestions", methods=["GET"])
-@require_auth
-@limiter.limit("60 per hour")
-def radar_suggestions():
-    """«Sugerencias de hoy» (carrusel de REELS): reels que PETAN en el nicho de creadores
-    que NO sigues ni descartaste. Cada reel se ROBA sin seguir; worth_follow ofrece «+
-    Añadir competidor» solo en los que merece. Cero scrape (pool cacheado)."""
-    user = current_user()
-    uid = user["id"]
-    project_id = request.args.get("project_id")
-    try:
-        limit = max(1, min(24, int(request.args.get("limit", "15"))))
-    except (TypeError, ValueError):
-        limit = 15
-    tq = (db.table("user_tracked_creators").select("creator_id")
-            .eq("user_id", uid).is_("archived_at", "null"))
-    if project_id:
-        tq = tq.eq("project_id", project_id)
-    try:
-        tracked = {t["creator_id"] for t in (tq.execute().data or [])}
-    except Exception:
-        tracked = set()
-    exclude = tracked | _dismissed_creator_ids(uid, project_id)
-    # NICHO EXPLÍCITO POR PROYECTO (no derivado de competidores ni del perfil compartido):
-    #   · Marca con project_id → usa projects.niche/subniches; si la marca no tiene nicho,
-    #     HEREDA el del onboarding (perfil).
-    #   · Marca "default" (sin project_id) → nicho del PERFIL (el del onboarding del usuario).
-    #   · Sin nicho en NINGÚN sitio (ni proyecto ni onboarding) → needs_niche:true para que la
-    #     UI pida definirlo, NUNCA {suggestions:[]} en silencio (el usuario lo lee como roto).
+def _resolve_brand_niche(uid, project_id):
+    """Nicho efectivo de la marca: proyecto → su nicho; si no tiene, HEREDA el del perfil
+    (onboarding); marca default → perfil. Devuelve (niche, subs). (None vacío en ambos ⇒
+    needs_niche en el caller)."""
     niche, subs = "", []
     if project_id:
         try:
@@ -9410,14 +9404,121 @@ def radar_suggestions():
         subs = [t for t in (_norm_tag(s) for s in (proj.get("subniches") or [])) if t]
         niche = (proj.get("niche") or "").strip()
     if not subs and not niche:
-        # Herencia (proyecto sin nicho) o marca default → nicho del perfil.
         prof = get_profile(uid)
         niche = (prof.get("niche") or "").strip()
         subs = [t for t in (_norm_tag(s) for s in (prof.get("subniches") or [])) if t]
+    return niche, subs
+
+
+def _sugg_exclude(uid, project_id):
+    """creator_ids a excluir de las sugerencias: ya seguidos (de la marca) + descartados."""
+    tq = (db.table("user_tracked_creators").select("creator_id")
+            .eq("user_id", uid).is_("archived_at", "null"))
+    if project_id:
+        tq = tq.eq("project_id", project_id)
+    try:
+        tracked = {t["creator_id"] for t in (tq.execute().data or [])}
+    except Exception:
+        tracked = set()
+    return tracked | _dismissed_creator_ids(uid, project_id)
+
+
+@app.route("/api/radar/suggestions", methods=["GET"])
+@require_auth
+@limiter.limit("60 per hour")
+def radar_suggestions():
+    """«Sugerencias de hoy» (carrusel de REELS): reels que PETAN en el nicho de creadores
+    que NO sigues ni descartaste. Cada reel se ROBA sin seguir; worth_follow ofrece «+
+    Añadir competidor» solo en los que merece. Cero scrape (pool cacheado). Devuelve la
+    VENTANA GRATIS (SUGG_FREE_N); `has_more` indica si hay más tras pagar («ver más»)."""
+    user = current_user()
+    uid = user["id"]
+    project_id = request.args.get("project_id")
+    exclude = _sugg_exclude(uid, project_id)
+    niche, subs = _resolve_brand_niche(uid, project_id)
     if not subs and not niche:
+        # Sin nicho en NINGÚN sitio → needs_niche (la UI pide definirlo, no vacío en silencio).
         return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
-    reels = _niche_suggestion_reels(subs, niche, exclude, limit)
-    return jsonify({"suggestions": reels, "total": len(reels)}), 200
+    sseed = _reshuffle_nonce(uid, project_id)
+    # +1 para saber si hay material más allá de la ventana gratis (sin un 2º query).
+    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_FREE_N + 1, shuffle_seed=sseed)
+    has_more = len(batch) > SUGG_FREE_N
+    return jsonify({"suggestions": batch[:SUGG_FREE_N], "total": len(batch[:SUGG_FREE_N]),
+                    "free_n": SUGG_FREE_N, "has_more": has_more, "more_units": SUGG_MORE_UNITS,
+                    "more_batch": SUGG_MORE_BATCH}), 200
+
+
+@app.route("/api/radar/reshuffle", methods=["POST"])
+@require_auth
+@limiter.limit("30 per minute")
+def radar_reshuffle():
+    """«↻ otras» GRATIS: re-baraja el orden del pool YA scrapeado (sugerencias + feed),
+    SIN scrape. Sube el nonce de re-baraja e invalida la caché del feed → el siguiente load
+    varía. NUNCA encola scrape (eso es solo /api/radar/refresh-now, de pago)."""
+    user = current_user()
+    uid = user["id"]
+    body = request.get_json(silent=True) or {}
+    project_id = body.get("project_id") or None
+    nonce = _reshuffle_bump(uid, project_id)
+    _radar_feed_invalidate(uid, project_id)
+    track_event("radar_reshuffle", uid, {"project_id": project_id})
+    return jsonify({"ok": True, "queued": 0, "nonce": nonce, "message": "Otras sugerencias."}), 200
+
+
+@app.route("/api/radar/suggestions/more", methods=["POST"])
+@require_auth
+@limiter.limit("20 per minute")
+def radar_suggestions_more():
+    """«Ver más» del carrusel: tras las SUGG_FREE_N gratis, cada tanda CUESTA SUGG_MORE_UNITS
+    créditos (monetización, CERO scrape — el pool ya está). Cobra dual-rail (créditos / uso
+    mensual). Cobra SOLO si devuelve reels nuevos."""
+    user = current_user()
+    uid = user["id"]
+    email = (user.get("email") or "").lower()
+    body = request.get_json(silent=True) or {}
+    project_id = body.get("project_id") or None
+    try:
+        offset = max(SUGG_FREE_N, min(SUGG_MAX_TOTAL, int(body.get("offset") or SUGG_FREE_N)))
+    except (TypeError, ValueError):
+        offset = SUGG_FREE_N
+    if offset >= SUGG_MAX_TOTAL:
+        return jsonify({"ok": True, "suggestions": [], "has_more": False, "charged": False}), 200
+    niche, subs = _resolve_brand_niche(uid, project_id)
+    if not subs and not niche:
+        return jsonify({"ok": False, "error": "no_niche"}), 400
+    exclude = _sugg_exclude(uid, project_id)
+    sseed = _reshuffle_nonce(uid, project_id)
+    # +1 para has_more sin 2º query. Cobramos ANTES solo si confirmamos que hay tanda nueva.
+    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1,
+                                    shuffle_seed=sseed, offset=offset)
+    reels = batch[:SUGG_MORE_BATCH]
+    if not reels:
+        return jsonify({"ok": True, "suggestions": [], "has_more": False, "charged": False}), 200
+    # Cobro dual-rail (cortesía gratis). Mismo patrón que refresh-now.
+    is_courtesy = email in UNLIMITED_EMAILS
+    if not is_courtesy:
+        profile = get_profile(uid)
+        plan = profile.get("plan", "free")
+        is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
+        if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SUGG_MORE_COST:
+            return jsonify({"ok": False, "error": "no_credits",
+                            "message": "Necesitas %d créditos para ver más." % SUGG_MORE_UNITS}), 402
+        try:
+            if is_paid_unlimited:
+                db.table("profiles").update({
+                    "monthly_usage": (profile.get("monthly_usage") or 0) + SUGG_MORE_UNITS
+                }).eq("id", uid).execute()
+            else:
+                db.table("profiles").update({
+                    "credits_cents": (profile.get("credits_cents") or 0) - SUGG_MORE_COST
+                }).eq("id", uid).execute()
+        except Exception:
+            logger.warning("[sugg-more] cobro falló uid=%s", uid)
+            return jsonify({"ok": False, "error": "charge_failed"}), 500
+    track_event("sugg_more", uid, {"project_id": project_id, "offset": offset, "n": len(reels)})
+    return jsonify({"ok": True, "suggestions": reels, "charged": not is_courtesy,
+                    "has_more": len(batch) > SUGG_MORE_BATCH and (offset + SUGG_MORE_BATCH) < SUGG_MAX_TOTAL,
+                    "more_units": SUGG_MORE_UNITS, "more_batch": SUGG_MORE_BATCH}), 200
 
 
 @app.route("/api/niche/subniche-suggestions", methods=["GET"])
@@ -10951,6 +11052,10 @@ def _radar_feed_order(uid, project_id, creator_ids, day_str=None, use_cache=True
     fresco sin leer/escribir la caché del feed completo (evita envenenarla). Devuelve
     [{'id','creator_id'}] ordenado."""
     day_str = day_str or datetime.now(timezone.utc).strftime("%Y%m%d")
+    # nonce de re-baraja: el botón «↻ otras» (gratis) lo sube → el siguiente cómputo varía el
+    # orden del MISMO pool, sin scrape. Entra en el jitter (no en la ckey: el reshuffle ya
+    # invalida la caché del día, así que el recómputo escribe el nuevo orden en la misma key).
+    rerank_nonce = _reshuffle_nonce(uid, project_id)
     ckey = "feedcache:%s:%s:%s" % (uid, project_id or "_", day_str)
     if use_cache and rds is not None:
         try:
@@ -10992,7 +11097,7 @@ def _radar_feed_order(uid, project_id, creator_ids, day_str=None, use_cache=True
         # jitter FUERTE sembrado por día (multiplicador [0.4,1.0]): baraja de verdad la
         # banda de mérito similar → el TOP cambia cada día (lo que pide "no repite los
         # mismos tops"), sin que un reel mediocre supere a uno muy explosivo.
-        jit = 0.4 + 0.6 * _unit_hash("%s:%s:%s" % (r.get("id"), uid, day_str))
+        jit = 0.4 + 0.6 * _unit_hash("%s:%s:%s:%s" % (r.get("id"), uid, day_str, rerank_nonce))
         score = exp * fresh * jit
         if r.get("id") in seen:
             score *= RADAR_FEED_SEEN_PENALTY
@@ -11023,6 +11128,30 @@ def _radar_feed_invalidate(uid, project_id=None, day_str=None):
         rds.delete("feedcache:%s:%s:%s" % (uid, project_id or "_", day_str))
     except Exception:
         pass
+
+
+def _reshuffle_nonce(uid, project_id=None):
+    """Nonce de re-baraja por (usuario, marca). Lo usan el feed y las sugerencias en su
+    jitter → «↻ otras» varía el orden del MISMO pool sin scrape. 0 si Redis cae (orden estable)."""
+    if rds is None:
+        return 0
+    try:
+        v = rds.get("reshuffle:%s:%s" % (uid, project_id or "_"))
+        return int(v) if v else 0
+    except Exception:
+        return 0
+
+
+def _reshuffle_bump(uid, project_id=None):
+    """Sube el nonce de re-baraja (botón «↻ otras», GRATIS). TTL ~2d (se reinicia solo)."""
+    if rds is None:
+        return 0
+    try:
+        n = rds.incr("reshuffle:%s:%s" % (uid, project_id or "_"))
+        rds.expire("reshuffle:%s:%s" % (uid, project_id or "_"), 2 * 86400)
+        return int(n)
+    except Exception:
+        return 0
 
 
 def _dismissed_creator_ids(uid, project_id=None):

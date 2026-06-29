@@ -10293,8 +10293,12 @@
     .rs .rdr-sub b { color:var(--text-primary); font-weight:600; }
     .rs .rdr-stats { display:flex; align-items:flex-end; gap:32px; margin-top:8px; flex-wrap:wrap; }
     /* Refresco manual VISIBLE en el hero (antes enterrado en la addbar al fondo) */
-    .rs .rdr-refresh-cta { align-self:flex-start; display:inline-flex; align-items:center; gap:7px; margin-top:6px; font-size:.86rem; font-weight:600; padding:9px 15px; border-radius:11px; border:1px solid var(--brand-500); background:color-mix(in srgb, var(--brand-500) 10%, transparent); color:var(--brand-500); cursor:pointer; transition:background .15s; }
+    .rs .rdr-refresh-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px; }
+    .rs .rdr-refresh-cta { display:inline-flex; align-items:center; gap:7px; font-size:.86rem; font-weight:600; padding:9px 15px; border-radius:11px; border:1px solid var(--brand-500); background:color-mix(in srgb, var(--brand-500) 10%, transparent); color:var(--brand-500); cursor:pointer; transition:background .15s; }
     .rs .rdr-refresh-cta:hover { background:color-mix(in srgb, var(--brand-500) 18%, transparent); }
+    /* «↻ otras» GRATIS: estilo SECUNDARIO/ghost, bien diferenciado del de pago (brand) */
+    .rs .rdr-reshuffle-cta { display:inline-flex; align-items:center; gap:7px; font-size:.86rem; font-weight:600; padding:9px 15px; border-radius:11px; border:1px solid var(--border-default); background:transparent; color:var(--text-secondary); cursor:pointer; transition:background .15s; }
+    .rs .rdr-reshuffle-cta:hover { color:var(--text); border-color:var(--text-tertiary); background:var(--surface-raised); }
     .rs .rdr-refresh-cta svg { width:15px; height:15px; }
     .rs .rdr-stat { display:flex; flex-direction:column; gap:5px; }
     .rs .rdr-stat-v { font-family:var(--font-display); font-weight:800; font-size:34px; line-height:1; font-variant-numeric:tabular-nums; }
@@ -11994,7 +11998,18 @@
     .rs .stday-arrow svg { width:15px; height:15px; }
     .rs .stday-row { display:flex; gap:12px; overflow-x:auto; padding:2px 2px 8px; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
     .rs .stday-row::-webkit-scrollbar { display:none; }
-    .rs .stday-card { flex:0 0 178px; width:178px; scroll-snap-align:start; display:flex; flex-direction:column; border:1px solid var(--border-subtle); border-radius:14px; overflow:hidden; background:var(--surface-raised); }
+    /* 4 visibles: cada tarjeta = 1/4 del ancho visible (resto desliza). min-width para móvil. */
+    .rs .stday-card { flex:0 0 calc(25% - 9px); min-width:150px; scroll-snap-align:start; display:flex; flex-direction:column; border:1px solid var(--border-subtle); border-radius:14px; overflow:hidden; background:var(--surface-raised); }
+    /* mini-acciones de cabecera: «↻ otras» (gratis) + «✎ nicho» */
+    .rs .stday-mini { display:inline-flex; align-items:center; gap:5px; background:none; border:1px solid var(--border-subtle); border-radius:8px; color:var(--text-tertiary); font-size:12.5px; cursor:pointer; padding:5px 9px; }
+    .rs .stday-mini:hover { color:var(--text); border-color:var(--border-default); }
+    .rs .stday-mini svg { width:13px; height:13px; }
+    /* tarjeta «Ver más» de PAGO al final del carrusel */
+    .rs .stday-morecard { align-items:center; justify-content:center; gap:6px; text-align:center; cursor:pointer; border-style:dashed; border-color:color-mix(in srgb, var(--brand-500) 45%, transparent); background:color-mix(in srgb, var(--brand-500) 6%, var(--surface-raised)); color:var(--brand-500); padding:14px 10px; }
+    .rs .stday-morecard:hover { background:color-mix(in srgb, var(--brand-500) 12%, var(--surface-raised)); }
+    .rs .stday-more-ic svg { width:22px; height:22px; }
+    .rs .stday-more-t { font-weight:700; font-size:.92rem; }
+    .rs .stday-more-c { font-size:.78rem; color:var(--text-secondary); }
     .rs .stday-thumb { position:relative; aspect-ratio:3/4; width:100%; overflow:hidden; cursor:pointer; }
     .rs .stday-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
     .rs .stday-thumb::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.18) 0%, transparent 28%, transparent 60%, rgba(0,0,0,.62) 100%); pointer-events:none; }
@@ -28692,6 +28707,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=158"></script>
+<script src="/static/js/radar-loop.js?v=159"></script>
 </body>
 </html>
