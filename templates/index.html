@@ -14225,8 +14225,8 @@
         <div class="rsl-plan rsl-rise">
           <h3>Creator</h3>
           <p class="rsl-for" data-i18n-en="For the creator who publishes weekly and wants to sound like themselves.">Para el creador que publica cada semana y quiere sonar a él.</p>
-          <p class="rsl-price" data-m="€29" data-y="€23"><span class="rsl-amt">€29</span><small data-i18n-en="/mo">/mes</small></p>
-          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €276/yr{% else %}facturado €276/año{% endif %}">&nbsp;</p>
+          <p class="rsl-price" data-m="€19" data-y="€15"><span class="rsl-amt">€19</span><small data-i18n-en="/mo">/mes</small></p>
+          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €182/yr{% else %}facturado €182/año{% endif %}">&nbsp;</p>
           <p class="rsl-day" data-m="{% if lang == 'en' %}under €1 a day · €0.15 per stolen reel{% else %}menos de €1 al día · €0,15 por reel robado{% endif %}" data-y="{% if lang == 'en' %}€0.76 a day · €0.12 per stolen reel{% else %}€0,76 al día · €0,12 por reel robado{% endif %}">{% if lang == 'en' %}under €1 a day · €0.15 per stolen reel{% else %}menos de €1 al día · €0,15 por reel robado{% endif %}</p>
           <ul>
             <li data-i18n-html-en="<strong>200 credits</strong> a month (~200 reels stolen into your voice)"><strong>200 créditos</strong> al mes (~200 reels robados a tu voz)</li>
@@ -14242,9 +14242,9 @@
           <span class="rsl-pop" data-i18n-en="Most popular">El más elegido</span>
           <h3>Estudio</h3>
           <p class="rsl-for" data-i18n-en="For the creator who already bills and runs a few brands.">Para el creador que ya factura y lleva varias marcas.</p>
-          <p class="rsl-price" data-m="€59" data-y="€47"><span class="rsl-amt">€59</span><small data-i18n-en="/mo">/mes</small></p>
-          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €564/yr{% else %}facturado €564/año{% endif %}">&nbsp;</p>
-          <p class="rsl-day" data-m="{% if lang == 'en' %}3 brands · €20 per brand/mo{% else %}3 marcas · €20 por marca/mes{% endif %}" data-y="{% if lang == 'en' %}3 brands · €16 per brand/mo{% else %}3 marcas · €16 por marca/mes{% endif %}">{% if lang == 'en' %}3 brands · €20 per brand/mo{% else %}3 marcas · €20 por marca/mes{% endif %}</p>
+          <p class="rsl-price" data-m="€39" data-y="€31"><span class="rsl-amt">€39</span><small data-i18n-en="/mo">/mes</small></p>
+          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €374/yr{% else %}facturado €374/año{% endif %}">&nbsp;</p>
+          <p class="rsl-day" data-m="{% if lang == 'en' %}3 brands · €13 per brand/mo{% else %}3 marcas · €13 por marca/mes{% endif %}" data-y="{% if lang == 'en' %}3 brands · €10 per brand/mo{% else %}3 marcas · €10 por marca/mes{% endif %}">{% if lang == 'en' %}3 brands · €13 per brand/mo{% else %}3 marcas · €13 por marca/mes{% endif %}</p>
           <ul>
             <li data-i18n-html-en="<strong>400 credits</strong> a month (double Creator)"><strong>400 créditos</strong> al mes (el doble que Creator)</li>
             <li data-i18n-html-en="<strong>3 brands</strong>, each with its own brain"><strong>3 marcas</strong> con cerebro propio cada una</li>
@@ -14257,9 +14257,9 @@
         <div class="rsl-plan rsl-rise">
           <h3>Agency</h3>
           <p class="rsl-for" data-i18n-en="For brand portfolios and teams.">Para portfolios de marcas y equipos.</p>
-          <p class="rsl-price" data-m="€129" data-y="€107"><span class="rsl-amt">€129</span><small data-i18n-en="/mo">/mes</small></p>
-          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €1,290/yr{% else %}facturado €1.290/año{% endif %}">&nbsp;</p>
-          <p class="rsl-day" data-m="{% if lang == 'en' %}10 brands · €13 per brand/mo{% else %}10 marcas · €13 por marca/mes{% endif %}" data-y="{% if lang == 'en' %}10 brands · €11 per brand/mo{% else %}10 marcas · €11 por marca/mes{% endif %}">{% if lang == 'en' %}10 brands · €13 per brand/mo{% else %}10 marcas · €13 por marca/mes{% endif %}</p>
+          <p class="rsl-price" data-m="€79" data-y="€63"><span class="rsl-amt">€79</span><small data-i18n-en="/mo">/mes</small></p>
+          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €758/yr{% else %}facturado €758/año{% endif %}">&nbsp;</p>
+          <p class="rsl-day" data-m="{% if lang == 'en' %}10 brands · €8 per brand/mo{% else %}10 marcas · €8 por marca/mes{% endif %}" data-y="{% if lang == 'en' %}10 brands · €6 per brand/mo{% else %}10 marcas · €6 por marca/mes{% endif %}">{% if lang == 'en' %}10 brands · €8 per brand/mo{% else %}10 marcas · €8 por marca/mes{% endif %}</p>
           <ul>
             <li data-i18n-html-en="<strong>Pool of 800 credits</strong> for the whole account"><strong>Pool de 800 créditos</strong> para toda la cuenta</li>
             <li data-i18n-html-en="<strong>10 brands</strong>, each with its own brain"><strong>10 marcas</strong> con cerebro propio cada una</li>
@@ -23037,6 +23037,10 @@ async function transcriptionToScript(id, opts) {
       (typeof loadScripts === "function") ? loadScripts() : Promise.resolve(),
     ]);
     if (typeof renderProfTransc === "function") renderProfTransc();
+    // Flujo SEGUIDO: abre el guion recién creado AQUÍ MISMO (editor), no manda a «Guiones».
+    if (d.script_id && typeof openScriptEditModal === "function") {
+      try { openScriptEditModal(d.script_id); } catch (e) {}
+    }
   } catch (e) {
     if (typeof _btnRotateStop === "function") _btnRotateStop(btn, _rot);
     showToast(t("toast.error_connection"));
@@ -26249,7 +26253,7 @@ const PLAN_META = {
   },
   creator: {
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>', label: "Basic",
-    price:    { monthEur: 2900, monthUsd: 3200, yearEur: 2300, yearUsd: 2500, billedEur: 27600, billedUsd: 30000 },
+    price:    { monthEur: 1900, monthUsd: 2100, yearEur: 1500, yearUsd: 1680, billedEur: 18200, billedUsd: 20160 },
     ideal:    { es: "Para creadores activos que viven del contenido.", en: "For active creators living off their content." },
     features: { es: ["200 créditos/mes","1 marca","Cerebro: aprende tu voz","Ideas, hooks y formatos","Métricas de Instagram","Teleprompter + grabación","Soporte por email"],
                 en: ["200 credits/mo","1 brand","Brain: learns your voice","Ideas, hooks & formats","Instagram metrics","Teleprompter + recording","Email support"] },
@@ -26257,7 +26261,7 @@ const PLAN_META = {
   },
   estudio: {
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>', label: "Content Creator",
-    price:    { monthEur: 5900, monthUsd: 6500, yearEur: 4700, yearUsd: 5200, billedEur: 56400, billedUsd: 62400 },
+    price:    { monthEur: 3900, monthUsd: 4400, yearEur: 3100, yearUsd: 3520, billedEur: 37400, billedUsd: 42240 },
     ideal:    { es: "Para el creador que ya factura y lleva varias marcas.", en: "For the creator who already bills and runs a few brands." },
     features: { es: ["400 créditos/mes (el doble)","3 marcas con cerebro propio","Todo lo de Creador + prioridad","El puente entre creador y agencia"],
                 en: ["400 credits/mo (double)","3 brands, each with its own brain","Everything in Creator + priority","The bridge between solo and agency"] },
@@ -26267,7 +26271,7 @@ const PLAN_META = {
   },
   agency: {
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>', label: "Agency",
-    price:    { monthEur: 12900, monthUsd: 13900, yearEur: 10750, yearUsd: 11600, billedEur: 129000, billedUsd: 139000 },
+    price:    { monthEur: 7900, monthUsd: 8900, yearEur: 6300, yearUsd: 7120, billedEur: 75800, billedUsd: 85440 },
     ideal:    { es: "Para agencias que gestionan varias marcas.", en: "For agencies managing multiple brands." },
     features: { es: ["800 créditos/mes (pool)","10 marcas con cerebro propio","Asientos de equipo ilimitados","Informe white-label en PDF por marca","Marca extra €10/mes","Portfolio multi-marca"],
                 en: ["800 credits/mo (pool)","10 brands, each with its own brain","Unlimited team seats","White-label PDF report per brand","Extra brand €10/mo","Multi-brand portfolio"] },
@@ -28707,6 +28711,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=160"></script>
+<script src="/static/js/radar-loop.js?v=161"></script>
 </body>
 </html>

@@ -2309,13 +2309,15 @@
       dashboardNextStepHTML()+   // #8 PROACTIVIDAD: «HAZ ESTO AHORA» — la acción más útil ya
       opportunityCarouselHTML(heroN)+   // OPORTUNIDAD justo tras el hero (acción sobre el fold)
       (S.reels.length?competitorGalleryHTML():"")+   // competidores (chips) + galería (mockup David)
+      // #1: SUBIDOS aquí (antes enterrados al fondo, invisibles) → junto a los competidores,
+      // «+ Añadir competidor» y quitar evidentes de un vistazo.
+      (S.reels.length?radarAddBarHTML():"")+     // añadir competidor/reel + actualizar
+      (S.reels.length?trackedManageHTML():"")+   // «Tus competidores» con × para quitar
       suggestionsTodayHTML()+    // «Sugerencias de hoy»: creadores NUEVOS del nicho que petan (sección propia)
       radarCerebroRowHTML()+     // progreso/cerebro (nivel + barra + Crear guion)
       (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+   // llena mi semana
       // ── bloques bajo la espina (recortados por decisión del usuario) ──
       flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro (condicional)
-      (S.reels.length?radarAddBarHTML():"")+   // añadir competidor/reel + actualizar  ← SE QUEDA
-      (S.reels.length?trackedManageHTML():"")+ // «Tus competidores» con × para quitar (re-añadido: ver/gestionar a quién sigues sin tener que vaciar el radar)
       seedBannerHTML()+           // aviso «esto petó en tu nicho» (solo radar-seed, demo vacío)
       // v2: el feed principal = solo competidores; el descubrimiento de creadores nuevos
       // vive arriba en «Sugerencias de hoy» (suggestionsTodayHTML). El cap free sigue al
@@ -6325,8 +6327,12 @@
         apiGet("/task/"+encodeURIComponent(taskId)).then(function(r){
           var d=r.d||{};
           if(d.state==="success"){ return showReelTranscript((d.text||"").trim(), d.username||null); }
-          if(d.state==="error") return showError(d.error||"El análisis falló. No se ha gastado tu análisis.");
-          if(++tries>48) return showError("El análisis está tardando demasiado. Inténtalo de nuevo en un rato.");
+          // Mensaje CLARO en fallo de descarga (muro de login IG): el reel puede ser privado
+          // o no estar disponible. No se cobra. Sugerimos un reel público o un TikTok.
+          if(d.state==="error") return showError(d.error||L("No pude descargar ese reel — puede ser privado o no estar disponible. No te hemos cobrado. Prueba con un reel público o un TikTok.","Couldn't download that reel — it may be private or unavailable. You weren't charged. Try a public reel or a TikTok."));
+          // Timeout más amplio: la descarga (Apify + yt-dlp con reintentos/backoff) puede tardar
+          // varios minutos en reels lentos. 96×2.5s = 240s antes de rendirnos.
+          if(++tries>96) return showError(L("El análisis está tardando demasiado. Suele pasar con reels privados o de cuentas poco públicas — prueba con un reel público o un TikTok. No te hemos cobrado.","Analysis is taking too long. This usually happens with private or low-reach reels — try a public reel or a TikTok. You weren't charged."));
           setTimeout(poll, 2500);
         });
       })();
@@ -6447,10 +6453,11 @@
             loadAnalyses();   // recarga el historial (la task ya lo persistió)
             return;
           }
-          if(d.state==="error"){ S.analyzeLoading=false; S.analyzeErr=d.error||L("El análisis falló. No se ha gastado tu análisis.","Analysis failed. No analysis spent."); return render(); }
+          if(d.state==="error"){ S.analyzeLoading=false; S.analyzeErr=d.error||L("No pude descargar ese reel — puede ser privado o no estar disponible. No te hemos cobrado. Prueba con un reel público o un TikTok.","Couldn't download that reel — it may be private or unavailable. You weren't charged. Try a public reel or a TikTok."); return render(); }
           S.analyzeStep=d.step||L("Transcribiendo…","Transcribing…");
           if(S.tab==="analizar") render();
-          if(++tries>48){ S.analyzeLoading=false; S.analyzeErr=L("Está tardando demasiado. Inténtalo en un rato.","Taking too long. Try again later."); return render(); }
+          // Timeout amplio (240s): Apify + yt-dlp con reintentos pueden tardar en reels lentos.
+          if(++tries>96){ S.analyzeLoading=false; S.analyzeErr=L("Está tardando demasiado. Suele pasar con reels privados o de cuentas poco públicas — prueba con un reel público o un TikTok. No te hemos cobrado.","Taking too long. This usually happens with private or low-reach reels — try a public reel or a TikTok. You weren't charged."); return render(); }
           setTimeout(poll, 2500);
         });
       })();
@@ -6582,8 +6589,8 @@
         apiGet("/task/"+encodeURIComponent(taskId)).then(function(r){
           var d=r.d||{};
           if(d.state==="success"){ bumpEco(0,1); return _followAuthor(d.username); }
-          if(d.state==="error") return showError(d.error||"El análisis falló. No se ha gastado tu análisis.");
-          if(++tries>48) return showError("El análisis está tardando demasiado. Lo encontrarás en Analizar en un rato.");
+          if(d.state==="error") return showError(d.error||L("No pude descargar ese reel — puede ser privado o no estar disponible. No te hemos cobrado.","Couldn't download that reel — it may be private or unavailable. You weren't charged."));
+          if(++tries>96) return showError(L("El análisis está tardando demasiado — prueba con un reel público o un TikTok. No te hemos cobrado.","Analysis is taking too long — try a public reel or a TikTok. You weren't charged."));
           setTimeout(poll, 2500);
         });
       })();
