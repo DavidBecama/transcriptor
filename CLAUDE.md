@@ -32,7 +32,7 @@ Opcionales: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `APIFY_TOKEN`, `STRIPE_TOP
 → http://localhost:3100 entra directo al Radar. Deep-links (`?plan=creador|agencia`, `?t=`, `?b=`) **solo** entrando por `/profile/radar?…` (entrar por `/es/` los pierde en el replaceState del shim).
 
 ## Harness funcional de la isla
-`node scripts/verify-island.mjs` (cero deps; Chrome headless + CDP) contra el server demo de arriba. 30 checks: montaje, deep-links, criterios IDI T1-T9 (acción primaria única, sheets sin prompt, Esc/Enter, aria/foco, targets móviles, anti-duplicado de robo). Correr tras cualquier cambio en `static/js/radar-loop.js`. Trampas que ya resuelve solo: mata su Chrome al salir (los huérfanos a 60% CPU degradan los runs siguientes), desactiva animaciones CSS (el orbe satura el renderer headless) y auto-descarta diálogos JS nativos.
+`node scripts/verify-island.mjs` (cero deps; Chrome headless + CDP) contra el server demo de arriba. 32 checks: montaje, deep-links, criterios IDI T1-T9 (acción primaria única, sheets sin prompt, Esc/Enter, aria/foco, targets móviles, anti-duplicado de robo) + flujo «Ideas robadas» (robo→workspace, agrupación por reel). Correr tras cualquier cambio en `static/js/radar-loop.js`. Trampas que ya resuelve solo: mata su Chrome al salir (los huérfanos a 60% CPU degradan los runs siguientes), desactiva animaciones CSS (el orbe satura el renderer headless) y auto-descarta diálogos JS nativos.
 
 ---
 
@@ -48,7 +48,7 @@ Opcionales: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `APIFY_TOKEN`, `STRIPE_TOP
 - Los números de tag **no siguen orden cronológico** por retagueos previos: `v0.9.0` tiene contenido más antiguo que `v0.9.1`. Confiar siempre en el SHA del commit, no en el número de versión.
 - Si `/es/` o `/en/` devuelven 404 en producción, el servidor está en un commit anterior a `a3f3bb2` (SEO fase 1). Fix: ssh al servidor → `git fetch && git reset --hard origin/prod && docker compose up -d --build`.
 - `templates/index.html` tiene ~8700 líneas. Editarlo con precisión quirúrgica. No rehacer bloques enteros sin leer primero qué hay alrededor.
-- Las secciones del perfil (métricas, ideas, teleprompter, proyectos) se muestran/ocultan por JS según `plan` del usuario (`hasPaidPlan = ["basic","pro","agency"]`). Empiezan con `display:none` en el HTML. No eliminar esa lógica.
+- Las secciones del perfil (métricas, ideas, teleprompter, proyectos) se muestran/ocultan por JS según `plan` del usuario (`hasPaidPlan = ["pro","creator","agency"]`, ver index.html). Empiezan con `display:none` en el HTML. No eliminar esa lógica.
 
 ---
 
@@ -72,7 +72,7 @@ Opcionales: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `APIFY_TOKEN`, `STRIPE_TOP
 
 ## Supabase — tablas principales
 `profiles` (plan, credits_cents, stripe_subscription_id, avatar_seed, monthly_usage)
-`transcriptions`, `saved_scripts`, `ideas`, `projects`, `assistants`, `agency_members`
+`transcriptions`, `scripts` (los guiones; `saved_scripts` NO existe, era el nombre legacy), `ideas` (con `inspired_by_id`/`notes` — ancla de «Ideas robadas»), `projects`, `assistants`, `agency_members`
 
 ## SEO implementado (desde a3f3bb2 + 5cae2f0)
 - Rutas bilingüe `/es/` y `/en/` con hreflang y canonical

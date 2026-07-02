@@ -170,7 +170,8 @@ CREATE TABLE IF NOT EXISTS public.ideas (
   inspired_by_type      TEXT,   -- 'reel' | 'transcription'
   source                TEXT NOT NULL DEFAULT 'manual',  -- 'manual' | 'suggestion'
   inspired_by_username  TEXT,
-  generation_reasoning  TEXT
+  generation_reasoning  TEXT,
+  notes                 TEXT    -- notas del usuario en el workspace de «Ideas robadas»
 );
 
 -- ════════════════════════════════════════════════════════════

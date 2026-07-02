@@ -5958,7 +5958,7 @@ def update_idea(idea_id):
     user = current_user()
     body = request.get_json() or {}
     updates = {}
-    for key in ("title", "category", "script_draft", "project_id", "assistant_id", "status", "recorded_at"):
+    for key in ("title", "category", "script_draft", "project_id", "assistant_id", "status", "recorded_at", "notes"):
         if key in body:
             updates[key] = body[key]
     if not updates:
@@ -5966,6 +5966,46 @@ def update_idea(idea_id):
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     db.table("ideas").update(updates).eq("id", idea_id).eq("user_id", user["id"]).execute()
     return jsonify({"ok": True})
+
+
+@app.route("/stolen-ideas/notes", methods=["POST"])
+@require_auth
+def stolen_idea_notes():
+    """Notas del workspace «Ideas robadas». El ancla es la fila de `ideas` con
+    inspired_by_id == reel/transcripción de origen. find-or-create manual:
+    NO hay unique sobre inspired_by_id (save_reel_as_idea tampoco deduplica),
+    así que buscamos la más antigua y solo insertamos si no existe."""
+    user = current_user()
+    body = request.get_json() or {}
+    notes = (body.get("notes") or "").strip()[:4000]
+    reel_id = (body.get("reel_id") or "").strip() or None
+    tx_id = (str(body.get("transcription_id") or "")).strip() or None
+    key = reel_id or tx_id
+    if not key:
+        return jsonify({"error": "missing_key"}), 400
+    now = datetime.now(timezone.utc).isoformat()
+    q = (db.table("ideas").select("id")
+           .eq("user_id", user["id"]).eq("inspired_by_id", key)
+           .order("created_at").limit(1).execute())
+    if q.data:
+        idea_id = q.data[0]["id"]
+        db.table("ideas").update({"notes": notes or None, "updated_at": now}) \
+          .eq("id", idea_id).eq("user_id", user["id"]).execute()
+        return jsonify({"ok": True, "idea_id": idea_id})
+    title = (body.get("title") or "").strip()[:120] or "Idea robada"
+    ins = db.table("ideas").insert({
+        "user_id": user["id"],
+        "project_id": body.get("project_id"),
+        "raw_text": title,
+        "title": title,
+        "status": "draft",
+        "source": "competitor_reel" if reel_id else "analyzed_reel",
+        "inspired_by_id": key,
+        "inspired_by_type": "reel" if reel_id else "transcription",
+        "inspired_by_username": (body.get("username") or "").strip() or None,
+        "notes": notes or None,
+    }).execute()
+    return jsonify({"ok": True, "idea_id": ins.data[0]["id"] if ins.data else None})
 
 
 @app.route("/ideas/<idea_id>", methods=["DELETE"])
