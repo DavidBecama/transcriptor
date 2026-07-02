@@ -1559,7 +1559,9 @@
       '<div class="dns-ic">'+IC.bolt+'</div>'+
       '<div class="dns-body"><span class="dns-eyebrow">'+L("HAZ ESTO AHORA","DO THIS NOW")+'</span>'+
         '<div class="dns-t">'+ESC(st.t)+'</div><div class="dns-b">'+ESC(st.b)+'</div></div>'+
-      '<button class="btn btn-md btn-primary dns-cta" data-act="'+st.act+'"'+dk+'>'+ESC(st.c)+'</button>'+
+      // T1 estricto (David 02-jul): el CTA contextual va SECUNDARIO — el único
+      // primario sobre el fold es «Roba la idea» (Oportunidad #1).
+      '<button class="btn btn-md btn-secondary dns-cta" data-act="'+st.act+'"'+dk+'>'+ESC(st.c)+'</button>'+
     '</div>';
   }
   /* v3 (mockup David «progreso / cerebro»): fila con icono cerebro azul, nivel +
