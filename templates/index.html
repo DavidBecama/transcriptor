@@ -9839,16 +9839,16 @@
     @media (prefers-reduced-motion: reduce) { .rs .onbw-sweep, .rs .onbw-blip, .rs .onbw-core-wrap, .rs .onbw-core, .rs .onbw-card, .rs .onbw-step, .rs .onbw-prog-fill { animation:none; } .rs .onbw-step.s1 { opacity:1; } }
     /* #8 PROACTIVIDAD — «Tu siguiente paso» (HAZ ESTO AHORA): tarjeta destacada con
        acento de marca, para que el usuario perdido sepa QUÉ hacer ya. */
-    .rs .dns { display:flex; align-items:center; gap:18px; padding:20px 22px; margin:16px 0 18px; border-radius:20px;
+    .rs .dns { display:flex; align-items:center; gap:14px; padding:12px 16px; margin:10px 0 12px; border-radius:16px;
       background:linear-gradient(120deg, rgba(47,91,255,.16), rgba(47,91,255,.05) 60%), var(--surface-raised);
       border:1px solid rgba(79,124,255,.42); box-shadow:0 8px 30px rgba(47,91,255,.14); }
-    .rs .dns-ic { width:52px; height:52px; border-radius:15px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    .rs .dns-ic { width:40px; height:40px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
       background:linear-gradient(140deg, var(--brand-600,#1B3FD6), var(--brand-500,#2F5BFF)); box-shadow:0 0 0 6px rgba(47,91,255,.12); }
     .rs .dns-ic svg { width:24px; height:24px; color:#fff; }
     .rs .dns-body { flex:1; min-width:0; }
-    .rs .dns-eyebrow { display:inline-block; font-family:var(--font-mono); font-size:10px; letter-spacing:.14em; font-weight:700; color:var(--brand-300,#6E92FF); margin-bottom:5px; }
-    .rs .dns-t { font-family:var(--font-display); font-weight:700; font-size:20px; color:var(--text-primary); line-height:1.15; }
-    .rs .dns-b { font-size:14px; color:var(--text-secondary); margin-top:4px; line-height:1.45; }
+    .rs .dns-eyebrow { display:inline-block; font-family:var(--font-mono); font-size:10px; letter-spacing:.14em; font-weight:700; color:var(--brand-300,#6E92FF); margin-bottom:3px; }
+    .rs .dns-t { font-family:var(--font-display); font-weight:700; font-size:17px; color:var(--text-primary); line-height:1.15; }
+    .rs .dns-b { font-size:13.5px; color:var(--text-secondary); margin-top:2px; line-height:1.4; }
     .rs .dns-cta { flex-shrink:0; }
     .rs--mobile .dns { flex-wrap:wrap; }
     .rs--mobile .dns-body { flex:1 1 calc(100% - 70px); }
@@ -10288,14 +10288,16 @@
     .rs .onb-eyebrow { display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; color:var(--brand-500); margin-bottom:14px; }
     .rs .onb-eyebrow svg { width:14px; height:14px; }
     /* ════ RADAR HERO v3 (mockup David «RADAR exploración») ════ */
-    .rs .rdr-hero { display:flex; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:24px; overflow:hidden; margin-bottom:26px; }
-    .rs .rdr-hero-l { flex:1; min-width:0; padding:34px 36px; display:flex; flex-direction:column; gap:18px; }
+    /* T1 fold: hero compactado (paddings/gaps/tipos) para que la Oportunidad #1
+       («Roba la idea») entre sobre el fold en 900px de alto. Misma jerarquía. */
+    .rs .rdr-hero { display:flex; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:24px; overflow:hidden; margin-bottom:18px; }
+    .rs .rdr-hero-l { flex:1; min-width:0; padding:22px 28px; display:flex; flex-direction:column; gap:12px; }
     .rs .rdr-eyebrow { display:inline-flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; color:var(--text-tertiary); }
     .rs .rdr-eye-dot { width:8px; height:8px; border-radius:9999px; background:var(--success-fg); box-shadow:0 0 8px var(--success-fg); flex:none; }
-    .rs .rdr-title { font-family:var(--font-display); font-weight:700; font-size:46px; line-height:1; letter-spacing:-.02em; color:var(--text-primary); margin:0; }
-    .rs .rdr-sub { font-size:18px; line-height:1.5; color:var(--text-secondary); margin:0; max-width:520px; }
+    .rs .rdr-title { font-family:var(--font-display); font-weight:700; font-size:38px; line-height:1; letter-spacing:-.02em; color:var(--text-primary); margin:0; }
+    .rs .rdr-sub { font-size:16px; line-height:1.45; color:var(--text-secondary); margin:0; max-width:520px; }
     .rs .rdr-sub b { color:var(--text-primary); font-weight:600; }
-    .rs .rdr-stats { display:flex; align-items:flex-end; gap:32px; margin-top:8px; flex-wrap:wrap; }
+    .rs .rdr-stats { display:flex; align-items:flex-end; gap:28px; margin-top:2px; flex-wrap:wrap; }
     /* Refresco manual VISIBLE en el hero (antes enterrado en la addbar al fondo) */
     .rs .rdr-refresh-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px; }
     .rs .rdr-refresh-cta { display:inline-flex; align-items:center; gap:7px; font-size:.86rem; font-weight:600; padding:9px 15px; border-radius:11px; border:1px solid var(--brand-500); background:color-mix(in srgb, var(--brand-500) 10%, transparent); color:var(--brand-500); cursor:pointer; transition:background .15s; }
@@ -10305,11 +10307,11 @@
     .rs .rdr-reshuffle-cta:hover { color:var(--text); border-color:var(--text-tertiary); background:var(--surface-raised); }
     .rs .rdr-refresh-cta svg { width:15px; height:15px; }
     .rs .rdr-stat { display:flex; flex-direction:column; gap:5px; }
-    .rs .rdr-stat-v { font-family:var(--font-display); font-weight:800; font-size:34px; line-height:1; font-variant-numeric:tabular-nums; }
+    .rs .rdr-stat-v { font-family:var(--font-display); font-weight:800; font-size:28px; line-height:1; font-variant-numeric:tabular-nums; }
     .rs .rdr-stat-l { font-size:13.5px; color:var(--text-secondary); display:inline-flex; align-items:center; gap:7px; }
     .rs .rdr-livedot { width:6px; height:6px; border-radius:50%; background:var(--success-fg); box-shadow:0 0 7px var(--success-fg); animation:esPulse 1.3s ease-in-out infinite; flex:none; }
-    .rs .rdr-hero-r { width:330px; flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:28px 24px; background:radial-gradient(circle at 50% 42%, var(--surface-overlay), var(--surface-raised)); border-left:1px solid var(--border-default); }
-    .rs .rdr-scope { position:relative; width:228px; height:228px; }
+    .rs .rdr-hero-r { width:300px; flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:18px 20px; background:radial-gradient(circle at 50% 42%, var(--surface-overlay), var(--surface-raised)); border-left:1px solid var(--border-default); }
+    .rs .rdr-scope { position:relative; width:176px; height:176px; }
     .rs .rdr-face { position:absolute; inset:0; border-radius:50%; overflow:hidden; background:radial-gradient(circle at 50% 50%, var(--surface-raised), var(--surface-overlay)); border:1px solid var(--border-strong); }
     .rs .rdr-ring { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); border-radius:50%; border:1px solid var(--border-default); }
     .rs .rdr-ring.r1 { width:74%; height:74%; } .rs .rdr-ring.r2 { width:48%; height:48%; } .rs .rdr-ring.r3 { width:22%; height:22%; border-color:var(--border-strong); }
@@ -11952,7 +11954,7 @@
       color:var(--success-fg, #22c55e); border:1px solid color-mix(in srgb, var(--success-fg, #22c55e) 30%, transparent); background:color-mix(in srgb, var(--success-fg, #22c55e) 9%, transparent); }
     .rs .lb-momentum b { color:var(--success-fg, #22c55e); font-weight:800; }
     .rs .lb-note { font-size:12px; color:var(--text-tertiary); margin:0 2px 18px; }
-    .rs .feature { display:grid; grid-template-columns:210px 1fr 150px; border:1px solid var(--border-default); border-radius:20px; background:var(--surface-raised); box-shadow:var(--shadow-lg); overflow:hidden; margin-bottom:14px; min-height:400px; max-height:560px; }
+    .rs .feature { display:grid; grid-template-columns:210px 1fr 150px; border:1px solid var(--border-default); border-radius:20px; background:var(--surface-raised); box-shadow:var(--shadow-lg); overflow:hidden; margin-bottom:14px; min-height:352px; max-height:560px; }   /* T1 fold: 400→352 — el CTA «Roba la idea» entra entero sobre el fold */
     /* Carrusel de 2-3 oportunidades (Fathom 18/06) */
     .rs .opp-carousel { position:relative; margin-bottom:36px; }
     .rs .opp-track { display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth; -ms-overflow-style:none; scrollbar-width:none; }
@@ -12118,7 +12120,7 @@
     .rs .feature-thumb .thumb-tag { position:absolute; left:12px; bottom:12px; z-index:2; color:rgba(255,255,255,.66); }
     .rs .feature-thumb .dur { position:absolute; right:12px; bottom:12px; z-index:2; }
     /* Cuerpo COMPACTO: hook + nota + CTA juntos, sin hueco muerto (nada de margin-top:auto). */
-    .rs .feature-main { padding:30px 34px; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:24px; }
+    .rs .feature-main { padding:22px 30px; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:18px; }   /* T1 fold: 30/24→22/18 */
     .rs .feature-eyebrow { font-family:var(--font-body); font-size:12.5px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--brand-500); margin-bottom:0; display:flex; align-items:center; gap:9px; }
     .rs .feature-eyebrow .who { color:var(--text-tertiary); }
     .rs .feature-cap { font-family:var(--font-display-2); font-weight:600; font-size:28px; line-height:1.2; letter-spacing:-.015em; color:var(--text-primary); margin:0; text-wrap:balance; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
