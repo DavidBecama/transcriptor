@@ -10156,6 +10156,10 @@
     .rs--mobile .belt-grid { grid-template-columns:1fr; }
     .rs .chain { text-align:left; display:flex; align-items:center; gap:13px; padding:14px; border-radius:14px; border:1px solid var(--border-default); background:var(--surface-raised); color:var(--text-primary); cursor:pointer; transition: border-color .15s var(--ease), transform .12s var(--ease), background .15s var(--ease); }
     .rs .chain:hover { border-color:var(--border-strong); transform:translateY(-1px); }
+    /* formatos aún no reales: visibles pero deshabilitados («Próximamente») */
+    .rs .chain.chain-soon { opacity:.55; cursor:default; }
+    .rs .chain.chain-soon:hover { border-color:var(--border-default); transform:none; }
+    .rs .chain-soon-tag { flex:none; font-family:var(--font-mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; padding:4px 8px; border-radius:999px; border:1px solid var(--border-strong); color:var(--text-tertiary); }
     .rs .chain:active { transform:scale(.99); }
     .rs .chain .cic { width:40px; height:40px; border-radius:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:19px; background:var(--surface-overlay); }
     .rs .chain.chain-feature { background:linear-gradient(120deg, rgba(79,124,255,.12), transparent); border-color:rgba(79,124,255,.35); }
@@ -10759,6 +10763,33 @@
     .rs .guix-hook { display:flex; align-items:flex-start; gap:8px; font-size:13.5px; line-height:1.4; color:var(--text-secondary); }
     .rs .guix-hook svg { width:14px; height:14px; color:var(--brand-500,#2F5BFF); flex:none; margin-top:2px; }
     .rs--mobile .guic-grid, .rs--mobile .guix-grid { grid-template-columns:1fr; }
+    /* ── Ideas robadas · card de grupo (reel origen + N guiones) ───────── */
+    .rs .igc-row { display:flex; align-items:flex-start; gap:14px; }
+    .rs .igc-thumb { width:64px; height:86px; border-radius:12px; overflow:hidden; flex:none; background:var(--surface-sunken); }
+    .rs .igc-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .igc-ph { width:100%; height:100%; }
+    .rs .igc-main { display:flex; flex-direction:column; gap:7px; min-width:0; }
+    .rs .igc-meta { font-size:13.5px; color:var(--text-tertiary); }
+    /* ── Ideas robadas · workspace de una idea ─────────────────────────── */
+    .rs .ws-canvas { gap:18px; }
+    .rs .ws-head { display:flex; align-items:center; }
+    .rs .ws-src { display:flex; align-items:flex-start; gap:18px; padding:20px; background:var(--surface-raised); border:1px solid var(--border-default); border-radius:18px; }
+    .rs .ws-src-thumb { position:relative; width:92px; height:124px; border-radius:14px; overflow:hidden; flex:none; background:var(--surface-sunken); }
+    .rs .ws-src-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .rs .ws-src-info { display:flex; flex-direction:column; gap:9px; min-width:0; }
+    .rs .ws-src-k { font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; color:var(--text-tertiary); }
+    .rs .ws-src-k b { color:var(--text-secondary); }
+    .rs .ws-title { font-size:24px; }
+    .rs .ws-src-acts { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:2px; }
+    .rs .ws-notes-block { display:flex; flex-direction:column; gap:8px; padding:16px 18px; background:var(--surface-raised); border:1px dashed var(--border-strong); border-radius:16px; }
+    .rs .ws-notes-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .rs .ws-notes-k { font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; color:var(--text-tertiary); }
+    .rs .ws-notes-save { font-family:var(--font-mono); font-size:11.5px; color:var(--text-tertiary); }
+    .rs .ws-notes { width:100%; min-height:76px; resize:vertical; padding:10px 12px; background:var(--surface-sunken); color:var(--text-primary); border:1px solid var(--border-subtle); border-radius:10px; font:inherit; font-size:14.5px; line-height:1.5; }
+    .rs .ws-notes:focus { outline:none; border-color:var(--brand-500,#2F5BFF); }
+    .rs .ws-scripts-h { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .rs--mobile .ws-src { flex-direction:column; }
+    .rs--mobile .ws-title { font-size:20px; }
     /* ── v3 mockup David · Cerebro ─────────────────────────────────────── */
     @keyframes ceGlow { 0%,100%{opacity:.5} 50%{opacity:1} }
     @keyframes ceBreathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }

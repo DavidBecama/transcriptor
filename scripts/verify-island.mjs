@@ -209,6 +209,9 @@ async function main() {
 
   /* ═══ T5: overlay como diálogo accesible ═══ */
   console.log("\n■ T5 · diálogo accesible");
+  // Esc desde el reveal ahora aterriza en el workspace de la idea (Ideas robadas),
+  // no en el feed: volvemos al Radar antes de re-robar.
+  await click('[data-act="tab"][data-k="dashboard"]'); await sleep(250);
   await click('.feature [data-act="steal"]'); await sleep(400);
   const dlg = await evaluate(`(function(){
     var o=document.querySelector('#radarRoot .overlay'); if(!o) return {};
@@ -310,6 +313,26 @@ async function main() {
   check("robo → reveal → teleprompter → «Ya lo grabé» cierra el loop",
     reveal2 && prompter && closed.feed && /Grabado/.test(closed.toast),
     JSON.stringify({ reveal2, prompter, closed }));
+
+  /* ═══ Ideas robadas: robo → workspace directo + agrupación por reel ═══ */
+  console.log("\n■ Ideas robadas · flujo directo + agrupación");
+  await nav(`${BASE}/profile/radar?plan=creador`);
+  await click('.feature [data-act="steal"]'); await sleep(2300);
+  await key("Escape"); await sleep(300);   // cerrar el reveal → workspace de la idea
+  const ws = await evaluate(`(function(){
+    return { ws: !!document.querySelector('#radarRoot .ws-canvas'),
+             notes: !!document.getElementById('rsWsNotes'),
+             cards: document.querySelectorAll('#radarRoot .ws-canvas .guic').length };
+  })()`);
+  check("Esc tras el reveal aterriza en el workspace de la idea (reel + notas + guion)", ws.ws && ws.notes && ws.cards === 1, JSON.stringify(ws));
+  await click('[data-act="ws-steal-again"]'); await sleep(2300);   // 2º guion del MISMO reel
+  await key("Escape"); await sleep(300);
+  const ws2 = await evaluate(`(function(){
+    var cards=document.querySelectorAll('#radarRoot .ws-canvas .guic').length;
+    var b=document.querySelector('#radarRoot [data-act="ws-close"]'); if(b) b.click();
+    return { cards: cards, groups: document.querySelectorAll('#radarRoot .igc').length };
+  })()`);
+  check("«Robar otro guion» agrupa: mismo reel → 1 idea con 2 guiones", ws2.cards === 2 && ws2.groups === 1, JSON.stringify(ws2));
 
   /* ═══ T9: deshacer al descartar guion ═══ */
   console.log("\n■ T9 · deshacer descarte");
