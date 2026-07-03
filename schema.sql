@@ -203,7 +203,8 @@ CREATE TABLE IF NOT EXISTS public.scripts (
   recording_status         TEXT NOT NULL DEFAULT 'pending',
   assistant_name           TEXT,
   hook                     TEXT,
-  alt_hooks                JSONB NOT NULL DEFAULT '[]'  -- migración 20260603_scripts_alt_hooks.sql (2026-06-03)
+  alt_hooks                JSONB NOT NULL DEFAULT '[]',  -- migración 20260603_scripts_alt_hooks.sql (2026-06-03)
+  gen_options              JSONB   -- reveal reconstruible: {options,pov_text,chosen} · migración 20260703090000
 );
 
 -- ════════════════════════════════════════════════════════════

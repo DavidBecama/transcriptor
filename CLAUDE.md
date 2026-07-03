@@ -32,7 +32,7 @@ Opcionales: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `APIFY_TOKEN`, `STRIPE_TOP
 → http://localhost:3100 entra directo al Radar. Deep-links (`?plan=creador|agencia`, `?t=`, `?b=`) **solo** entrando por `/profile/radar?…` (entrar por `/es/` los pierde en el replaceState del shim).
 
 ## Harness funcional de la isla
-`node scripts/verify-island.mjs` (cero deps; Chrome headless + CDP) contra el server demo de arriba. 32 checks: montaje, deep-links, criterios IDI T1-T9 (acción primaria única, sheets sin prompt, Esc/Enter, aria/foco, targets móviles, anti-duplicado de robo) + flujo «Ideas robadas» (robo→workspace, agrupación por reel). Correr tras cualquier cambio en `static/js/radar-loop.js`. Trampas que ya resuelve solo: mata su Chrome al salir (los huérfanos a 60% CPU degradan los runs siguientes), desactiva animaciones CSS (el orbe satura el renderer headless) y auto-descarta diálogos JS nativos.
+`node scripts/verify-island.mjs` (cero deps; Chrome headless + CDP) contra el server demo de arriba. 33 checks: montaje, deep-links, criterios IDI T1-T9 (acción primaria única, sheets sin prompt, Esc/Enter, aria/foco, targets móviles, anti-duplicado de robo) + flujo «Ideas robadas» (robo→workspace, agrupación por reel, elección pendiente tras robo en background). Correr tras cualquier cambio en `static/js/radar-loop.js`. Trampas que ya resuelve solo: mata su Chrome al salir (los huérfanos a 60% CPU degradan los runs siguientes), desactiva animaciones CSS (el orbe satura el renderer headless) y auto-descarta diálogos JS nativos.
 
 ---
 

@@ -61,6 +61,9 @@
       // fuente tras recargar. El backend las manda en GET /scripts (select *).
       reelId:s.from_competitor_reel_id||null, ideaId:s.idea_id||null,
       txId:(s.transcription_id!=null?String(s.transcription_id):null),
+      // P1: opciones/hooks/POV del robo persistidos → el reveal se reconstruye
+      // también tras recargar. chosen==null → elección pendiente (robo en background).
+      genOptions:(s.gen_options&&typeof s.gen_options==="object")?s.gen_options:null,
       brand:brand().name, type:"guión",
       approval:(s.approval_status==="approved"?"approved":"pending"),   // B3: aprobación
       status:(s.recording_status==="recorded"?"recorded":(s.recording_status==="discarded"?"discarded":"draft")) };
@@ -2428,7 +2431,8 @@
       // fuente del reel robado → miniatura/URL/stats reales en el editor (persisten en sesión).
       thumb:p.thumb||null, url:p.url||null, srcViews:p.srcViews||"", srcLikes:p.srcLikes||"",
       // origen («Ideas robadas»): mismo id que las FKs de backend → el guion cae en su grupo
-      reelId:p.reelId||null, ideaId:p.ideaId||null, txId:p.txId||null };
+      reelId:p.reelId||null, ideaId:p.ideaId||null, txId:p.txId||null,
+      genOptions:p.genOptions||null };
     S.guiones.unshift(g); return g.id;
   }
   function guionById(id){ return S.guiones.filter(function(x){return x.id===id;})[0]; }
@@ -2701,7 +2705,43 @@
       } else { _wsNotesBadge("error"); showError(L("No pude guardar tus notas. Reintenta en un momento.","Couldn't save your notes. Try again in a moment.")); }
     });
   }
-  function wsOpen(key){ if(!key) return; if(S.legacy) _exitLegacy(); S._wsKey=key; S.tab="guiones"; S.view="ideaws"; S.detailReelId=null; render(); }
+  /* ── P1 · la elección de opciones/hooks se presenta SIEMPRE ──────────
+     El robo persiste gen_options (2 opciones + hooks + POV + chosen). Si el robo
+     acabó en background nadie eligió (chosen==null): al abrir la idea se presenta
+     el MISMO reveal que en primer plano, también tras recargar u otro día. */
+  function guionChoicePending(g){
+    var go=g&&g.genOptions;
+    return !!(go && go.chosen==null && Array.isArray(go.options) && go.options.length>1);
+  }
+  function groupChoicePending(grp){ return ((grp&&grp.guiones)||[]).filter(guionChoicePending)[0]||null; }
+  // Reconstruye el reveal desde el guion persistido (sin reel vivo en memoria).
+  function openChoiceReveal(g){
+    var go=g.genOptions||{};
+    var r={ id:g.reelId||g.id, creator:{handle:(g.from||"").replace(/^@/,"")},
+      url:g.url||null, thumb:g.thumb||null, views:g.srcViews||"", likes:g.srcLikes||"",
+      explosionTxt:g.mult||g.fromMult||null, cap:g.title||"", dur:"",
+      _sid:g._sid||null, _gid:g.id,
+      options:(go.options||[]), optIdx:0, hookIdx:0,
+      recFormat:g.recFormat||null, povText:go.pov_text||null, _saved:false };
+    applyScriptOption(r,0,0);
+    S.reel=r;   // el teleprompter y la cinta «¿Y ahora?» leen S.reel
+    S.revealReel=r; S.activeGuionId=g.id;
+    S.tab="guiones"; S.view="script"; render();
+  }
+  // Cierra el estado «pendiente»: persiste la elección en gen_options.chosen.
+  function persistChosen(g, optIdx){
+    if(!g||!g.genOptions) return;
+    g.genOptions.chosen=(optIdx==null?0:optIdx);
+    if(!isDemo() && g._sid) apiPatch("/scripts/"+encodeURIComponent(g._sid), {gen_options:g.genOptions});
+  }
+  function wsOpen(key){
+    if(!key) return; if(S.legacy) _exitLegacy();
+    S._wsKey=key; S.tab="guiones"; S.detailReelId=null;
+    // P1: elección pendiente en esta idea → primero el reveal (opciones + hooks).
+    var pend=groupChoicePending(_groupByKey(key));
+    if(pend){ openChoiceReveal(pend); return; }
+    S.view="ideaws"; render();
+  }
   function wsClose(){ S._wsKey=null; S.view="feed"; S.tab="guiones"; render(); }
   // Card de grupo en la lista: el reel de origen + cuántos guiones + estado agregado.
   function ideaGroupCardHTML(grp){
@@ -2716,7 +2756,7 @@
     var src=grp.handle?('<span class="guic-src">'+ESC(grp.handle)+'</span>'):'';
     var thumb=grp.thumb?('<img src="'+ESC(grp.thumb)+'" alt="" loading="lazy">'):('<div class="igc-ph" style="background:'+_galGrad(grp.key)+'"></div>');
     var notes=_groupNotesVal(grp.key);
-    var meta=(n===0?L("aún sin guion","no script yet"):(n+" "+(n===1?L("guion","script"):L("guiones","scripts"))+(nDraft?(" · "+nDraft+" "+L("por grabar","to record")):"")))+(notes?(" · "+L("con notas","has notes")):"");
+    var meta=(n===0?L("aún sin guion","no script yet"):(n+" "+(n===1?L("guion","script"):L("guiones","scripts"))+(nDraft?(" · "+nDraft+" "+L("por grabar","to record")):"")))+(notes?(" · "+L("con notas","has notes")):"")+(groupChoicePending(grp)?(" · ⚡ "+L("elige tu versión","pick your version")):"");
     return '<div class="guic-wrap"><div class="guic igc'+(n>0&&!nDraft?" is-rec":"")+'">'+
       '<div class="guic-top">'+badge+'<span class="guic-metaR">'+mult+src+'</span></div>'+
       '<div class="igc-row">'+
@@ -4817,7 +4857,7 @@
   function generatingHTML(kind){
     var steps=S._genSlow?HONEST_MSGS:(GEN_STEPS[kind]||GEN_STEPS.script);
     return '<div class="gen'+(kind==="script"?" cooking":"")+'"><div class="orb"></div><div><div class="gtitle">'+ESC(GEN_TITLE[kind]||"Trabajando")+'</div><div class="gstep" id="rsGenStep">'+ESC(steps[0])+'</div>'+
-      (S._genSlow?'<div class="gen-bg"><div class="gen-bg-hint">No hace falta que esperes aquí: el guion aterriza en Guiones igualmente.</div><button class="btn btn-md btn-secondary" data-act="gen-background">Seguir navegando — te aviso al terminar</button></div>':'')+
+      (S._genSlow?'<div class="gen-bg"><div class="gen-bg-hint">'+L("En menos de 1 min lo tienes en Ideas robadas.","In under 1 min it'll be in your Stolen ideas.")+'</div><button class="btn btn-md btn-secondary" data-act="gen-background">Seguir navegando — te aviso al terminar</button></div>':'')+
     '</div></div>';
   }
   function conveyorHTML(){
@@ -4982,7 +5022,9 @@
     var mainHTML = hero+
       '<div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div>'+
       '<div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span>'+savedBadge+'</div>'+
-      '<div class="script-acts"><button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>'+
+      '<div class="script-acts">'+(r.url
+        ? '<a class="script-act" href="'+ESC(r.url)+'" target="_blank" rel="noopener noreferrer">'+IC.eye+' '+L("Ver original","View original")+'</a>'
+        : '<button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>')+
         '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
       optTabs+hooksH+
       '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+
@@ -5871,7 +5913,8 @@
         return;
       }
       // El guión generado se guarda SIEMPRE (draft) y cae en su idea robada. No se pierde nada.
-      var s=r.script||{}; var gidNew=addGuion({title:s.hook, hook:s.hook, beats:s.beats, close:s.close, from:"@"+r.creator.handle, type:"guión", thumb:r.thumb||null, url:r.url||null, srcViews:r.views||"", srcLikes:r.likes||"", reelId:r.id});
+      var s=r.script||{}; var gidNew=addGuion({title:s.hook, hook:s.hook, beats:s.beats, close:s.close, from:"@"+r.creator.handle, type:"guión", thumb:r.thumb||null, url:r.url||null, srcViews:r.views||"", srcLikes:r.likes||"", reelId:r.id,
+        genOptions:{options:(r.options||[]), pov_text:r.povText||null, chosen:null}});   // P1: elección pendiente hasta que el usuario la vea
       S._lastStealKey="r:"+r.id;   // destino del toast «Ver la idea» si el robo acabó en background
       S._stolenReels=S._stolenReels||{}; S._stolenReels[r.id]=r;   // re-robable desde el workspace aunque salga del radar
       removeStolenReel(id);   // loop continuity (Fathom): robado → fuera del radar, entra el siguiente
@@ -5879,7 +5922,7 @@
       startFlash();           // PEAK: la oferta flash arranca tras el PRIMER valor real (no al entrar)
       if(!isDemo() && r._sid){ var g=guionById(gidNew); if(g) g._sid=r._sid; }
       // F2: el toast del robo en background lleva un botón REAL al workspace de la idea.
-      if(bg){ render(); showToast(L("Tu guion ya está listo.","Your script is ready."), L("Ver la idea","See the idea"), "ws-open-last"); }
+      if(bg){ render(); showToast(L("Tu guion ya está listo.","Your script is ready."), L("Elegir mi versión","Pick my version"), "ws-open-last"); }   // P1: abre el reveal con la elección pendiente
       else {
         // SNAPSHOT del reel exacto que generó → el reveal es inmune a que la global
         // S.reel cambie o a que el objeto-reel se reuse/mute por otro robo.
@@ -6042,7 +6085,10 @@
       r._sid=sid;
       var p=row?scriptToParts(row.script):{hook:r.cap,beats:[],close:""};
       r.script=p;
-      r.options=r.options||[{title:(row&&row.title)||"",hooks:[p.hook],body:p.beats||[],closing:p.close||"",script:(row&&row.script)||""}];
+      // P1: si la fila trae gen_options persistidas, el reveal recupera las 2 opciones reales.
+      var _go=row&&row.gen_options;
+      if(_go&&Array.isArray(_go.options)&&_go.options.length){ r.options=_go.options; if(_go.pov_text) r.povText=_go.pov_text; }
+      else r.options=r.options||[{title:(row&&row.title)||"",hooks:[p.hook],body:p.beats||[],closing:p.close||"",script:(row&&row.script)||""}];
       if(row&&row.recording_format) r.recFormat=row.recording_format;
       applyScriptOption(r,0,0);
       setTimeout(function(){cb();},Math.max(0,1200-(Date.now()-t0)));
@@ -6064,6 +6110,7 @@
     var s=r.script||{};
     var g=guionById(r._gid||S.activeGuionId);
     if(g){ g.title=s.hook||g.title; g.hook=s.hook||g.hook; if(s.beats) g.beats=s.beats; if(s.close!=null) g.close=s.close; if(r.recFormat) g.recFormat=r.recFormat; }
+    if(g) persistChosen(g, r.optIdx||0);   // P1: la elección queda cerrada y persistida
     r._saved=true; render();
     if(isDemo()){ return showToast(L("Guion guardado en Guiones.","Script saved to your Scripts.")); }
     var sid=r._sid||(g&&g._sid);
@@ -7168,11 +7215,22 @@
   /* ── teclado (T3, IDI): Esc cierra, Enter envía — como la chrome legacy ── */
   // T6: cerrar el orbe NO cancela el robo — sigue en background y avisa al acabar.
   function closeOverlay(){
-    if(S.view==="gen") S._genBg=true;
     clearInterval(S.genStepTimer); clearTimeout(S.fillTimer); S._fillPhase=null;
+    if(S.view==="gen"){
+      // T6: cerrar el orbe NO cancela el robo — sigue en background. Copy David:
+      S._genBg=true; S.view="feed"; render();
+      showToast(L("En menos de 1 min lo tienes en Ideas robadas.","In under 1 min it'll be in your Stolen ideas."));
+      return;
+    }
     // F2: salir del reveal no te deja tirado en el feed — aterrizas en el workspace
-    // de la idea recién robada (reel + guiones + notas).
-    if(S.view==="script" && S.revealReel && S.revealReel.id!=null){ return wsOpen("r:"+S.revealReel.id); }
+    // de la idea recién robada (reel + guiones + notas). P1: ver el selector cuenta
+    // como elegir (opción activa) → el reveal no se re-impone al reabrir la idea.
+    if(S.view==="script" && S.revealReel && S.revealReel.id!=null){
+      var _rg=S.revealReel._gid?guionById(S.revealReel._gid):null;
+      if(_rg && guionChoicePending(_rg)) persistChosen(_rg, S.revealReel.optIdx||0);
+      var _k=(_rg&&guionGroupKey(_rg))||("r:"+S.revealReel.id);
+      return wsOpen(_k);
+    }
     // Editor abierto desde un workspace → vuelve al workspace, no a la lista.
     if(S.view==="editor" && S._edFrom==="ideaws" && S._wsKey){ S._edFrom=null; S.view="ideaws"; S.tab="guiones"; return render(); }
     S.view="feed"; render();
