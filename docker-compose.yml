@@ -5,6 +5,10 @@ services:
     networks:
       - traefik-public
 
+  # P2: rotación de logs con retención — el histórico sobrevive semanas, no hasta
+  # el siguiente `up --build` (los contenedores se recrean en cada deploy, pero
+  # los json-file rotados persisten en /var/lib/docker mientras viva el contenedor;
+  # el tamaño acotado evita llenar disco). Aplica al recrear (próximo deploy).
   app:
     build: .
     restart: always
@@ -13,6 +17,11 @@ services:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
+    logging: &log-rotate
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "10"
     labels:
       - traefik.enable=true
       - traefik.http.routers.reelscript.rule=Host(`reelscript.net`) || Host(`www.reelscript.net`)
@@ -32,6 +41,7 @@ services:
     depends_on:
       - redis
     command: celery -A tasks worker --loglevel=info --concurrency=4
+    logging: *log-rotate
     networks:
       - traefik-public
 
@@ -45,6 +55,7 @@ services:
     depends_on:
       - redis
     command: celery -A tasks beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    logging: *log-rotate
     networks:
       - traefik-public
 

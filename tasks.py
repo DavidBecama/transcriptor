@@ -1722,7 +1722,14 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
     def _fail(error, message):
-        logger.warning("gen_script_task reel=%s user=%s fail: %s", reel_id, user_id, error)
+        # P2: marca ÚNICA de robo fallido con causa — greppeable ([steal_failed]) y
+        # medible en PostHog. Antes los fallos no dejaban rastro cuantificable.
+        logger.warning("[steal_failed] cause=%s reel=%s user=%s", error, reel_id, user_id)
+        try:
+            from emails import track as _ph_track
+            _ph_track("steal_failed", user_id, {"cause": error, "reel_id": reel_id})
+        except Exception:
+            pass
         return {"ok": False, "error": error, "message": message}
 
     # v0.15.8: liberar lock siempre (try/finally envolvente). Cubre éxito,
@@ -1879,7 +1886,12 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         if not transcript_text:
             _cap_g = (reel.get("caption") or "").strip()
             if len(_cap_g) >= 25:
-                logger.warning("gen_script_task: sin transcript reel=%s → caption-only (%d chars)", reel_id, len(_cap_g))
+                logger.warning("[steal_degraded] cause=no_transcript reel=%s user=%s caption_chars=%d", reel_id, user_id, len(_cap_g))
+                try:
+                    from emails import track as _ph_track_deg
+                    _ph_track_deg("steal_degraded", user_id, {"cause": "no_transcript", "reel_id": reel_id})
+                except Exception:
+                    pass
             else:
                 return _fail("transcribe_error", "Este reel no tiene audio transcribible ni texto suficiente para generar.")
 
@@ -2037,19 +2049,23 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
                 "idea_id":                None,
                 "title":                  script_title,
                 "script":                 result,
-                "project_id":             None,
+                # P0: la task YA recibía project_id (el endpoint se lo pasa) pero lo tiraba.
+                "project_id":             project_id,
                 "from_competitor_reel_id": reel["id"],
                 "from_competitor_username": ig_username,
                 "assistant_name":         _TASK_LABELS.get(style_label, style_label) if style_label else None,
                 "alt_hooks":              _alt_hooks,   # 2 hooks alternativos (device distinto)
                 "recording_format":       _rec_fmt,     # ítem 10
+                # P1: reveal reconstruible siempre (opciones + POV); chosen=None = elección pendiente.
+                "gen_options":            {"options": options, "pov_text": _pov_text, "chosen": None},
             }
             try:
                 ins = db.table("scripts").insert(_row).execute()
             except Exception as _e1:
-                # Degradación segura: columna recording_format aún sin migrar → sin ella.
-                if "recording_format" in str(_e1).lower():
+                # Degradación segura: columna recording_format/gen_options aún sin migrar → sin ellas.
+                if "recording_format" in str(_e1).lower() or "gen_options" in str(_e1).lower():
                     _row.pop("recording_format", None)
+                    _row.pop("gen_options", None)
                     ins = db.table("scripts").insert(_row).execute()
                 else:
                     raise

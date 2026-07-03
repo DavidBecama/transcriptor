@@ -334,6 +334,18 @@ async function main() {
   })()`);
   check("«Robar otro guion» agrupa: mismo reel → 1 idea con 2 guiones", ws2.cards === 2 && ws2.groups === 1, JSON.stringify(ws2));
 
+  /* ═══ P1: robo en background → elección pendiente → reveal al abrir ═══ */
+  console.log("\n■ P1 · elección pendiente tras robo en background");
+  await nav(`${BASE}/profile/radar?plan=creador`);
+  await click('.feature [data-act="steal"]'); await sleep(150);
+  await key("Escape"); await sleep(2500);            // background → resuelve y avisa
+  await click('#rsToastAct'); await sleep(400);      // «Elegir mi versión»
+  const p1 = await evaluate(`(function(){
+    return { reveal: !!document.querySelector('#radarRoot .script-hook'),
+             opts: document.querySelectorAll('#radarRoot .opt-tab').length };
+  })()`);
+  check("robo en background → «Elegir mi versión» presenta el reveal con opciones", p1.reveal && p1.opts >= 2, JSON.stringify(p1));
+
   /* ═══ T9: deshacer al descartar guion ═══ */
   console.log("\n■ T9 · deshacer descarte");
   await nav(`${BASE}/profile/radar?plan=creador&t=guiones`);

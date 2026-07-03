@@ -5059,7 +5059,7 @@ def update_script(script_id):
     user = current_user()
     body = request.get_json()
     updates = {}
-    for key in ("title", "transcription", "script", "performance_notes", "views_count", "engagement_rate", "project_id", "likes", "comments", "saves", "metrics_image_url", "published_at", "recording_status", "alt_hooks", "approval_status", "recording_format"):
+    for key in ("title", "transcription", "script", "performance_notes", "views_count", "engagement_rate", "project_id", "likes", "comments", "saves", "metrics_image_url", "published_at", "recording_status", "alt_hooks", "approval_status", "recording_format", "gen_options"):
         if key in body:
             updates[key] = body[key]
     if "recording_status" in updates and updates["recording_status"] not in ("pending", "recorded", "discarded"):
@@ -10416,6 +10416,14 @@ def generate_script_from_competitor_reel(reel_id: str):
             raw_opts = _generate_script_options(user_content, style_arg, custom_prompt, uid, gen_pid, n=2)
         except Exception as e:
             logger.error("generate_script: LLM failed user=%s err=%s", uid, e, exc_info=True)
+            # P2: marca única de robo fallido con causa (greppeable + PostHog).
+            _cause = "assistant_empty_response" if (style_arg == "custom" and "empty content" in str(e).lower()) else "llm_error"
+            logger.warning("[steal_failed] cause=%s reel=%s user=%s", _cause, reel["id"], uid)
+            try:
+                from emails import track as _ph_track_f
+                _ph_track_f("steal_failed", uid, {"cause": _cause, "reel_id": reel["id"]})
+            except Exception:
+                pass
             _refund()
             # v0.15.7.b: mensaje contextual si style=custom y empty content
             # (guard v0.15.7.a). Apunta al asistente concreto en vez del
@@ -10473,22 +10481,29 @@ def generate_script_from_competitor_reel(reel_id: str):
             "idea_id":                None,
             "title":                  script_title,
             "script":                 result,
-            "project_id":             None,
+            # P0: el robo pertenece a la marca desde la que se robó (antes None →
+            # invisible en las vistas de proyecto y mezclado en la sesión activa).
+            "project_id":             gen_pid,
             "from_competitor_reel_id": reel["id"],
             "from_competitor_username": ig_username,
             "assistant_name":         _resolve_assistant_name(
                 {"assistant_id": assistant_id, "style": style_label}, uid, db
             ),
             "recording_format":       rec_fmt,   # ítem 10
+            # P1: el reveal (2 opciones + hooks + POV) debe poder reconstruirse SIEMPRE,
+            # también tras recargar. chosen=None → elección pendiente (robo en background).
+            "gen_options":            {"options": options, "pov_text": pov_text, "chosen": None},
+            "alt_hooks":              (options[0].get("hooks") or [])[1:] or None,
         }
         try:
             ins = db.table("scripts").insert(_script_row).execute()
             if ins.data:
                 script_id = ins.data[0].get("id")
         except Exception as e:
-            # Degradación segura: columna recording_format aún sin migrar → reintenta sin ella.
-            if "recording_format" in str(e).lower():
+            # Degradación segura: columna recording_format/gen_options aún sin migrar → sin ellas.
+            if "recording_format" in str(e).lower() or "gen_options" in str(e).lower():
                 _script_row.pop("recording_format", None)
+                _script_row.pop("gen_options", None)
                 try:
                     ins = db.table("scripts").insert(_script_row).execute()
                     if ins.data:
@@ -13213,6 +13228,7 @@ def reels_steal_batch():
     user = current_user()
     uid = user["id"]
     body = request.get_json(silent=True) or {}
+    batch_pid = _req_project_id()   # P0: los robos del lote pertenecen a la marca activa
     reel_ids = body.get("reel_ids") or []
     count = max(1, min(int(body.get("count") or 5), 5))
 
@@ -13320,6 +13336,7 @@ def reels_steal_batch():
                 "user_id": uid,
                 "title": script_title,
                 "script": flat,
+                "project_id": batch_pid,   # P0: antes None → huérfano invisible en vistas de proyecto
                 "from_competitor_reel_id": reel["id"],
                 "from_competitor_username": ig_username,
                 "assistant_name": _resolve_assistant_name(
