@@ -153,6 +153,10 @@ RADAR_FEED_SERVED_N    = 24
 RADAR_FEED_SEEN_PENALTY = 0.45       # ×score a los reels servidos ayer (los desbanca)
 RADAR_FEED_SEEN_TTL     = 3 * 86400
 RADAR_SUGG_MAX_AGE_DAYS = 30         # frescura: «Sugerencias de hoy» solo reels ≤30 días
+# Rotación diaria de sugerencias (fase0 feed-vivo): mismo motor que el feed — jitter
+# sembrado por (uid,marca,día) + penalización a lo servido ayer (set Redis suggserved:).
+RADAR_SUGG_SEEN_PENALTY = 0.45       # ×score a las sugerencias servidas ayer (las desbanca)
+RADAR_SUGG_SEEN_TTL     = 3 * 86400
 # Refresco manual de PAGO (única vía de scrape on-demand). Parametrizable (doc economía).
 REFRESH_NOW_UNITS         = int(os.environ.get("REFRESH_NOW_UNITS", "5"))   # ~5 créditos
 REFRESH_NOW_COST          = REFRESH_NOW_UNITS * COST_CENTS
@@ -8429,6 +8433,7 @@ _POOL_NICHE_ALIAS = {
     "creacion de contenido": "marketing", "creador de contenido": "marketing",
     "emprendimiento": "negocios", "emprender": "negocios", "ecommerce": "negocios", "ventas": "negocios",
     "meditacion": "espiritualidad y mindfulness", "mindfulness": "espiritualidad y mindfulness",
+    "espiritualidad": "espiritualidad y mindfulness",
     "nutricion": "salud", "psicologia": "salud", "bienestar": "salud",
 }
 
@@ -9326,13 +9331,15 @@ def _suggestion_reason(exp, formato, age_days):
 
 
 def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, limit=15,
-                            shuffle_seed=None, offset=0):
+                            shuffle_seed=None, offset=0, day_seed=None, seen_ids=None):
     """«Sugerencias de hoy» orientado a REELS: reels que PETAN en el nicho de creadores que
     el user NO sigue ni descartó. Cada reel es ROBABLE sin seguir al creador. `worth_follow`
     marca a los creadores que MERECE seguir (listón alto) → la 2ª acción «+ Añadir competidor»
     solo se ofrece en esos (menos sugerencias de seguir, más curadas). SOLO on-niche; cero
     scrape (pool cacheado). `shuffle_seed` re-baraja el orden (botón «↻ otras» GRATIS, sin
-    scrape); `offset` pagina (tandas del carrusel). Devuelve reels normReel-compat+worth_follow."""
+    scrape); `offset` pagina (tandas del carrusel). `day_seed` ROTA el orden cada día (jitter
+    multiplicativo estable dentro del día → paginado coherente); `seen_ids` penaliza los reels
+    servidos ayer (rotación real). Devuelve reels normReel-compat+worth_follow."""
     subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:16]
     # El propio nicho normalizado suele ser un SUBNICHE válido en la taxonomía rica de
     # creators_global ("inteligencia artificial", "marketing digital", "espiritualidad y
@@ -9363,62 +9370,82 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
                 uname[cid] = c.get("ig_username") or ""
     except Exception:
         logger.warning("[sugg] subniche overlap failed (¿migración subniches?)")
-    # FALLBACK por NICHE AMPLIO: si el overlap fuerte no encontró a NADIE (nicho con pocos/0
-    # subnichos en el pool), casa por nicho canónico en vez de devolver 0. Solo como red de
-    # seguridad (no como widener permanente) → no reintroduce la fuga off-niche del caso normal.
-    if not uname:
-        pn = _pool_niche_canon(niche)
-        if pn:
-            try:
-                for c in (db.table("creators_global").select("id, ig_username")
-                            .eq("niche", pn).limit(600).execute()).data or []:
-                    cid = c.get("id")
-                    if cid and cid not in exclude:
-                        uname[cid] = c.get("ig_username") or ""
-            except Exception:
-                pass
-    cids = list(uname.keys())
-    if not cids:
-        return []
-    baselines = _creator_view_baselines(cids)
-    # FRESCURA: solo reels de ≤30 días (mejor pocas recientes que rellenar con viejos).
-    fresh_cutoff = (datetime.now(timezone.utc) - timedelta(days=RADAR_SUGG_MAX_AGE_DAYS)).isoformat()
-    try:
-        rr = (db.table("creator_reels_global")
-                .select("id, ig_reel_id, creator_id, caption, views, likes, comments, "
-                        "posted_at, video_duration_sec, formato")
-                .in_("creator_id", cids).eq("is_archived", False)
-                .gte("posted_at", fresh_cutoff)
-                .order("views", desc=True).limit(max(limit * 15, 360)).execute()).data or []
-    except Exception:
-        rr = []
-    # explosión por reel.
-    by_creator = {}
-    for r in rr:
-        cid = r.get("creator_id"); v = int(r.get("views") or 0)
-        r["_exp"] = _explosion_score(v, baselines.get(cid)) or 0.0
-        by_creator.setdefault(cid, []).append(r)
     REEL_FLOOR = 1.2      # MÁS reels: umbral bajo para que un reel APAREZCA
     FOLLOW_MIN_EXP = 2.0  # «petando» a efectos de seguir
     FOLLOW_MIN_HITS = 2   # CURACIÓN: «+ Añadir competidor» solo si el creador peta de FORMA
                           # CONSISTENTE (≥2 reels petando), no un único viral de chiripa.
     PER_CREATOR = 2       # hasta 2 reels por creador → más volumen sin que uno domine
     sseed = str(shuffle_seed) if shuffle_seed else None
-    chosen = []
-    for cid, lst in by_creator.items():
-        lst.sort(key=lambda r: -(r.get("_exp") or 0.0))
-        wf = sum(1 for x in lst if (x.get("_exp") or 0.0) >= FOLLOW_MIN_EXP) >= FOLLOW_MIN_HITS
-        for r in lst[:PER_CREATOR]:
-            if (r.get("_exp") or 0.0) >= REEL_FLOOR:
-                # 1ª vista (sseed=None) → orden por explosión (lo que MÁS peta primero).
-                # «↻ otras» (sseed) → baraja FUERTE (hash puro): todos ya pasan REEL_FLOOR
-                # (petan), así que variar el orden trae otros reels on-niche, sin scrape. El
-                # offset (paginado de «ver más») es estable mientras no se rebaraje.
-                if sseed:
-                    score = _unit_hash("%s:%s" % (r.get("id"), sseed))
-                else:
-                    score = r.get("_exp") or 0.0
-                chosen.append((score, r, wf))
+
+    def _score_pool(pool):
+        """Reels frescos que pasan el listón en un pool {cid: handle} → [(score, reel, wf)]."""
+        cids = list(pool.keys())
+        if not cids:
+            return []
+        baselines = _creator_view_baselines(cids)
+        # FRESCURA: solo reels de ≤30 días (mejor pocas recientes que rellenar con viejos).
+        fresh_cutoff = (datetime.now(timezone.utc) - timedelta(days=RADAR_SUGG_MAX_AGE_DAYS)).isoformat()
+        try:
+            rr = (db.table("creator_reels_global")
+                    .select("id, ig_reel_id, creator_id, caption, views, likes, comments, "
+                            "posted_at, video_duration_sec, formato")
+                    .in_("creator_id", cids).eq("is_archived", False)
+                    .gte("posted_at", fresh_cutoff)
+                    .order("views", desc=True).limit(max(limit * 15, 360)).execute()).data or []
+        except Exception:
+            rr = []
+        # explosión por reel.
+        by_creator = {}
+        for r in rr:
+            cid = r.get("creator_id"); v = int(r.get("views") or 0)
+            r["_exp"] = _explosion_score(v, baselines.get(cid)) or 0.0
+            by_creator.setdefault(cid, []).append(r)
+        picked = []
+        for cid, lst in by_creator.items():
+            lst.sort(key=lambda r: -(r.get("_exp") or 0.0))
+            wf = sum(1 for x in lst if (x.get("_exp") or 0.0) >= FOLLOW_MIN_EXP) >= FOLLOW_MIN_HITS
+            for r in lst[:PER_CREATOR]:
+                if (r.get("_exp") or 0.0) >= REEL_FLOOR:
+                    # 1ª vista (sseed=None) → explosión × jitter DIARIO (day_seed): mismo
+                    # orden todo el día (paginado por offset coherente entre GET y «ver
+                    # más») y orden DISTINTO cada mañana; lo servido ayer (seen_ids) se
+                    # penaliza → rotación real, mismo motor que el feed. Sin day_seed
+                    # (legacy) → explosión pura.
+                    # «↻ otras» (sseed) → baraja FUERTE (hash puro): todos ya pasan
+                    # REEL_FLOOR (petan), así que variar el orden trae otros reels
+                    # on-niche, sin scrape.
+                    if sseed:
+                        score = _unit_hash("%s:%s" % (r.get("id"), sseed))
+                    else:
+                        score = r.get("_exp") or 0.0
+                        if day_seed:
+                            score *= 0.4 + 0.6 * _unit_hash("%s:%s" % (r.get("id"), day_seed))
+                        if seen_ids and str(r.get("id")) in seen_ids:
+                            score *= RADAR_SUGG_SEEN_PENALTY
+                    picked.append((score, r, wf))
+        return picked
+
+    chosen = _score_pool(uname)
+    # FALLBACK por NICHE AMPLIO: si el overlap fuerte no encontró a NADIE (nicho con pocos/0
+    # subnichos en el pool) O sus creadores no tienen NI UN reel fresco que pase el listón
+    # (pool congelado, p.ej. todos 'private' sin re-scrape), casa por nicho canónico en vez
+    # de devolver 0/los mismos muertos. Solo red de seguridad (no widener permanente) → no
+    # reintroduce la fuga off-niche del caso normal.
+    if not chosen:
+        pn = _pool_niche_canon(niche)
+        fb = {}
+        if pn:
+            try:
+                for c in (db.table("creators_global").select("id, ig_username")
+                            .eq("niche", pn).limit(600).execute()).data or []:
+                    cid = c.get("id")
+                    if cid and cid not in exclude and cid not in uname:
+                        fb[cid] = c.get("ig_username") or ""
+            except Exception:
+                pass
+        if fb:
+            uname.update(fb)   # handles del fallback para el formateo de salida
+            chosen = _score_pool(fb)
     chosen.sort(key=lambda x: -x[0])
     now = datetime.now(timezone.utc)
     out = []
@@ -9476,6 +9503,39 @@ def _sugg_exclude(uid, project_id):
     return tracked | _dismissed_creator_ids(uid, project_id)
 
 
+def _sugg_day_seed(uid, project_id):
+    """Semilla de ROTACIÓN DIARIA de sugerencias por (uid, marca, día): mismo orden todo
+    el día (paginado estable entre el GET y «ver más»), orden distinto cada mañana. Solo
+    fecha, cero Redis/estado → no puede colgar (#231)."""
+    return "%s:%s:%s" % (uid, project_id or "_", datetime.now(timezone.utc).strftime("%Y%m%d"))
+
+
+def _sugg_seen_yesterday(uid, project_id):
+    """Ids de reels servidos AYER en el carrusel (set Redis suggserved:) → hoy se penalizan
+    (rotación real, mismo motor que feedserved). Sin Redis degrada a set() (solo jitter)."""
+    if rds is None:
+        return set()
+    yday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")
+    try:
+        return {m.decode() if isinstance(m, bytes) else m
+                for m in (rds.smembers("suggserved:%s:%s:%s" % (uid, project_id or "_", yday)) or [])}
+    except Exception:
+        return set()
+
+
+def _sugg_record_served(uid, project_id, reel_ids):
+    """Registra lo servido HOY en la ventana gratis para penalizarlo mañana."""
+    if rds is None or not reel_ids:
+        return
+    tkey = "suggserved:%s:%s:%s" % (uid, project_id or "_",
+                                    datetime.now(timezone.utc).strftime("%Y%m%d"))
+    try:
+        rds.sadd(tkey, *[str(i) for i in reel_ids if i])
+        rds.expire(tkey, RADAR_SUGG_SEEN_TTL)
+    except Exception:
+        pass
+
+
 @app.route("/api/radar/suggestions", methods=["GET"])
 @require_auth
 @limiter.limit("60 per hour")
@@ -9487,9 +9547,10 @@ def radar_suggestions():
     user = current_user()
     uid = user["id"]
     project_id = request.args.get("project_id")
-    # HOTFIX cuelgue prod (#231): orden DETERMINISTA por explosión (sin shuffle/nonce en el GET).
-    # El re-baraja de sugerencias se hará client-side (cero round-trip → no puede colgar). Todo
-    # el cómputo va dentro de try/except → el endpoint NUNCA cuelga ni 500: peor caso, [].
+    # HOTFIX cuelgue prod (#231): orden DETERMINISTA (el «↻ otras» sigue client-side, sin
+    # nonce en el GET). Determinista POR DÍA: jitter sembrado por (uid,marca,fecha) + pena
+    # a lo servido ayer (Redis; degrada a solo-jitter si Redis cae) → rotación cada mañana.
+    # Todo el cómputo va dentro de try/except → el endpoint NUNCA cuelga ni 500: peor caso, [].
     try:
         exclude = _sugg_exclude(uid, project_id)
         niche, subs = _resolve_brand_niche(uid, project_id)
@@ -9497,8 +9558,11 @@ def radar_suggestions():
             # Sin nicho en NINGÚN sitio → needs_niche (la UI pide definirlo, no vacío en silencio).
             return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
         # +1 para saber si hay material más allá de la ventana gratis (sin un 2º query).
-        batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_FREE_N + 1)
+        batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_FREE_N + 1,
+                                        day_seed=_sugg_day_seed(uid, project_id),
+                                        seen_ids=_sugg_seen_yesterday(uid, project_id))
         has_more = len(batch) > SUGG_FREE_N
+        _sugg_record_served(uid, project_id, [x.get("id") for x in batch[:SUGG_FREE_N]])
         return jsonify({"suggestions": batch[:SUGG_FREE_N], "total": len(batch[:SUGG_FREE_N]),
                         "free_n": SUGG_FREE_N, "has_more": has_more, "more_units": SUGG_MORE_UNITS,
                         "more_batch": SUGG_MORE_BATCH}), 200
@@ -9546,8 +9610,11 @@ def radar_suggestions_more():
     if not subs and not niche:
         return jsonify({"ok": False, "error": "no_niche"}), 400
     exclude = _sugg_exclude(uid, project_id)
-    # Orden DETERMINISTA (sin shuffle) → el paginado por offset es estable entre tandas.
-    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1, offset=offset)
+    # Orden DETERMINISTA por día (misma semilla y pena que el GET) → el paginado por offset
+    # es estable entre tandas y coherente con la ventana gratis servida hoy.
+    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1, offset=offset,
+                                    day_seed=_sugg_day_seed(uid, project_id),
+                                    seen_ids=_sugg_seen_yesterday(uid, project_id))
     reels = batch[:SUGG_MORE_BATCH]
     if not reels:
         return jsonify({"ok": True, "suggestions": [], "has_more": False, "charged": False}), 200

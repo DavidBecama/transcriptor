@@ -920,11 +920,12 @@ def refresh_metrics_bulk(self, user_id, tid_list):
 # Supabase local + env vars vía os.environ (mismo que transcribe_task).
 # Lógica de negocio idéntica a la versión sync previa: anti-race lock +
 # Apify run-sync-get-dataset-items + UPSERT reels + UPDATE final.
-# DEUDA PRIORITARIA v0.15.4: si el worker muere mid-task, scrape_status queda
-# 'scraping' permanente y el anti-race bloquea re-scrape para siempre. Fix:
-# guard "stale" = si last_scraped_at < now() - 10min con status='scraping',
-# considerar abandonado y permitir re-encolar.
+# Fix deuda v0.15.4 (fase0 feed-vivo): el lock anti-race escribe last_scraped_at al
+# ARRANCAR (semántica «último intento», el UPDATE final la reafirma al acabar) → un
+# 'scraping' con último intento > SCRAPE_STUCK_MIN es un ZOMBI (worker muerto mid-task)
+# y se permite takeover aquí + re-encolado en _enqueue_if_stale.
 SCRAPE_TIMEOUT_SEC = 240
+SCRAPE_STUCK_MIN = int(os.environ.get("SCRAPE_STUCK_MIN", "10"))
 # SPEC-fase-accion-radar #4 (Fathom 18/06): pre-transcripción top-N al primer scrape.
 # N=3 confirmado por David (presupuesto conservador). Ajustable por env.
 _PRETRANSCRIBE_TOP_N = int(os.environ.get("PRETRANSCRIBE_TOP_N", "3"))
@@ -965,15 +966,30 @@ def scrape_creator_task(creator_id: str) -> dict:
     # entonces, no en refrescos — acota el coste Groq). Estado previo al lock.
     was_first_scrape = (creator.get("scrape_status") in (None, "", "pending"))
 
-    # 2. Anti-race: UPDATE scrape_status='scraping' WHERE != 'scraping'.
+    # 2. Anti-race: UPDATE scrape_status='scraping' WHERE != 'scraping'. Escribe también
+    # last_scraped_at (=último INTENTO) → distingue un scrape vivo de un zombi.
+    lock_fields = {"scrape_status": "scraping", "last_error": None,
+                   "last_scraped_at": datetime.now(timezone.utc).isoformat()}
     lock = (db.table("creators_global")
-              .update({"scrape_status": "scraping", "last_error": None})
+              .update(lock_fields)
               .eq("id", creator_id)
               .neq("scrape_status", "scraping")
               .execute())
     if not lock.data:
-        logger.info("scrape_creator skip (in_progress) for %s", ig_username)
-        return {"status": "in_progress", "creator_id": creator_id, "ig_username": ig_username}
+        # TAKEOVER de zombi: 'scraping' con último intento hace > SCRAPE_STUCK_MIN → el
+        # worker murió mid-task. El WHERE condicionado evita la carrera entre workers.
+        stuck_iso = (datetime.now(timezone.utc)
+                     - timedelta(minutes=SCRAPE_STUCK_MIN)).isoformat()
+        lock = (db.table("creators_global")
+                  .update(lock_fields)
+                  .eq("id", creator_id)
+                  .eq("scrape_status", "scraping")
+                  .lt("last_scraped_at", stuck_iso)
+                  .execute())
+        if not lock.data:
+            logger.info("scrape_creator skip (in_progress) for %s", ig_username)
+            return {"status": "in_progress", "creator_id": creator_id, "ig_username": ig_username}
+        logger.warning("scrape_creator: takeover de zombi 'scraping' para %s", ig_username)
 
     # 3. Llamada Apify sync (timeout 240s; server-side limit Apify ~300s).
     # v0.15.2.b: memory 512→1024 (default oficial del actor apify/instagram-reel-scraper).
@@ -1176,12 +1192,18 @@ def scrape_creator_task(creator_id: str) -> dict:
 # y CAPAN el nº de scrapes por corrida para no disparar el coste de Apify.
 _RADAR_DAILY_CAP = int(os.environ.get("RADAR_DAILY_SCRAPE_CAP", "400"))
 _USER_SCRAPE_CAP = int(os.environ.get("USER_PROFILE_SCRAPE_CAP", "400"))
+# 'private' ya NO es condena perpetua: el login-wall de IG lo dispara también en cuentas
+# públicas (47/57 tracked el 04/07/26) y suele ser transitorio → reintento cada N días
+# (coste acotado: 1 run/creador cada N días). 'not_found' sí sigue siendo permanente.
+_PRIVATE_RETRY_DAYS = int(os.environ.get("RADAR_PRIVATE_RETRY_DAYS", "3"))
 
 
 def _enqueue_if_stale(db, creator_ids, stale_hours, cap):
-    """Encola scrape_creator_task para los creadores stale (>stale_hours) y no
-    privados/inexistentes. Una sola lectura a creators_global (.in_) + filtro en
-    memoria. Devuelve (queued, candidates)."""
+    """Encola scrape_creator_task para los creadores stale (>stale_hours). Skips:
+    'not_found' (permanente), 'private' fresco (<_PRIVATE_RETRY_DAYS), 'scraping' vivo
+    (<SCRAPE_STUCK_MIN; los zombis más viejos se re-encolan y el takeover del lock los
+    roba). Una sola lectura a creators_global (.in_) + filtro en memoria. Devuelve
+    (queued, candidates)."""
     creator_ids = [c for c in dict.fromkeys(creator_ids) if c]  # únicos, orden estable
     if not creator_ids:
         return 0, 0
@@ -1198,14 +1220,23 @@ def _enqueue_if_stale(db, creator_ids, stale_hours, cap):
             rows.extend(r.data or [])
         except Exception:
             logger.exception("refresh: creators_global read failed (chunk)")
+    private_cutoff = (datetime.now(timezone.utc)
+                      - timedelta(days=_PRIVATE_RETRY_DAYS)).isoformat()
+    stuck_cutoff = (datetime.now(timezone.utc)
+                    - timedelta(minutes=SCRAPE_STUCK_MIN)).isoformat()
     for cr in rows:
         if queued >= cap:
             break
-        if cr.get("scrape_status") in ("private", "not_found", "scraping"):
-            continue
+        st = cr.get("scrape_status")
         last = cr.get("last_scraped_at")
-        if last and str(last) > cutoff:   # fresco → skip (ISO comparable lexicográficamente)
+        if st == "not_found":
             continue
+        if st == "private" and last and str(last) > private_cutoff:
+            continue   # private fresco → reintento solo cada _PRIVATE_RETRY_DAYS
+        if st == "scraping" and last and str(last) > stuck_cutoff:
+            continue   # scrape vivo de verdad; los zombis (más viejos) sí se re-encolan
+        if st not in ("private", "scraping") and last and str(last) > cutoff:
+            continue   # fresco → skip (ISO comparable lexicográficamente)
         try:
             scrape_creator_task.delay(cr["id"])
             queued += 1
