@@ -938,6 +938,51 @@ def set_security_headers(response):
     return response
 
 
+# ── Perf de entrada (fase 04/07): compresión gzip + cache de estáticos versionados ──
+# El HTML (~1,6 MB) y el bundle (~617 KB) viajaban SIN comprimir (ni Flask ni Traefik
+# gzipeaban). gzip stdlib (cero dependencia nueva) los baja ~75%/~69%. Y los estáticos
+# con ?v= (cache-bust por URL) pueden cachearse immutable en vez del 'no-cache' que Flask
+# pone por defecto (revalidaba en cada visita).
+_COMPRESSIBLE_TYPES = ("text/html", "text/css", "text/plain", "text/xml",
+                       "application/javascript", "text/javascript", "application/json",
+                       "application/xml", "image/svg+xml")
+_COMPRESS_MIN_BYTES = 1024
+
+
+@app.after_request
+def _compress_and_cache(response):
+    try:
+        # Cache immutable para estáticos versionados (?v= ya invalida por URL).
+        if request.path.startswith("/static/") and request.args.get("v"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        if "gzip" not in (request.headers.get("Accept-Encoding") or "").lower():
+            return response
+        if not (200 <= response.status_code < 300) or "Content-Encoding" in response.headers:
+            return response
+        ctype = (response.content_type or "").split(";")[0].strip().lower()
+        if ctype not in _COMPRESSIBLE_TYPES:
+            return response
+        # send_file marca direct_passthrough (estáticos): desactívalo para leer el cuerpo.
+        if getattr(response, "direct_passthrough", False):
+            response.direct_passthrough = False
+        data = response.get_data()
+        if len(data) < _COMPRESS_MIN_BYTES:
+            return response
+        import gzip as _gzip
+        comp = _gzip.compress(data, 6)
+        response.set_data(comp)
+        response.headers["Content-Encoding"] = "gzip"
+        response.headers["Content-Length"] = str(len(comp))
+        vary = response.headers.get("Vary")
+        if not vary:
+            response.headers["Vary"] = "Accept-Encoding"
+        elif "accept-encoding" not in vary.lower():
+            response.headers["Vary"] = vary + ", Accept-Encoding"
+    except Exception:
+        logger.warning("[perf] compress/cache failed for %s", request.path, exc_info=True)
+    return response
+
+
 # ── Input validators ────────────────────────────────────────────────────────
 
 def validate_url(url):

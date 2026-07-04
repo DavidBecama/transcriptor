@@ -7849,9 +7849,37 @@
     // P0 aislamiento: el backend filtra por project_id ("brand" lo ignoraba) —
     // stats y feed de señales salían mezclados entre marcas. "default" → sin filtro.
     var _pq=(S.brandId&&S.brandId!=="default")?("?project_id="+encodeURIComponent(S.brandId)):"";
+    // Perf entrada (04/07): OLA CRÍTICA = solo stats + feed de reels → es lo que el primer
+    // Radar necesita (hero, oportunidades, feed). El resto (métricas/voz/insights/videos e
+    // ideas/guiones — pestañas propias, que recargan bajo demanda) va en una ola DIFERIDA
+    // tras render(), sin bloquear el primer paint. Antes los 8 fetches bloqueaban en un
+    // solo Promise.all → el Radar no aparecía hasta que volvían todos.
     Promise.all([
       fetch("/api/radar/stats"+_pq,{credentials:"same-origin"}).then(function(r){return r.json();}).catch(function(){return{};}),
-      fetch("/api/tracked-creators/reels"+(_pq?_pq+"&":"?")+"sort=explosion&limit=24",{credentials:"same-origin"}).then(function(r){return r.json();}).catch(function(){return{reels:[]};}),
+      fetch("/api/tracked-creators/reels"+(_pq?_pq+"&":"?")+"sort=explosion&limit=24",{credentials:"same-origin"}).then(function(r){return r.json();}).catch(function(){return{reels:[]};})
+    ]).then(function(res){
+      var stats=res[0]||{}, feed=res[1]||{};
+      S.stats={ competitors:stats.competitors||0, reels_week:stats.reels_week||0, exploded_week:stats.exploded_week||0, stolen_today:stats.stolen_today!=null?stats.stolen_today:(stats.stolen_total||0) };
+      S.reels=(feed.reels||[]).map(normReel);
+      S.radarSeed=!!feed.seed;   // SPEC #3: el radar viene del seed del nicho (sin competidores)
+      loadTracked();   // T3: lista de competidores seguidos (manejable en Cerebro)
+      S.favs={}; S.reels.forEach(function(r){ if(r.fav) S.favs[r.id]=true; });
+      S._reelPool=S.reels.slice();   // pool base para variar feed por-marca en demo
+      if(isDemo()) seedDemoContent();   // MVP demo: SIEMPRE siembra guiones+hooks+reels vinculados
+      if(isDemo() && !(isAgency() && S.tab==="portfolio")) applyDemoBrand();
+      if(!isDemo() && isAgency()){ S.team=[]; loadTeam(); }   // S.team=[] antes de render: evita que teamHTML caiga al pool demo mientras loadTeam (async) resuelve; loadTeam re-renderiza al volver
+      render();               // PRIMER PAINT del Radar — no espera a la ola diferida
+      brainLevelPulse();
+      _loadDeferredBrandData(q, _pq);   // métricas/voz/insights/videos/ideas/guiones en background
+    });
+  }
+
+  // Ola DIFERIDA (perf 04/07): lo que NO hace falta para el primer Radar. Re-renderiza al
+  // volver. GUARDAS: el render crítico ya corrió con S.metrics=null / S.voice sin fijar /
+  // S.guiones=[] / S.ideas=[] — metricVideos() y hasRealVoice() ya toleran ese estado. En
+  // DEMO no pisa lo sembrado por seedDemoContent (writes de métricas/ideas gateados por !isDemo).
+  function _loadDeferredBrandData(q, _pq){
+    Promise.all([
       fetch("/metrics/summary"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/api/voice",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/api/metrics/insights"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
@@ -7862,25 +7890,17 @@
       isDemo()?Promise.resolve(null):fetch("/ideas"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       isDemo()?Promise.resolve(null):fetch("/scripts"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
     ]).then(function(res){
-      var stats=res[0]||{}, feed=res[1]||{}, met=res[2], ins=res[4], vids=res[5], ideasRows=res[6], scriptRows=res[7];
-      if(res[3]) S.voice=res[3];   // perfil de voz real (moat) — null en demo dummy
-      S.stats={ competitors:stats.competitors||0, reels_week:stats.reels_week||0, exploded_week:stats.exploded_week||0, stolen_today:stats.stolen_today!=null?stats.stolen_today:(stats.stolen_total||0) };
-      S.reels=(feed.reels||[]).map(normReel);
-      S.radarSeed=!!feed.seed;   // SPEC #3: el radar viene del seed del nicho (sin competidores)
-      loadTracked();   // T3: lista de competidores seguidos (manejable en Cerebro)
-      S.favs={}; S.reels.forEach(function(r){ if(r.fav) S.favs[r.id]=true; });
-      S._reelPool=S.reels.slice();   // pool base para variar feed por-marca en demo
-      if(met){ S.metrics=met; S.igConnected=!!(met && met.connected); }
-      else { S.metrics=null; }
-      // /metrics/summary solo trae agregados; los reels reales viven en /metrics/videos.
-      // Volcamos a S.metrics.videos (shape que lee metricGridHTML). En demo lo pisa seedDemoContent.
-      if(vids){ S.metrics=S.metrics||{}; S.metrics.videos=(vids.videos||[]).map(normMetricVideo); }
-      // Insights del Cerebro (lo que funciona en TU cuenta + el siguiente de la serie).
-      if(ins){ S.metrics=S.metrics||{}; S.metrics.insights={ what_works:ins.what_works||[], next:ins.next||null }; }
-      // Prod: hidrata Ideas (con sus guiones por idea_id) y Guiones desde el backend.
-      // Guiones = TODOS los scripts del user; los que tienen idea_id también cuelgan
-      // de su idea en la fábrica de Ideas. _sid preserva el id de backend para PATCH/hooks.
+      var met=res[0], ins=res[2], vids=res[3], ideasRows=res[4], scriptRows=res[5];
+      if(res[1]) S.voice=res[1];   // perfil de voz real (moat) — null en demo dummy
+      // Métricas: NO tocar en demo (seedDemoContent ya sembró S.metrics con datos falsos).
       if(!isDemo()){
+        if(met){ S.metrics=met; S.igConnected=!!(met && met.connected); }
+        else { S.metrics=null; }
+        // /metrics/summary solo trae agregados; los reels reales viven en /metrics/videos.
+        if(vids){ S.metrics=S.metrics||{}; S.metrics.videos=(vids.videos||[]).map(normMetricVideo); }
+        // Insights del Cerebro (lo que funciona en TU cuenta + el siguiente de la serie).
+        if(ins){ S.metrics=S.metrics||{}; S.metrics.insights={ what_works:ins.what_works||[], next:ins.next||null }; }
+        // Hidrata Ideas (con sus guiones por idea_id) y Guiones desde el backend.
         var rows=Array.isArray(scriptRows)?scriptRows:[];
         S.guiones=rows.filter(function(s){return s.recording_status!=="discarded";}).map(normScript);
         // _sid → guionId local, para enlazar las script-cards de Ideas con su guión ya
@@ -7899,11 +7919,8 @@
           return it;
         });
       }
-      if(isDemo()) seedDemoContent();   // MVP demo: SIEMPRE siembra guiones+hooks+reels vinculados
-      if(isDemo() && !(isAgency() && S.tab==="portfolio")) applyDemoBrand();
-      if(!isDemo() && isAgency()){ S.team=[]; loadTeam(); }   // S.team=[] antes de render: evita que teamHTML caiga al pool demo mientras loadTeam (async) resuelve; loadTeam re-renderiza al volver
       render();
-      brainLevelPulse();   // B3: ¿subió el nivel con las señales recién cargadas? → recompensa
+      brainLevelPulse();   // por si los guiones recién cargados suben el nivel del Cerebro
     });
   }
 
