@@ -997,10 +997,13 @@ def scrape_creator_task(creator_id: str) -> dict:
         f"https://api.apify.com/v2/acts/xMc5Ga1oCONPmWJIa"
         f"/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024"
     )
+    # SIN includeSharesCount (decisión David 04/07): el add-on cuesta $0.006/reel = 71% del
+    # run ($0.084→$0.024/creador) y en cards de competidor el stat se oculta cuando es 0.
+    # El scrape del PERFIL PROPIO (_scrape_ig_reels en app.py) SÍ lo mantiene: Métricas
+    # (pestaña Compartidos + engagement) lo usa y su volumen es mínimo.
     payload = {
         "username": [ig_username],
         "resultsLimit": 10,
-        "includeSharesCount": True,
     }
 
     final_status = "ok"
@@ -1077,7 +1080,7 @@ def scrape_creator_task(creator_id: str) -> dict:
                 "views": item.get("videoPlayCount") or item.get("videoViewCount") or 0,
                 "likes": item.get("likesCount") or 0,
                 "comments": item.get("commentsCount") or 0,
-                "shares": item.get("sharesCount") or 0,   # ítem 6: Apify lo trae (includeSharesCount)
+                "shares": item.get("sharesCount") or 0,   # add-on shares OFF desde 04/07 → 0 en scrapes nuevos (la card lo oculta)
                 "posted_at": item.get("timestamp"),
                 "thumb_url": display_url,
                 "thumb_b64": _download_thumbnail_b64(display_url),
