@@ -1505,11 +1505,22 @@
     return '<div class="sugg-card">'+head+rows+foot+'</div>';
   }
 
-  // Gestión de competidores seguidos desde el Radar (acordeón plegado): borrar
-  // reusa data-act="untrack" (mismo handler + confirm que en Cerebro).
-  function trackedManageHTML(){
+  // «Gestiona competidores» (reorganización 04/07): fusión en UN bloque plegado de los 3
+  // sitios anteriores — la addbar (añadir + contador de plan), el botón «Añadir» de la
+  // galería y el acordeón «Tus competidores» (lista con ×). El refresco de pago vive SOLO
+  // en el hero (rdr-refresh-cta). openDefault=true con el radar vacío (añadir es LA acción).
+  function manageCompetitorsHTML(openDefault){
     var t=Array.isArray(S.tracked)?S.tracked:[];
-    if(!t.length) return "";
+    var used=(S.trackedCount!=null?S.trackedCount:t.length);
+    var lim=S.trackedLimit;
+    var atCap=(lim!=null && used>=lim);
+    var counter=(lim!=null)
+      ? '<span class="addbar-count'+(atCap?" full":"")+'" title="'+L("Competidores en esta marca / tope de tu plan","Competitors in this brand / your plan cap")+'">'+used+' / '+lim+'</span>'
+      : '';
+    var addWrap='<div class="mc-addwrap"><div class="mc-addrow">'+
+      '<button class="addbar-cta'+(S.addCompOpen?" on":"")+'" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+      counter+
+    '</div>'+addCompInlineHTML()+analyzingBannerHTML()+'</div>';
     var rows=t.map(function(tt){
       var h=(tt.creator&&tt.creator.ig_username)||tt.ig_username||"";
       var n=(tt.reels_count!=null)?(tt.reels_count+' reel'+(tt.reels_count===1?'':'es')):'';
@@ -1521,7 +1532,19 @@
         '<button class="brain-comp-x" data-act="untrack" data-id="'+ESC(String(tt.id))+'" data-handle="'+ESC(h)+'" title="Dejar de seguir a @'+ESC(h)+'" aria-label="Dejar de seguir a @'+ESC(h)+'">'+IC.x+'</button>'+
       '</div>';
     }).join("");
-    return '<details class="comp-manage" open><summary>'+L("Tus competidores · ","Your competitors · ")+t.length+'</summary><div class="comp-manage-list">'+rows+'</div></details>';
+    var list=rows?('<div class="comp-manage-list">'+rows+'</div>'):'';
+    return '<details class="comp-manage" id="rsManageComp"'+(openDefault?' open':'')+'><summary>'+
+      L("Gestiona competidores","Manage competitors")+
+      '<span class="rs-fold-sub">'+used+(lim!=null?(' / '+lim):'')+'</span></summary>'+
+      addWrap+list+'</details>';
+  }
+
+  // Sección PLEGADA genérica (reorganización 04/07): reusa el look/CSS de .comp-manage
+  // (details nativo → teclado y aria gratis). Lo secundario se pliega, no compite arriba.
+  function foldedSectionHTML(id, title, sub, inner, openDefault){
+    return '<details class="comp-manage rs-fold" id="'+id+'"'+(openDefault?' open':'')+'><summary>'+title+
+      (sub?'<span class="rs-fold-sub">'+ESC(sub)+'</span>':'')+'</summary>'+
+      '<div class="rs-fold-body">'+inner+'</div></details>';
   }
 
   // v3 (mockup David «llena mi semana»): fila degradada con icono azul + chispa
@@ -1630,29 +1653,9 @@
     // B1: añadir/actualizar viven en radarAddBarHTML (siempre presente). Aquí solo filtros.
     return '<div class="filters">'+base.map(function(f){return '<button class="fchip'+(S.filter===f[0]?" on":"")+'" data-act="filter" data-k="'+f[0]+'">'+f[1]+'</button>';}).join("")+'</div>';
   }
-  // B1: barra de "añadir competidor" SIEMPRE disponible (también con el radar vacío,
-  // que es justo cuando hace falta). El input inline + el banner "analizando" viven aquí,
-  // no dentro de filtersHTML (que no se renderiza sin reels). Incluye "Actualizar radar".
-  function radarAddBarHTML(){
-    // Contador "X / límite del plan" por MARCA (ítem 4) — del backend (loadTracked).
-    var used=(S.trackedCount!=null?S.trackedCount:(Array.isArray(S.tracked)?S.tracked.length:0));
-    var lim=S.trackedLimit;
-    var atCap=(lim!=null && used>=lim);
-    var counter=(lim!=null)
-      ? '<span class="addbar-count'+(atCap?" full":"")+'" title="'+L("Competidores en esta marca / tope de tu plan","Competitors in this brand / your plan cap")+'">'+used+' / '+lim+'</span>'
-      : '';
-    var bar='<div class="radar-addbar">'+
-      // Acción primaria prominente (ítem 4): añadir competidor + contador al lado.
-      '<button class="addbar-cta'+(S.addCompOpen?" on":"")+'" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
-      counter+
-      '<button class="fchip ghost" data-act="add-reel">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
-      '<button class="fchip ghost" data-act="analyze-reel" title="'+L("Transcribe un reel suelto sin seguir a su autor","Transcribe a single reel without following its author")+'">'+IC.doc+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
-      '<span style="flex:1"></span>'+
-      // Forzar refresh ya (ítem 7): el job diario renueva solo; este botón lo fuerza.
-      '<button class="fchip addbar-refresh" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora · 5 créditos","Refresh now · 5 credits")+'</button>'+
-    '</div>';
-    return bar+addCompInlineHTML()+analyzingBannerHTML();
-  }
+  // (radarAddBarHTML DISUELTA en la reorganización 04/07: añadir competidor + contador →
+  //  manageCompetitorsHTML; «Añadir/Analizar reel» → botones del hero; el refresco de pago
+  //  ya vivía en el hero.)
 
   // SPEC #3: cuando el radar se llena con el SEED del nicho (user sin competidores
   // aún), microcopy honesto + CTA a seguir competidores para tener señales propias.
@@ -1779,13 +1782,8 @@
       // EMPTY-STATE honesto: ya cargó (S._suggToday es array) y hay nicho fijado pero 0 reels
       // frescos en el pool → mensaje, NO ocultar en silencio (parecía roto). Mientras carga
       // (S._suggToday undefined) sí se oculta. El pool se renueva con el job diario, no a mano.
-      if(Array.isArray(S._suggToday)){
-        return '<section class="stday-sec stday-empty-sec">'+
-          '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span>'+
-            _stdayMiniActs()+'</div>'+
-          '<div class="stday-empty">'+L("Hoy no hay reels nuevos petando en tu nicho. El radar se renueva solo cada día — vuelve mañana. ¿Nicho mal puesto? Edítalo arriba.","No new reels blowing up in your niche today. The radar refreshes on its own daily — check back tomorrow. Wrong niche? Edit it above.")+'</div>'+
-        '</section>';
-      }
+      // Regla de vacíos (David 04/07): bloque sin datos → NO se pinta (antes: empty-state
+      // «vuelve mañana»). El prompt de nicho de arriba sí queda (es config, no placeholder).
       return '';
     }
     var cards=list.slice(0,16).map(suggTodayCardHTML).join("");
@@ -1951,9 +1949,10 @@
       ? '<div class="rgal-track crd-track">'+reels.slice(0,12).map(function(r,i){ return competitorReelCardHTML(r, imgs?imgs[i%imgs.length]:null); }).join("")+'</div>'
       : '<div class="rgal-empty"><span class="rgal-empty-h">'+L("Nada que robar aquí… todavía","Nothing to steal here… yet")+'</span><span class="rgal-empty-s">'+L("Este competidor no tiene reels explosivos esta semana.","This competitor has no explosive reels this week.")+'</span></div>';
     return '<section class="rgal">'+
+      // Reorganización 04/07: sin botón «Añadir» aquí — los chips son FILTROS de la galería;
+      // la gestión (añadir/quitar) vive en su único bloque «Gestiona competidores».
       '<div class="rgal-comps-head"><span class="rgal-comps-t">'+L("Competidores en el radar","Competitors on the radar")+'</span>'+
-        '<div class="rgal-comps">'+chips+'</div>'+moreWrap+
-        '<button class="rgal-add" data-act="add-comp">'+IC.plus+' '+L("Añadir","Add")+'</button></div>'+
+        '<div class="rgal-comps">'+chips+'</div>'+moreWrap+'</div>'+
       '<div class="rgal-galline-row"><div class="rgal-galline">'+L("Galería · ","Gallery · ")+'<b>'+ESC(activeLabel)+'</b> — '+L("pulsa <b>Ver métricas</b> para abrir transcripción y datos.","tap <b>See metrics</b> to open transcript and data.")+'</div>'+arrows+'</div>'+
       body+
     '</section>';
@@ -2266,6 +2265,11 @@
         '<div class="rdr-refresh-row">'+
           '<button class="rdr-reshuffle-cta" data-act="reshuffle-feed" title="'+L("Baraja otras del pool que ya tienes — gratis, sin scrape","Shuffle others from the pool you already have — free, no scrape")+'">'+IC.repeat+' '+L("Otras · gratis","Others · free")+'</button>'+
           '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora · 5 créditos","Refresh now · 5 credits")+'</button>'+
+          // Reorganización 04/07: «Añadir/Analizar reel» SUBEN al hero como botones visibles
+          // (antes links enterrados en la addbar a media página). Secundarios a propósito:
+          // la única primaria sobre el fold sigue siendo «Roba la idea» (T1).
+          '<button class="rdr-reshuffle-cta" data-act="add-reel">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
+          '<button class="rdr-reshuffle-cta" data-act="analyze-reel" title="'+L("Transcribe un reel suelto sin seguir a su autor","Transcribe a single reel without following its author")+'">'+IC.doc+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
         '</div>'+
       '</div>'+
       '<div class="rdr-hero-r">'+radarScopeHTML()+
@@ -2301,8 +2305,7 @@
         return '<div class="scroll"><div class="canvas">'+head+onboardingHTML()+'</div></div>';
       }
       return '<div class="scroll"><div class="canvas">'+head+""+statbarHTML()+
-        radarAddBarHTML()+        // B1: añadir competidor SIEMPRE accesible, también con el radar vacío
-        trackedManageHTML()+
+        manageCompetitorsHTML(true)+   // añadir competidor SIEMPRE accesible; ABIERTO: con el radar vacío es LA acción
         voiceOnboardCardHTML()+   // B6: en first-run sin reels, el banner de voz es lo primero que aporta
         nextSeriesHTML("dash")+   // B1+T1: CTA secundario en el Dashboard
         '<div class="rs-empty">'+(S.filter==="fav"?"Sin favoritos aún. Toca la estrella en una señal.":"Sin reels todavía. Añade un competidor arriba o pulsa «Actualizar radar» — sus reels entrarán solos.")+'</div>'+
@@ -2313,32 +2316,26 @@
     var heroN=sorted.slice(0,Math.min(3,sorted.length)), rest=sorted.slice(heroN.length);
     var fillCount=Math.min(5,S.reels.length)||5;
 
-    // v3 — espina del mockup David (Layout A), de arriba abajo:
-    //   hero → oportunidad → competidores+galería → cerebro/progreso → llena mi
-    //   semana → más señales. Los banners promo (flash/seed/activación/voz/serie)
-    //   se DEMOTAN bajo la espina para no romper la jerarquía visual de David.
+    // Reorganización 04/07 (plan David, «flujo continuo sin apartados»): arriba lo
+    // accionable — hero (con «Añadir/Analizar reel») → HAZ ESTO AHORA → Oportunidades
+    // («Roba la idea») → Sugerencias de hoy. Debajo la galería con sus chips-filtro, y
+    // TODO lo secundario PLEGADO (details): gestiona competidores (fusión de los 3 sitios),
+    // cerebro, llena mi semana, conecta IG (solo si falta). Vacíos → ocultos. Comunidad
+    // FUERA (placeholder puro — vuelve cuando exista; communityGalleryHTML queda definida).
+    var _bl=brainLevel();
+    var _brainSub=_bl.full?L("al máximo","maxed"):(_bl.canLevelUp?L("¡listo para subir!","ready to level up!"):(_bl.pct+'%'));
     return '<div class="scroll"><div class="canvas">'+
-      radarHeroHTML()+            // hero con scope animado + stats (sustituye phead+statbar)
+      radarHeroHTML()+            // hero con scope animado + stats + añadir/analizar reel
       dashboardNextStepHTML()+   // #8 PROACTIVIDAD: «HAZ ESTO AHORA» — la acción más útil ya
       opportunityCarouselHTML(heroN)+   // OPORTUNIDAD justo tras el hero (acción sobre el fold)
-      (S.reels.length?competitorGalleryHTML():"")+   // competidores (chips) + galería (mockup David)
-      // #1: SUBIDOS aquí (antes enterrados al fondo, invisibles) → junto a los competidores,
-      // «+ Añadir competidor» y quitar evidentes de un vistazo.
-      (S.reels.length?radarAddBarHTML():"")+     // añadir competidor/reel + actualizar
-      (S.reels.length?trackedManageHTML():"")+   // «Tus competidores» con × para quitar
-      suggestionsTodayHTML()+    // «Sugerencias de hoy»: creadores NUEVOS del nicho que petan (sección propia)
-      radarCerebroRowHTML()+     // progreso/cerebro (nivel + barra + Crear guion)
-      (S.reels.length?'<div class="plays">'+whaleHTML(fillCount)+'</div>':'')+   // llena mi semana
-      // ── bloques bajo la espina (recortados por decisión del usuario) ──
+      suggestionsTodayHTML()+    // «Sugerencias de hoy» SUBE aquí: reels del nicho que petan, robables ya
+      (S.reels.length?competitorGalleryHTML():"")+   // galería (chips = filtros, sin gestión)
+      manageCompetitorsHTML(false)+   // ÚNICO bloque de gestión (plegado): añadir + límite + lista con ×
+      foldedSectionHTML("rsFoldBrain", IC.brain+' '+L("Tu cerebro","Your brain"), _brainSub, radarCerebroRowHTML())+
+      (S.reels.length?foldedSectionHTML("rsFoldWeek", IC.bolt+' '+L("Llena mi semana","Fill my week"), L(fillCount+" guiones de golpe",fillCount+" scripts in one tap"), '<div class="plays">'+whaleHTML(fillCount)+'</div>'):"")+
       flashBannerHTML()+          // Flash 1ª compra: -30% 48h tras cruzar el muro (condicional)
       seedBannerHTML()+           // aviso «esto petó en tu nicho» (solo radar-seed, demo vacío)
-      // v2: el feed principal = solo competidores; el descubrimiento de creadores nuevos
-      // vive arriba en «Sugerencias de hoy» (suggestionsTodayHTML). El cap free sigue al
-      // INTENTAR añadir (handler add-suggested).
-      (S.reels.length?communityGalleryHTML():"")+   // «Creaciones de la comunidad»    ← SE QUEDA
-      // QUITADOS (mockup David / petición usuario): trackedManageHTML (Tus competidores),
-      // activationProgressHTML (Activa tu cuenta), voiceOnboardCardHTML (Enséñame tu voz),
-      // nextSeriesHTML (Tu próxima serie), radarSignalsListHTML (Más señales).
+      (!S.igConnected?foldedSectionHTML("rsFoldIg", IC.ig+' '+L("Conecta Instagram","Connect Instagram"), L("mide lo que publicas","measure what you post"), igConnectCardHTML()):"")+
     '</div></div>';
   }
 
@@ -3058,16 +3055,20 @@
      (reels publicados ↔ guiones que los originaron → la IA aprende qué
       funciona en TU cuenta y mejora tus sugerencias y tu voz).
      ════════════════════════════════════════════════════════════════ */
-  function connectIgHTML(){
-    return '<div class="scroll"><div class="pad">'+
-      '<div class="ig-connect">'+
+  // Card extraída para reuso: página completa (tab Métricas) Y bloque plegado del
+  // dashboard (reorganización 04/07). Su btn-primary no compite con T1: en el dashboard
+  // vive al fondo dentro de un details cerrado (sin geometría hasta expandir).
+  function igConnectCardHTML(){
+    return '<div class="ig-connect">'+
         '<div class="ig-connect-ic">'+IC.ig+'</div>'+
         '<h2 class="ig-connect-h serif">Conecta tu Instagram</h2>'+
         '<p class="ig-connect-p">Aquí se cierra el círculo. El sistema mira lo que <b>publicas</b> y aprende qué hooks, qué temas y qué duración funcionan <b>en tu cuenta</b> — y con eso te da reels cada vez más tuyos. Cuanto más publicas, más te conoce.</p>'+
         '<button class="btn btn-lg btn-primary" data-act="ig-connect">'+IC.ig+' Conectar Instagram</button>'+
         '<p class="ig-connect-note">Solo lectura de tus métricas públicas. Sin contraseñas.</p>'+
-      '</div>'+
-    '</div></div>';
+      '</div>';
+  }
+  function connectIgHTML(){
+    return '<div class="scroll"><div class="pad">'+igConnectCardHTML()+'</div></div>';
   }
   function fmtK(n){ n=Number(n||0); if(n>=1000){ var v=n/1000; return (v>=10?Math.round(v):v.toFixed(1).replace(/\.0$/,"")).toString().replace(".",",")+"k"; } return String(n); }
   // KPIs de Métricas: SIEMPRE k/M con 1 decimal (187,4k · 1,5k · 1,2M) → formato
@@ -4086,6 +4087,10 @@
   }
   function toggleAddComp(){
     S.addCompOpen=!S.addCompOpen;
+    // Reorganización 04/07: el input vive dentro del details «Gestiona competidores» —
+    // si el CTA vino de fuera (DNS, seed banner, Cerebro), ábrelo para que se vea.
+    var det=document.getElementById("rsManageComp");
+    if(det && S.addCompOpen) det.setAttribute("open","");
     var box=document.getElementById("rsCompAdd");
     if(!box){ return render(); }   // aún no montado (p.ej. radar vacío recién entrado) → render normal
     // Toggle in-place (sin re-render → SIN salto de scroll). Marca el botón y enfoca.
