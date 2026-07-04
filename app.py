@@ -27,6 +27,11 @@ import yt_dlp
 from dotenv import load_dotenv
 from flask import Flask, Response, abort, g, jsonify, make_response, redirect, render_template, request, session
 
+from niche_canon import (SEED_NICHE_ALIAS as _SEED_NICHE_ALIAS,       # noqa: F401
+                         POOL_NICHE_ALIAS as _POOL_NICHE_ALIAS,       # noqa: F401
+                         norm_tag as _norm_tag,
+                         pool_niche_canon as _pool_niche_canon)
+
 load_dotenv()
 
 # ── Validate required env vars ───────────────────────────────────────────────
@@ -8413,40 +8418,8 @@ def count_active_tracked(user_id: str, project_id: str | None = None,
 # El onboarding bilingüe guarda el nicho en el idioma del usuario ("Tech",
 # "Finance"…), pero la semilla usa los 12 nichos amplios en español. Alias EN→ES
 # para que el match por nicho funcione también para usuarios en inglés.
-_SEED_NICHE_ALIAS = {
-    "tech": "tecnologia", "finance": "finanzas", "cooking": "cocina",
-    "fashion": "moda", "beauty": "belleza", "travel": "viajes",
-    "education": "educacion", "business": "negocios", "health": "salud",
-    "real estate": "inmobiliaria",
-}
-
-# Mapa de nicho de TEXTO LIBRE → nicho canónico del pool (creators_global.niche). El
-# onboarding y el modal dejan nichos libres ("inteligencia artificial", "marketing
-# digital", "meditacion"…) que NO casan exacto con la taxonomía del pool → 0 sugerencias.
-# Este alias los lleva a su nicho canónico para el FALLBACK por nicho amplio.
-_POOL_NICHE_ALIAS = {
-    "ia": "tecnologia", "ai": "tecnologia", "inteligencia artificial": "tecnologia",
-    "automatizacion": "tecnologia", "no-code": "tecnologia", "nocode": "tecnologia",
-    "programacion": "tecnologia", "software": "tecnologia", "saas": "negocios",
-    "marketing digital": "marketing", "growth": "marketing", "ads": "marketing",
-    "publicidad": "marketing", "copywriting": "marketing", "redes sociales": "marketing",
-    "creacion de contenido": "marketing", "creador de contenido": "marketing",
-    "emprendimiento": "negocios", "emprender": "negocios", "ecommerce": "negocios", "ventas": "negocios",
-    "meditacion": "espiritualidad y mindfulness", "mindfulness": "espiritualidad y mindfulness",
-    "espiritualidad": "espiritualidad y mindfulness",
-    "nutricion": "salud", "psicologia": "salud", "bienestar": "salud",
-}
-
-
-def _pool_niche_canon(niche):
-    """Nicho del usuario (texto libre) → nicho canónico de creators_global, para el
-    fallback por nicho amplio. Devuelve "" si no hay nicho."""
-    n = _norm_tag(niche or "")
-    if not n:
-        return ""
-    if n in _POOL_NICHE_ALIAS:
-        return _POOL_NICHE_ALIAS[n]
-    return _SEED_NICHE_ALIAS.get(n, n)
+# _SEED_NICHE_ALIAS / _POOL_NICHE_ALIAS / _pool_niche_canon viven en niche_canon.py
+# (módulo compartido con tasks.py — refresh_suggestion_pools necesita el mismo canon).
 
 
 def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, limit=5):
@@ -8607,11 +8580,7 @@ NICHE_SUBNICHE_SEED = {
 }
 
 
-def _norm_tag(s: str) -> str:
-    s = (s or "").strip().lower()
-    for a, b in (("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n")):
-        s = s.replace(a, b)
-    return re.sub(r"[^a-z0-9 _-]", "", s)[:40].strip()
+# _norm_tag vive en niche_canon.py (compartido con tasks.py).
 
 
 def _subniche_suggestions(niche: str):
@@ -9331,7 +9300,8 @@ def _suggestion_reason(exp, formato, age_days):
 
 
 def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, limit=15,
-                            shuffle_seed=None, offset=0, day_seed=None, seen_ids=None):
+                            shuffle_seed=None, offset=0, day_seed=None, seen_ids=None,
+                            served_today=None):
     """«Sugerencias de hoy» orientado a REELS: reels que PETAN en el nicho de creadores que
     el user NO sigue ni descartó. Cada reel es ROBABLE sin seguir al creador. `worth_follow`
     marca a los creadores que MERECE seguir (listón alto) → la 2ª acción «+ Añadir competidor»
@@ -9447,6 +9417,12 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
             uname.update(fb)   # handles del fallback para el formateo de salida
             chosen = _score_pool(fb)
     chosen.sort(key=lambda x: -x[0])
+    # ROTACIÓN POR VISITA (criterio David 04/07): lo ya servido HOY va al FINAL (partición
+    # estable, el orden del día se conserva dentro de cada bloque) → cada GET/«↻ otras»/
+    # «ver más» trae reels DISTINTOS del pool hasta agotarlo; después cicla por mérito.
+    if served_today:
+        chosen = ([c for c in chosen if str(c[1].get("id")) not in served_today]
+                  + [c for c in chosen if str(c[1].get("id")) in served_today])
     now = datetime.now(timezone.utc)
     out = []
     for _score, r, wf in chosen[offset:offset + limit]:
@@ -9523,8 +9499,23 @@ def _sugg_seen_yesterday(uid, project_id):
         return set()
 
 
+def _sugg_seen_today(uid, project_id):
+    """Ids de reels YA SERVIDOS HOY en sugerencias → van al FINAL en la siguiente petición
+    (rotación POR VISITA: cada entrada a la app / «↻ otras» / «ver más» trae reels distintos
+    del pool hasta agotarlo, luego cicla). Sin Redis degrada a set() (orden del día estable)."""
+    if rds is None:
+        return set()
+    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    try:
+        return {m.decode() if isinstance(m, bytes) else m
+                for m in (rds.smembers("suggserved:%s:%s:%s" % (uid, project_id or "_", day)) or [])}
+    except Exception:
+        return set()
+
+
 def _sugg_record_served(uid, project_id, reel_ids):
-    """Registra lo servido HOY en la ventana gratis para penalizarlo mañana."""
+    """Registra lo servido (ventana gratis y tandas de «ver más»): hoy va al final de las
+    siguientes visitas, mañana se penaliza (RADAR_SUGG_SEEN_PENALTY)."""
     if rds is None or not reel_ids:
         return
     tkey = "suggserved:%s:%s:%s" % (uid, project_id or "_",
@@ -9560,7 +9551,8 @@ def radar_suggestions():
         # +1 para saber si hay material más allá de la ventana gratis (sin un 2º query).
         batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_FREE_N + 1,
                                         day_seed=_sugg_day_seed(uid, project_id),
-                                        seen_ids=_sugg_seen_yesterday(uid, project_id))
+                                        seen_ids=_sugg_seen_yesterday(uid, project_id),
+                                        served_today=_sugg_seen_today(uid, project_id))
         has_more = len(batch) > SUGG_FREE_N
         _sugg_record_served(uid, project_id, [x.get("id") for x in batch[:SUGG_FREE_N]])
         return jsonify({"suggestions": batch[:SUGG_FREE_N], "total": len(batch[:SUGG_FREE_N]),
@@ -9610,11 +9602,15 @@ def radar_suggestions_more():
     if not subs and not niche:
         return jsonify({"ok": False, "error": "no_niche"}), 400
     exclude = _sugg_exclude(uid, project_id)
-    # Orden DETERMINISTA por día (misma semilla y pena que el GET) → el paginado por offset
-    # es estable entre tandas y coherente con la ventana gratis servida hoy.
-    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1, offset=offset,
+    # ROTACIÓN POR VISITA: lo servido hoy (registrado en el GET y en tandas previas) va al
+    # final → la tanda sale del TOP sin servir con offset 0. El offset del cliente solo
+    # gobierna el cap/cobro. Sin Redis (served vacío) degrada al slicing por offset clásico.
+    srv_today = _sugg_seen_today(uid, project_id)
+    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1,
+                                    offset=(0 if srv_today else offset),
                                     day_seed=_sugg_day_seed(uid, project_id),
-                                    seen_ids=_sugg_seen_yesterday(uid, project_id))
+                                    seen_ids=_sugg_seen_yesterday(uid, project_id),
+                                    served_today=srv_today)
     reels = batch[:SUGG_MORE_BATCH]
     if not reels:
         return jsonify({"ok": True, "suggestions": [], "has_more": False, "charged": False}), 200
@@ -9639,6 +9635,7 @@ def radar_suggestions_more():
         except Exception:
             logger.warning("[sugg-more] cobro falló uid=%s", uid)
             return jsonify({"ok": False, "error": "charge_failed"}), 500
+    _sugg_record_served(uid, project_id, [x.get("id") for x in reels])
     track_event("sugg_more", uid, {"project_id": project_id, "offset": offset, "n": len(reels)})
     return jsonify({"ok": True, "suggestions": reels, "charged": not is_courtesy,
                     "has_more": len(batch) > SUGG_MORE_BATCH and (offset + SUGG_MORE_BATCH) < SUGG_MAX_TOTAL,

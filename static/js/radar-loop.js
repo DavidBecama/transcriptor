@@ -7429,16 +7429,23 @@
       return;
     }
     if(act==="st-dismiss-all"){ S._stDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
-    if(act==="reshuffle-sugg"){   // «↻ otras» GRATIS: re-baraja CLIENT-SIDE (cero round-trip,
-      // NO puede colgar). Reordena la ventana ya cargada (Fisher-Yates). El re-fetch al server
-      // se quitó: causaba peticiones apiladas que colgaban el endpoint en prod (#231).
-      var _a=Array.isArray(S._suggToday)?S._suggToday:[];
-      if(_a.length>1){
-        _a=_a.slice();
-        for(var _i=_a.length-1;_i>0;_i--){ var _j=Math.floor(Math.random()*(_i+1)); var _t=_a[_i]; _a[_i]=_a[_j]; _a[_j]=_t; }
-        S._suggToday=_a;
-      }
-      return render();
+    if(act==="reshuffle-sugg"){   // «↻ otras» GRATIS: pide al SERVER otras de verdad del pool
+      // (criterio David 04/07 — lo ya servido hoy va al final en backend, suggserved:).
+      // El apilado de re-fetches que colgaba prod (#231) lo evita el guard de 1 petición
+      // en vuelo; el endpoint además ya es hang-proof (try/except, sin nonce Redis en GET).
+      if(isDemo()) return;   // la demo no muestra sugerencias (loadSuggestionsToday corta)
+      if(S._suggReloading) return;
+      S._suggReloading=true;
+      showToast(L("Trayendo otras…","Fetching others…"));
+      var _rp=_pidOf(S.brandId);
+      apiGet("/api/radar/suggestions"+(_rp?("?project_id="+encodeURIComponent(_rp)):"")).then(function(r){
+        S._suggReloading=false;
+        if(!r.ok||!r.d||!Array.isArray(r.d.suggestions)) return showError(L("No pude traer otras.","Couldn't fetch others."));
+        S._suggToday=r.d.suggestions.map(_normSugg);
+        S._suggHasMore=!!r.d.has_more;
+        render();
+      });
+      return;
     }
     if(act==="sugg-more"){   // «Ver más» de PAGO: confirma coste → cobra → añade la tanda
       if(isDemo()) return;

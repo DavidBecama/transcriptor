@@ -12,6 +12,8 @@ from celery.schedules import crontab
 from dotenv import load_dotenv
 from supabase import create_client
 
+from niche_canon import pool_niche_canon
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -105,6 +107,13 @@ celery_app.conf.beat_schedule = {
     "refresh-radar-daily": {
         "task": "tasks.refresh_radar_daily",
         "schedule": crontab(hour=6, minute=0),
+    },
+    # FASE 2 feed-vivo (04/07): pool de SUGERENCIAS vivo — re-scrape de creadores de nichos
+    # activos que nadie sigue, máx 2×/semana por creador, capado. DORMIDO hasta que David
+    # suba el cap de Apify: kill-switch RADAR_POOL_REFRESH_ENABLED (default OFF).
+    "refresh-suggestion-pools": {
+        "task": "tasks.refresh_suggestion_pools",
+        "schedule": crontab(hour=5, minute=30),
     },
     # v1 feed diario: RE-RANK gratis del feed (CERO scrape) a las 07:00 UTC — DESPUÉS del
     # re-scrape de las 06:00, para calentar la caché con lo recién traído. Solo re-rankea.
@@ -1199,6 +1208,7 @@ _USER_SCRAPE_CAP = int(os.environ.get("USER_PROFILE_SCRAPE_CAP", "400"))
 # públicas (47/57 tracked el 04/07/26) y suele ser transitorio → reintento cada N días
 # (coste acotado: 1 run/creador cada N días). 'not_found' sí sigue siendo permanente.
 _PRIVATE_RETRY_DAYS = int(os.environ.get("RADAR_PRIVATE_RETRY_DAYS", "3"))
+_TRACKED_STALE_HOURS = int(os.environ.get("RADAR_TRACKED_STALE_HOURS", "48"))
 
 
 def _enqueue_if_stale(db, creator_ids, stale_hours, cap):
@@ -1250,8 +1260,9 @@ def _enqueue_if_stale(db, creator_ids, stale_hours, cap):
 
 @celery_app.task(name="tasks.refresh_radar_daily")
 def refresh_radar_daily():
-    """NOVEDAD DIARIA (Fathom 18/06): re-scrapea a diario los competidores que alguien
-    sigue (stale >20h) → cada día hay reels nuevos en el radar. Capado a _RADAR_DAILY_CAP."""
+    """NOVEDAD DIARIA (Fathom 18/06): re-scrapea los competidores que alguien sigue
+    (stale >_TRACKED_STALE_HOURS; 48h desde fase2 — decisión David 04/07, ~½ coste) →
+    reels nuevos cada 2 días por creador. Capado a _RADAR_DAILY_CAP."""
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -1262,9 +1273,59 @@ def refresh_radar_daily():
     except Exception:
         logger.exception("refresh_radar_daily: tracked read failed")
         return {"status": "error"}
-    queued, cand = _enqueue_if_stale(db, creator_ids, stale_hours=20, cap=_RADAR_DAILY_CAP)
+    queued, cand = _enqueue_if_stale(db, creator_ids, stale_hours=_TRACKED_STALE_HOURS,
+                                     cap=_RADAR_DAILY_CAP)
     logger.info("refresh_radar_daily: queued=%d candidates=%d", queued, cand)
     return {"queued": queued, "candidates": cand}
+
+
+# FASE 2 feed-vivo (dimensionado David 04/07): pool ≤2×/semana por creador (stale 84h),
+# cap diario acorde (~$0.024/creador sin shares), kill-switch por env — default OFF hasta
+# «cap subido» (Apify maxMonthlyUsageUsd). Activar: RADAR_POOL_REFRESH_ENABLED=1 en el
+# .env del VPS + docker compose up -d. El primer arranque hace de BACKFILL natural: los
+# seeds nunca scrapeados van primero (stalest-first) y el cap lo reparte en días.
+_POOL_STALE_HOURS = int(os.environ.get("RADAR_POOL_STALE_HOURS", "84"))
+_POOL_DAILY_CAP = int(os.environ.get("RADAR_POOL_SCRAPE_CAP", "40"))
+
+
+@celery_app.task(name="tasks.refresh_suggestion_pools")
+def refresh_suggestion_pools():
+    """Pool de sugerencias VIVO: re-scrapea creadores de NICHOS ACTIVOS (nicho canónico
+    de algún proyecto o perfil). No excluye seguidos: el doble scrape lo evita solo la
+    staleness (84h aquí vs 48h del job de tracked). Stalest-first + cap diario."""
+    if os.environ.get("RADAR_POOL_REFRESH_ENABLED", "0") != "1":
+        logger.info("refresh_suggestion_pools: OFF (RADAR_POOL_REFRESH_ENABLED != 1)")
+        return {"status": "disabled"}
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    niches = set()
+    try:
+        for table in ("projects", "profiles"):
+            for row in (db.table(table).select("niche").limit(5000).execute()).data or []:
+                pn = pool_niche_canon(row.get("niche") or "")
+                if pn:
+                    niches.add(pn)
+    except Exception:
+        logger.exception("refresh_suggestion_pools: niches read failed")
+        return {"status": "error"}
+    if not niches:
+        return {"queued": 0, "candidates": 0, "niches": 0}
+    try:
+        rows = (db.table("creators_global").select("id, last_scraped_at")
+                  .in_("niche", sorted(niches)).limit(3000).execute()).data or []
+    except Exception:
+        logger.exception("refresh_suggestion_pools: creators read failed")
+        return {"status": "error"}
+    # Stalest-first: los nunca scrapeados ("" ordena primero) y luego los más viejos → el
+    # cap reparte el backfill en días y después mantiene la rotación ≤2×/semana.
+    rows.sort(key=lambda r: str(r.get("last_scraped_at") or ""))
+    ids = [r["id"] for r in rows if r.get("id")]
+    queued, cand = _enqueue_if_stale(db, ids, stale_hours=_POOL_STALE_HOURS,
+                                     cap=_POOL_DAILY_CAP)
+    logger.info("refresh_suggestion_pools: queued=%d candidates=%d niches=%d",
+                queued, cand, len(niches))
+    return {"queued": queued, "candidates": cand, "niches": len(niches)}
 
 
 _RADAR_RERANK_CAP = int(os.environ.get("RADAR_RERANK_CAP", "3000"))
