@@ -115,6 +115,12 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.refresh_suggestion_pools",
         "schedule": crontab(hour=5, minute=30),
     },
+    # DEEP READ semanal de tracked (04/07): N=10 lunes 05:00 UTC (ANTES del diario de las
+    # 06:00, que a N=4 los verá frescos y no duplica) → refresca vistas del baseline.
+    "deep-refresh-tracked": {
+        "task": "tasks.deep_refresh_tracked",
+        "schedule": crontab(day_of_week=1, hour=5, minute=0),
+    },
     # v1 feed diario: RE-RANK gratis del feed (CERO scrape) a las 07:00 UTC — DESPUÉS del
     # re-scrape de las 06:00, para calentar la caché con lo recién traído. Solo re-rankea.
     "rerank-radar-daily": {
@@ -941,8 +947,13 @@ _PRETRANSCRIBE_TOP_N = int(os.environ.get("PRETRANSCRIBE_TOP_N", "3"))
 
 
 @celery_app.task(name="tasks.scrape_creator")
-def scrape_creator_task(creator_id: str) -> dict:
+def scrape_creator_task(creator_id: str, results_limit: int = 10) -> dict:
     """Scrape async de reels de un creator. Encolada desde POST /admin/scrape.
+
+    `results_limit` (David 04/07, ahorro Apify): reels a traer. Default 10 (primera
+    pasada / refresh manual / onboarding → historia completa para fijar baseline). Los
+    refrescos recurrentes lo bajan a 4 (nadie sube reels entre refrescos); el deep read
+    semanal de tracked vuelve a 10 para refrescar vistas del baseline. Clamp [1, 50].
 
     Returns dict con:
       - status: "ok" | "failed" | "private" | "not_found" | "in_progress" | "creator_not_found"
@@ -1010,9 +1021,13 @@ def scrape_creator_task(creator_id: str) -> dict:
     # run ($0.084→$0.024/creador) y en cards de competidor el stat se oculta cuando es 0.
     # El scrape del PERFIL PROPIO (_scrape_ig_reels en app.py) SÍ lo mantiene: Métricas
     # (pestaña Compartidos + engagement) lo usa y su volumen es mínimo.
+    try:
+        _rl = max(1, min(50, int(results_limit)))
+    except (TypeError, ValueError):
+        _rl = 10
     payload = {
         "username": [ig_username],
-        "resultsLimit": 10,
+        "resultsLimit": _rl,
     }
 
     final_status = "ok"
@@ -1209,9 +1224,16 @@ _USER_SCRAPE_CAP = int(os.environ.get("USER_PROFILE_SCRAPE_CAP", "400"))
 # (coste acotado: 1 run/creador cada N días). 'not_found' sí sigue siendo permanente.
 _PRIVATE_RETRY_DAYS = int(os.environ.get("RADAR_PRIVATE_RETRY_DAYS", "3"))
 _TRACKED_STALE_HOURS = int(os.environ.get("RADAR_TRACKED_STALE_HOURS", "48"))
+# Ahorro Apify (David 04/07): reels por refresco RECURRENTE. 4 basta (nadie sube reels
+# entre refrescos y la explosión pasa en los nuevos, que sí se refrescan). El deep read
+# SEMANAL de tracked vuelve a 10 para refrescar las vistas del baseline y cazar
+# late-bloomers. Primera pasada / manual / onboarding se quedan en 10 (default del task).
+_TRACKED_REFRESH_LIMIT = int(os.environ.get("RADAR_TRACKED_REFRESH_LIMIT", "4"))
+_POOL_REFRESH_LIMIT = int(os.environ.get("RADAR_POOL_REFRESH_LIMIT", "4"))
+_DEEP_REFRESH_LIMIT = int(os.environ.get("RADAR_DEEP_REFRESH_LIMIT", "10"))
 
 
-def _enqueue_if_stale(db, creator_ids, stale_hours, cap):
+def _enqueue_if_stale(db, creator_ids, stale_hours, cap, results_limit=10):
     """Encola scrape_creator_task para los creadores stale (>stale_hours). Skips:
     'not_found' (permanente), 'private' fresco (<_PRIVATE_RETRY_DAYS), 'scraping' vivo
     (<SCRAPE_STUCK_MIN; los zombis más viejos se re-encolan y el takeover del lock los
@@ -1251,7 +1273,7 @@ def _enqueue_if_stale(db, creator_ids, stale_hours, cap):
         if st not in ("private", "scraping") and last and str(last) > cutoff:
             continue   # fresco → skip (ISO comparable lexicográficamente)
         try:
-            scrape_creator_task.delay(cr["id"])
+            scrape_creator_task.delay(cr["id"], results_limit)
             queued += 1
         except Exception:
             logger.exception("refresh: enqueue failed for %s", cr.get("id"))
@@ -1261,8 +1283,8 @@ def _enqueue_if_stale(db, creator_ids, stale_hours, cap):
 @celery_app.task(name="tasks.refresh_radar_daily")
 def refresh_radar_daily():
     """NOVEDAD DIARIA (Fathom 18/06): re-scrapea los competidores que alguien sigue
-    (stale >_TRACKED_STALE_HOURS; 48h desde fase2 — decisión David 04/07, ~½ coste) →
-    reels nuevos cada 2 días por creador. Capado a _RADAR_DAILY_CAP."""
+    (stale >_TRACKED_STALE_HOURS; 48h desde fase2) → reels nuevos cada 2 días por creador.
+    resultsLimit=_TRACKED_REFRESH_LIMIT (4, ahorro David 04/07). Capado a _RADAR_DAILY_CAP."""
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -1274,8 +1296,34 @@ def refresh_radar_daily():
         logger.exception("refresh_radar_daily: tracked read failed")
         return {"status": "error"}
     queued, cand = _enqueue_if_stale(db, creator_ids, stale_hours=_TRACKED_STALE_HOURS,
-                                     cap=_RADAR_DAILY_CAP)
-    logger.info("refresh_radar_daily: queued=%d candidates=%d", queued, cand)
+                                     cap=_RADAR_DAILY_CAP, results_limit=_TRACKED_REFRESH_LIMIT)
+    logger.info("refresh_radar_daily: queued=%d candidates=%d limit=%d",
+                queued, cand, _TRACKED_REFRESH_LIMIT)
+    return {"queued": queued, "candidates": cand}
+
+
+@celery_app.task(name="tasks.deep_refresh_tracked")
+def deep_refresh_tracked():
+    """DEEP READ SEMANAL de tracked (David 04/07): re-scrapea TODOS los competidores
+    seguidos con resultsLimit=_DEEP_REFRESH_LIMIT (10) para refrescar las vistas de los
+    ~10 reels recientes → mantiene honesto el baseline de explosión y caza late-bloomers
+    que el refresco recurrente (N=4) congela. stale_hours=0 = fuerza a todos (freshness no
+    salta); respeta private/not_found/zombis igual que el diario. Corre ANTES del diario
+    (lunes 05:00) → el diario de las 06:00 los ve frescos y no duplica."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        tr = (db.table("user_tracked_creators").select("creator_id")
+                .is_("archived_at", "null").limit(5000).execute())
+        creator_ids = [r["creator_id"] for r in (tr.data or []) if r.get("creator_id")]
+    except Exception:
+        logger.exception("deep_refresh_tracked: tracked read failed")
+        return {"status": "error"}
+    queued, cand = _enqueue_if_stale(db, creator_ids, stale_hours=0,
+                                     cap=_RADAR_DAILY_CAP, results_limit=_DEEP_REFRESH_LIMIT)
+    logger.info("deep_refresh_tracked: queued=%d candidates=%d limit=%d",
+                queued, cand, _DEEP_REFRESH_LIMIT)
     return {"queued": queued, "candidates": cand}
 
 
@@ -1322,9 +1370,9 @@ def refresh_suggestion_pools():
     rows.sort(key=lambda r: str(r.get("last_scraped_at") or ""))
     ids = [r["id"] for r in rows if r.get("id")]
     queued, cand = _enqueue_if_stale(db, ids, stale_hours=_POOL_STALE_HOURS,
-                                     cap=_POOL_DAILY_CAP)
-    logger.info("refresh_suggestion_pools: queued=%d candidates=%d niches=%d",
-                queued, cand, len(niches))
+                                     cap=_POOL_DAILY_CAP, results_limit=_POOL_REFRESH_LIMIT)
+    logger.info("refresh_suggestion_pools: queued=%d candidates=%d niches=%d limit=%d",
+                queued, cand, len(niches), _POOL_REFRESH_LIMIT)
     return {"queued": queued, "candidates": cand, "niches": len(niches)}
 
 
