@@ -8476,12 +8476,18 @@ def count_active_tracked(user_id: str, project_id: str | None = None,
 # (módulo compartido con tasks.py — refresh_suggestion_pools necesita el mismo canon).
 
 
+_SEED_CACHE: dict = {}          # (niche, tags) -> (ts, found)  — la semilla es casi estática
+_SEED_CACHE_TTL_S = 600
+
+
 def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, limit=5):
     """Competidores CURADOS (creators_global.niche_source='seed') del nicho/subnichos
     dados que el usuario aún no sigue. Cold-start del radar SIN grafo de co-ocurrencia
     ni LLM (handles reales, no alucinados). Matchea por nicho amplio O por overlap de
     subniches (que incluye el nicho granular del CSV como tag). Degrada a [] si falta
-    la semilla o la migración. Devuelve [{'id','handle','niche','subniches'}]."""
+    la semilla o la migración. Devuelve [{'id','handle','niche','subniches'}].
+    Las queries se cachean 10 min por (nicho, tags) — la semilla solo cambia al re-correr
+    el ingest; las EXCLUSIONES por usuario se aplican después, fuera del cache."""
     if limit <= 0:
         return []
     exclude_handles = {(h or "").lstrip("@").lower() for h in (exclude_handles or [])}
@@ -8491,23 +8497,32 @@ def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, 
     tags = [t for t in (_norm_tag(s) for s in (subniches or [])) if t]
     if pn and pn not in tags:
         tags.append(pn)
-    found, seen = [], set()
-    sel = "id,ig_username,niche,subniches"
+    _ck = (pn, tuple(sorted(tags)))
+    _hit = _SEED_CACHE.get(_ck)
+    if _hit and (_cfg_time.time() - _hit[0]) < _SEED_CACHE_TTL_S:
+        found = _hit[1]
+    else:
+        found, seen = [], set()
+        sel = "id,ig_username,niche,subniches"
 
-    def _collect(q):
-        try:
-            for x in (q.eq("niche_source", "seed").limit(150).execute()).data or []:
-                cid = x.get("id")
-                if cid and cid not in seen:
-                    seen.add(cid)
-                    found.append(x)
-        except Exception:
-            logger.warning("[seed] query failed (¿migración onboarding_v2_tags?)", exc_info=True)
+        def _collect(q):
+            try:
+                for x in (q.eq("niche_source", "seed").limit(150).execute()).data or []:
+                    cid = x.get("id")
+                    if cid and cid not in seen:
+                        seen.add(cid)
+                        found.append(x)
+            except Exception:
+                logger.warning("[seed] query failed (¿migración onboarding_v2_tags?)", exc_info=True)
 
-    if pn:
-        _collect(db.table("creators_global").select(sel).eq("niche", pn))
-    if tags:
-        _collect(db.table("creators_global").select(sel).overlaps("subniches", tags))
+        if pn:
+            _collect(db.table("creators_global").select(sel).eq("niche", pn))
+        if tags:
+            _collect(db.table("creators_global").select(sel).overlaps("subniches", tags))
+        if found:                      # no cachear fallos/vacíos (p.ej. migración a medias)
+            _SEED_CACHE[_ck] = (_cfg_time.time(), found)
+            if len(_SEED_CACHE) > 256:  # bound de memoria: nichos×subniches es finito, pero por si acaso
+                _SEED_CACHE.pop(next(iter(_SEED_CACHE)))
     out = []
     for x in found:
         cid = x.get("id")
