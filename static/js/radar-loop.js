@@ -1716,8 +1716,36 @@
       // Son REELS (normReel-compat): los normalizo y marco suggestion=true (para robar SIN
       // seguir vía no_follow) + worthFollow (para ofrecer «+ Añadir competidor» solo en esos).
       S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions)) ? r.d.suggestions.map(_normSugg) : [];
+      // #3b «posibles competidores»: creadores del nicho (worth_follow) que no sigues.
+      S._suggCompetitors=(r&&r.d&&Array.isArray(r.d.possible_competitors)) ? r.d.possible_competitors : [];
       if(S.tab==="dashboard") render();
     });
+  }
+  // #3b: sección pequeña «Posibles competidores» — creadores del nicho que petan consistente
+  // y NO sigues. Foto = INICIALES (el scrape de reels no trae avatar; fotos reales = fase 2).
+  // Cada uno: avatar-inicial + @handle + ×explosión + «Añadir competidor» (reusa add-suggested).
+  function suggestedCompetitorsHTML(){
+    if(isDemo()) return '';
+    var list=Array.isArray(S._suggCompetitors)?S._suggCompetitors:[];
+    // filtra los que el usuario acaba de añadir (por si el estado local ya los sigue)
+    var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
+      return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
+    list=list.filter(function(c){ return tracked.indexOf(String(c.handle||"").toLowerCase())<0; });
+    if(!list.length) return '';
+    var cards=list.slice(0,6).map(function(c){
+      var h=String(c.handle||"").replace(/^@+/,"");
+      var exp=(c.explosion_score!=null)?('<span class="pcomp-exp">'+IC.bolt+' '+ESC(String(c.explosion_score))+'×</span>'):'';
+      return '<div class="pcomp-card">'+
+        '<div class="pcomp-ava">'+ESC(initialsOf(h))+'</div>'+
+        '<div class="pcomp-meta"><span class="pcomp-h">@'+ESC(h)+'</span>'+exp+'</div>'+
+        '<button class="pcomp-add" data-act="add-suggested" data-id="'+ESC(h)+'" title="'+L("Añadir a tu radar","Add to your radar")+'">'+IC.plus+' '+L("Añadir","Add")+'</button>'+
+      '</div>';
+    }).join("");
+    return '<section class="pcomp-sec">'+
+      '<div class="pcomp-head"><span class="pcomp-t">'+IC.eye+' '+L("Posibles competidores","Possible competitors")+'</span>'+
+        '<span class="pcomp-sub">'+L("petan en tu nicho · aún no los sigues","blowing up in your niche · not followed yet")+'</span></div>'+
+      '<div class="pcomp-row">'+cards+'</div>'+
+    '</section>';
   }
   // Tarjeta de creador sugerido (vertical, para el carrusel): miniatura de su reel que peta
   // + @handle + por qué + «Añadir al radar» + descartar. Layout limpio (no se rompe).
@@ -2332,6 +2360,7 @@
       dashboardNextStepHTML()+   // #8 PROACTIVIDAD: «HAZ ESTO AHORA» — la acción más útil ya
       opportunityCarouselHTML(heroN)+   // OPORTUNIDAD justo tras el hero (acción sobre el fold)
       suggestionsTodayHTML()+    // «Sugerencias de hoy» SUBE aquí: reels del nicho que petan, robables ya
+      suggestedCompetitorsHTML()+   // #3b: creadores del nicho que petan y no sigues (iniciales)
       (S.reels.length?competitorGalleryHTML():"")+   // galería (chips = filtros, sin gestión)
       manageCompetitorsHTML(false)+   // ÚNICO bloque de gestión (plegado): añadir + límite + lista con ×
       foldedSectionHTML("rsFoldBrain", IC.brain+' '+L("Tu cerebro","Your brain"), _brainSub, radarCerebroRowHTML())+

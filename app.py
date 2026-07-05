@@ -9598,16 +9598,30 @@ def radar_suggestions():
         if not subs and not niche:
             # Sin nicho en NINGÚN sitio → needs_niche (la UI pide definirlo, no vacío en silencio).
             return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
-        # +1 para saber si hay material más allá de la ventana gratis (sin un 2º query).
-        batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_FREE_N + 1,
-                                        day_seed=_sugg_day_seed(uid, project_id),
-                                        seen_ids=_sugg_seen_yesterday(uid, project_id),
-                                        served_today=_sugg_seen_today(uid, project_id))
-        has_more = len(batch) > SUGG_FREE_N
-        _sugg_record_served(uid, project_id, [x.get("id") for x in batch[:SUGG_FREE_N]])
-        return jsonify({"suggestions": batch[:SUGG_FREE_N], "total": len(batch[:SUGG_FREE_N]),
+        # Traigo el pool amplio (hasta SUGG_MAX_TOTAL) en UNA llamada: de ahí salen la ventana
+        # gratis (has_more) Y los «posibles competidores» (#2, coste cero — creadores worth_follow
+        # del mismo pool ya scoreado, no seguidos, deduplicados).
+        pool = _niche_suggestion_reels(subs, niche, exclude, SUGG_MAX_TOTAL,
+                                       day_seed=_sugg_day_seed(uid, project_id),
+                                       seen_ids=_sugg_seen_yesterday(uid, project_id),
+                                       served_today=_sugg_seen_today(uid, project_id))
+        batch = pool[:SUGG_FREE_N]
+        has_more = len(pool) > SUGG_FREE_N
+        _sugg_record_served(uid, project_id, [x.get("id") for x in batch])
+        # #2/#3b «posibles competidores»: creadores que petan de forma consistente (worth_follow),
+        # no seguidos, del nicho. Foto = iniciales en el front (el payload no trae avatar).
+        seen_h, competitors = set(), []
+        for r in pool:
+            h = ((r.get("creator") or {}).get("ig_username") or "").lower().lstrip("@")
+            if r.get("worth_follow") and h and h not in seen_h:
+                seen_h.add(h)
+                competitors.append({"handle": h, "explosion_score": r.get("explosion_score"),
+                                    "thumb_reel_id": r.get("id"), "formato": r.get("formato")})
+            if len(competitors) >= 6:
+                break
+        return jsonify({"suggestions": batch, "total": len(batch),
                         "free_n": SUGG_FREE_N, "has_more": has_more, "more_units": SUGG_MORE_UNITS,
-                        "more_batch": SUGG_MORE_BATCH}), 200
+                        "more_batch": SUGG_MORE_BATCH, "possible_competitors": competitors}), 200
     except Exception:
         logger.warning("[sugg] radar_suggestions falló uid=%s pid=%s", uid, project_id, exc_info=True)
         return jsonify({"suggestions": [], "total": 0, "error": True}), 200
