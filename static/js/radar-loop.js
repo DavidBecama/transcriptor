@@ -1249,11 +1249,12 @@
     function size(){ var r=cv.getBoundingClientRect(); var dpr=Math.min(window.devicePixelRatio||1,2); cv.width=Math.max(1,Math.round(r.width*dpr)); cv.height=Math.max(1,Math.round(r.height*dpr)); ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); W=r.width||1200; H=r.height||800; }
     function build(){ var hues=[222,250,268,205,234,290], spacing=86, lanes=Math.max(5,Math.round(H/120)); span=W+320; thumbs=[];
       for(var l=0;l<lanes;l++){ var y=(H/(lanes+1))*(l+1)+(Math.random()-0.5)*40, rot=(Math.random()-0.5)*0.28, dir=(l%2===0?1:-1), speed=dir*(520+Math.random()*360), count=Math.ceil(span/spacing)+2;
-        for(var i=0;i<count;i++){ thumbs.push({y:y,rot:rot,speed:speed,x0:i*spacing+Math.random()*30,hue:hues[(l+i)%hues.length],sc:0.78+Math.random()*0.5,a:0.5+Math.random()*0.5}); } } }
+        for(var i=0;i<count;i++){ thumbs.push({y:y,rot:rot,speed:speed,x0:i*spacing+Math.random()*30,hue:hues[(l+i)%hues.length],sc:0.78+Math.random()*0.5,a:0.62+Math.random()*0.38}); } } }
+    // Reels MÁS visibles sobre el fondo casi-negro (antes hsl 24%/12% = apenas se veían).
     function drawThumb(x,y,rot,sc,a,hue){ ctx.save(); ctx.globalAlpha=a; ctx.translate(x,y); ctx.rotate(rot); ctx.scale(sc,sc); ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(-tw/2,-th/2,tw,th,9); else ctx.rect(-tw/2,-th/2,tw,th);
-      var g=ctx.createLinearGradient(0,-th/2,0,th/2); g.addColorStop(0,'hsl('+hue+' 46% 24%)'); g.addColorStop(1,'hsl('+(hue+16)+' 52% 12%)'); ctx.fillStyle=g; ctx.fill();
-      ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.stroke();
-      ctx.globalAlpha=a*0.45; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.moveTo(-4,-7); ctx.lineTo(8,0); ctx.lineTo(-4,7); ctx.closePath(); ctx.fill(); ctx.restore(); }
+      var g=ctx.createLinearGradient(0,-th/2,0,th/2); g.addColorStop(0,'hsl('+hue+' 62% 46%)'); g.addColorStop(1,'hsl('+(hue+16)+' 66% 28%)'); ctx.fillStyle=g; ctx.fill();
+      ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,0.16)'; ctx.stroke();
+      ctx.globalAlpha=a*0.6; ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.moveTo(-4,-7); ctx.lineTo(8,0); ctx.lineTo(-4,7); ctx.closePath(); ctx.fill(); ctx.restore(); }
     function draw(t){ if(!ctx) return; ctx.clearRect(0,0,W,H);
       var cntEl=document.getElementById('rsCofreCount'), barEl=document.getElementById('rsCofreBar');
       if(cntEl){ var p=Math.min(t/2.2,1), e=1-Math.pow(1-p,3); cntEl.textContent=String(Math.round(e*COFRE_TARGET)).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
@@ -1272,7 +1273,15 @@
     // innerHTML, cuando el canvas puede no estar maquetado → su backing store quedaría en
     // 1px y la avalancha (los reels de fondo) se dibujaría en la nada, aunque los números
     // (DOM) sí animaran. Esperar al 1er frame garantiza tamaño real. Bug Leo 29-jun.
-    if(cv.getBoundingClientRect().width<2){ requestAnimationFrame(begin); } else { begin(); }
+    // Reintenta por frames hasta que el canvas tenga tamaño real (un solo rAF a veces no
+    // basta si el layout aún no está listo). Sin esto el backing store queda en 1px y la
+    // avalancha se dibuja en la nada, aunque los números (DOM) sí animen. Bug Leo.
+    var _tries=0;
+    function tryBegin(){ var rc=cv.getBoundingClientRect();
+      if((rc.width<2||rc.height<2) && _tries<15){ _tries++; requestAnimationFrame(tryBegin); return; }
+      begin();
+    }
+    tryBegin();
   }
   // CIERRE: ingiere (prod) → Cerebro ~50% + 1er guión; demo simula y siembra panel.
   function onbFinish(){
@@ -5018,6 +5027,11 @@
     // completó (S.revealReel), no la global S.reel (que una 2ª generación en vuelo pudo
     // reasignar). Así guion + «ver original» pertenecen al MISMO reel que se robó.
     var r=S.revealReel||S.reel,s=r.script||{hook:"",beats:[],close:""};
+    // ANTI-PARPADEO: la animación de entrada (.fade-in + .reveal-hero) solo debe correr
+    // en el PRIMER pintado de este guion. Sin esto, cualquier re-render de fondo (p.ej.
+    // loadFormatExamples al resolver, o refresco de créditos) reconstruye el .script-wrap
+    // y REINICIA la animación → el guion "parpadea". Marcamos el reel ya animado.
+    var _firstPaint = S._revealShownId !== (r.id||"x"); S._revealShownId = (r.id||"x");
     var beats=(s.beats||[]).map(function(b,i){return '<div class="beat"><span class="n">'+String(i+1).padStart(2,"0")+'</span><span>'+ESC(b)+'</span></div>';}).join("");
     // PRIMER guion → banner héroe + prueba social del reel robado (lo que petó).
     // Solo la 1ª vez (S._firstStealCelebrate, one-shot que pone steal()).
@@ -5074,7 +5088,7 @@
           : '<button class="btn btn-md btn-primary script-save-btn" data-act="save-script-choice">'+IC.check+' '+L("Guardar guion","Save script")+'</button>')+
       '</div>';
     var sideHTML = recFormatCardHTML(r)+conveyorHTML();
-    return '<div class="script-wrap fade-in">'+
+    return '<div class="script-wrap'+(_firstPaint?' fade-in':' no-entry')+'">'+
       '<div class="script-main">'+mainHTML+'</div>'+
       '<aside class="script-side">'+sideHTML+'</aside>'+
     '</div>';

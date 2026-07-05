@@ -12661,6 +12661,9 @@
     .rs .reveal-hero-proof .num-hi { color:var(--success-fg); font-weight:800; }
     @keyframes revealHeroIn { 0%{ opacity:0; transform:translateY(10px) scale(.98); } 100%{ opacity:1; transform:translateY(0) scale(1); } }
     @media (prefers-reduced-motion: reduce){ .rs .reveal-hero { animation:none; } }
+    /* Anti-parpadeo: en re-renders de fondo del guion ya mostrado (.no-entry) NO reanimar
+       la entrada — evita que el guion "parpadee" al resolver cargas async (formato, créditos). */
+    .rs .script-wrap.no-entry, .rs .script-wrap.no-entry .reveal-hero { animation: none; }
     /* voice-tag legible en oscuro (brand-700 sobre brand-100 se quedaba flojo) */
     .rs[data-theme="dark"] .voice-tag { color: var(--brand-400); }
     /* cinta "¿Y ahora?": botones 3D + una sola primaria fuerte (Grábalo = .chain-prim) */
@@ -28770,6 +28773,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=168"></script>
+<script src="/static/js/radar-loop.js?v=169"></script>
 </body>
 </html>
