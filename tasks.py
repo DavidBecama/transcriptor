@@ -121,6 +121,12 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.deep_refresh_tracked",
         "schedule": crontab(day_of_week=1, hour=5, minute=0),
     },
+    # Avatares de «posibles competidores» (05/07): re-cachea fotos de perfil de creadores
+    # de nichos activos 1×/mes (cambian raro; los bytes cacheados no caducan).
+    "refresh-avatars-monthly": {
+        "task": "tasks.refresh_avatars_monthly",
+        "schedule": crontab(day_of_month=1, hour=4, minute=0),
+    },
     # v1 feed diario: RE-RANK gratis del feed (CERO scrape) a las 07:00 UTC — DESPUÉS del
     # re-scrape de las 06:00, para calentar la caché con lo recién traído. Solo re-rankea.
     "rerank-radar-daily": {
@@ -1374,6 +1380,107 @@ def refresh_suggestion_pools():
     logger.info("refresh_suggestion_pools: queued=%d candidates=%d niches=%d limit=%d",
                 queued, cand, len(niches), _POOL_REFRESH_LIMIT)
     return {"queued": queued, "candidates": cand, "niches": len(niches)}
+
+
+# ── Avatares de creadores («posibles competidores», fotos reales) ────────────
+# El scrape de reels no trae foto de perfil; instagram-profile-scraper sí (profilePicUrl,
+# ~$0.0023/perfil). Cacheamos los BYTES (la URL del CDN caduca; los bytes no) en
+# creators_global.profile_data.avatar_b64 → los sirve /img/creator/<id>. Sin foto → el
+# front usa iniciales. Coste: backfill 163 ≈ $0.37; re-scrape mensual ≈ $0.4/mes.
+_AVATAR_ACTOR = os.environ.get("AVATAR_ACTOR", "apify~instagram-profile-scraper")
+_AVATAR_BATCH = int(os.environ.get("AVATAR_SCRAPE_BATCH", "50"))
+_AVATAR_MONTHLY_CAP = int(os.environ.get("AVATAR_MONTHLY_CAP", "500"))
+
+
+@celery_app.task(name="tasks.refresh_creator_avatars")
+def refresh_creator_avatars(creator_ids=None, cap=300):
+    """Cachea el avatar de creadores en profile_data.avatar_b64. Con `creator_ids` explícito
+    re-scrapea TODOS (force, p.ej. refresh mensual); sin lista → creadores 'ok' SIN avatar
+    (backfill). Batch de _AVATAR_BATCH usernames/run. Fallback silencioso a iniciales."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    APIFY_TOKEN = os.environ.get("APIFY_TOKEN", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        if creator_ids:
+            rows = []
+            for i in range(0, len(creator_ids), 100):
+                r = (db.table("creators_global").select("id, ig_username, profile_data")
+                       .in_("id", creator_ids[i:i + 100]).execute())
+                rows.extend(r.data or [])
+        else:
+            rows = (db.table("creators_global").select("id, ig_username, profile_data")
+                      .eq("scrape_status", "ok").limit(3000).execute()).data or []
+    except Exception:
+        logger.exception("refresh_creator_avatars: read failed")
+        return {"status": "error"}
+    pend = rows if creator_ids else [
+        r for r in rows if not ((r.get("profile_data") or {}).get("avatar_b64"))]
+    pend = [r for r in pend if r.get("ig_username")][:cap]
+    if not pend:
+        return {"scraped": 0, "stored": 0}
+    by_handle = {}
+    for r in pend:
+        by_handle[(r["ig_username"] or "").lstrip("@").lower()] = r
+    handles = list(by_handle.keys())
+    actor_url = ("https://api.apify.com/v2/acts/%s/run-sync-get-dataset-items"
+                 "?token=%s&memory=256" % (_AVATAR_ACTOR, APIFY_TOKEN))
+    stored = 0
+    for i in range(0, len(handles), _AVATAR_BATCH):
+        chunk = handles[i:i + _AVATAR_BATCH]
+        try:
+            resp = requests.post(actor_url, json={"usernames": chunk}, timeout=SCRAPE_TIMEOUT_SEC)
+            items = resp.json() if resp.status_code < 300 else []
+        except Exception as e:
+            logger.warning("refresh_creator_avatars: apify chunk failed: %s", e)
+            continue
+        for it in (items or []):
+            if not isinstance(it, dict):
+                continue
+            uname = (it.get("username") or "").lstrip("@").lower()
+            cr = by_handle.get(uname)
+            if not cr:
+                continue
+            pic = it.get("profilePicUrl") or it.get("profilePicUrlHD")
+            b64 = _download_thumbnail_b64(pic) if pic else None
+            if not b64:
+                continue
+            pd = cr.get("profile_data")
+            pd = pd if isinstance(pd, dict) else {}
+            pd["avatar_b64"] = b64
+            try:
+                db.table("creators_global").update({"profile_data": pd}).eq("id", cr["id"]).execute()
+                stored += 1
+            except Exception:
+                logger.warning("refresh_creator_avatars: store failed for %s", uname)
+    logger.info("refresh_creator_avatars: handles=%d stored=%d", len(handles), stored)
+    return {"scraped": len(handles), "stored": stored}
+
+
+@celery_app.task(name="tasks.refresh_avatars_monthly")
+def refresh_avatars_monthly():
+    """Mensual: re-cachea avatares de creadores de nichos ACTIVOS (cambian raro; re-scrape
+    por si acaso). Reusa el canon de nicho de refresh_suggestion_pools."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    niches = set()
+    try:
+        for table in ("projects", "profiles"):
+            for row in (db.table(table).select("niche").limit(5000).execute()).data or []:
+                pn = pool_niche_canon(row.get("niche") or "")
+                if pn:
+                    niches.add(pn)
+        if not niches:
+            return {"scraped": 0}
+        rows = (db.table("creators_global").select("id")
+                  .in_("niche", sorted(niches)).eq("scrape_status", "ok")
+                  .limit(3000).execute()).data or []
+    except Exception:
+        logger.exception("refresh_avatars_monthly: read failed")
+        return {"status": "error"}
+    ids = [r["id"] for r in rows if r.get("id")]
+    return refresh_creator_avatars(ids, cap=_AVATAR_MONTHLY_CAP)
 
 
 _RADAR_RERANK_CAP = int(os.environ.get("RADAR_RERANK_CAP", "3000"))

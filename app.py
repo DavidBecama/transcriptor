@@ -9613,9 +9613,14 @@ def radar_suggestions():
         seen_h, competitors = set(), []
         for r in pool:
             h = ((r.get("creator") or {}).get("ig_username") or "").lower().lstrip("@")
+            cid = r.get("creator_id")
             if r.get("worth_follow") and h and h not in seen_h:
                 seen_h.add(h)
-                competitors.append({"handle": h, "explosion_score": r.get("explosion_score"),
+                # avatar_url SIEMPRE apunta a /img/creator/<id>; si no hay foto cacheada la
+                # ruta da 404 y el front cae a iniciales (onerror). Cero coste extra aquí.
+                competitors.append({"handle": h, "creator_id": cid,
+                                    "avatar_url": ("/img/creator/%s" % cid) if cid else None,
+                                    "explosion_score": r.get("explosion_score"),
                                     "thumb_reel_id": r.get("id"), "formato": r.get("formato")})
             if len(competitors) >= 6:
                 break
@@ -11377,6 +11382,30 @@ def reel_thumb(reel_id):
     except Exception:
         b64 = ""
     if not b64.startswith("data:image"):
+        return "", 404
+    try:
+        import base64 as _b64
+        header, payload = b64.split(",", 1)
+        raw = _b64.b64decode(payload)
+        mime = header.split(";")[0].split(":", 1)[1] or "image/jpeg"
+    except Exception:
+        return "", 404
+    resp = app.response_class(raw, mimetype=mime)
+    resp.headers["Cache-Control"] = "public, max-age=604800, immutable"   # 7 días
+    return resp
+
+
+@app.route("/img/creator/<creator_id>")
+def creator_avatar(creator_id):
+    """Sirve el AVATAR cacheado del creador (creators_global.profile_data.avatar_b64), como
+    /img/reel pero para «posibles competidores». 404 si no hay foto → el front cae a
+    iniciales (onerror). Los bytes se cachean al scrapear (la URL del CDN de IG caduca)."""
+    try:
+        r = db.table("creators_global").select("profile_data").eq("id", creator_id).single().execute()
+        b64 = (((r.data or {}).get("profile_data") or {}).get("avatar_b64") or "")
+    except Exception:
+        b64 = ""
+    if not isinstance(b64, str) or not b64.startswith("data:image"):
         return "", 404
     try:
         import base64 as _b64
