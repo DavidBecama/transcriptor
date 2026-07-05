@@ -13571,26 +13571,20 @@ const _TOUR_EN = (document.documentElement.lang || "es").toLowerCase().indexOf("
 //   hold: true       → paso sin botón «Siguiente»; avanza cuando el usuario actúa.
 //   awaitEl: 'sel'   → avanza cuando ESE elemento aparece (p.ej. el guión generado).
 //   awaitGone: 'sel' → avanza cuando ESE elemento desaparece (p.ej. al cerrar el reveal).
+// Tour v2 (Leo 05-jul): el onboarding TERMINA en el reveal del guion robado (cofre →
+// robar → «Tu guión, en tu voz») → el tour arranca AHÍ. Paso 1 = los dos botones de esa
+// página (Grábalo ahora + Roba la siguiente señal); después, las demás secciones. El
+// tutorial de la página Radar se OMITE (el usuario ya vivió el robo en el cofre).
+// Paso 1 es ephemeral: si su ventana ya no existe (re-runs, ?tour=1 desde el dashboard),
+// renderTourStep lo salta solo y el tour empieza en Guiones.
 const TOUR_STEPS = _TOUR_EN ? [
-  { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "Your Radar. Every day I bring you the reels exploding in your niche, sorted by what deserves your next script." },
-  { tab: 'dashboard', target: '.feature',                    text: "Today's opportunity: the most explosive reel in your niche, with the why behind it. You don't start from scratch." },
-  { tab: 'dashboard', target: '.rgal',                       text: "Your competitors and their gallery: filter by whoever you want and open metrics + transcript for each reel." },
-  { tab: 'dashboard', target: '.feature [data-act="steal"]', text: "Try it 👇 Hit «Steal the idea» and I'll turn it into your first script — in your voice, ready to record.", hold: true, awaitEl: '.script-hook' },
-  {                   target: '.script-hook', ephemeral: true, noFrame: true, text: "This is the script I just created in your voice. From here you record it, regenerate it or turn it into other formats — and it auto-saves to Scripts." },
-  {                   target: '.chain[data-k="record"]', ephemeral: true, text: "«Record it now»: opens the teleprompter and you read it straight to camera — free." },
-  {                   target: '.chain[data-k="next"]',   ephemeral: true, text: "Or «Steal the next signal» without leaving: chain scripts back to back and keep the loop going." },
+  {                   target: '.script-side .belt', ephemeral: true, text: "Your first script is ready — and these are your two moves: «Record it now» opens the teleprompter so you read it straight to camera (free), or «Steal the next signal» chains the next script without leaving the loop." },
   { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "And here it is — your first script, saved. Everything you steal lives here, ready to record, edit and reuse." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Your Brain: it learns your voice. The more you create, the more the next one sounds like you. That's the moat." },
   { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "The ranking: see how you stack up against other creators in your niche — and climb." },
   { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Metrics: the hooks, hours and topics actually moving your account. Unlock them and double down — with Pro. 👉" },
 ] : [
-  { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "Tu Radar. Cada día te traigo los reels que están explotando en tu nicho, ordenados por lo que merece tu próximo guion." },
-  { tab: 'dashboard', target: '.feature',                    text: "Tu oportunidad de hoy: el reel más explosivo de tu nicho, con el porqué de por qué funcionó. No empiezas de cero." },
-  { tab: 'dashboard', target: '.rgal',                       text: "Tus competidores y su galería: filtra por quien quieras y abre métricas + transcripción de cada reel." },
-  { tab: 'dashboard', target: '.feature [data-act="steal"]', text: "Pruébalo 👇 Pulsa «Roba la idea» y te lo convierto en tu primer guión — en tu voz, listo para grabar.", hold: true, awaitEl: '.script-hook' },
-  {                   target: '.script-hook', ephemeral: true, noFrame: true, text: "Este es el guión que acabo de crear en tu voz. Desde aquí lo grabas, lo regeneras o lo conviertes en otros formatos — y se guarda solo en Guiones." },
-  {                   target: '.chain[data-k="record"]', ephemeral: true, text: "«Grábalo ahora»: abre el teleprónter y lo lees directo a cámara — gratis." },
-  {                   target: '.chain[data-k="next"]',   ephemeral: true, text: "O «Roba la siguiente señal» sin salir: encadenas guiones uno tras otro y el bucle no para." },
+  {                   target: '.script-side .belt', ephemeral: true, text: "Tu primer guión ya está listo — y estos son tus dos caminos: «Grábalo ahora» abre el teleprónter y lo lees directo a cámara (gratis), o «Roba la siguiente señal» y encadenas el próximo guion sin salir del bucle." },
   { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Y aquí está: tu primer guión, ya guardado. Todo lo que robas vive aquí, listo para grabar, editar y reutilizar." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Tu Cerebro: aprende tu voz. Cuanto más creas, más tuyo suena lo siguiente. Ese es el moat." },
   { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "El ranking: mira cómo vas frente a otros creadores de tu nicho — y sube posiciones." },
@@ -15525,6 +15519,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=175"></script>
+<script src="/static/js/radar-loop.js?v=176"></script>
 </body>
 </html>

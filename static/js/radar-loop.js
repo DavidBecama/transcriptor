@@ -6021,6 +6021,9 @@
       var bg=S._genBg || tok!==S._genSeq;   // cerró el orbe, siguió navegando o lanzó otro robo
       if(tok===S._genSeq){ clearTimeout(S._genHonestTimer); S._genSlow=false; S._genBg=false; S._stealInFlight=null; }
       else if(S._stealInFlight===id) S._stealInFlight=null;   // robo superado: libera el guard de ESTE reel
+      // House tour v2: si el robo del cofre acabó en error o en background, NO armar el
+      // tour sobre este reveal (no existe) — el fallback del dashboard lo recoge después.
+      if((err||bg) && S._tourAfterReveal) S._tourAfterReveal=false;
       if(err){
         if(bg){
           if(err==="trial_daily_limit") showDailyLimit();
@@ -6062,6 +6065,16 @@
         S._firstStealCelebrate=_firstSteal; if(_firstSteal) markFirstSteal();
         render();
         if(_firstSteal){ try{ brainFeast(16); }catch(e){} }
+        // House tour v2 (Leo 05-jul): el robo del COFRE aterriza aquí → arranca el tour
+        // SOBRE el reveal (paso 1 = «Grábalo ahora» + «Roba la siguiente señal»). 1.4s de
+        // respiro para que el reveal asiente (fade-in + celebración) antes de oscurecer.
+        if(S._tourAfterReveal){
+          S._tourAfterReveal=false;
+          var _tSeen=false; try{ _tSeen=localStorage.getItem("onboarding_completed")==="true"; }catch(e){}
+          if(!_tSeen && typeof window.startTour==="function"){
+            setTimeout(function(){ if(S.view==="script"){ try{ window.startTour(); }catch(e){} } }, 1400);
+          }
+        }
       }
       // Demo: descuento local cosmético. Prod: el backend ya cobró server-side →
       // refrescamos el saldo real (/auth/me) sin descontar local (evita doble-cobro).
@@ -7496,6 +7509,9 @@
       var _cof=S.onbCofre; if(!_cof || _cof.selected>=0) return;   // ya elegido
       var _idx=_cofreReels().map(function(x){return x.id;}).indexOf(id); if(_idx<0) return;
       _cof.selected=_idx; render();   // muestra «Robando @X — generando…»
+      // House tour v2 (Leo 05-jul): el onboarding termina EN el reveal del guion →
+      // el tour arranca ahí (paso 1 = los dos botones de esa página), no en el radar.
+      S._tourAfterReveal=true;
       setTimeout(function(){ S.onbStealOffer=null; S.onbCofre=null; steal(id); }, 1100);
       return;
     }
