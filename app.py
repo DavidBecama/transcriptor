@@ -174,6 +174,10 @@ SUGG_MORE_BATCH           = int(os.environ.get("SUGG_MORE_BATCH", "4"))  # tanda
 SUGG_MORE_UNITS           = int(os.environ.get("SUGG_MORE_UNITS", "3"))  # ~3 créditos/tanda
 SUGG_MORE_COST            = SUGG_MORE_UNITS * COST_CENTS
 SUGG_MAX_TOTAL            = int(os.environ.get("SUGG_MAX_TOTAL", "40"))  # techo absoluto del carrusel
+# Si el overlap FUERTE de subnichos da menos de esto (reels que pasan el listón), top-up por
+# nicho canónico amplio → volumen para ROTAR de verdad (fix 05/07: IA daba 7 reels fuertes y
+# nunca tocaba los 71 de «tecnología»). 2× la ventana gratis para que haya recambio diario.
+SUGG_POOL_TARGET          = int(os.environ.get("SUGG_POOL_TARGET", "16"))
 
 # Flash por-usuario (economia-creditos.md §4): tras chocar el PRIMER muro, el Pack 300
 # baja a TOPUP_FLASH_EUR € (vs 49 €) durante TOPUP_FLASH_HOURS h. Urgencia + ancla.
@@ -9423,9 +9427,9 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
                 if (r.get("_exp") or 0.0) >= REEL_FLOOR:
                     # 1ª vista (sseed=None) → explosión × jitter DIARIO (day_seed): mismo
                     # orden todo el día (paginado por offset coherente entre GET y «ver
-                    # más») y orden DISTINTO cada mañana; lo servido ayer (seen_ids) se
-                    # penaliza → rotación real, mismo motor que el feed. Sin day_seed
-                    # (legacy) → explosión pura.
+                    # más») y reordenado cada mañana. La ROTACIÓN real (no repetir lo de
+                    # ayer/hoy) la hace la PARTICIÓN por servido más abajo, NO un
+                    # multiplicador (el 0.45× no desbancaba reels de explosión alta).
                     # «↻ otras» (sseed) → baraja FUERTE (hash puro): todos ya pasan
                     # REEL_FLOOR (petan), así que variar el orden trae otros reels
                     # on-niche, sin scrape.
@@ -9435,18 +9439,16 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
                         score = r.get("_exp") or 0.0
                         if day_seed:
                             score *= 0.4 + 0.6 * _unit_hash("%s:%s" % (r.get("id"), day_seed))
-                        if seen_ids and str(r.get("id")) in seen_ids:
-                            score *= RADAR_SUGG_SEEN_PENALTY
                     picked.append((score, r, wf))
         return picked
 
     chosen = _score_pool(uname)
-    # FALLBACK por NICHE AMPLIO: si el overlap fuerte no encontró a NADIE (nicho con pocos/0
-    # subnichos en el pool) O sus creadores no tienen NI UN reel fresco que pase el listón
-    # (pool congelado, p.ej. todos 'private' sin re-scrape), casa por nicho canónico en vez
-    # de devolver 0/los mismos muertos. Solo red de seguridad (no widener permanente) → no
-    # reintroduce la fuga off-niche del caso normal.
-    if not chosen:
+    # TOP-UP por NICHO AMPLIO (fix 05/07): si el overlap FUERTE da menos de SUGG_POOL_TARGET
+    # reels que pasan el listón, rellena con el nicho canónico → VOLUMEN para rotar. Los del
+    # overlap fuerte ya están en `chosen` y rankean primero (precisión on-niche); el canon
+    # añade cola (IA: 7 fuertes → ~78 con «tecnología»). Antes solo disparaba con pool fuerte
+    # = 0, así que marcas con match estrecho quedaban clavadas en ≤8 reels idénticos cada día.
+    if len(chosen) < SUGG_POOL_TARGET:
         pn = _pool_niche_canon(niche)
         fb = {}
         if pn:
@@ -9460,14 +9462,17 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
                 pass
         if fb:
             uname.update(fb)   # handles del fallback para el formateo de salida
-            chosen = _score_pool(fb)
-    chosen.sort(key=lambda x: -x[0])
-    # ROTACIÓN POR VISITA (criterio David 04/07): lo ya servido HOY va al FINAL (partición
-    # estable, el orden del día se conserva dentro de cada bloque) → cada GET/«↻ otras»/
-    # «ver más» trae reels DISTINTOS del pool hasta agotarlo; después cicla por mérito.
-    if served_today:
-        chosen = ([c for c in chosen if str(c[1].get("id")) not in served_today]
-                  + [c for c in chosen if str(c[1].get("id")) in served_today])
+            chosen += _score_pool(fb)   # cola on-niche tras el overlap fuerte
+    # ROTACIÓN por PARTICIÓN (fix 05/07): orden = (servido HOY, servido AYER, −score). Primero
+    # los NO vistos (ranked por explosión×jitter-del-día), luego los de ayer, luego los de esta
+    # sesión. Con pool grande → reels DISTINTOS cada mañana Y cada visita; con pool pequeño
+    # degrada a re-orden (lo máximo posible). Sustituye el multiplicador 0.45× que no bastaba.
+    _st = served_today or set()
+    _sy = seen_ids or set()
+    def _rot_key(c):
+        rid = str(c[1].get("id"))
+        return (1 if rid in _st else 0, 1 if rid in _sy else 0, -c[0])
+    chosen.sort(key=_rot_key)
     now = datetime.now(timezone.utc)
     out = []
     for _score, r, wf in chosen[offset:offset + limit]:
