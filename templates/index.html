@@ -12072,6 +12072,8 @@
     .rs .stday-rob { flex:1 1 auto; white-space:nowrap; }
     .rs .stday-follow { flex:1 1 100%; display:inline-flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; font-size:.74rem; font-weight:600; padding:7px 9px; border:1px solid var(--border-subtle); border-radius:9px; background:transparent; color:var(--text-secondary); cursor:pointer; }
     .rs .stday-follow:hover { color:var(--text); border-color:var(--brand-500); }
+    /* #3a: el botón va en TODAS las cards; --hot resalta al creador curado (worthFollow). */
+    .rs .stday-follow--hot { color:var(--brand-500); border-color:color-mix(in srgb, var(--brand-500) 40%, transparent); }
     .rs .stday-follow svg { width:13px; height:13px; }
     .rs .stday-x { flex:none; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--border-subtle); border-radius:9px; background:transparent; color:var(--text-tertiary); cursor:pointer; }
     .rs .stday-x:hover { color:var(--text); border-color:var(--border-default); }
@@ -28751,6 +28753,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=166"></script>
+<script src="/static/js/radar-loop.js?v=167"></script>
 </body>
 </html>

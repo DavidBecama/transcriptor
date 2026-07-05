@@ -1727,8 +1727,11 @@
     if(!r||!r.id) return '';
     var h=(r.creator&&r.creator.handle)||"";
     var media=r.thumb?('<img src="'+ESC(r.thumb)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">'):'';
-    var follow=r.worthFollow
-      ? '<button class="stday-follow" data-act="add-suggested" data-id="'+ESC(h)+'" title="'+L("Añadir a tu radar","Add to your radar")+'">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'
+    // #3a (David 05/07): «Añadir competidor» visible en TODAS las cards, no solo en las
+    // worthFollow. worthFollow ahora solo resalta al creador curado (clase --hot), pero el
+    // botón se ofrece siempre (robar sin seguir sigue siendo la acción primaria).
+    var follow=h
+      ? '<button class="stday-follow'+(r.worthFollow?' stday-follow--hot':'')+'" data-act="add-suggested" data-id="'+ESC(h)+'" title="'+L("Añadir a tu radar","Add to your radar")+'">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'
       : '';
     // Métricas en la tarjeta (diferencia del feed: aquí van en una FILA, no solo badge):
     // ×explosión · views · antigüedad. La explosión NO va de badge en el thumb (la lleva la fila).
