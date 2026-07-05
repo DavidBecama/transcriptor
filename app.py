@@ -9238,8 +9238,11 @@ def suggested_competitor():
     # 4. Mejor reel reciente (explosión) de los candidatos.
     baselines = _creator_view_baselines(cand_ids)
     try:
+        # DIETA (ANALISIS #4): SIN thumb_b64 aquí — son decenas de KB por fila × 240 filas
+        # (varios MB por llamada) y solo se usa el thumb del MEJOR reel de ≤8 candidatos.
+        # El b64 se trae después, solo para los ganadores.
         reels = (db.table("creator_reels_global")
-                   .select("creator_id, views, posted_at, thumb_url, thumb_b64")
+                   .select("id, creator_id, views, posted_at, thumb_url")
                    .in_("creator_id", cand_ids).eq("is_archived", False)
                    .order("posted_at", desc=True).limit(240).execute()).data or []
     except Exception:
@@ -9251,7 +9254,20 @@ def suggested_competitor():
         score = exp if exp is not None else 0
         if cid and (cid not in best or score > best[cid]["score"]):
             best[cid] = {"views": v, "exp": exp, "score": score,
-                         "thumb": r.get("thumb_b64") or r.get("thumb_url")}  # #4: su reel que petó
+                         "thumb": r.get("thumb_url"), "_rid": r.get("id")}  # #4: su reel que petó
+    # thumb_b64 SOLO de los reels ganadores (≤8 filas) — se prefiere al thumb_url porque
+    # las URLs del CDN de IG caducan; el fallback URL queda por si el b64 no existe.
+    _win_ids = [b["_rid"] for b in best.values() if b.get("_rid")]
+    if _win_ids:
+        try:
+            _b64 = {tr["id"]: tr.get("thumb_b64")
+                    for tr in (db.table("creator_reels_global").select("id, thumb_b64")
+                                 .in_("id", _win_ids).execute()).data or []}
+            for b in best.values():
+                if b.get("_rid") and _b64.get(b["_rid"]):
+                    b["thumb"] = _b64[b["_rid"]]
+        except Exception:
+            pass  # best-effort: queda el thumb_url
     # Orden: primero los que tienen un reel que petó (views>0), luego el resto por
     # co-ocurrencia. ?limit=N (muro de competidores, Bernat 24-jun) → lista de N.
     ordered = [cid for cid, _ in ranked if (best.get(cid) or {}).get("views")]
@@ -11672,9 +11688,12 @@ def _recycled_reels(subniches, niche=None, limit=20, exclude_creator_ids=None,
     # ordenar por explosión post-query; "views" (seed/fallback) basta con menos.
     window = max(limit * 4, 60) if rank == "explosion" else max(limit * 2, 30)
     try:
+        # DIETA (ANALISIS #4): SIN thumb_b64 en la query ancha — se piden `window` filas
+        # (60-80) para rankear pero solo se devuelven `limit` (6-20). El b64 (decenas de
+        # KB/fila) se trae en una 2ª query solo para las filas que salen.
         rr = (db.table("creator_reels_global")
                 .select("id, ig_reel_id, creator_id, caption, views, likes, comments, "
-                        "posted_at, thumb_url, thumb_b64, video_duration_sec")
+                        "posted_at, thumb_url, video_duration_sec")
                 .in_("creator_id", cids).eq("is_archived", False)
                 .order("views", desc=True).limit(window).execute()).data or []
     except Exception:
@@ -11687,8 +11706,18 @@ def _recycled_reels(subniches, niche=None, limit=20, exclude_creator_ids=None,
         rr.sort(key=lambda r: (r.get("explosion_score") or 0), reverse=True)
     if min_explosion is not None:
         rr = [r for r in rr if (r.get("explosion_score") or 0) >= min_explosion]
+    picked = rr[:limit]
+    if picked:
+        try:
+            _b64 = {tr["id"]: tr.get("thumb_b64")
+                    for tr in (db.table("creator_reels_global").select("id, thumb_b64")
+                                 .in_("id", [r["id"] for r in picked]).execute()).data or []}
+            for r in picked:
+                r["thumb_b64"] = _b64.get(r["id"])
+        except Exception:
+            logger.warning("[seed] thumb_b64 backfill failed")  # best-effort: queda thumb_url
     out = []
-    for r in rr[:limit]:
+    for r in picked:
         r["creator"] = {"ig_username": uname.get(r.get("creator_id"), "")}
         r["is_favorite"] = False
         r["source"] = "seed"   # el front muestra microcopy honesto «mientras llenas tu radar»
