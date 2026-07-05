@@ -499,6 +499,18 @@
     return !!(S.onbStealOffer || S._onbWaiting || showOnboarding()
       || S.view==="gen" || S.view==="script" || S.view==="editor" || S.view==="prompter" || S.view==="result");
   }
+  // RENDER DE FONDO (bgRender): TODO loader async (sugerencias, discover, tracked,
+  // leaderboard, métricas…) debe repintar con esto, NUNCA con render() directo.
+  //  · Gate: si una pantalla full-screen es la dueña (_screenBusy) NO repinta — el estado
+  //    queda actualizado y la vista se repinta al cerrar el overlay. (Repintar por debajo
+  //    desconecta canvas del cofre, parpadea el guion, roba el foco.)
+  //  · Coalescing: si varios loaders resuelven a la vez (carga inicial del dashboard),
+  //    un solo repintado por frame en vez de una ráfaga de renders completos.
+  function bgRender(){
+    if(_screenBusy()) return;            // el estado S ya quedó al día; se pinta al cerrar
+    if(S._bgRT) return;                  // ya hay un repintado agendado en este frame
+    S._bgRT=setTimeout(function(){ S._bgRT=null; if(!_screenBusy()) render(); },50);
+  }
   function onbIdx(){ var i=ONB_STEPS.indexOf(S.onb.step); return i<0?0:i; }
 
   /* ── PostHog: 1 evento "viewed" por paso (entrada) + "completed" (avance) →
@@ -1410,7 +1422,7 @@
       if(r && r.ok && r.d){
         S._suggReal=r.d.suggestion||null;
         S._suggList=Array.isArray(r.d.suggestions)?r.d.suggestions:(r.d.suggestion?[r.d.suggestion]:[]);
-        if(S.tab==="dashboard") render();
+        if(S.tab==="dashboard") bgRender();
       }
     });
   }
@@ -1422,7 +1434,7 @@
     apiGet('/api/niche/discover?limit=6').then(function(r){
       S._discLoading=false;
       S.discover=(r && r.ok && r.d && Array.isArray(r.d.reels)) ? r.d.reels.map(normReel) : [];
-      if(S.tab==="dashboard") render();
+      if(S.tab==="dashboard") bgRender();
     });
   }
   // Reel por id buscándolo TAMBIÉN en discover (para robar uno del descubrimiento).
@@ -1442,7 +1454,7 @@
     var _pid=_pidOf(S.brandId);
     apiGet('/api/leaderboard'+(_pid?('?project_id='+encodeURIComponent(_pid)):'')).then(function(r){
       S._lbLoading=false;
-      if(r && r.ok && r.d){ S._lbReal=r.d; if(S.tab==="leaderboard") render(); }
+      if(r && r.ok && r.d){ S._lbReal=r.d; if(S.tab==="leaderboard") bgRender(); }
     });
   }
   // Recarga LIGERA de métricas (summary + videos + insights) al entrar en la pestaña
@@ -1465,7 +1477,7 @@
       S.metrics=S.metrics||{};
       if(vids){ S.metrics.videos=(vids.videos||[]).map(normMetricVideo); }
       if(ins){ S.metrics.insights={ what_works:ins.what_works||[], next:ins.next||null }; }
-      if(S.tab==="metrics") render();
+      if(S.tab==="metrics") bgRender();
       // Si el perfil está conectado pero aún no hay reels (scrape del onboarding en
       // curso), reintenta en silencio mientras sigas en Métricas (~45s) → los datos
       // aparecen solos sin que el user tenga que recargar ni pulsar nada.
@@ -1745,7 +1757,7 @@
       S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions)) ? r.d.suggestions.map(_normSugg) : [];
       // #3b «posibles competidores»: creadores del nicho (worth_follow) que no sigues.
       S._suggCompetitors=(r&&r.d&&Array.isArray(r.d.possible_competitors)) ? r.d.possible_competitors : [];
-      if(S.tab==="dashboard") render();
+      if(S.tab==="dashboard") bgRender();
     });
   }
   // #3b: sección pequeña «Posibles competidores» — creadores del nicho que petan consistente
@@ -4154,7 +4166,7 @@
         S.tracked=r.d.tracked;
         // Contador "X / límite del plan" (ítem 4): usa el uso/límite POR MARCA del backend.
         if(r.d.usage){ S.trackedCount=(r.d.usage.per_brand_used!=null?r.d.usage.per_brand_used:S.tracked.length); S.trackedLimit=r.d.usage.per_brand_limit; }
-        if((S.tab==="brain"||S.tab==="dashboard") && !_screenBusy()) render(); brainLevelPulse();
+        if(S.tab==="brain"||S.tab==="dashboard") bgRender(); brainLevelPulse();
       }
     });
   }
@@ -5558,8 +5570,13 @@
     // cambiar de tab o abrir un overlay sí empieza arriba, que es lo esperado.
     var _scKey=S.tab+"|"+(S.view||"feed")+"|"+(S.creatorFilter?S.creatorFilter.id:"");
     var _scTop=null; var _scEl=document.querySelector("#radarRoot .work .scroll"); if(_scEl) _scTop=_scEl.scrollTop;
+    // Scroll del OVERLAY (guion, rendimiento…): también sobrevive a re-renders de la misma
+    // vista (p.ej. llegan las referencias del formato con el guion a medio leer → sin esto,
+    // el overlay saltaba arriba). Misma clave _scKey (tab|view).
+    var _osTop=null; var _osEl=document.querySelector("#radarRoot .overlay .oscroll"); if(_osEl) _osTop=_osEl.scrollTop;
     view.innerHTML=html;
     if(_scTop!=null && S._scKey===_scKey){ var _scEl2=document.querySelector("#radarRoot .work .scroll"); if(_scEl2){ _scEl2.style.scrollBehavior="auto"; _scEl2.scrollTop=_scTop; _scEl2.style.scrollBehavior=""; } }
+    if(_osTop!=null && S._scKey===_scKey){ var _osEl2=document.querySelector("#radarRoot .overlay .oscroll"); if(_osEl2){ _osEl2.style.scrollBehavior="auto"; _osEl2.scrollTop=_osTop; _osEl2.style.scrollBehavior=""; } }
     S._scKey=_scKey;
     if(_tpScroll!=null){ var _tpe2=document.getElementById("rsTpScroll"); if(_tpe2) _tpe2.scrollTop=_tpScroll; }
     // T4: el error persistente sobrevive a los re-render mutando el nodo estable.
@@ -7014,7 +7031,7 @@
       if(st&&st.ok&&st.d){ S.stats={ competitors:st.d.competitors||0, reels_week:st.d.reels_week||0, exploded_week:st.d.exploded_week||0, stolen_today:st.d.stolen_today!=null?st.d.stolen_today:(st.d.stolen_total||0) }; }
       if(fd&&fd.ok&&fd.d&&Array.isArray(fd.d.reels)){ S.reels=fd.d.reels.map(normReel); S.radarSeed=!!fd.d.seed; S.favs={}; S.reels.forEach(function(r){ if(r.fav) S.favs[r.id]=true; }); }
       loadTracked();
-      if(!_screenBusy()) render();   // no repintar por debajo del cofre/guion (desconecta canvas / parpadeo)
+      bgRender();   // gate _screenBusy + coalescing dentro de bgRender
       if(cb) cb();
     });
   }
