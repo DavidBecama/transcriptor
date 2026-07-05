@@ -9665,12 +9665,11 @@ def radar_reshuffle():
 @require_auth
 @limiter.limit("20 per minute")
 def radar_suggestions_more():
-    """«Ver más» del carrusel: tras las SUGG_FREE_N gratis, cada tanda CUESTA SUGG_MORE_UNITS
-    créditos (monetización, CERO scrape — el pool ya está). Cobra dual-rail (créditos / uso
-    mensual). Cobra SOLO si devuelve reels nuevos."""
+    """«Ver más» del carrusel: pagina el pool YA scrapeado. GRATIS (decisión David 05/07):
+    el pool ya está, no scrapea → cero coste al usuario y SIN modal de confirmación. El
+    scrape de pago es aparte («Refrescar ahora · 5 cr», /api/radar/refresh-now)."""
     user = current_user()
     uid = user["id"]
-    email = (user.get("email") or "").lower()
     body = request.get_json(silent=True) or {}
     project_id = body.get("project_id") or None
     try:
@@ -9678,14 +9677,14 @@ def radar_suggestions_more():
     except (TypeError, ValueError):
         offset = SUGG_FREE_N
     if offset >= SUGG_MAX_TOTAL:
-        return jsonify({"ok": True, "suggestions": [], "has_more": False, "charged": False}), 200
+        return jsonify({"ok": True, "suggestions": [], "has_more": False}), 200
     niche, subs = _resolve_brand_niche(uid, project_id)
     if not subs and not niche:
         return jsonify({"ok": False, "error": "no_niche"}), 400
     exclude = _sugg_exclude(uid, project_id)
     # ROTACIÓN POR VISITA: lo servido hoy (registrado en el GET y en tandas previas) va al
-    # final → la tanda sale del TOP sin servir con offset 0. El offset del cliente solo
-    # gobierna el cap/cobro. Sin Redis (served vacío) degrada al slicing por offset clásico.
+    # final → la tanda sale del TOP sin servir con offset 0. Sin Redis (served vacío) degrada
+    # al slicing por offset clásico.
     srv_today = _sugg_seen_today(uid, project_id)
     batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1,
                                     offset=(0 if srv_today else offset),
@@ -9694,33 +9693,12 @@ def radar_suggestions_more():
                                     served_today=srv_today)
     reels = batch[:SUGG_MORE_BATCH]
     if not reels:
-        return jsonify({"ok": True, "suggestions": [], "has_more": False, "charged": False}), 200
-    # Cobro dual-rail (cortesía gratis). Mismo patrón que refresh-now.
-    is_courtesy = email in UNLIMITED_EMAILS
-    if not is_courtesy:
-        profile = get_profile(uid)
-        plan = profile.get("plan", "free")
-        is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
-        if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SUGG_MORE_COST:
-            return jsonify({"ok": False, "error": "no_credits",
-                            "message": "Necesitas %d créditos para ver más." % SUGG_MORE_UNITS}), 402
-        try:
-            if is_paid_unlimited:
-                db.table("profiles").update({
-                    "monthly_usage": (profile.get("monthly_usage") or 0) + SUGG_MORE_UNITS
-                }).eq("id", uid).execute()
-            else:
-                db.table("profiles").update({
-                    "credits_cents": (profile.get("credits_cents") or 0) - SUGG_MORE_COST
-                }).eq("id", uid).execute()
-        except Exception:
-            logger.warning("[sugg-more] cobro falló uid=%s", uid)
-            return jsonify({"ok": False, "error": "charge_failed"}), 500
+        return jsonify({"ok": True, "suggestions": [], "has_more": False}), 200
     _sugg_record_served(uid, project_id, [x.get("id") for x in reels])
     track_event("sugg_more", uid, {"project_id": project_id, "offset": offset, "n": len(reels)})
-    return jsonify({"ok": True, "suggestions": reels, "charged": not is_courtesy,
+    return jsonify({"ok": True, "suggestions": reels,
                     "has_more": len(batch) > SUGG_MORE_BATCH and (offset + SUGG_MORE_BATCH) < SUGG_MAX_TOTAL,
-                    "more_units": SUGG_MORE_UNITS, "more_batch": SUGG_MORE_BATCH}), 200
+                    "more_batch": SUGG_MORE_BATCH}), 200
 
 
 @app.route("/api/niche/subniche-suggestions", methods=["GET"])

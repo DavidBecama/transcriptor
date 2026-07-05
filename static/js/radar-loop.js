@@ -1798,23 +1798,18 @@
       '<span class="stday-met">'+IC.eye+' '+ESC(r.views)+'</span>'+
       (r.when?'<span class="stday-met stday-met--age">'+ESC(r.when)+'</span>':'')+
     '</div>';
-    // #2 (David 05/07): tocar thumb o cuerpo abre el DETALLE (métricas + transcripción
-    // on-demand + «Roba la idea»); el que DUDA mira. El botón «Robar» de la card roba
-    // DIRECTO (no pasa por el detalle); el que DECIDE roba.
-    return '<article class="stday-card">'+
-      '<div class="stday-thumb" style="background:'+_galGrad(r.id||h)+'" data-act="reel-detail" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Ver detalle del reel","See reel detail")+'">'+media+
+    // #2 (David 05/07): TODA la card (salvo los botones) abre el detalle de métricas —
+    // data-act en el <article>; los botones internos ganan por closest([data-act]). El CTA
+    // «Ver métricas» desaparece (ya no hace falta). «Robar» sigue primario y roba DIRECTO.
+    return '<article class="stday-card" data-act="reel-detail" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Ver detalle del reel","See reel detail")+'">'+
+      '<div class="stday-thumb" style="background:'+_galGrad(r.id||h)+'">'+media+
         (r.dur?'<span class="stday-dur">'+ESC(r.dur)+'</span>':'')+
         '<span class="stday-play">'+_icPlay+'</span>'+
         '<span class="stday-at">@'+ESC(h)+'</span>'+
       '</div>'+
       '<div class="stday-body">'+
-        '<div class="stday-detailzone" data-act="reel-detail" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Ver detalle del reel","See reel detail")+'">'+
-          mets+
-          (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
-          // #4 (David 05/07): CTA VISIBLE para abrir el detalle (antes solo se descubría
-          // tocando la miniatura). «Robar» sigue siendo la acción primaria abajo.
-          '<span class="stday-seemore">'+IC.doc+' '+L("Ver métricas y transcripción","See metrics & transcript")+' ›</span>'+
-        '</div>'+
+        mets+
+        (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
         '<div class="stday-acts">'+
           '<button class="btn btn-sm btn-primary stday-rob" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Robar","Steal")+'</button>'+
           '<button class="stday-x" data-act="sugg-dismiss-one" data-id="'+ESC(h)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
@@ -1856,12 +1851,12 @@
       return '';
     }
     var cards=list.slice(0,16).map(suggTodayCardHTML).join("");
-    // «Ver más» de PAGO: tras la ventana gratis (8), cada tanda cuesta créditos (sin scrape).
+    // «Ver más» GRATIS (David 05/07): pagina el pool ya scrapeado, sin cobro ni modal.
     var moreCard=S._suggHasMore
       ? '<button class="stday-card stday-morecard" data-act="sugg-more" data-offset="'+list.length+'">'+
           '<span class="stday-more-ic">'+IC.bolt+'</span>'+
           '<span class="stday-more-t">'+L("Ver más","See more")+'</span>'+
-          '<span class="stday-more-c">'+(S._suggMoreUnits||3)+' '+L("créditos","credits")+'</span>'+
+          '<span class="stday-more-c">'+L("gratis","free")+'</span>'+
         '</button>'
       : '';
     var arrows='<div class="stday-arrows">'+
@@ -5863,7 +5858,8 @@
     var metsBlock=isFree()?compMetsLock(metsHTML):metsHTML;
     return '<div class="reel-inline reel-detail fade-in">'+
       '<div class="reel-d-top">'+
-        '<div class="reel-d-thumb"><div class="thumb">'+thumbInner+'<span class="dur">'+ESC(r.dur)+'</span></div></div>'+
+        // #2 (David 05/07): tocar el vídeo abre el reel ORIGINAL en pestaña nueva.
+        '<div class="reel-d-thumb reel-d-thumb--link" data-act="reel-open" data-id="'+ESC(r.id)+'" role="button" tabindex="0" title="'+L("Abrir el reel original ↗","Open the original reel ↗")+'"><div class="thumb">'+thumbInner+'<span class="dur">'+ESC(r.dur)+'</span><span class="reel-d-open">↗</span></div></div>'+
         '<div class="reel-d-metcol">'+metsBlock+'</div>'+
         '<div class="reel-d-main">'+
           '<div class="reel-d-who"><span class="ava bava">'+ESC(r.creator.initials)+'</span>'+who+'<span class="reel-d-when">'+ESC(r.when)+'</span></div>'+
@@ -7481,6 +7477,11 @@
     if(act==="reel-dismiss") return reelDismiss(id);
     if(act==="undo-dismiss") return undoDismiss();
     if(act==="reel-detail") return openReelDetail(id);
+    if(act==="reel-open"){   // #2: abrir el reel original en pestaña nueva (tocar el vídeo del detalle)
+      var _ro=reelById(id);
+      if(_ro&&_ro.url){ try{ window.open(_ro.url,"_blank","noopener"); }catch(e){} }
+      return;
+    }
     if(act==="reel-tx") return loadReelTranscript(id);
     if(act==="reel-follow"){ if(typeof window.openAddCompetitorModal==="function") window.openAddCompetitorModal(btn.getAttribute("data-handle")||""); return; }
     if(act==="creator-reels") return openCreatorReels(id, btn.getAttribute("data-handle")||"");
@@ -7539,32 +7540,24 @@
       });
       return;
     }
-    if(act==="sugg-more"){   // «Ver más» de PAGO: confirma coste → cobra → añade la tanda
+    if(act==="sugg-more"){   // «Ver más» GRATIS (David 05/07): pagina el pool YA scrapeado,
+      // SIN modal ni cobro → clic y aparecen más. El scrape de pago es «Refrescar ahora · 5 cr».
       if(isDemo()) return;
+      if(S._suggMoreLoading) return;   // anti doble-clic
+      S._suggMoreLoading=true;
       var _mp=_pidOf(S.brandId), _off=parseInt(btn.getAttribute("data-offset")||"8",10)||8;
-      var _units=S._suggMoreUnits||3;
-      var _go=function(){
-        showToast(L("Trayendo más…","Loading more…"));
-        apiPost("/api/radar/suggestions/more", _mp?{project_id:_mp, offset:_off}:{offset:_off}).then(function(r){
-          if(r.status===402){ showError((r.d&&r.d.message)||L("Necesitas créditos para ver más.","You need credits to see more.")); try{ if(window.openUpgradeModal) window.openUpgradeModal("credits"); }catch(e){} return; }
-          if(!r.ok||!r.d){ return showError(L("No pude traer más.","Couldn't load more.")); }
-          var got=(Array.isArray(r.d.suggestions)?r.d.suggestions:[]).map(_normSugg);
-          if(got.length){ S._suggToday=(Array.isArray(S._suggToday)?S._suggToday:[]).concat(got); }
-          S._suggHasMore=!!r.d.has_more;
-          if(r.d.charged){ try{ refreshCredits(); }catch(e){} }
-          render();
-          // Fix #235: tras re-render el carrusel vuelve al inicio → las cards nuevas quedan
-          // fuera de viewport a la derecha y parece que «no pasó nada». Lo desplazo para
-          // revelarlas.
-          if(got.length){ try{ var _rw=(root()||document).querySelector(".stday-row"); if(_rw) _rw.scrollTo({left:_rw.scrollWidth, behavior:"smooth"}); }catch(e){} }
-          if(!got.length) showToast(L("No hay más por ahora.","No more for now."));
-        });
-      };
-      if(typeof window.confirmModal==="function"){
-        window.confirmModal({ title:L("Ver más sugerencias","See more suggestions"),
-          body:L("Te traigo "+(S._suggMoreBatch||4)+" reels más de tu nicho. Cuesta "+_units+" créditos (no scrapea nada nuevo, son del pool).","I'll bring "+(S._suggMoreBatch||4)+" more reels from your niche. Costs "+_units+" credits (no new scrape, from the pool)."),
-          confirmText:L("Ver más · "+_units+" cr","See more · "+_units+" cr"), cancelText:L("Ahora no","Not now") }).then(function(ok){ if(ok) _go(); });
-      } else { _go(); }
+      showToast(L("Trayendo más…","Loading more…"));
+      apiPost("/api/radar/suggestions/more", _mp?{project_id:_mp, offset:_off}:{offset:_off}).then(function(r){
+        S._suggMoreLoading=false;
+        if(!r.ok||!r.d){ return showError(L("No pude traer más.","Couldn't load more.")); }
+        var got=(Array.isArray(r.d.suggestions)?r.d.suggestions:[]).map(_normSugg);
+        if(got.length){ S._suggToday=(Array.isArray(S._suggToday)?S._suggToday:[]).concat(got); }
+        S._suggHasMore=!!r.d.has_more;
+        render();
+        // Tras el re-render el carrusel vuelve al inicio → desplazo para revelar las nuevas.
+        if(got.length){ try{ var _rw=(root()||document).querySelector(".stday-row"); if(_rw) _rw.scrollTo({left:_rw.scrollWidth, behavior:"smooth"}); }catch(e){} }
+        if(!got.length) showToast(L("No hay más por ahora.","No more for now."));
+      });
       return;
     }
     if(act==="reshuffle-feed"){   // «↻ otras» GRATIS del feed del radar: re-baraja sin scrape
