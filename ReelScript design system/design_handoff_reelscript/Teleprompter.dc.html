@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+:root{
+ --bg:#090C15; --surface:#111726; --surface-2:#172032; --surface-3:#202C46;
+ --border:rgba(255,255,255,.07); --border-strong:rgba(255,255,255,.13);
+ --text:#F3F6FC; --text-2:#A6B1C6; --text-3:#69748C;
+ --blue:#2F5BFF; --blue-press:#1B3FD6; --blue-soft:rgba(47,91,255,.16); --blue-400:#6E92FF;
+ --orange:#FF8A3D; --green:#2FD18A; --danger:#FF5C72;
+}
+[data-theme="light"]{
+ --bg:#FAF7F1; --surface:#FFFFFF; --surface-2:#F4EFE6; --surface-3:#E7DFD2;
+ --border:rgba(24,22,14,.10); --border-strong:rgba(24,22,14,.18);
+ --text:#171511; --text-2:#574F42; --text-3:#8E8472;
+ --blue:#2348E6; --blue-press:#1A37B8; --blue-soft:rgba(35,72,230,.10); --blue-400:#4A74FF;
+ --orange:#BE5510; --green:#0E8A5A; --danger:#C8324A;
+}
+*{box-sizing:border-box}
+body{margin:0}
+@keyframes tpRec{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes tpPop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+</helmet>
+<div data-theme="{{ theme }}" style="min-height:100vh;background:#d8d6cf;font-family:'Schibsted Grotesk',system-ui,sans-serif;padding-bottom:80px">
+
+  <div style="position:sticky;top:0;z-index:60;background:rgba(216,214,207,.9);backdrop-filter:blur(10px);padding:20px 40px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(0,0,0,.08)">
+    <div style="display:flex;align-items:center;gap:13px">
+      <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(140deg,#FF8A3D,#2F5BFF);display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Clash Display',sans-serif;font-weight:700;font-size:18px">R</div>
+      <div style="font-family:'Clash Display',sans-serif;font-weight:600;font-size:17px;color:#14181f">ReelScript · Teleprónter</div>
+    </div>
+    <div style="display:inline-flex;padding:4px;background:#c5c3bb;border-radius:12px;gap:3px">
+      <button onClick="{{ toDark }}" style="{{ darkBtnStyle }}">Oscuro</button>
+      <button onClick="{{ toLight }}" style="{{ lightBtnStyle }}">Claro</button>
+    </div>
+  </div>
+
+  <div style="padding:36px 40px;display:flex;justify-content:flex-start">
+    <div data-screen-label="Teleprompter" style="width:1080px;background:var(--bg);border:1px solid var(--border-strong);border-radius:18px;overflow:hidden;box-shadow:0 30px 70px -24px rgba(8,12,20,.5);color:var(--text);display:flex;flex-direction:column">
+
+      <!-- top bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:12px;min-width:0">
+          <button style="display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:8px 13px;color:var(--text-2);font-family:inherit;font-weight:600;font-size:13.5px;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>Editor</button>
+          <span style="font-size:14.5px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px">Comenta “Secretario” y te mando el manual desde 0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="{{ recPillStyle }}">{{ recDot }}{{ recPillLabel }}</span>
+          <span style="font-family:'Geist Mono',monospace;font-size:18px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums">{{ timer }}</span>
+        </div>
+      </div>
+
+      <!-- stage -->
+      <div style="position:relative;height:470px;overflow:hidden;background:#05070D">
+        <!-- reading guide -->
+        <div style="position:absolute;top:50%;left:0;right:0;height:118px;transform:translateY(-50%);background:linear-gradient(90deg,rgba(47,91,255,.05),rgba(47,91,255,.12),rgba(47,91,255,.05));border-top:1px solid rgba(47,91,255,.25);border-bottom:1px solid rgba(47,91,255,.25);z-index:2;pointer-events:none"></div>
+        <div style="position:absolute;left:18px;top:50%;transform:translateY(-50%);z-index:3;color:var(--blue-400);pointer-events:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 6l6 6-6 6z"/></svg></div>
+        <!-- fades -->
+        <div style="position:absolute;top:0;left:0;right:0;height:150px;background:linear-gradient(#05070D,rgba(5,7,13,0));z-index:4;pointer-events:none"></div>
+        <div style="position:absolute;bottom:0;left:0;right:0;height:150px;background:linear-gradient(rgba(5,7,13,0),#05070D);z-index:4;pointer-events:none"></div>
+
+        <!-- scrolling text -->
+        <div style="position:absolute;top:0;left:0;right:0;transform:{{ mirrorTf }}">
+          <div style="padding:235px 64px 235px;transform:translateY({{ ty }});transition:transform .04s linear">
+            <div style="max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:30px">
+              <sc-for list="{{ blocks }}" as="b" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <span style="font-family:'Geist Mono',monospace;font-size:14px;letter-spacing:.08em;color:var(--blue-400)">{{ b.kicker }}</span>
+                  <p style="margin:0;font-family:'Clash Display',sans-serif;font-weight:600;line-height:1.32;color:#F3F6FC;font-size:{{ fs }}">{{ b.body }}</p>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <!-- countdown -->
+        <sc-if value="{{ showCountdown }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:rgba(5,7,13,.72);backdrop-filter:blur(3px)">
+            <span style="font-family:'Clash Display',sans-serif;font-weight:700;font-size:120px;color:#fff;animation:tpPop .3s cubic-bezier(.16,1,.3,1)">{{ countdown }}</span>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- controls -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 24px;border-top:1px solid var(--border);flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onClick="{{ togglePlay }}" style="width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid var(--border-strong);border-bottom:3px solid var(--border-strong);border-radius:13px;color:var(--text);cursor:pointer" style-active="{ 'transform':'translateY(1px)' }">{{ playIcon }}</button>
+          <button onClick="{{ restart }}" style="width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid var(--border-strong);border-bottom:3px solid var(--border-strong);border-radius:13px;color:var(--text);cursor:pointer" style-active="{ 'transform':'translateY(1px)' }"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+          <!-- velocidad -->
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font-size:13px;color:var(--text-3);font-weight:600">Velocidad</span>
+            <div style="display:inline-flex;align-items:center;gap:2px;background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:3px">
+              <button onClick="{{ speedDown }}" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text-2);font-size:18px;cursor:pointer;border-radius:8px">−</button>
+              <span style="width:34px;text-align:center;font-family:'Geist Mono',monospace;font-size:14px;color:var(--text)">{{ speedLabel }}</span>
+              <button onClick="{{ speedUp }}" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text-2);font-size:18px;cursor:pointer;border-radius:8px">＋</button>
+            </div>
+          </div>
+          <!-- tamaño -->
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font-size:13px;color:var(--text-3);font-weight:600">Texto</span>
+            <div style="display:inline-flex;align-items:center;gap:2px;background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:3px">
+              <button onClick="{{ fontDown }}" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text-2);font-size:14px;cursor:pointer;border-radius:8px">A</button>
+              <span style="width:34px;text-align:center;font-family:'Geist Mono',monospace;font-size:13px;color:var(--text)">{{ fontLabel }}</span>
+              <button onClick="{{ fontUp }}" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text-2);font-size:19px;cursor:pointer;border-radius:8px">A</button>
+            </div>
+          </div>
+          <!-- espejo -->
+          <button onClick="{{ toggleMirror }}" style="{{ mirrorBtnStyle }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 7 4 12l4 5"/><path d="m16 7 4 5-4 5"/></svg>Espejo</button>
+        </div>
+
+        <button onClick="{{ toggleRec }}" style="{{ recBtnStyle }}">{{ recBtnIcon }}{{ recBtnLabel }}</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:820},&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;}}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { theme:(props && props.defaultTheme)||'dark', playing:false, recording:false, speed:2, font:36, mirror:false, offset:0, ms:0, countdown:0 };
+    this.maxOffset = 900;
+  }
+  blocksData(){
+    return [
+      {kicker:'Gancho · 0–3 s', body:'Comenta “Secretario” y te paso el manual entero. Lo que vas a ver lo montas tú hoy, sin saber programar.'},
+      {kicker:'Desarrollo', body:'Tres piezas: Claude hace de cerebro, Whisper pasa la voz a texto y Telegram es donde le hablas. Las conectas con una API y en una tarde lo tienes contestando solo.'},
+      {kicker:'CTA · cierre', body:'Si lo quieres montar igual, comenta “Secretario” y te mando el manual paso a paso. Cero código, te lo prometo.'},
+    ];
+  }
+  componentDidMount(){
+    this._iv = setInterval(()=>{
+      this.setState(s=>{ if(!s.playing) return {}; const o=Math.min(this.maxOffset, s.offset + s.speed*1.3); return { offset:o, playing: o>=this.maxOffset? false : s.playing }; });
+    }, 40);
+    this._sec = setInterval(()=>{ this.setState(s=> s.recording ? { ms:s.ms+100 } : {}); }, 100);
+  }
+  componentWillUnmount(){ clearInterval(this._iv); clearInterval(this._sec); if(this._cd) clearInterval(this._cd); }
+  startRec(){
+    this.setState({ countdown:3 });
+    this._cd = setInterval(()=>{
+      this.setState(s=>{
+        if(s.countdown<=1){ clearInterval(this._cd); this._cd=null; return { countdown:0, recording:true, playing:true, offset:0, ms:0 }; }
+        return { countdown:s.countdown-1 };
+      });
+    }, 800);
+  }
+  toggleRec(){
+    if(this.state.recording || this.state.countdown>0){
+      if(this._cd){ clearInterval(this._cd); this._cd=null; }
+      this.setState({ recording:false, playing:false, countdown:0 });
+    } else { this.startRec(); }
+  }
+  fmt(ms){ const tot=Math.floor(ms/1000); const m=String(Math.floor(tot/60)).padStart(2,'0'); const s=String(tot%60).padStart(2,'0'); return m+':'+s; }
+  renderVals(){
+    const st=this.state, t=st.theme, darkActive=t==='dark';
+    const seg=(on)=>({padding:'8px 18px',borderRadius:'9px',border:'none',cursor:'pointer',fontWeight:600,fontSize:'13px',fontFamily:"'Schibsted Grotesk',sans-serif",background:on?'#11151c':'transparent',color:on?'#fff':'#5b5f68',transition:'all .18s ease'});
+    const playIcon = st.playing
+      ? React.createElement('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'currentColor'},React.createElement('rect',{x:6,y:5,width:4,height:14,rx:1}),React.createElement('rect',{x:14,y:5,width:4,height:14,rx:1}))
+      : React.createElement('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'currentColor'},React.createElement('path',{d:'M8 5v14l11-7z'}));
+    const recDot = (st.recording)
+      ? React.createElement('span',{style:{width:'8px',height:'8px',borderRadius:'50%',background:'var(--danger)',animation:'tpRec 1s infinite'}})
+      : React.createElement('span',{style:{width:'8px',height:'8px',borderRadius:'50%',background:'var(--text-3)'}});
+    const recPillStyle = {display:'inline-flex',alignItems:'center',gap:'8px',padding:'6px 12px',borderRadius:'9999px',fontFamily:"'Geist Mono',monospace",fontSize:'12px',fontWeight:600, background: st.recording?'rgba(255,92,114,.14)':'var(--surface-2)', color: st.recording?'var(--danger)':'var(--text-3)', border:'1px solid '+(st.recording?'var(--danger)':'var(--border)')};
+    const mirrorBtnStyle = {display:'inline-flex',alignItems:'center',gap:'8px',padding:'10px 15px',borderRadius:'12px',cursor:'pointer',fontFamily:"'Schibsted Grotesk',sans-serif",fontWeight:600,fontSize:'13.5px', background: st.mirror?'var(--blue-soft)':'var(--surface-2)', border:'1px solid '+(st.mirror?'var(--blue)':'var(--border-strong)'), color: st.mirror?'var(--blue)':'var(--text)'};
+    const recBtnStyle = st.recording
+      ? {display:'inline-flex',alignItems:'center',gap:'10px',background:'rgba(255,92,114,.14)',border:'1px solid var(--danger)',borderRadius:'14px',padding:'13px 24px',color:'var(--danger)',fontFamily:"'Schibsted Grotesk',sans-serif",fontWeight:600,fontSize:'16px',cursor:'pointer'}
+      : {display:'inline-flex',alignItems:'center',gap:'10px',background:'var(--danger)',border:'none',borderBottom:'4px solid #b3263a',borderRadius:'14px',padding:'14px 26px',color:'#fff',fontFamily:"'Schibsted Grotesk',sans-serif",fontWeight:600,fontSize:'16px',cursor:'pointer'};
+    const recBtnIcon = st.recording
+      ? React.createElement('span',{style:{width:'14px',height:'14px',borderRadius:'3px',background:'var(--danger)'}})
+      : React.createElement('span',{style:{width:'14px',height:'14px',borderRadius:'50%',background:'#fff'}});
+    return {
+      theme:t, toDark:()=>this.setState({theme:'dark'}), toLight:()=>this.setState({theme:'light'}),
+      darkBtnStyle:seg(darkActive), lightBtnStyle:seg(!darkActive),
+      blocks:this.blocksData(),
+      ty: (-st.offset)+'px', fs: st.font+'px', mirrorTf: st.mirror?'scaleX(-1)':'none',
+      timer:this.fmt(st.ms),
+      playIcon, togglePlay:()=>this.setState(s=>({playing:!s.playing})),
+      restart:()=>this.setState({offset:0, ms:0, playing:false}),
+      speedLabel:'×'+st.speed, speedDown:()=>this.setState(s=>({speed:Math.max(1,s.speed-1)})), speedUp:()=>this.setState(s=>({speed:Math.min(6,s.speed+1)})),
+      fontLabel:st.font, fontDown:()=>this.setState(s=>({font:Math.max(24,s.font-2)})), fontUp:()=>this.setState(s=>({font:Math.min(56,s.font+2)})),
+      mirror:st.mirror, mirrorBtnStyle, toggleMirror:()=>this.setState(s=>({mirror:!s.mirror})),
+      showCountdown: st.countdown>0, countdown:st.countdown,
+      recDot, recPillStyle, recPillLabel: st.recording?'REC':'en pausa',
+      recBtnStyle, recBtnIcon, recBtnLabel: st.recording?'Detener':'Grabar', toggleRec:()=>this.toggleRec(),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1428,7 +1428,10 @@
   // Reel por id buscándolo TAMBIÉN en discover (para robar uno del descubrimiento).
   function reelById(id){
     var r=(S.reels||[]).filter(function(x){return x.id===id;})[0];
-    return r || (S.discover||[]).filter(function(x){return x.id===id;})[0] || null;
+    // #2: los reels de «Sugerencias de hoy» también son buscables → el detalle se abre desde
+    // su card. Son normReel-compat (_normSugg → normReel).
+    return r || (S._suggToday||[]).filter(function(x){return x.id===id;})[0]
+             || (S.discover||[]).filter(function(x){return x.id===id;})[0] || null;
   }
   // Real: ranking del nicho por VIEWS medias/reel (no seguidores — el scrape no los
   // trae). Lo carga 1 vez al entrar en el tab. S.lb = {you, rows[], metric}.
@@ -1759,8 +1762,10 @@
     var cards=list.slice(0,6).map(function(c){
       var h=String(c.handle||"").replace(/^@+/,"");
       var exp=(c.explosion_score!=null)?('<span class="pcomp-exp">'+IC.bolt+' '+ESC(String(c.explosion_score))+'×</span>'):'';
+      // Foto real si está cacheada; onerror → se quita la img y quedan las iniciales debajo.
+      var img=c.avatar_url?('<img src="'+ESC(c.avatar_url)+'" alt="" loading="lazy" onerror="this.remove()">'):'';
       return '<div class="pcomp-card">'+
-        '<div class="pcomp-ava">'+ESC(initialsOf(h))+'</div>'+
+        '<div class="pcomp-ava">'+ESC(initialsOf(h))+img+'</div>'+
         '<div class="pcomp-meta"><span class="pcomp-h">@'+ESC(h)+'</span>'+exp+'</div>'+
         '<button class="pcomp-add" data-act="add-suggested" data-id="'+ESC(h)+'" title="'+L("Añadir a tu radar","Add to your radar")+'">'+IC.plus+' '+L("Añadir","Add")+'</button>'+
       '</div>';
@@ -1792,15 +1797,20 @@
       '<span class="stday-met">'+IC.eye+' '+ESC(r.views)+'</span>'+
       (r.when?'<span class="stday-met stday-met--age">'+ESC(r.when)+'</span>':'')+
     '</div>';
+    // #2 (David 05/07): tocar thumb o cuerpo abre el DETALLE (métricas + transcripción
+    // on-demand + «Roba la idea»); el que DUDA mira. El botón «Robar» de la card roba
+    // DIRECTO (no pasa por el detalle); el que DECIDE roba.
     return '<article class="stday-card">'+
-      '<div class="stday-thumb" style="background:'+_galGrad(r.id||h)+'" data-act="steal" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Robar este reel","Steal this reel")+'">'+media+
+      '<div class="stday-thumb" style="background:'+_galGrad(r.id||h)+'" data-act="reel-detail" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Ver detalle del reel","See reel detail")+'">'+media+
         (r.dur?'<span class="stday-dur">'+ESC(r.dur)+'</span>':'')+
         '<span class="stday-play">'+_icPlay+'</span>'+
         '<span class="stday-at">@'+ESC(h)+'</span>'+
       '</div>'+
       '<div class="stday-body">'+
-        mets+
-        (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
+        '<div class="stday-detailzone" data-act="reel-detail" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Ver detalle del reel","See reel detail")+'">'+
+          mets+
+          (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
+        '</div>'+
         '<div class="stday-acts">'+
           '<button class="btn btn-sm btn-primary stday-rob" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Robar","Steal")+'</button>'+
           '<button class="stday-x" data-act="sugg-dismiss-one" data-id="'+ESC(h)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
@@ -1854,10 +1864,18 @@
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
     '</div>';
+    // #2: si el reel abierto es una sugerencia, el detalle (métricas + transcripción +
+    // «Roba la idea») va BAJO el carrusel (inline rompería el scroll horizontal).
+    var detail='';
+    if(S.detailReelId){
+      var dr=list.filter(function(x){return x.id===S.detailReelId;})[0];
+      if(dr) detail='<div class="stday-detail-wrap">'+reelDetailHTML(dr)+'</div>';
+    }
     return '<section class="stday-sec">'+
       '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+' <span class="stday-tag">'+L("reels que petan en tu nicho","reels blowing up in your niche")+'</span></span>'+
         arrows+_stdayMiniActs()+'</div>'+
       '<div class="stday-row">'+cards+moreCard+'</div>'+
+      detail+
     '</section>';
   }
   // Acciones de cabecera de «Sugerencias de hoy»: «↻ otras» (re-baraja GRATIS, sin scrape) +
