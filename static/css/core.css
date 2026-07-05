@@ -12612,3 +12612,12 @@
     #profPanelSettings .set-aff-row .nm b { display:block; font-size:14.5px; color:var(--text-primary); }
     #profPanelSettings .set-aff-row .nm span { font-size:12.5px; color:var(--text-tertiary); }
     #profPanelSettings .set-aff-row .amt { font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--success-fg); }
+    /* Contrato punto 5 (05/07): agotamiento honesto — card «has visto todo lo fresco» + CTA. */
+    .rs .stday-exhausted { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; padding:16px 12px; }
+    .rs .stday-exhausted-full { display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:22px 16px; border:1px dashed var(--border-default); border-radius:14px; }
+    .rs .stday-exh-t { font-size:12.5px; font-weight:600; color:var(--text-secondary); }
+    .rs .stday-exhausted-full .stday-exh-t { font-size:14px; }
+    .rs .stday-exh-cta { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:8px 13px; border:1px solid var(--brand-500); border-radius:9px; background:transparent; color:var(--brand-500); cursor:pointer; }
+    .rs .stday-exh-cta:hover { background:color-mix(in srgb, var(--brand-500) 10%, transparent); }
+    .rs .stday-exh-cta svg { width:13px; height:13px; }
+    .rs .stday-exh-sub { font-size:11px; color:var(--text-tertiary); }

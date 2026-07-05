@@ -1737,8 +1737,8 @@
       // needs_niche: la marca no tiene nicho propio fijado → en vez de sacar genérico/off-niche,
       // el front pide definirlo (CTA → editor de proyecto).
       S._suggNeedsNiche=!!(r&&r.d&&r.d.needs_niche);
-      S._suggHasMore=!!(r&&r.d&&r.d.has_more);                 // ¿hay tandas de pago tras las gratis?
-      S._suggMoreUnits=(r&&r.d&&r.d.more_units)||3;            // coste por tanda (créditos)
+      S._suggHasMore=!!(r&&r.d&&r.d.has_more);                 // ¿quedan MÁS frescos («Ver más» gratis)?
+      S._suggExhausted=!!(r&&r.d&&r.d.exhausted);              // contrato punto 5: visto todo lo fresco
       S._suggMoreBatch=(r&&r.d&&r.d.more_batch)||4;
       // Son REELS (normReel-compat): los normalizo y marco suggestion=true (para robar SIN
       // seguir vía no_follow) + worthFollow (para ofrecer «+ Añadir competidor» solo en esos).
@@ -1841,24 +1841,44 @@
     }
     var tracked=(Array.isArray(S.tracked)?S.tracked:[]).map(function(t){
       return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
-    var list=(Array.isArray(S._suggToday)?S._suggToday:[]).filter(function(r){ return tracked.indexOf(String((r.creator&&r.creator.handle)||"").toLowerCase())<0; });
+    // DEDUP DURO por id (contrato: ningún reel dos veces en pantalla) + excluye seguidos.
+    var _seen={}, list=[];
+    (Array.isArray(S._suggToday)?S._suggToday:[]).forEach(function(r){
+      if(!r||!r.id||_seen[r.id]) return;
+      if(tracked.indexOf(String((r.creator&&r.creator.handle)||"").toLowerCase())>=0) return;
+      _seen[r.id]=1; list.push(r);
+    });
     if(!list.length){
-      // EMPTY-STATE honesto: ya cargó (S._suggToday es array) y hay nicho fijado pero 0 reels
-      // frescos en el pool → mensaje, NO ocultar en silencio (parecía roto). Mientras carga
-      // (S._suggToday undefined) sí se oculta. El pool se renueva con el job diario, no a mano.
-      // Regla de vacíos (David 04/07): bloque sin datos → NO se pinta (antes: empty-state
-      // «vuelve mañana»). El prompt de nicho de arriba sí queda (es config, no placeholder).
+      // Contrato punto 5: agotado de verdad → «has visto todo lo fresco» + CTA (no vacío mudo).
+      // Sin agotar (cargando / pool sin nicho) → no se pinta (regla de vacíos).
+      if(S._suggExhausted){
+        return '<section class="stday-sec">'+
+          '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span>'+_stdayMiniActs()+'</div>'+
+          '<div class="stday-exhausted-full">'+
+            '<div class="stday-exh-t">'+L("Has visto todo lo fresco de hoy","You\'ve seen all today\'s fresh reels")+'</div>'+
+            '<button class="stday-exh-cta" data-act="refresh-radar">'+IC.repeat+' '+L("Refrescar ahora · 5 cr","Refresh now · 5 cr")+'</button>'+
+            '<div class="stday-exh-sub">'+L("o vuelve mañana — el radar se renueva solo","or come back tomorrow — the radar refreshes on its own")+'</div>'+
+          '</div>'+
+        '</section>';
+      }
       return '';
     }
     var cards=list.slice(0,16).map(suggTodayCardHTML).join("");
-    // «Ver más» GRATIS (David 05/07): pagina el pool ya scrapeado, sin cobro ni modal.
-    var moreCard=S._suggHasMore
-      ? '<button class="stday-card stday-morecard" data-act="sugg-more" data-offset="'+list.length+'">'+
-          '<span class="stday-more-ic">'+IC.bolt+'</span>'+
-          '<span class="stday-more-t">'+L("Ver más","See more")+'</span>'+
-          '<span class="stday-more-c">'+L("gratis","free")+'</span>'+
-        '</button>'
-      : '';
+    // Contrato punto 5: si de verdad se agotó lo fresco → dilo + CTA (nunca repetir en silencio).
+    // Si quedan frescos → «Ver más» GRATIS (pagina el pool ya scrapeado, sin cobro ni modal).
+    var moreCard=S._suggExhausted
+      ? '<div class="stday-card stday-exhausted">'+
+          '<span class="stday-exh-t">'+L("Has visto todo lo fresco de hoy","You\'ve seen all today\'s fresh reels")+'</span>'+
+          '<button class="stday-exh-cta" data-act="refresh-radar">'+IC.repeat+' '+L("Refrescar ahora · 5 cr","Refresh now · 5 cr")+'</button>'+
+          '<span class="stday-exh-sub">'+L("o vuelve mañana","or come back tomorrow")+'</span>'+
+        '</div>'
+      : (S._suggHasMore
+        ? '<button class="stday-card stday-morecard" data-act="sugg-more" data-offset="'+list.length+'">'+
+            '<span class="stday-more-ic">'+IC.bolt+'</span>'+
+            '<span class="stday-more-t">'+L("Ver más","See more")+'</span>'+
+            '<span class="stday-more-c">'+L("gratis","free")+'</span>'+
+          '</button>'
+        : '');
     var arrows='<div class="stday-arrows">'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
@@ -7551,12 +7571,15 @@
         S._suggMoreLoading=false;
         if(!r.ok||!r.d){ return showError(L("No pude traer más.","Couldn't load more.")); }
         var got=(Array.isArray(r.d.suggestions)?r.d.suggestions:[]).map(_normSugg);
+        // DEDUP DURO por id contra lo ya cargado (contrato: ningún reel dos veces en pantalla).
+        var have={}; (Array.isArray(S._suggToday)?S._suggToday:[]).forEach(function(x){ if(x&&x.id) have[x.id]=1; });
+        got=got.filter(function(x){ return x&&x.id&&!have[x.id]; });
         if(got.length){ S._suggToday=(Array.isArray(S._suggToday)?S._suggToday:[]).concat(got); }
         S._suggHasMore=!!r.d.has_more;
+        S._suggExhausted=!!r.d.exhausted;   // agotado → la card de agotamiento sustituye a «Ver más»
         render();
         // Tras el re-render el carrusel vuelve al inicio → desplazo para revelar las nuevas.
         if(got.length){ try{ var _rw=(root()||document).querySelector(".stday-row"); if(_rw) _rw.scrollTo({left:_rw.scrollWidth, behavior:"smooth"}); }catch(e){} }
-        if(!got.length) showToast(L("No hay más por ahora.","No more for now."));
       });
       return;
     }
@@ -7924,7 +7947,7 @@
     try{ window.RS_reloadRadar=loadBrandData; }catch(e){}   // puente: el chrome legacy recarga el Radar tras añadir competidor
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: al cambiar de marca no arrastres la vista de otro competidor
     S._lbReal=null;   // ranking por-marca: fuerza recarga de /api/leaderboard de ESTA marca (no caché de la anterior)
-    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
+    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false; S._suggExhausted=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");   // grid rail+work YA en el skeleton (si no, el rail sale centrado sobre negro)
     // Onboarding pendiente (o demo ?onb=1) → loader full-screen limpio, sin que asome la
     // chrome de la app antes de montar el onboarding. Si ya pasó el onboarding → skeleton normal.
