@@ -178,6 +178,11 @@ SUGG_MAX_TOTAL            = int(os.environ.get("SUGG_MAX_TOTAL", "40"))  # techo
 # nicho canónico amplio → volumen para ROTAR de verdad (fix 05/07: IA daba 7 reels fuertes y
 # nunca tocaba los 71 de «tecnología»). 2× la ventana gratis para que haya recambio diario.
 SUGG_POOL_TARGET          = int(os.environ.get("SUGG_POOL_TARGET", "16"))
+# «Posibles competidores»: nº máx de creadores sugeridos. worth_follow (≥2 reels petando)
+# daba solo 0-2 por marca → la sección se quedaba corta. Ahora TODOS los del pool no
+# seguidos, por explosión; worth_follow queda como flag «recomendado». Cap 12 (llena la fila
+# en todas las marcas: pools reales dan 9-22 creadores únicos).
+SUGG_COMPETITORS_N        = int(os.environ.get("SUGG_COMPETITORS_N", "12"))
 
 # Flash por-usuario (economia-creditos.md §4): tras chocar el PRIMER muro, el Pack 300
 # baja a TOPUP_FLASH_EUR € (vs 49 €) durante TOPUP_FLASH_HOURS h. Urgencia + ancla.
@@ -9610,20 +9615,27 @@ def radar_suggestions():
         _sugg_record_served(uid, project_id, [x.get("id") for x in batch])
         # #2/#3b «posibles competidores»: creadores que petan de forma consistente (worth_follow),
         # no seguidos, del nicho. Foto = iniciales en el front (el payload no trae avatar).
-        seen_h, competitors = set(), []
+        # #3 (David 05/07): TODOS los creadores del nicho no seguidos, por explosión (antes
+        # solo worth_follow → 0-2/marca). Dedup por creador quedándose con su mejor reel;
+        # worth_follow = flag «recomendado». avatar_url → /img/creator/<id> (404→iniciales).
+        by_creator = {}
         for r in pool:
             h = ((r.get("creator") or {}).get("ig_username") or "").lower().lstrip("@")
             cid = r.get("creator_id")
-            if r.get("worth_follow") and h and h not in seen_h:
-                seen_h.add(h)
-                # avatar_url SIEMPRE apunta a /img/creator/<id>; si no hay foto cacheada la
-                # ruta da 404 y el front cae a iniciales (onerror). Cero coste extra aquí.
-                competitors.append({"handle": h, "creator_id": cid,
-                                    "avatar_url": ("/img/creator/%s" % cid) if cid else None,
-                                    "explosion_score": r.get("explosion_score"),
-                                    "thumb_reel_id": r.get("id"), "formato": r.get("formato")})
-            if len(competitors) >= 6:
-                break
+            if not h or not cid:
+                continue
+            exp = r.get("explosion_score") or 0
+            cur = by_creator.get(h)
+            if cur is None or exp > cur["explosion_score"]:
+                by_creator[h] = {"handle": h, "creator_id": cid,
+                                 "avatar_url": "/img/creator/%s" % cid,
+                                 "explosion_score": exp, "thumb_reel_id": r.get("id"),
+                                 "formato": r.get("formato"),
+                                 "worth_follow": bool(r.get("worth_follow"))}
+            elif r.get("worth_follow"):
+                by_creator[h]["worth_follow"] = True
+        competitors = sorted(by_creator.values(),
+                             key=lambda c: -(c["explosion_score"] or 0))[:SUGG_COMPETITORS_N]
         return jsonify({"suggestions": batch, "total": len(batch),
                         "free_n": SUGG_FREE_N, "has_more": has_more, "more_units": SUGG_MORE_UNITS,
                         "more_batch": SUGG_MORE_BATCH, "possible_competitors": competitors}), 200

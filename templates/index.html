@@ -3549,7 +3549,10 @@
     .overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.65); backdrop-filter: blur(6px);
-      z-index: 300; align-items: center; justify-content: center; padding: 20px;
+      /* z-index 300→10050 (fix #235 «Ver más»): el confirmModal quedaba POR DEBAJO de los
+         overlays de la isla, loaders de fondo y el tour-overlay (z 10000) → el clic no
+         llegaba y parecía que «no funcionaba». Un modal debe estar por encima de todo. */
+      z-index: 10050; align-items: center; justify-content: center; padding: 20px;
     }
     .overlay.on { display: flex; }
     .modal {
@@ -12085,6 +12088,8 @@
     .rs .pcomp-card { flex:0 0 auto; width:150px; display:flex; flex-direction:column; align-items:center; gap:7px; padding:12px 10px; border:1px solid var(--border-default); border-radius:12px; background:var(--surface-raised); }
     .rs .pcomp-ava { position:relative; width:46px; height:46px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; color:#fff; background:linear-gradient(135deg,var(--brand-500),#12a37c); }
     .rs .pcomp-ava img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .rs .pcomp-rec { position:absolute; top:-2px; right:-2px; z-index:2; font-size:12px; color:#f59e0b; background:var(--surface-raised); border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center; }
+    .rs .pcomp-card--rec { border-color:color-mix(in srgb, var(--brand-500) 35%, transparent); }
     .rs .pcomp-meta { display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0; width:100%; }
     .rs .pcomp-h { font-size:12.5px; font-weight:600; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .rs .pcomp-exp { font-size:11.5px; color:var(--success-fg); display:inline-flex; align-items:center; gap:3px; }
@@ -12096,6 +12101,10 @@
     /* #2: zona clicable (thumb+cuerpo) abre el detalle; el detalle va bajo el carrusel. */
     .rs .stday-detailzone { cursor:pointer; }
     .rs .stday-detail-wrap { margin-top:12px; }
+    /* #4: CTA visible «Ver métricas y transcripción» dentro de la card. */
+    .rs .stday-seemore { display:inline-flex; align-items:center; gap:4px; margin-top:8px; font-size:11.5px; font-weight:600; color:var(--brand-500); }
+    .rs .stday-seemore svg { width:12px; height:12px; }
+    .rs .stday-detailzone:hover .stday-seemore { text-decoration:underline; }
     .rs .stday-x { flex:none; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--border-subtle); border-radius:9px; background:transparent; color:var(--text-tertiary); cursor:pointer; }
     .rs .stday-x:hover { color:var(--text); border-color:var(--border-default); }
     .rs .stday-x svg { width:15px; height:15px; }
@@ -12200,11 +12209,18 @@
     .rs .reel-d-when { color:var(--text-tertiary); font-size:12.5px; }
     .rs .reel-d-cap { font-size:16px; font-weight:700; line-height:1.35; margin:0 0 6px; }
     .rs .reel-d-sum { font-size:13.5px; color:var(--text-secondary); margin:0 0 12px; line-height:1.5; }
+    /* #2: métricas en COLUMNA pegadas al vídeo (Views/Likes/Explosión/Duración apiladas). */
+    .rs .reel-d-metcol { flex:0 0 auto; }
+    .rs .reel-d-metcol .reel-d-mets { flex-direction:column; gap:12px; }
+    .rs .reel-d-metcol .pm-k { font-size:10.5px; letter-spacing:.04em; color:var(--text-tertiary); }
+    .rs .reel-d-metcol .pm-v { font-size:16px; font-weight:700; }
     .rs .reel-d-mets { display:flex; gap:22px; flex-wrap:wrap; }
     .rs .reel-d-acts { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:16px; }
     .rs .reel-tx-text { font-size:14.5px; line-height:1.65; color:var(--text-secondary); background:var(--surface-raised); border:1px solid var(--border-default); border-radius:12px; padding:14px 16px; white-space:pre-wrap; }
     .rs .reel-tx-wait { display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--text-secondary); }
-    .rs--mobile .reel-d-top { flex-direction:column; }
+    /* Móvil: vídeo + métricas EN FILA (números sin scroll), el resto envuelve debajo. */
+    .rs--mobile .reel-d-top { flex-direction:row; flex-wrap:wrap; gap:12px; }
+    .rs--mobile .reel-d-main { flex-basis:100%; }
     .rs--mobile .reel-d-thumb .thumb { width:90px; height:124px; }
     .rs .row-score { display:flex; flex-direction:column; gap:3px; }
     .rs .row-score .sv { font-family:var(--font-mono); font-size:17px; font-weight:500; color:var(--text-primary); letter-spacing:-.02em; }
@@ -28777,6 +28793,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=171"></script>
+<script src="/static/js/radar-loop.js?v=172"></script>
 </body>
 </html>
