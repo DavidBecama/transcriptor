@@ -12051,6 +12051,15 @@
     .rs .stday-morecard { align-items:center; justify-content:center; gap:6px; text-align:center; cursor:pointer; border-style:dashed; border-color:color-mix(in srgb, var(--brand-500) 45%, transparent); background:color-mix(in srgb, var(--brand-500) 6%, var(--surface-raised)); color:var(--brand-500); padding:14px 10px; }
     .rs .stday-morecard:hover { background:color-mix(in srgb, var(--brand-500) 12%, var(--surface-raised)); }
     .rs .stday-more-ic svg { width:22px; height:22px; }
+    /* Contrato punto 5: agotamiento honesto — card «has visto todo lo fresco» + CTA. */
+    .rs .stday-exhausted { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; padding:16px 12px; }
+    .rs .stday-exhausted-full { display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:22px 16px; border:1px dashed var(--border-default); border-radius:14px; }
+    .rs .stday-exh-t { font-size:12.5px; font-weight:600; color:var(--text-secondary); }
+    .rs .stday-exhausted-full .stday-exh-t { font-size:14px; }
+    .rs .stday-exh-cta { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:8px 13px; border:1px solid var(--brand-500); border-radius:9px; background:transparent; color:var(--brand-500); cursor:pointer; }
+    .rs .stday-exh-cta:hover { background:color-mix(in srgb, var(--brand-500) 10%, transparent); }
+    .rs .stday-exh-cta svg { width:13px; height:13px; }
+    .rs .stday-exh-sub { font-size:11px; color:var(--text-tertiary); }
     .rs .stday-more-t { font-weight:700; font-size:.92rem; }
     .rs .stday-more-c { font-size:.78rem; color:var(--text-secondary); }
     .rs .stday-thumb { position:relative; aspect-ratio:3/4; width:100%; overflow:hidden; cursor:pointer; }
@@ -28793,6 +28802,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=173"></script>
+<script src="/static/js/radar-loop.js?v=174"></script>
 </body>
 </html>

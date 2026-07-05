@@ -9355,7 +9355,7 @@ def _suggestion_reason(exp, formato, age_days):
 
 def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, limit=15,
                             shuffle_seed=None, offset=0, day_seed=None, seen_ids=None,
-                            served_today=None):
+                            exclude_reel_ids=None):
     """«Sugerencias de hoy» orientado a REELS: reels que PETAN en el nicho de creadores que
     el user NO sigue ni descartó. Cada reel es ROBABLE sin seguir al creador. `worth_follow`
     marca a los creadores que MERECE seguir (listón alto) → la 2ª acción «+ Añadir competidor»
@@ -9363,7 +9363,10 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
     scrape (pool cacheado). `shuffle_seed` re-baraja el orden (botón «↻ otras» GRATIS, sin
     scrape); `offset` pagina (tandas del carrusel). `day_seed` ROTA el orden cada día (jitter
     multiplicativo estable dentro del día → paginado coherente); `seen_ids` penaliza los reels
-    servidos ayer (rotación real). Devuelve reels normReel-compat+worth_follow."""
+    servidos ayer (rotación entre días, partición blanda). `exclude_reel_ids` = EXCLUSIÓN DURA
+    por reel-id (servidos HOY + robados): NUNCA se devuelven → contrato «no repetir en sesión».
+    Devuelve reels normReel-compat+worth_follow."""
+    _excl_reels = {str(x) for x in (exclude_reel_ids or [])}
     subs = [t for t in (_norm_tag(s) for s in (subniches or [])) if t][:16]
     # El propio nicho normalizado suele ser un SUBNICHE válido en la taxonomía rica de
     # creators_global ("inteligencia artificial", "marketing digital", "espiritualidad y
@@ -9418,9 +9421,12 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
                     .order("views", desc=True).limit(max(limit * 15, 360)).execute()).data or []
         except Exception:
             rr = []
-        # explosión por reel.
+        # explosión por reel. EXCLUSIÓN DURA: los servidos hoy / robados no entran ni al pool
+        # (así el top-up por SUGG_POOL_TARGET rellena con canon cuando los frescos escasean).
         by_creator = {}
         for r in rr:
+            if str(r.get("id")) in _excl_reels:
+                continue
             cid = r.get("creator_id"); v = int(r.get("views") or 0)
             r["_exp"] = _explosion_score(v, baselines.get(cid)) or 0.0
             by_creator.setdefault(cid, []).append(r)
@@ -9468,16 +9474,11 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
         if fb:
             uname.update(fb)   # handles del fallback para el formateo de salida
             chosen += _score_pool(fb)   # cola on-niche tras el overlap fuerte
-    # ROTACIÓN por PARTICIÓN (fix 05/07): orden = (servido HOY, servido AYER, −score). Primero
-    # los NO vistos (ranked por explosión×jitter-del-día), luego los de ayer, luego los de esta
-    # sesión. Con pool grande → reels DISTINTOS cada mañana Y cada visita; con pool pequeño
-    # degrada a re-orden (lo máximo posible). Sustituye el multiplicador 0.45× que no bastaba.
-    _st = served_today or set()
+    # ROTACIÓN ENTRE DÍAS (partición blanda): los servidos AYER (seen_ids) al final → hoy
+    # entran antes los no vistos ayer; dentro, explosión×jitter-del-día. Los servidos HOY y los
+    # robados NO están aquí (exclusión dura arriba) → «Ver más» nunca repite en la sesión.
     _sy = seen_ids or set()
-    def _rot_key(c):
-        rid = str(c[1].get("id"))
-        return (1 if rid in _st else 0, 1 if rid in _sy else 0, -c[0])
-    chosen.sort(key=_rot_key)
+    chosen.sort(key=lambda c: (1 if str(c[1].get("id")) in _sy else 0, -c[0]))
     now = datetime.now(timezone.utc)
     out = []
     for _score, r, wf in chosen[offset:offset + limit]:
@@ -9532,6 +9533,35 @@ def _sugg_exclude(uid, project_id):
     except Exception:
         tracked = set()
     return tracked | _dismissed_creator_ids(uid, project_id)
+
+
+def _stolen_reel_ids(uid):
+    """reel_ids que el usuario YA robó (guion vía scripts.from_competitor_reel_id) o guardó
+    como idea (ideas.inspired_by_id, type=reel) → EXCLUSIÓN DURA permanente de sugerencias y
+    feed (contrato punto 3). Global al usuario (una vez robado, no re-sugerir en ninguna marca).
+    Degrada a set() si falla."""
+    ids = set()
+    try:
+        rows = (db.table("scripts").select("from_competitor_reel_id")
+                  .eq("user_id", uid).not_.is_("from_competitor_reel_id", "null")
+                  .limit(4000).execute()).data or []
+        for r in rows:
+            v = r.get("from_competitor_reel_id")
+            if v:
+                ids.add(str(v))
+    except Exception:
+        pass
+    try:
+        rows = (db.table("ideas").select("inspired_by_id")
+                  .eq("user_id", uid).eq("inspired_by_type", "reel")
+                  .limit(4000).execute()).data or []
+        for r in rows:
+            v = r.get("inspired_by_id")
+            if v:
+                ids.add(str(v))
+    except Exception:
+        pass
+    return ids
 
 
 def _sugg_day_seed(uid, project_id):
@@ -9603,26 +9633,34 @@ def radar_suggestions():
         if not subs and not niche:
             # Sin nicho en NINGÚN sitio → needs_niche (la UI pide definirlo, no vacío en silencio).
             return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
-        # Traigo el pool amplio (hasta SUGG_MAX_TOTAL) en UNA llamada: de ahí salen la ventana
-        # gratis (has_more) Y los «posibles competidores» (#2, coste cero — creadores worth_follow
-        # del mismo pool ya scoreado, no seguidos, deduplicados).
+        # EXCLUSIÓN DURA por reel-id (contrato): servidos HOY (sesión) ∪ robados (permanente).
+        excl_reels = _sugg_seen_today(uid, project_id) | _stolen_reel_ids(uid)
+        # Pool amplio (hasta SUGG_MAX_TOTAL) en UNA llamada, ya SIN los excluidos: de ahí salen
+        # la ventana gratis y los «posibles competidores» (mismo pool ya scoreado).
         pool = _niche_suggestion_reels(subs, niche, exclude, SUGG_MAX_TOTAL,
                                        day_seed=_sugg_day_seed(uid, project_id),
                                        seen_ids=_sugg_seen_yesterday(uid, project_id),
-                                       served_today=_sugg_seen_today(uid, project_id))
+                                       exclude_reel_ids=excl_reels)
         batch = pool[:SUGG_FREE_N]
-        has_more = len(pool) > SUGG_FREE_N
+        has_more = len(pool) > SUGG_FREE_N   # frescos REALES restantes (excluidos ya fuera)
+        # Agotamiento honesto (contrato punto 5): 0 frescos AHORA pero el usuario YA vio algo hoy
+        # → «has visto todo lo fresco», no vacío mudo. (Sin nada servido aún ⇒ marca sin pool.)
+        exhausted = (len(batch) == 0 and bool(excl_reels))
         _sugg_record_served(uid, project_id, [x.get("id") for x in batch])
         # #2/#3b «posibles competidores»: creadores que petan de forma consistente (worth_follow),
         # no seguidos, del nicho. Foto = iniciales en el front (el payload no trae avatar).
         # #3 (David 05/07): TODOS los creadores del nicho no seguidos, por explosión (antes
         # solo worth_follow → 0-2/marca). Dedup por creador quedándose con su mejor reel;
         # worth_follow = flag «recomendado». avatar_url → /img/creator/<id> (404→iniciales).
+        # Punto 4 (sin dup entre secciones visibles): un creador cuyo reel ya se muestra en el
+        # carrusel gratis NO aparece además como tarjeta de «posible competidor».
+        shown_handles = {((x.get("creator") or {}).get("ig_username") or "").lower().lstrip("@")
+                         for x in batch}
         by_creator = {}
         for r in pool:
             h = ((r.get("creator") or {}).get("ig_username") or "").lower().lstrip("@")
             cid = r.get("creator_id")
-            if not h or not cid:
+            if not h or not cid or h in shown_handles:
                 continue
             exp = r.get("explosion_score") or 0
             cur = by_creator.get(h)
@@ -9637,8 +9675,9 @@ def radar_suggestions():
         competitors = sorted(by_creator.values(),
                              key=lambda c: -(c["explosion_score"] or 0))[:SUGG_COMPETITORS_N]
         return jsonify({"suggestions": batch, "total": len(batch),
-                        "free_n": SUGG_FREE_N, "has_more": has_more, "more_units": SUGG_MORE_UNITS,
-                        "more_batch": SUGG_MORE_BATCH, "possible_competitors": competitors}), 200
+                        "free_n": SUGG_FREE_N, "has_more": has_more, "exhausted": exhausted,
+                        "more_units": SUGG_MORE_UNITS, "more_batch": SUGG_MORE_BATCH,
+                        "possible_competitors": competitors}), 200
     except Exception:
         logger.warning("[sugg] radar_suggestions falló uid=%s pid=%s", uid, project_id, exc_info=True)
         return jsonify({"suggestions": [], "total": 0, "error": True}), 200
@@ -9665,39 +9704,35 @@ def radar_reshuffle():
 @require_auth
 @limiter.limit("20 per minute")
 def radar_suggestions_more():
-    """«Ver más» del carrusel: pagina el pool YA scrapeado. GRATIS (decisión David 05/07):
-    el pool ya está, no scrapea → cero coste al usuario y SIN modal de confirmación. El
-    scrape de pago es aparte («Refrescar ahora · 5 cr», /api/radar/refresh-now)."""
+    """«Ver más» del carrusel: pagina el pool YA scrapeado. GRATIS y SIN modal. Devuelve SOLO
+    reels frescos (exclusión DURA de servidos-hoy + robados → contrato «no repetir en sesión»);
+    cuando no quedan frescos → `exhausted:True`, jamás repite. El offset del cliente ya no
+    gobierna nada (la exclusión por id sí): se ignora salvo para telemetría."""
     user = current_user()
     uid = user["id"]
     body = request.get_json(silent=True) or {}
     project_id = body.get("project_id") or None
-    try:
-        offset = max(SUGG_FREE_N, min(SUGG_MAX_TOTAL, int(body.get("offset") or SUGG_FREE_N)))
-    except (TypeError, ValueError):
-        offset = SUGG_FREE_N
-    if offset >= SUGG_MAX_TOTAL:
-        return jsonify({"ok": True, "suggestions": [], "has_more": False}), 200
     niche, subs = _resolve_brand_niche(uid, project_id)
     if not subs and not niche:
         return jsonify({"ok": False, "error": "no_niche"}), 400
     exclude = _sugg_exclude(uid, project_id)
-    # ROTACIÓN POR VISITA: lo servido hoy (registrado en el GET y en tandas previas) va al
-    # final → la tanda sale del TOP sin servir con offset 0. Sin Redis (served vacío) degrada
-    # al slicing por offset clásico.
-    srv_today = _sugg_seen_today(uid, project_id)
+    # EXCLUSIÓN DURA por id: servidos HOY (GET + tandas previas) ∪ robados → nunca se repiten.
+    excl_reels = _sugg_seen_today(uid, project_id) | _stolen_reel_ids(uid)
+    # +1 sobre el batch para saber si quedan MÁS frescos tras esta tanda (has_more real).
     batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1,
-                                    offset=(0 if srv_today else offset),
                                     day_seed=_sugg_day_seed(uid, project_id),
                                     seen_ids=_sugg_seen_yesterday(uid, project_id),
-                                    served_today=srv_today)
+                                    exclude_reel_ids=excl_reels)
     reels = batch[:SUGG_MORE_BATCH]
     if not reels:
-        return jsonify({"ok": True, "suggestions": [], "has_more": False}), 200
+        # Contrato punto 5: agotado de verdad → dilo, no repitas.
+        return jsonify({"ok": True, "suggestions": [], "has_more": False, "exhausted": True}), 200
     _sugg_record_served(uid, project_id, [x.get("id") for x in reels])
-    track_event("sugg_more", uid, {"project_id": project_id, "offset": offset, "n": len(reels)})
+    track_event("sugg_more", uid, {"project_id": project_id, "n": len(reels)})
+    # has_more=True mientras esta tanda trajo algo → el botón sigue hasta que un «Ver más»
+    # devuelva 0 y muestre la card de agotamiento (contrato punto 5: el mensaje SIEMPRE aparece).
     return jsonify({"ok": True, "suggestions": reels,
-                    "has_more": len(batch) > SUGG_MORE_BATCH and (offset + SUGG_MORE_BATCH) < SUGG_MAX_TOTAL,
+                    "has_more": len(reels) > 0, "exhausted": False,
                     "more_batch": SUGG_MORE_BATCH}), 200
 
 
@@ -11809,6 +11844,11 @@ def get_tracked_creators_reels():
         # Filtro por 1 creador (creator_id=X) NO debe leer/escribir la caché del feed
         # completo (compartirían slot y se envenenarían). use_cache=False computa fresco.
         order = _radar_feed_order(uid, project_id, creator_ids, use_cache=not filter_creator_id)
+        # Contrato punto 3: los reels YA ROBADOS no reaparecen en el radar (filtro tras el orden
+        # cacheado → no complica la cache-key; el resto de sorts los cubre el annotate `stolen`).
+        _stolen = _stolen_reel_ids(uid)
+        if _stolen:
+            order = [o for o in order if str(o.get("id")) not in _stolen]
         if not order and offset == 0:
             # Competidores aún sin reels (scrape async pendiente) o sin reels → seed,
             # para no dejar el radar (ni el house tour) vacío en el first-run.
