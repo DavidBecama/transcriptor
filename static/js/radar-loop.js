@@ -488,6 +488,17 @@
     return S.filter!=="fav" && !S.user.onbV2Done && Array.isArray(S.tracked) && S.tracked.length===0
       && (S.reels||[]).length===0 && !S.creatorFilter;
   }
+  // ¿Una pantalla FULL-SCREEN (onboarding, cofre/oferta, o un overlay gen/guion/editor/
+  // teleprónter) es la dueña de la vista? En ese caso los LOADERS DE FONDO (refresco de
+  // reels/tracked que sondean cada varios segundos) NO deben llamar a render(): reconstruir
+  // el DOM desde debajo desconecta el canvas del cofre (los reels de fondo dejan de verse,
+  // aunque los números —que se re-buscan por id cada frame— sigan animando) y hace
+  // PARPADEAR el guion recién robado. El estado ya se actualiza; al cerrar el overlay se
+  // repinta con datos frescos. (Bug Leo 05-jul: cofre no se ve + guion parpadea.)
+  function _screenBusy(){
+    return !!(S.onbStealOffer || S._onbWaiting || showOnboarding()
+      || S.view==="gen" || S.view==="script" || S.view==="editor" || S.view==="prompter" || S.view==="result");
+  }
   function onbIdx(){ var i=ONB_STEPS.indexOf(S.onb.step); return i<0?0:i; }
 
   /* ── PostHog: 1 evento "viewed" por paso (entrada) + "completed" (avance) →
@@ -1263,7 +1274,11 @@
       for(var k=0;k<thumbs.length;k++){ var tb=thumbs[k]; var x=(((tb.x0+tb.speed*t)%span)+span)%span-160; var px=x+ce*(cx-x), py=tb.y+ce*(cy-tb.y), sc=tb.sc*(1-0.85*ce), a=tb.a*(1-ce*ce); if(a<=0.01) continue; drawThumb(px,py,tb.rot*(1-ce),sc,a,tb.hue); }
       if(conv>0.15){ var g=ctx.createRadialGradient(cx,cy,0,cx,cy,260*ce); g.addColorStop(0,'rgba(120,150,255,'+(0.5*ce)+')'); g.addColorStop(1,'rgba(120,150,255,0)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
       if(t>COFRE_FL){ var u=t-COFRE_FL, fa=u<0.08?u/0.08:Math.max(0,1-(u-0.08)/0.45); if(fa>0){ var g2=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)*0.7); g2.addColorStop(0,'rgba(255,255,255,'+(0.9*fa)+')'); g2.addColorStop(0.4,'rgba(160,185,255,'+(0.5*fa)+')'); g2.addColorStop(1,'rgba(160,185,255,0)'); ctx.fillStyle=g2; ctx.fillRect(0,0,W,H); } } }
-    function loop(){ var t=(_now()-start)/1000; try{ draw(t); }catch(e){} if(t<COFRE_AV+0.4){ raf=requestAnimationFrame(loop); } else if(ctx){ ctx.clearRect(0,0,W,H); } }
+    function loop(){
+      // Cinturón: si un render() reconstruyó el canvas por debajo, re-vincula al VIVO
+      // (si no, seguiríamos dibujando en el canvas viejo desconectado y no se vería nada).
+      var live=document.getElementById('rsCofreCanvas'); if(live && live!==cv){ cv=live; try{ size(); }catch(e){} }
+      var t=(_now()-start)/1000; try{ draw(t); }catch(e){} if(t<COFRE_AV+0.4){ raf=requestAnimationFrame(loop); } else if(ctx){ ctx.clearRect(0,0,W,H); } }
     function begin(){
       try{ size(); build(); }catch(e){ if(onDone) onDone(); return; }
       start=_now(); loop();
@@ -4102,7 +4117,7 @@
         S.tracked=r.d.tracked;
         // Contador "X / límite del plan" (ítem 4): usa el uso/límite POR MARCA del backend.
         if(r.d.usage){ S.trackedCount=(r.d.usage.per_brand_used!=null?r.d.usage.per_brand_used:S.tracked.length); S.trackedLimit=r.d.usage.per_brand_limit; }
-        if(S.tab==="brain"||S.tab==="dashboard") render(); brainLevelPulse();
+        if((S.tab==="brain"||S.tab==="dashboard") && !_screenBusy()) render(); brainLevelPulse();
       }
     });
   }
@@ -6957,7 +6972,7 @@
       if(st&&st.ok&&st.d){ S.stats={ competitors:st.d.competitors||0, reels_week:st.d.reels_week||0, exploded_week:st.d.exploded_week||0, stolen_today:st.d.stolen_today!=null?st.d.stolen_today:(st.d.stolen_total||0) }; }
       if(fd&&fd.ok&&fd.d&&Array.isArray(fd.d.reels)){ S.reels=fd.d.reels.map(normReel); S.radarSeed=!!fd.d.seed; S.favs={}; S.reels.forEach(function(r){ if(r.fav) S.favs[r.id]=true; }); }
       loadTracked();
-      render();
+      if(!_screenBusy()) render();   // no repintar por debajo del cofre/guion (desconecta canvas / parpadeo)
       if(cb) cb();
     });
   }
