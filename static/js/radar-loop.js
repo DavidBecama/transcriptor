@@ -1759,13 +1759,14 @@
       return String((t.creator&&t.creator.ig_username)||t.handle||t.ig_username||"").toLowerCase().replace(/^@+/,""); });
     list=list.filter(function(c){ return tracked.indexOf(String(c.handle||"").toLowerCase())<0; });
     if(!list.length) return '';
-    var cards=list.slice(0,6).map(function(c){
+    var cards=list.slice(0,12).map(function(c){   // #3: hasta 12 (backend ya lo capa), no 6
       var h=String(c.handle||"").replace(/^@+/,"");
       var exp=(c.explosion_score!=null)?('<span class="pcomp-exp">'+IC.bolt+' '+ESC(String(c.explosion_score))+'×</span>'):'';
       // Foto real si está cacheada; onerror → se quita la img y quedan las iniciales debajo.
       var img=c.avatar_url?('<img src="'+ESC(c.avatar_url)+'" alt="" loading="lazy" onerror="this.remove()">'):'';
-      return '<div class="pcomp-card">'+
-        '<div class="pcomp-ava">'+ESC(initialsOf(h))+img+'</div>'+
+      var rec=c.worth_follow?('<span class="pcomp-rec" title="'+L("Peta de forma consistente","Consistently blowing up")+'">★</span>'):'';
+      return '<div class="pcomp-card'+(c.worth_follow?' pcomp-card--rec':'')+'">'+
+        '<div class="pcomp-ava">'+ESC(initialsOf(h))+img+rec+'</div>'+
         '<div class="pcomp-meta"><span class="pcomp-h">@'+ESC(h)+'</span>'+exp+'</div>'+
         '<button class="pcomp-add" data-act="add-suggested" data-id="'+ESC(h)+'" title="'+L("Añadir a tu radar","Add to your radar")+'">'+IC.plus+' '+L("Añadir","Add")+'</button>'+
       '</div>';
@@ -1810,6 +1811,9 @@
         '<div class="stday-detailzone" data-act="reel-detail" data-id="'+ESC(r.id)+'" role="button" tabindex="0" aria-label="'+L("Ver detalle del reel","See reel detail")+'">'+
           mets+
           (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
+          // #4 (David 05/07): CTA VISIBLE para abrir el detalle (antes solo se descubría
+          // tocando la miniatura). «Robar» sigue siendo la acción primaria abajo.
+          '<span class="stday-seemore">'+IC.doc+' '+L("Ver métricas y transcripción","See metrics & transcript")+' ›</span>'+
         '</div>'+
         '<div class="stday-acts">'+
           '<button class="btn btn-sm btn-primary stday-rob" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Robar","Steal")+'</button>'+
@@ -5853,14 +5857,18 @@
     var who=r.creator_id
       ? '<button class="reel-d-author" data-act="creator-reels" data-id="'+ESC(r.creator_id)+'" data-handle="'+ESC(r.creator.handle)+'" title="Ver todos los reels de @'+ESC(r.creator.handle)+'">@'+ESC(r.creator.handle)+'</button>'
       : '<b>@'+ESC(r.creator.handle)+'</b>';
+    // #2 (David 05/07): métricas EN COLUMNA pegadas al vídeo (antes iban dentro de reel-d-main,
+    // bajo el caption → había que hacer scroll para ver los números). Ahora se ven de un vistazo.
+    var metsHTML='<div class="reel-d-mets">'+mets.map(function(m){return '<div class="pm"><div class="pm-k">'+ESC(m[0].toUpperCase())+'</div><div class="pm-v">'+ESC(String(m[1]))+'</div></div>';}).join("")+'</div>';
+    var metsBlock=isFree()?compMetsLock(metsHTML):metsHTML;
     return '<div class="reel-inline reel-detail fade-in">'+
       '<div class="reel-d-top">'+
         '<div class="reel-d-thumb"><div class="thumb">'+thumbInner+'<span class="dur">'+ESC(r.dur)+'</span></div></div>'+
+        '<div class="reel-d-metcol">'+metsBlock+'</div>'+
         '<div class="reel-d-main">'+
           '<div class="reel-d-who"><span class="ava bava">'+ESC(r.creator.initials)+'</span>'+who+'<span class="reel-d-when">'+ESC(r.when)+'</span></div>'+
           '<p class="reel-d-cap">'+ESC(r.cap)+'</p>'+
           (r.sum?'<p class="reel-d-sum">'+ESC(r.sum)+'</p>':'')+
-          (function(){ var metsHTML='<div class="reel-d-mets">'+mets.map(function(m){return '<div class="pm"><div class="pm-k">'+ESC(m[0].toUpperCase())+'</div><div class="pm-v">'+ESC(String(m[1]))+'</div></div>';}).join("")+'</div>'; return isFree()?compMetsLock(metsHTML):metsHTML; })()+
         '</div>'+
       '</div>'+
       '<div class="reel-d-acts">'+
@@ -7545,6 +7553,10 @@
           S._suggHasMore=!!r.d.has_more;
           if(r.d.charged){ try{ refreshCredits(); }catch(e){} }
           render();
+          // Fix #235: tras re-render el carrusel vuelve al inicio → las cards nuevas quedan
+          // fuera de viewport a la derecha y parece que «no pasó nada». Lo desplazo para
+          // revelarlas.
+          if(got.length){ try{ var _rw=(root()||document).querySelector(".stday-row"); if(_rw) _rw.scrollTo({left:_rw.scrollWidth, behavior:"smooth"}); }catch(e){} }
           if(!got.length) showToast(L("No hay más por ahora.","No more for now."));
         });
       };
