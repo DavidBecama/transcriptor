@@ -7870,6 +7870,16 @@ def metrics_link_profile():
         "project_id": pid,   # la cuenta de IG pertenece a la MARCA activa
     }).execute()
 
+    # Fase 2 (David): al CONECTAR la cuenta de IG, cosecha sus relatedProfiles (competidores del
+    # grafo real de IG) → pool on-niche taggeado con el nicho de la marca + scrape bg → sugerencias
+    # y «posibles competidores» se construyen desde el grafo del usuario. Best-effort, no bloquea.
+    try:
+        _bn, _bs = _resolve_brand_niche(user["id"], pid)
+        from tasks import harvest_related_creators_task  # noqa: E402
+        harvest_related_creators_task.delay(username.lstrip("@").lower(), _bn, _bs, pid, "connect_ig")
+    except Exception as e:
+        logger.warning("[related] harvest enqueue failed (connect_ig): %s", e)
+
     return jsonify({"ok": True, "ig_profile_id": row.data[0]["id"], "ig_username": username})
 
 
@@ -8537,7 +8547,10 @@ def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, 
 
         def _collect(q):
             try:
-                for x in (q.eq("niche_source", "seed").limit(150).execute()).data or []:
+                # 'seed' (catálogo curado) + 'related' (fase 2: vecinos del grafo real de IG
+                # cosechados al añadir competidor/conectar IG) → competidores on-niche reales,
+                # sin necesidad de reels scrapeados aún. Cubre nichos finos fuera del catálogo.
+                for x in (q.in_("niche_source", ["seed", "related"]).limit(150).execute()).data or []:
                     cid = x.get("id")
                     if cid and cid not in seen:
                         seen.add(cid)
@@ -10222,6 +10235,17 @@ def post_tracked_creator():
     # Feed v1: invalida la caché del día → el nuevo competidor entra ya en el re-rank
     # (sus reels al completar el scrape los mete scrape_creator_task, que también invalida).
     _radar_feed_invalidate(user["id"], tracking_row.get("project_id"))
+
+    # Fase 2 (David): cosecha los relatedProfiles del competidor añadido → vecinos on-niche del
+    # grafo real de IG entran al pool (taggeados con el nicho de la marca) y se scrapean en bg →
+    # las sugerencias/competidores se construyen desde AQUÍ, no solo del catálogo (clave nichos finos).
+    try:
+        _pid = tracking_row.get("project_id")
+        _bn, _bs = _resolve_brand_niche(user["id"], _pid)
+        from tasks import harvest_related_creators_task  # noqa: E402
+        harvest_related_creators_task.delay(ig_username, _bn, _bs, _pid, "add_competitor")
+    except Exception as e:
+        logger.warning("[related] harvest enqueue failed (add_competitor): %s", e)
 
     return jsonify({
         "tracking": {

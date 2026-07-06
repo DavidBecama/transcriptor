@@ -12,7 +12,7 @@ from celery.schedules import crontab
 from dotenv import load_dotenv
 from supabase import create_client
 
-from niche_canon import pool_niche_canon
+from niche_canon import pool_niche_canon, norm_tag
 
 load_dotenv()
 
@@ -1758,6 +1758,109 @@ def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
             logger.warning("[discover] creator @%s failed: %s", uname, e)
     logger.info("[discover] seed=@%s followed=%d scraped=%d", seed_handle, followed, scraped)
     return {"status": "ok", "seed": seed_handle, "followed": followed, "scraped": scraped}
+
+
+@celery_app.task(name="tasks.harvest_related_creators")
+def harvest_related_creators_task(handle, niche="", subniches=None, project_id=None,
+                                  source="add_competitor"):
+    """Fase 2 (David): al AÑADIR un competidor o CONECTAR una cuenta de IG, cosechar los
+    `relatedProfiles` que Apify ya devuelve para ese perfil (vecinos on-niche del grafo REAL
+    de IG) → upsert en creators_global TAGUEADOS con el nicho/subnichos de la marca + scrape
+    en background de unos pocos → «posibles competidores» y «Sugerencias de hoy» se construyen
+    desde el grafo del usuario, no solo del catálogo estático (clave para nichos finos que el
+    catálogo no cubre). Acotado (HARVEST_N upserts, SCRAPE_N scrapes) y killable
+    (RADAR_RELATED_HARVEST_ENABLED). Best-effort: cualquier fallo → no-op, no rompe el alta."""
+    if os.environ.get("RADAR_RELATED_HARVEST_ENABLED", "1") != "1":
+        return {"status": "disabled"}
+    APIFY_TOKEN = os.environ.get("APIFY_TOKEN", "")
+    if not APIFY_TOKEN:
+        return {"status": "no_apify"}
+    handle = (handle or "").strip().lstrip("@").lower()
+    if not re.match(r"^[a-z0-9._]{1,30}$", handle):
+        return {"status": "bad_handle"}
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    HARVEST_N = int(os.environ.get("RADAR_RELATED_HARVEST_N", "12"))
+    SCRAPE_N = int(os.environ.get("RADAR_RELATED_SCRAPE_N", "6"))
+    tags = sorted({norm_tag(s) for s in ([niche] + list(subniches or [])) if norm_tag(s)})
+    pn = pool_niche_canon(niche or "")
+
+    # 1. Perfil (resultsType=details) → relatedProfiles (vecinos on-niche del grafo de IG).
+    related = []
+    try:
+        actor_url = ("https://api.apify.com/v2/acts/apify~instagram-scraper"
+                     "/run-sync-get-dataset-items?token=" + APIFY_TOKEN + "&memory=256")
+        resp = requests.post(actor_url, json={
+            "directUrls": ["https://www.instagram.com/" + handle + "/"],
+            "resultsType": "details", "resultsLimit": 1,
+        }, timeout=SCRAPE_TIMEOUT_SEC)
+        resp.raise_for_status()
+        items = resp.json() or []
+        item = items[0] if items else {}
+        for rp in (item.get("relatedProfiles") or [])[:40]:
+            u = ((rp.get("username") or rp.get("ownerUsername") or "")
+                 .strip().lstrip("@").lower()) if isinstance(rp, dict) else ""
+            if re.match(r"^[a-z0-9._]{1,30}$", u) and u != handle:
+                related.append(u)
+    except Exception as e:
+        logger.warning("[related] apify details failed handle=%s: %s", handle, e)
+        return {"status": "apify_failed", "handle": handle}
+    if not related:
+        return {"status": "no_related", "handle": handle}
+    seen = set()
+    related = [u for u in related if not (u in seen or seen.add(u))][:HARVEST_N]
+
+    # 2. Upsert + TAG con el nicho/subnichos de la marca (enriquece el foso) + scrape bg acotado.
+    scraped = 0
+    added = 0
+    for u in related:
+        try:
+            ins = (db.table("creators_global")
+                     .upsert({"ig_username": u}, on_conflict="ig_username").execute())
+            row = (ins.data or [None])[0]
+            if not row:
+                row = (db.table("creators_global")
+                         .select("id, niche, niche_source, subniches, scrape_status, last_scraped_at")
+                         .eq("ig_username", u).single().execute()).data
+            if not row:
+                continue
+            cid = row["id"]
+            added += 1
+            upd = {}
+            cur_tags = set(row.get("subniches") or [])
+            if tags and (set(tags) - cur_tags):
+                upd["subniches"] = sorted(cur_tags | set(tags))
+            if pn and not (row.get("niche") or "").strip():
+                upd["niche"] = pn
+            if not row.get("niche_source"):
+                upd["niche_source"] = "related"   # NO pisar 'seed'/'user' (curados) → solo etiqueta lo nuevo
+            if upd:
+                try:
+                    db.table("creators_global").update(upd).eq("id", cid).execute()
+                except Exception:
+                    logger.warning("[related] tag failed %s (¿migración subniches/niche?)", u, exc_info=True)
+            # scrape bg SOLO si sin reels frescos (>7d o nunca) y estado no definitivo, acotado.
+            if scraped < SCRAPE_N and row.get("scrape_status") not in ("private", "not_found", "scraping"):
+                last = row.get("last_scraped_at")
+                stale = True
+                if last:
+                    try:
+                        stale = (datetime.now(timezone.utc) - datetime.fromisoformat(
+                            str(last).replace("Z", "+00:00"))).total_seconds() / 3600.0 > 168
+                    except Exception:
+                        stale = True
+                if stale:
+                    try:
+                        scrape_creator_task.delay(cid)
+                        scraped += 1
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning("[related] creator @%s failed: %s", u, e)
+    logger.info("[related] handle=@%s niche=%r added=%d scraped=%d source=%s",
+                handle, niche, added, scraped, source)
+    return {"status": "ok", "handle": handle, "added": added, "scraped": scraped}
 
 
 @celery_app.task(name="tasks.send_train_hooks_nudges")
