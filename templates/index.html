@@ -11051,7 +11051,12 @@ function tpSaveSettings() {
   }, 200);
 }
 
-function tpOpen(text) {
+function tpOpen(text, opts) {
+  opts = opts || {};
+  // #loop (David 06/07): abierto desde el loop de la isla → onDone=recorded() (marca grabado +
+  // aterriza en el workspace) al «Ya lo grabé». fromLoop muestra ese botón.
+  TP.onDone = (typeof opts.onDone === "function") ? opts.onDone : null;
+  TP.fromLoop = !!opts.fromLoop;
   tpLoadSettings();
   TP.isOpen = true; TP.isPlaying = false; TP.currentY = 0;
   const overlay = document.getElementById("tpOverlay");
@@ -11076,14 +11081,25 @@ function tpOpen(text) {
   tpSyncSettingsUI();
   tpStartAutoHide();
   tpRecInit();
+  // #loop: «Ya lo grabé» (cierra el loop → workspace) solo en modo loop, en header + fin.
+  var _dbtn = document.getElementById("tpDoneBtn"); if (_dbtn) _dbtn.style.display = TP.fromLoop ? "" : "none";
+  var _edbtn = document.getElementById("tpEndDoneBtn"); if (_edbtn) _edbtn.style.display = TP.fromLoop ? "" : "none";
+}
+
+// #loop (David 06/07): «Ya lo grabé» — completa el loop (recorded → workspace). Si sigue
+// grabando, PARA primero (tpRecFinished muestra el preview/guardar, sin descartar el vídeo);
+// el usuario re-pulsa tras guardar → cierra y aterriza en el workspace.
+function tpDoneLoop() {
+  if (TPR.isRecording) { tpRecStop(); return; }
+  const cb = TP.onDone; TP.onDone = null; TP.fromLoop = false;
+  tpClose();
+  if (typeof cb === "function") { try { cb(); } catch (e) {} }
 }
 
 async function tpClose() {
-  // v0.14.38: solo modal confirm si está grabando (acción crítica). Reproduciendo → cerrar directo.
-  if (TPR.isRecording) {
-    if (!(await window.confirmModal({ title: t("tp.close_confirm_title"), body: t("tp.close_confirm_body"), danger: true }))) return;
-  }
-  if (TPR.isRecording) tpRecStop();
+  // bug6 (David 06/07): NO descartar el vídeo en silencio. Si graba, PARA primero → tpRecFinished
+  // muestra el preview/guardar; el usuario cierra de nuevo tras guardar (cierre no destructivo).
+  if (TPR.isRecording) { tpRecStop(); return; }
   tpRecCleanup();
   tpStop();
   TP.isOpen = false;
@@ -11113,13 +11129,14 @@ function tpRunCountdown(cb) {
   const area = document.getElementById("tpOverlay");
   let count = TP.countdownSec || 3;
   function show() {
+    if (!TP.isOpen) return;   // bug5 (David 06/07): cerrado durante la cuenta atrás → aborta
     const el = document.createElement("div");
     el.className = "tp-countdown";
     el.textContent = count > 0 ? count : "GO";
     area.appendChild(el);
     setTimeout(() => el.remove(), 900);
     if (count > 0) { count--; setTimeout(show, 1000); }
-    else { setTimeout(cb, 500); }
+    else { setTimeout(() => { if (TP.isOpen) cb(); }, 500); }   // bug5: no arrancar scroll/grabación en overlay cerrado
   }
   show();
 }
@@ -11374,10 +11391,13 @@ document.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("keydown", e => {
   if (!TP.isOpen) return;
   if (e.code === "Space" && document.activeElement.tagName !== "TEXTAREA" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); tpTogglePlay(); }
-  if (e.code === "ArrowUp") { e.preventDefault(); tpSetSpeed(Math.min(200, TP.speed + 5)); document.getElementById("tpSpeedSlider").value = TP.speed; }
-  if (e.code === "ArrowDown") { e.preventDefault(); tpSetSpeed(Math.max(20, TP.speed - 5)); document.getElementById("tpSpeedSlider").value = TP.speed; }
-  if (e.code === "ArrowRight") { e.preventDefault(); tpSetFontSize(Math.min(96, TP.fontSize + 4)); document.getElementById("tpFontSlider").value = TP.fontSize; }
-  if (e.code === "ArrowLeft") { e.preventDefault(); tpSetFontSize(Math.max(24, TP.fontSize - 4)); document.getElementById("tpFontSlider").value = TP.fontSize; }
+  // bug9 (David 06/07): si el foco está en un slider (input range), el navegador YA lo ajusta
+  // con las flechas → no dupliques desde JS (saltaba ±10 en vez de ±5).
+  var _onInput = !!(document.activeElement && document.activeElement.tagName === "INPUT");
+  if (e.code === "ArrowUp" && !_onInput) { e.preventDefault(); tpSetSpeed(Math.min(200, TP.speed + 5)); document.getElementById("tpSpeedSlider").value = TP.speed; }
+  if (e.code === "ArrowDown" && !_onInput) { e.preventDefault(); tpSetSpeed(Math.max(20, TP.speed - 5)); document.getElementById("tpSpeedSlider").value = TP.speed; }
+  if (e.code === "ArrowRight" && !_onInput) { e.preventDefault(); tpSetFontSize(Math.min(96, TP.fontSize + 4)); document.getElementById("tpFontSlider").value = TP.fontSize; }
+  if (e.code === "ArrowLeft" && !_onInput) { e.preventDefault(); tpSetFontSize(Math.max(24, TP.fontSize - 4)); document.getElementById("tpFontSlider").value = TP.fontSize; }
   if (e.code === "KeyR" && e.shiftKey) { e.preventDefault(); tpRecToggle(); return; }
   if (e.code === "KeyR") { tpReset(); }
   if (e.code === "KeyF") { if (document.fullscreenElement) document.exitFullscreen(); else document.getElementById("tpOverlay").requestFullscreen?.(); }
@@ -14835,6 +14855,7 @@ async function removeCompetitor(trackingId, username) {
       <span id="tpRecLabel">Record</span>
       <span id="tpRecTimer" style="display:none">00:00</span>
     </button>
+    <button class="tp-btn tp-done" id="tpDoneBtn" onclick="tpDoneLoop()" style="display:none;width:auto;border-radius:8px;padding:8px 14px;font-size:.82rem;font-weight:600" title="Ya lo grabé">✓ Ya lo grabé</button>
     <button class="tp-btn" id="tpSettingsBtn" onclick="tpToggleSettings()" title="Settings">⚙</button>
   </div>
   <div id="tpControls">
@@ -14845,6 +14866,7 @@ async function removeCompetitor(trackingId, username) {
   <div id="tpEnd">
     <h2>End</h2>
     <div style="display:flex;gap:12px">
+      <button class="tp-btn tp-done" id="tpEndDoneBtn" onclick="tpDoneLoop()" style="display:none;width:auto;border-radius:8px;padding:10px 20px;font-size:.85rem;font-weight:600">✓ Ya lo grabé</button>
       <button class="tp-btn" onclick="tpReset()" style="width:auto;border-radius:8px;padding:10px 20px;font-size:.85rem">Restart</button>
       <button class="tp-btn" onclick="tpClose()" style="width:auto;border-radius:8px;padding:10px 20px;font-size:.85rem">Close</button>
     </div>

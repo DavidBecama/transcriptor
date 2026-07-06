@@ -5658,7 +5658,9 @@
     else if(S.view==="editor") html+=scriptEditorHTML();   // v3: editor completo (mockup David), desde «Abrir guion»
     else if(S.view==="result") html+=overlayShellHTML(formatResultHTML(S.resultKind),"Listo","back-script",false);
     else if(S.view==="perf") html+=overlayShellHTML(guiPerfHTML(),"Rendimiento del guion","close-feed",true);
-    else if(S.view==="prompter") html+=teleprompterHTML();
+    // teleprompter unificado (David 06/07): S.view==="prompter" RETIRADO — el loop abre el
+    // teleprompter REAL vía window.tpOpen (openLoopPrompter). teleprompterHTML() (mock) queda
+    // muerto y sin invocar; no se borra su def por compartir helpers (_icLock) con otras vistas.
     else if(S.view==="fillweek") html+='<div class="overlay" role="dialog" aria-modal="true" aria-label="Llena mi semana"><div class="obar"><button class="back" data-act="close-feed" aria-label="Cerrar">'+IC.x+'</button><span class="otitle">Llena mi semana</span></div><div class="oscroll" id="rsFillHost">'+fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase)+'</div></div>';
     if(S.communityInfo) html+=communityInfoModalHTML();   // mini-modal «Más información» Comunidad
     if(S.levelup) html+=levelupHTML();   // pantalla de animación al subir de nivel el Cerebro
@@ -6483,7 +6485,7 @@
   // con «Próximamente» en la cinta: este guard corta cualquier disparo residual para
   // que NUNCA gasten créditos (antes en demo eran teatro con spend local).
   function chain(kind){
-    if(kind==="record"){ S._tpFrom=S.view; S.view="prompter"; render(); return; }   // recuerda el origen (reveal/editor/workspace) para volver ahí
+    if(kind==="record"){ S._tpFrom=S.view; openLoopPrompter(); return; }   // recuerda el origen (reveal/editor/workspace) para volver ahí
     // P4: «Roba la siguiente señal» — salta al siguiente reel del radar y lo roba sin
     // volver al feed. Funciona en prod (real), no solo demo. Mantiene el bucle girando.
     if(kind==="next"){
@@ -6505,6 +6507,15 @@
     render();
     if(!maybeUpgradeNudge("recorded"))   // growth-3: nudge tras éxito (no pisa el toast propio si no aplica)
       showToast(L("Grabado ✓ — marcado en tu idea.","Recorded ✓ — marked on your idea."));
+  }
+  // #teleprompter unificado (David 06/07): el LOOP usa el teleprompter REAL (index.html,
+  // window.tpOpen — cámara + grabación de verdad) en vez del mock de la isla. Preserva el
+  // retorno del loop vía onDone: «Ya lo grabé» del real → recorded() (marca grabado + workspace).
+  function _tpTextOf(s){ s=s||{}; return [s.hook].concat(s.beats||[],[s.close]).filter(Boolean).join("\n\n"); }
+  function openLoopPrompter(){
+    var r=S.reel||{}; var txt=_tpTextOf(r.script);
+    if(typeof window.tpOpen==="function"){ window.tpOpen(txt, {fromLoop:true, onDone:function(){ recorded(); }}); return; }
+    showError(L("No pude abrir el teleprompter. Recarga la página.","Couldn't open the teleprompter. Reload the page."));   // el real (index.html) no cargó — no debería pasar
   }
   /* growth-3 · PAYWALL CONTEXTUAL — el research dice que el paywall convierte
      MEJOR después del primer éxito, nunca antes. Este nudge SOLO se dispara
@@ -8002,7 +8013,7 @@
     }
     if(act==="gen-background") return closeOverlay();   // T6: seguir navegando (el robo sigue detrás)
     if(act==="chain") return chain(k);
-    if(act==="record"){ S.view="prompter"; return render(); }
+    if(act==="record"){ S._tpFrom=S.view; return openLoopPrompter(); }
     if(act==="recorded") return recorded();
     if(act==="back-script"){ S.view="script"; return render(); }
     if(act==="close-feed") return closeOverlay();
@@ -8021,7 +8032,7 @@
     if(act==="metric-view"){ S.metricView=k||"resumen"; return render(); }
     if(act==="metric-refresh"){ if(!isDemo()) return refreshReels(); render(); return showToast("Métricas actualizadas."); }
     if(act==="fw-guiones"){ S.view="feed"; S._fillPhase=null; S.tab="guiones"; S.guiFilter="all"; return render(); }
-    if(act==="fw-record"){ var fid=S._fillGuionIds&&S._fillGuionIds[0]; var g0=fid?guionById(fid):null; if(g0){ S.activeGuionId=g0.id; S.reel={creator:{handle:(g0.from||"").replace("@","")},script:{hook:g0.hook,beats:g0.beats,close:g0.close}}; S.view="prompter"; render(); } return; }
+    if(act==="fw-record"){ var fid=S._fillGuionIds&&S._fillGuionIds[0]; var g0=fid?guionById(fid):null; if(g0){ S.activeGuionId=g0.id; S.reel={creator:{handle:(g0.from||"").replace("@","")},script:{hook:g0.hook,beats:g0.beats,close:g0.close}}; openLoopPrompter(); } return; }
     if(act==="gui-filter"){ S.guiFilter=k; return render(); }
     if(act==="gui-approval-filter"){ S.guiApproval=k; return render(); }
     if(act==="gui-approve"){
@@ -8033,7 +8044,7 @@
       }
       return;
     }
-    if(act==="gui-record"){ var g=guionById(id); if(g){ S._tpFrom=S.view; S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; S.view="prompter"; render(); } return; }
+    if(act==="gui-record"){ var g=guionById(id); if(g){ S._tpFrom=S.view; S.activeGuionId=g.id; S.reel={creator:{handle:(g.from||"").replace("@","")},script:{hook:g.hook,beats:g.beats,close:g.close}}; openLoopPrompter(); } return; }
     if(act==="gui-open"){ var go=guionById(id); if(go){ S._edFrom=(S.view==="ideaws")?"ideaws":null; S.activeGuionId=go.id; S.reel={id:go.from,creator:{handle:(go.from||"").replace(/^@/,"")},script:{hook:go.hook,beats:go.beats,close:go.close},dur:"",views:go.srcViews||"",likes:go.srcLikes||"",when:go.when||"",thumb:go.thumb||null,url:go.url||null}; S.view="editor"; render();
       // Si no tenemos miniatura/URL en sesión, las pedimos al backend (resuelve por la
       // FK del reel fuente). Cubre guiones de sesiones anteriores / tras recargar.
