@@ -11722,6 +11722,25 @@
        carrusel. El thumb del detalle abre el reel original en pestaña nueva. */
     .rs .stday-card[data-act] { cursor:pointer; }
     .rs .stday-detail-wrap { margin-top:12px; }
+    /* #4 (David 06/07): detalle de sugerencia en PANEL LATERAL junto al carrusel (desktop) /
+       OVERLAY a pantalla (móvil), ya no debajo. */
+    .rs .stday-main { min-width:0; }
+    .rs .stday-sec--split .stday-main { display:flex; gap:16px; align-items:flex-start; }
+    .rs .stday-sec--split .stday-row { flex:1 1 auto; min-width:0; }
+    .rs .stday-side { flex:0 0 380px; max-width:400px; position:sticky; top:12px; max-height:calc(100vh - 120px); overflow-y:auto; border:1px solid var(--border-default); border-radius:14px; background:var(--surface-base); padding:14px; }
+    .rs .stday-side-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+    .rs .stday-side-t { display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:.9rem; color:var(--text); }
+    .rs .stday-side-t svg { width:15px; height:15px; color:var(--brand-500); }
+    .rs .stday-side-x { flex:none; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--border-subtle); border-radius:9px; background:transparent; color:var(--text-tertiary); cursor:pointer; }
+    .rs .stday-side-x:hover { color:var(--text); border-color:var(--border-default); }
+    .rs .stday-side-x svg { width:15px; height:15px; }
+    /* el detalle reutiliza reel-inline (pensado para ir pegado a una card de feed): dentro del
+       panel/hoja neutraliza borde/negativos para que respire como tarjeta autónoma. */
+    .rs .stday-side .reel-inline, .rs .stday-sheet .reel-inline { grid-column:auto; margin:0; padding:0; border:none; border-radius:0; background:transparent; }
+    .rs .stday-side .reel-detail, .rs .stday-sheet .reel-detail { max-width:none; }
+    /* overlay móvil: hoja inferior a pantalla; el backdrop cierra, la hoja no. */
+    .rs .stday-overlay { position:fixed; inset:0; z-index:130; background:rgba(0,0,0,.55); display:flex; align-items:flex-end; }
+    .rs .stday-sheet { width:100%; max-height:88vh; overflow-y:auto; background:var(--surface-base); border-radius:16px 16px 0 0; padding:16px 16px 28px; box-shadow:0 -8px 30px rgba(0,0,0,.35); }
     .rs .reel-d-thumb--link { cursor:pointer; }
     .rs .reel-d-thumb--link .thumb { position:relative; }
     .rs .reel-d-open { position:absolute; top:6px; left:6px; font-size:12px; line-height:1; background:rgba(0,0,0,.6); color:#fff; width:20px; height:20px; border-radius:6px; display:flex; align-items:center; justify-content:center; }

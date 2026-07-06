@@ -129,7 +129,7 @@
   var GEN_TITLE = { script:"Cocinando el guion…", hooks:"Buscando tu hook", carousel:"Montando el carrusel", linkedin:"Pasando a LinkedIn", x:"Tejiendo el hilo", serie:"Creando tu serie" };
   // econ (economia-creditos.md): 1 guión = 3 créditos. hooks "3 más" = 2 gratis/día
   // luego 1 (ver hooksUnitsToday). "Llena mi semana" 5 guiones = 12. Regenerar = 1.
-  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:5, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30 };   // idea5 = lote de «Generar 3 ideas» (3 ideas, 5 créd.)
+  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:5, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30, suggmore:3 };   // idea5 = lote de «Generar 3 ideas» (3 ideas, 5 créd.); suggmore = «Ver más» del carrusel de sugerencias
   var HOOKS_FREE_PER_DAY = 2;   // primeros "3 hooks más" del día gratis (demo + prod)
   function hooksUnitsToday(){   // demo: 0 mientras queden gratis hoy, luego COST.hooks5
     if(typeof S.hooksToday!=="number") S.hooksToday=0;
@@ -1877,7 +1877,8 @@
     }
     var cards=list.slice(0,16).map(suggTodayCardHTML).join("");
     // Contrato punto 5: si de verdad se agotó lo fresco → dilo + CTA (nunca repetir en silencio).
-    // Si quedan frescos → «Ver más» GRATIS (pagina el pool ya scrapeado, sin cobro ni modal).
+    // Si quedan frescos → «Ver más» DE PAGO (David 06/07): 3 créditos, tanda completa, cobro
+    // DIRECTO sin modal; sin saldo → muro de recarga. Cero scrape (el pool ya está).
     var moreCard=S._suggExhausted
       ? '<div class="stday-card stday-exhausted">'+
           '<span class="stday-exh-t">'+L("Has visto todo lo fresco de hoy","You\'ve seen all today\'s fresh reels")+'</span>'+
@@ -1888,25 +1889,34 @@
         ? '<button class="stday-card stday-morecard" data-act="sugg-more" data-offset="'+list.length+'">'+
             '<span class="stday-more-ic">'+IC.bolt+'</span>'+
             '<span class="stday-more-t">'+L("Ver más","See more")+'</span>'+
-            '<span class="stday-more-c">'+L("gratis","free")+'</span>'+
+            '<span class="stday-more-c">'+L("3 créditos","3 credits")+'</span>'+
           '</button>'
         : '');
     var arrows='<div class="stday-arrows">'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
     '</div>';
-    // #2: si el reel abierto es una sugerencia, el detalle (métricas + transcripción +
-    // «Roba la idea») va BAJO el carrusel (inline rompería el scroll horizontal).
-    var detail='';
-    if(S.detailReelId){
-      var dr=list.filter(function(x){return x.id===S.detailReelId;})[0];
-      if(dr) detail='<div class="stday-detail-wrap">'+reelDetailHTML(dr)+'</div>';
+    // #4 (David 06/07): el detalle de una sugerencia abre EN PANEL LATERAL junto al carrusel
+    // (desktop), no debajo; en MÓVIL, overlay a pantalla. Cabecera con botón «cerrar» (la card
+    // sigue siendo toggle y Esc cierra). Si el reel abierto no es una sugerencia (feed), dr=null.
+    var dr=S.detailReelId?list.filter(function(x){return x.id===S.detailReelId;})[0]:null;
+    var isMob=(S.device==="mobile");
+    var panel='';
+    if(dr){
+      var _head='<div class="stday-side-head"><span class="stday-side-t">'+IC.bolt+' '+L("Detalle del reel","Reel detail")+'</span>'+
+        '<button class="stday-side-x" data-act="close-reel-detail" aria-label="'+L("Cerrar","Close")+'">'+IC.x+'</button></div>';
+      panel=_head+reelDetailHTML(dr);
     }
-    return '<section class="stday-sec">'+
+    var side=(dr&&!isMob)?'<aside class="stday-side">'+panel+'</aside>':'';
+    var overlay=(dr&&isMob)?'<div class="stday-overlay" data-act="close-reel-detail"><div class="stday-sheet" data-act="stday-noop">'+panel+'</div></div>':'';
+    return '<section class="stday-sec'+(dr&&!isMob?' stday-sec--split':'')+'">'+
       '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+' <span class="stday-tag">'+L("reels que petan en tu nicho","reels blowing up in your niche")+'</span></span>'+
         arrows+_stdayMiniActs()+'</div>'+
-      '<div class="stday-row">'+cards+moreCard+'</div>'+
-      detail+
+      '<div class="stday-main">'+
+        '<div class="stday-row">'+cards+moreCard+'</div>'+
+        side+
+      '</div>'+
+      overlay+
     '</section>';
   }
   // Acciones de cabecera de «Sugerencias de hoy»: «↻ otras» (re-baraja GRATIS, sin scrape) +
@@ -7593,21 +7603,27 @@
       });
       return;
     }
-    if(act==="sugg-more"){   // «Ver más» GRATIS (David 05/07): pagina el pool YA scrapeado,
-      // SIN modal ni cobro → clic y aparecen más. El scrape de pago es «Refrescar ahora · 5 cr».
+    if(act==="sugg-more"){   // «Ver más» DE PAGO (David 06/07): la tanda inicial (8) es gratis;
+      // cada «Ver más» = COST.suggmore créditos y trae una tanda COMPLETA. Cobro DIRECTO, sin
+      // modal. Sin saldo → muro de recarga. Cero scrape (el pool ya está); nunca repite.
       if(isDemo()) return;
       if(S._suggMoreLoading) return;   // anti doble-clic
+      if((S.user.credits||0) < COST.suggmore){ return showPaywall("no_credits"); }   // muro de recarga
       S._suggMoreLoading=true;
       var _mp=_pidOf(S.brandId), _off=parseInt(btn.getAttribute("data-offset")||"8",10)||8;
       showToast(L("Trayendo más…","Loading more…"));
       apiPost("/api/radar/suggestions/more", _mp?{project_id:_mp, offset:_off}:{offset:_off}).then(function(r){
         S._suggMoreLoading=false;
+        if(r.status===402 || (r.d&&r.d.error==="no_credits")){ return showPaywall("no_credits"); }
         if(!r.ok||!r.d){ return showError(L("No pude traer más.","Couldn't load more.")); }
         var got=(Array.isArray(r.d.suggestions)?r.d.suggestions:[]).map(_normSugg);
         // DEDUP DURO por id contra lo ya cargado (contrato: ningún reel dos veces en pantalla).
         var have={}; (Array.isArray(S._suggToday)?S._suggToday:[]).forEach(function(x){ if(x&&x.id) have[x.id]=1; });
         got=got.filter(function(x){ return x&&x.id&&!have[x.id]; });
         if(got.length){ S._suggToday=(Array.isArray(S._suggToday)?S._suggToday:[]).concat(got); }
+        // El backend es la fuente de verdad del saldo: sincroniza siempre; anima el gasto solo
+        // si de verdad se cobró (trajo reels; agotado no cobra y no manda credits).
+        if(r.d.credits!=null){ applyCredits(r.d, got.length?COST.suggmore:0); }
         S._suggHasMore=!!r.d.has_more;
         S._suggExhausted=!!r.d.exhausted;   // agotado → la card de agotamiento sustituye a «Ver más»
         render();
@@ -7616,6 +7632,8 @@
       });
       return;
     }
+    if(act==="close-reel-detail"){ S.detailReelId=null; return render(); }   // #4: cerrar panel/overlay del detalle
+    if(act==="stday-noop"){ return; }   // #4: la hoja del overlay no cierra al tocarla (solo el backdrop)
     if(act==="reshuffle-feed"){   // «↻ otras» GRATIS del feed del radar: re-baraja sin scrape
       if(isDemo()) return;
       var _fp=_pidOf(S.brandId);
