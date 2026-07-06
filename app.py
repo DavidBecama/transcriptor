@@ -175,6 +175,11 @@ REFRESH_NOW_UNITS         = int(os.environ.get("REFRESH_NOW_UNITS", "5"))   # ~5
 REFRESH_NOW_COST          = REFRESH_NOW_UNITS * COST_CENTS
 REFRESH_NOW_COOLDOWN_S    = int(os.environ.get("REFRESH_NOW_COOLDOWN_S", str(8 * 3600)))  # 8h
 PER_USER_REFRESH_CAP      = int(os.environ.get("PER_USER_REFRESH_CAP", "10"))  # cap Apify/refresh
+# «Refrescar sugerencias» (pool de nicho, de pago): guardarraíl anti-«vender aire». Solo se
+# ofrece el botón de pago si hay creadores del nicho stale (last_scraped_at > esto, o nunca);
+# si el pool ya se scrapeó hace <POOL_REFRESH_MIN_AGE_H, un re-scrape no traería nada → «vuelve
+# mañana» SIN botón. El reembolso on-empty (finalize) sigue de red de seguridad.
+POOL_REFRESH_MIN_AGE_H    = int(os.environ.get("POOL_REFRESH_MIN_AGE_H", "12"))
 # «Sugerencias de hoy»: paginado del carrusel. La tanda inicial (SUGG_FREE_N) es GRATIS; a
 # partir de ahí cada «Ver más» CUESTA SUGG_MORE_UNITS créditos y trae una tanda COMPLETA
 # (SUGG_MORE_BATCH) — David 06/07. CERO scrape (el pool ya está); solo se cobra si hay frescos.
@@ -9933,6 +9938,34 @@ def _pretranscribe_served(reel_ids):
             pass
 
 
+def _pool_refreshable(niche):
+    """Guardarraíl anti-«vender aire» (David #2): ¿un scrape del POOL de nicho puede traer algo?
+    True si hay creadores del nicho SIN scrapear o con last_scraped_at más viejo que
+    POOL_REFRESH_MIN_AGE_H (re-scraparlos puede traer reels nuevos). False → nada que refrescar
+    ahora → «Refrescar sugerencias 5cr» NO se ofrece; el front muestra «vuelve mañana».
+    Devuelve (refreshable, stale_ids capados a PER_USER_REFRESH_CAP). Degrada a (False, [])."""
+    pn = _pool_niche_canon(niche or "")
+    if not pn:
+        return False, []
+    try:
+        rows = (db.table("creators_global").select("id, scrape_status, last_scraped_at")
+                  .eq("niche", pn).limit(1500).execute()).data or []
+    except Exception:
+        logger.warning("[pool_refresh] creators read failed niche=%s", pn, exc_info=True)
+        return False, []
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=POOL_REFRESH_MIN_AGE_H)).isoformat()
+    stale = []
+    for cr in rows:
+        if cr.get("scrape_status") in ("private", "not_found", "scraping"):
+            continue
+        last = cr.get("last_scraped_at")
+        if (not last) or str(last) <= cutoff:   # nunca scrapeado o stale → puede traer nuevo
+            stale.append((str(last or ""), cr["id"]))
+    stale.sort(key=lambda t: t[0])   # stalest-first: nunca scrapeados ("") primero, luego los más viejos
+    ids = [cid for _, cid in stale][:PER_USER_REFRESH_CAP]
+    return (len(ids) > 0), ids
+
+
 @app.route("/api/radar/suggestions", methods=["GET"])
 @require_auth
 @limiter.limit("60 per hour")
@@ -10019,10 +10052,14 @@ def radar_suggestions():
         #   populating ⇒ nicho de catálogo SIN reels aún → dispara siembra en background
         #   (idempotente/throttled) y la UI muestra «poblando tu radar» + hace polling hasta ready
         #   (pestaña se llena SOLA, sin recargar). empty ⇒ nicho de texto libre fuera de catálogo.
+        pool_refreshable = False   # guardarraíl #2: ¿ofrecer «Refrescar sugerencias 5cr»?
         if batch:
             pool_status = "ready"
         elif exhausted:
             pool_status = "exhausted"
+            # Agotado: solo se ofrece el botón de PAGO si un scrape del POOL puede traer algo
+            # (creadores del nicho stale). Si no → «vuelve mañana» SIN botón (no vender aire).
+            pool_refreshable, _ = _pool_refreshable(niche)
         elif _pool_niche_canon(niche) or subs:
             _seed_brand_pool(uid, project_id, niche, subs, source="suggestions")
             pool_status = "populating"
@@ -10032,7 +10069,7 @@ def radar_suggestions():
                         "free_n": SUGG_FREE_N, "has_more": has_more, "exhausted": exhausted,
                         "more_units": SUGG_MORE_UNITS, "more_batch": SUGG_MORE_BATCH,
                         "possible_competitors": competitors,
-                        "pool_status": pool_status}), 200
+                        "pool_status": pool_status, "pool_refreshable": pool_refreshable}), 200
     except Exception:
         logger.warning("[sugg] radar_suggestions falló uid=%s pid=%s", uid, project_id, exc_info=True)
         return jsonify({"suggestions": [], "total": 0, "error": True}), 200
@@ -12672,6 +12709,116 @@ def radar_refresh_now():
                     "refresh_task_id": refresh_task_id,
                     "retry_after_s": (0 if is_courtesy else REFRESH_NOW_COOLDOWN_S),
                     "message": "Trayendo lo nuevo de tus competidores…"}), 202
+
+
+@app.route("/api/radar/refresh-pool", methods=["POST"])
+@require_auth
+@limiter.limit("6 per minute")
+def radar_refresh_pool():
+    """Refresco manual de PAGO del POOL DE NICHO (SUGERENCIAS) — distinto de refresh-now (que
+    scrapea TUS competidores/feed). Scrapea creadores del NICHO de la marca que estén stale →
+    pueden traer reels nuevos al carrusel «Sugerencias de hoy». GUARDARRAÍL anti-«vender aire»:
+    si no hay creadores stale (pool ya scrapeado <POOL_REFRESH_MIN_AGE_H) → NO cobra, «vuelve
+    mañana». Reembolso on-empty (finalize_manual_refresh, v0.43.1) de red de seguridad. Cooldown
+    por (user, nicho). Cortesía gratis. [Comparte el patrón con radar_refresh_now — duplicado a
+    propósito para no tocar el path de dinero recién arreglado.]"""
+    user = current_user()
+    uid = user["id"]
+    email = (user.get("email") or "").lower()
+    body = request.get_json(silent=True) or {}
+    project_id = body.get("project_id") or None
+    is_courtesy = email in UNLIMITED_EMAILS
+
+    niche, subs = _resolve_brand_niche(uid, project_id)
+    pn = _pool_niche_canon(niche or "")
+    if not pn:
+        return jsonify({"ok": True, "queued": 0, "charged": False, "refreshable": False,
+                        "message": "Define el nicho de la marca para refrescar sus sugerencias."})
+
+    # GUARDARRAÍL: solo cobramos si hay creadores del nicho stale (un scrape puede traer algo).
+    refreshable, stale_ids = _pool_refreshable(niche)
+    if not refreshable or not stale_ids:
+        return jsonify({"ok": True, "queued": 0, "charged": False, "refreshable": False,
+                        "message": "No hay reels nuevos en tu nicho ahora. Vuelve mañana — el pool se refresca solo."})
+
+    cd_key = "poolrefresh:%s:%s" % (uid, pn)
+    # 1) COOLDOWN fast-path (antes de cobrar). Cortesía lo salta.
+    if not is_courtesy and rds is not None:
+        try:
+            ttl = rds.ttl(cd_key)
+        except Exception:
+            ttl = -2
+        if ttl and ttl > 0:
+            return jsonify({"ok": False, "cooldown": True, "retry_after_s": int(ttl),
+                            "message": "Acabas de refrescar tus sugerencias. Vuelve en %s." % _fmt_cooldown(ttl)}), 429
+
+    # 2) Cobro dual-rail (salvo cortesía) bajo lock + cooldown atómico. [Espejo de refresh_now.]
+    profile = get_profile(uid)
+    plan = profile.get("plan", "free")
+    is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
+    charged_amount = 0
+    charge_id = _uuid.uuid4().hex
+    if not is_courtesy:
+        if not is_paid_unlimited and (profile.get("credits_cents") or 0) < REFRESH_NOW_COST:
+            return jsonify({"error": "no_credits",
+                            "message": "Necesitas %d créditos para refrescar tus sugerencias." % REFRESH_NOW_UNITS}), 402
+        tok = acquire_credit_lock(uid)
+        if tok is None:
+            return jsonify({"error": "busy", "message": "Otra operación en curso. Inténtalo de nuevo."}), 409
+        try:
+            profile = get_profile(uid)
+            if not is_paid_unlimited and (profile.get("credits_cents") or 0) < REFRESH_NOW_COST:
+                return jsonify({"error": "no_credits", "message": "Sin créditos suficientes."}), 402
+            if rds is not None:
+                try:
+                    got = rds.set(cd_key, "1", nx=True, ex=REFRESH_NOW_COOLDOWN_S)
+                except Exception:
+                    got = True
+                if not got:
+                    return jsonify({"ok": False, "cooldown": True, "retry_after_s": REFRESH_NOW_COOLDOWN_S,
+                                    "message": "Acabas de refrescar tus sugerencias. Vuelve en %s." % _fmt_cooldown(REFRESH_NOW_COOLDOWN_S)}), 429
+            try:
+                if is_paid_unlimited:
+                    db.table("profiles").update({
+                        "monthly_usage": (profile.get("monthly_usage") or 0) + REFRESH_NOW_UNITS
+                    }).eq("id", uid).execute()
+                    charged_amount = REFRESH_NOW_UNITS
+                else:
+                    db.table("profiles").update({
+                        "credits_cents": (profile.get("credits_cents") or 0) - REFRESH_NOW_COST
+                    }).eq("id", uid).execute()
+                    charged_amount = REFRESH_NOW_COST
+            except Exception as e:
+                logger.error("refresh_pool: charge failed uid=%s: %s", uid, e, exc_info=True)
+                if rds is not None:
+                    try:
+                        rds.delete(cd_key)
+                    except Exception:
+                        pass
+                return jsonify({"ok": False, "message": "No pude cobrar. Inténtalo de nuevo."}), 500
+        finally:
+            release_credit_lock(uid, tok)
+
+    # 3) Chord: scrape del pool de nicho stale + finalize (reembolsa si NADA nuevo — red de
+    #    seguridad v0.43.1). Las sugerencias se leen en vivo → los reels nuevos entran solos.
+    refresh_task_id = None
+    try:
+        from tasks import scrape_creator_task, finalize_manual_refresh
+        from celery import chord, group
+        _chord_res = chord(group(scrape_creator_task.s(c) for c in stale_ids))(
+            finalize_manual_refresh.s(uid, project_id, charged_amount, is_paid_unlimited, charge_id))
+        refresh_task_id = getattr(_chord_res, "id", None)
+    except Exception as e:
+        logger.error("refresh_pool: chord enqueue failed uid=%s: %s", uid, e, exc_info=True)
+        _refresh_now_refund(uid, charged_amount, is_paid_unlimited, cd_key)
+        return jsonify({"ok": False, "message": "No pude lanzar el refresco. Inténtalo de nuevo."}), 500
+
+    track_event("radar_refresh_pool", uid,
+                {"queued": len(stale_ids), "charged": charged_amount, "niche": pn, "project_id": project_id})
+    return jsonify({"ok": True, "queued": len(stale_ids), "charged": bool(charged_amount),
+                    "refresh_task_id": refresh_task_id, "refreshable": True,
+                    "retry_after_s": (0 if is_courtesy else REFRESH_NOW_COOLDOWN_S),
+                    "message": "Buscando reels nuevos en tu nicho…"}), 202
 
 
 @app.route("/task/refresh/<task_id>", methods=["GET"])
