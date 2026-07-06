@@ -2109,6 +2109,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             rr = (db.table("creator_reels_global")
                     .select("id, ig_reel_id, caption, transcript, transcript_status, "
                             "transcript_started_at, "
+                            "formato, video_duration_sec, "   # fallback FORMATO SUGERIDO
                             "creator:creators_global(ig_username)")
                     .eq("id", reel_id)
                     .single()
@@ -2366,6 +2367,15 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
 
         options = [_shape_script_option(r) for r in raw_opts]
         _rec_fmt = raw_opts[0].get("recording_format") or None     # ítem 10
+        # FORMATO SUGERIDO SIEMPRE: reintento Flash + heurística si el LLM no clasificó
+        # (~26%) → la tarjeta del robo nunca queda vacía. Mismo helper que el path sync.
+        try:
+            from app import ensure_recording_format  # lazy import (circular)
+            _rec_fmt = ensure_recording_format(
+                _rec_fmt, caption=caption, transcript=transcript_text,
+                duration_sec=reel.get("video_duration_sec"), cached_formato=reel.get("formato"))
+        except Exception:
+            logger.warning("gen_script_task ensure_recording_format failed reel=%s", reel_id, exc_info=True)
         _pov_text = raw_opts[0].get("pov_text") or None
         _alt_hooks = (options[0]["hooks"][1:] or None)             # los 2 hooks alternativos de la A
         llm_title = options[0]["title"]

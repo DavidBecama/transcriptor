@@ -4088,6 +4088,105 @@ def classify_reel_format(caption, transcript, duration_sec=None):
         return None
 
 
+# ── FORMATO SUGERIDO del robo: garantía de que NUNCA sale vacío ────────────────
+# Contexto: ~26% de los robos reales devuelven recording_format=None (el LLM de
+# generación no clasifica uno de los 6 formatos) → la tarjeta «FORMATO SUGERIDO»
+# se auto-oculta. Decisión (David): esa tarjeta debe salir SIEMPRE. Estos helpers
+# aplican 2 niveles de fallback ANTES de guardar/devolver el robo. Solo se usan en
+# el path de robo de reel (donde la tarjeta se muestra); no tocan hooks ni otras gen.
+
+# Señales de keyword → formato más cercano (heurística determinista, sin LLM).
+# Bilingüe ES/EN porque la landing y los captions lo son.
+_FMT_HEURISTIC_KEYWORDS = {
+    # grabación de pantalla / tutorial digital / uso de app
+    "escritorio": (
+        "pantalla", "screen", "screenshot", "captura de pantalla", "tutorial",
+        "paso a paso", "step by step", "aplicación", "aplicacion", " app ",
+        "software", "herramienta", "click", "clic", "menú", "menu", "ajustes",
+        "settings", "configura", "dashboard", "navegador", "browser", "prompt",
+        "chatgpt", "excel", "notion", "cómo usar", "como usar", "how to use", "demo",
+    ),
+    # conversación sentada con micrófono a la vista
+    "podcast": (
+        "podcast", "entrevista", "interview", "invitado", "guest", "micrófono",
+        "microfono", "episodio", "episode", "conversación", "conversacion",
+        "charla", "hablamos con", "conversamos", "mesa redonda",
+    ),
+    # explica escribiendo / dibujando a mano
+    "pizarra": (
+        "pizarra", "whiteboard", "dibuj", "esquema", "diagrama", "a mano",
+        "boceto", "explico dibujando", "gráfico", "grafico",
+    ),
+    # imágenes de apoyo con voz en off, sin presentador a cámara
+    "broll-vo": (
+        "voz en off", "voice over", "voiceover", "b-roll", "broll", "metraje",
+        "imágenes de", "imagenes de", "sin aparecer", "narración", "narracion",
+        "planos de", "stock",
+    ),
+    # primera persona / texto sobreimpreso («POV: ...»)
+    "pov": (
+        "pov", "primera persona", "punto de vista", "first person",
+    ),
+}
+
+
+def _heuristic_recording_format(caption=None, transcript=None, duration_sec=None,
+                                cached_formato=None):
+    """FALLBACK determinista (sin LLM) al formato más cercano. NUNCA devuelve None.
+    Prioridad: formato ya cacheado del reel original → señales de keyword →
+    (clip muy corto con texto → pov) → default selfie (talking head, el más común)."""
+    # (1) Si el reel original ya venía clasificado en background, replicar su formato
+    # es el mejor «cómo grabarlo» (premisa del robo: copia lo que funciona).
+    cf = str(cached_formato or "").strip().lower()
+    if cf in REC_FORMAT_KEYS:
+        return cf
+    text = ((caption or "") + " \n " + (transcript or "")).lower()
+    # (2) Keywords: puntúa cada formato y elige el de más señales.
+    best, best_score = None, 0
+    for fmt, kws in _FMT_HEURISTIC_KEYWORDS.items():
+        score = sum(1 for kw in kws if kw in text)
+        if score > best_score:
+            best, best_score = fmt, score
+    if best:
+        return best
+    # (3) Clip muy corto con caption pero casi sin transcript → texto en pantalla (POV).
+    try:
+        dur = float(duration_sec) if duration_sec is not None else None
+    except (TypeError, ValueError):
+        dur = None
+    if dur is not None and dur <= 12 and len((transcript or "").strip()) < 40 and (caption or "").strip():
+        return "pov"
+    # (4) Default honesto: persona hablando a cámara — el formato más común y seguro.
+    return "selfie"
+
+
+def ensure_recording_format(rec_fmt, caption=None, transcript=None,
+                            duration_sec=None, cached_formato=None):
+    """Garantiza un FORMATO de grabación SIEMPRE válido (uno de REC_FORMAT_KEYS) para
+    la tarjeta «FORMATO SUGERIDO» de un robo. Niveles:
+      0. Primario válido (lo que devolvió el LLM de generación) → se respeta, coste 0.
+      1. Formato cacheado del reel original (misma clasificación de background) → coste 0.
+      2. Reintento barato en Flash (classify_reel_format, max_tokens=40) — solo si 0 y 1 fallan.
+      3. Heurística determinista (_heuristic_recording_format) — cierra el caso, NUNCA None.
+    El reintento Flash (nivel 2) solo se dispara cuando el primario es inválido (~26%)."""
+    _p = str(rec_fmt or "").strip().lower()
+    if _p in REC_FORMAT_KEYS:
+        return _p
+    _c = str(cached_formato or "").strip().lower()
+    if _c in REC_FORMAT_KEYS:
+        return _c
+    # Nivel 2: reintento estricto en Flash. classify_reel_format ya pide EXACTAMENTE
+    # una de las 6 claves con instrucción estricta y modelo flash (OPENROUTER_MODEL).
+    try:
+        _retry = classify_reel_format(caption, transcript, duration_sec)
+    except Exception:
+        _retry = None
+    if _retry in REC_FORMAT_KEYS:
+        return _retry
+    # Nivel 3: heurística. Nunca None.
+    return _heuristic_recording_format(caption, transcript, duration_sec, cached_formato)
+
+
 _REEL_TRANSCRIBE_PER_RUN = 6   # tope de transcripciones NUEVAS por refresco (coste Groq+Apify)
 
 
@@ -10592,6 +10691,7 @@ def generate_script_from_competitor_reel(reel_id: str):
         reel_r = (db.table("creator_reels_global")
                     .select("id, ig_reel_id, creator_id, caption, transcript, "
                             "transcript_status, transcript_started_at, "
+                            "formato, video_duration_sec, "   # fallback FORMATO SUGERIDO
                             "creator:creators_global(id, ig_username)")
                     .eq("id", reel_id)
                     .eq("is_archived", False)
@@ -10853,6 +10953,11 @@ def generate_script_from_competitor_reel(reel_id: str):
         # Estructura: opciones para la UI + formato/POV de la opción A. Se guarda la A.
         options = [_shape_script_option(r) for r in raw_opts]
         rec_fmt = raw_opts[0].get("recording_format") if isinstance(raw_opts[0], dict) else None  # ítem 10
+        # FORMATO SUGERIDO SIEMPRE: si el LLM no clasificó formato (~26%), reintento Flash
+        # + heurística (nunca None) → la tarjeta nunca queda vacía. Solo en robos de reel.
+        rec_fmt = ensure_recording_format(
+            rec_fmt, caption=caption, transcript=transcript_text,
+            duration_sec=reel.get("video_duration_sec"), cached_formato=reel.get("formato"))
         pov_text = raw_opts[0].get("pov_text") if isinstance(raw_opts[0], dict) else None
         llm_title = options[0]["title"]
         result = options[0]["script"]
