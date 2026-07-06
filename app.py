@@ -138,6 +138,7 @@ COST_CENTS       = 18   # $0.18 por uso de pago (~7 usos por $1.29)
 SCRIPT_UNITS          = 3    # generar guión (Roba la idea / desde idea / desde competidor)
 REGEN_UNITS           = 1    # regenerar guión (re-tira del mismo reel)
 DEVELOP_UNITS         = 1    # desarrollar idea (draft→developed, llama al LLM) — David 06/07 (antes gratis = fuga)
+SAVE_IDEA_UNITS       = int(os.environ.get("SAVE_IDEA_UNITS", "1"))  # «Guardar idea con datos» (reel+transcript+métricas). El favorito simple sigue GRATIS.
 HOOKS_EXTRA_UNITS     = 1    # "3 hooks más" tras agotar el cupo diario gratis
 HOOKS_FREE_PER_DAY    = 2    # hooks-extra gratis por usuario y día
 FILL_WEEK_UNITS       = 12   # "Llena mi semana" (5 guiones de golpe; vs 15 sueltos)
@@ -11683,6 +11684,104 @@ def save_reel_as_idea(reel_id: str):
         "title": title,
         "already_exists": False,
     }), 200
+
+
+@app.route("/api/competitors/reels/<reel_id>/save-with-data", methods=["POST"])
+@require_auth
+@limiter.limit("20 per minute")
+def save_reel_with_data(reel_id: str):
+    """«Guardar idea CON DATOS» (David, DE PAGO = SAVE_IDEA_UNITS): guarda el reel + su
+    transcripción + métricas como idea PERSISTENTE (snapshot en la propia idea → sobrevive aunque
+    el reel envejezca y salga del pool). Transcribe si falta EN BACKGROUND (nunca trabajo lento en
+    el request → lección del 502). El favorito/bookmark simple sigue GRATIS (endpoint aparte). Lo
+    de pago es guardar la idea con sus datos. Idempotente por (user, reel, source='reel_with_data')
+    → no re-cobra. Reembolsa si el insert falla."""
+    user = current_user()
+    uid = user["id"]
+    if not (_user_owns_reel(uid, reel_id) or _reel_matches_user_niche(uid, reel_id)):
+        return jsonify({"error": "reel_not_found"}), 404
+    body = request.get_json(silent=True) or {}
+    project_id = (body.get("project_id") or "").strip() or None
+
+    # 1. Idempotencia (source PROPIO → no choca con el guardado GRATIS 'competitor_reel').
+    try:
+        existing = (db.table("ideas").select("id, title")
+                      .eq("user_id", uid).eq("inspired_by_id", reel_id)
+                      .eq("inspired_by_type", "reel").eq("source", "reel_with_data")
+                      .in_("status", ["draft", "developed"]).limit(1).execute())
+        if existing.data:
+            return jsonify({"ok": True, "idea_id": existing.data[0]["id"],
+                            "title": existing.data[0].get("title"),
+                            "already_exists": True, "charged": False}), 200
+    except Exception as e:
+        logger.warning("save_with_data: dup check failed user=%s reel=%s err=%s", uid, reel_id, e)
+
+    # 2. Cargar reel + métricas.
+    try:
+        rr = (db.table("creator_reels_global")
+                .select("id, ig_reel_id, caption, transcript, transcript_status, views, likes, "
+                        "comments, posted_at, video_duration_sec, formato, "
+                        "creator:creators_global(ig_username)")
+                .eq("id", reel_id).single().execute())
+        reel = rr.data
+    except Exception:
+        reel = None
+    if not reel:
+        return jsonify({"error": "reel_not_found"}), 404
+
+    # 3. COBRAR (el favorito es gratis; ESTO es «con datos»). Reembolsa si el insert falla.
+    err, refund, _ = _charge_units_locked(uid, SAVE_IDEA_UNITS, user)
+    if err:
+        return err
+    try:
+        ig_username = (reel.get("creator") or {}).get("ig_username") or ""
+        caption = (reel.get("caption") or "").strip()
+        transcript_text = (reel.get("transcript") or "").strip()
+        transcript_ok = reel.get("transcript_status") == "ok" and bool(transcript_text)
+        metrics_snapshot = {
+            "views": reel.get("views"), "likes": reel.get("likes"),
+            "comments": reel.get("comments"), "posted_at": reel.get("posted_at"),
+            "video_duration_sec": reel.get("video_duration_sec"),
+            "formato": reel.get("formato"), "ig_reel_id": reel.get("ig_reel_id"),
+        }
+        llm_title, llm_summary = _llm_extract_idea_from_reel(ig_username, caption, transcript_text, transcript_ok)
+        if llm_title and llm_summary:
+            title = llm_title
+            raw_text = _build_idea_raw_text_from_summary(ig_username, llm_summary, caption)
+        else:
+            title = _build_idea_title_from_reel(caption, ig_username)
+            raw_text = _build_idea_raw_text_from_reel(ig_username, caption, transcript_text, transcript_ok)
+        ins = db.table("ideas").insert({
+            "user_id": uid, "project_id": project_id, "raw_text": raw_text, "title": title,
+            "status": "draft", "source": "reel_with_data",
+            "inspired_by_id": reel_id, "inspired_by_type": "reel", "inspired_by_username": ig_username,
+            "transcript_snapshot": (transcript_text if transcript_ok else None),
+            "metrics_snapshot": metrics_snapshot,
+        }).execute()
+        idea_id = ins.data[0]["id"] if ins.data else None
+    except Exception as e:
+        logger.error("save_with_data: insert failed user=%s reel=%s err=%s", uid, reel_id, e, exc_info=True)
+        refund()   # no se guardó → devolver los créditos
+        return jsonify({"error": "internal", "message": "No se pudo guardar la idea."}), 500
+
+    # 4. Transcribe-si-falta EN BACKGROUND (nunca en el request): transcribe el reel y copia el
+    #    transcript al snapshot de la idea cuando aterrice. Si ya estaba cacheado, no hace nada.
+    transcript_pending = not transcript_ok
+    if transcript_pending and idea_id:
+        try:
+            from tasks import attach_transcript_to_idea_task  # noqa: E402
+            attach_transcript_to_idea_task.delay(idea_id, reel_id)
+        except Exception as e:
+            logger.warning("save_with_data: transcript task enqueue failed idea=%s: %s", idea_id, e)
+
+    try:
+        from emails import track as _ph_track
+        _ph_track("idea_saved_with_data", uid, {"reel_id": reel_id, "has_transcript": transcript_ok})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "idea_id": idea_id, "title": title, "already_exists": False,
+                    "charged": True, "transcript_pending": transcript_pending,
+                    **_credits_display(uid)}), 200
 
 
 def _creator_view_baselines(creator_ids):

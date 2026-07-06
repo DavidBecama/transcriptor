@@ -481,6 +481,25 @@ async function main() {
   check("agotado + pool NO refrescable: «vuelve mañana» SIN botón de pago (no vender aire)",
         !exhHonest.payBtn && exhHonest.honest, JSON.stringify(exhHonest));
 
+  /* ═══ Feature David · «Guardar idea con datos» (de pago, junto a «Robar guion») ═══
+     Botón hermano de «Robar» que guarda el reel + datos sin generar guión. Rojo si no aparece
+     junto a «Robar» o si al pulsarlo no confirma el guardado. */
+  console.log("\n■ Guardar idea con datos (junto a «Robar»)");
+  await nav(`${BASE}/profile/radar?plan=creador`);
+  const siBtn = await evaluate(`(function(){
+    var root=document.querySelector('#radarRoot');
+    return { hasSave: !!root.querySelector('[data-act="save-idea-data"]'),
+             hasSteal: !!root.querySelector('[data-act="steal"]') };
+  })()`);
+  check("«Guardar idea» aparece junto a «Robar guion»", siBtn.hasSave && siBtn.hasSteal, JSON.stringify(siBtn));
+  await click('#radarRoot [data-act="save-idea-data"]');
+  await sleep(400);
+  const saved = await evaluate(`(function(){
+    var t=document.getElementById('rsToast');
+    return { toast:(t&&t.textContent||'').trim().slice(0,70) };
+  })()`);
+  check("«Guardar idea» confirma el guardado con datos", /guardada|saved/i.test(saved.toast), JSON.stringify(saved));
+
   console.log(`\n═══ RESULTADO: ${passed} ✓ · ${failed} ✗ ═══`);
   if (fails.length) { console.log(fails.map((f) => "  ✗ " + f).join("\n")); }
   process.exitCode = failed ? 1 : 0;

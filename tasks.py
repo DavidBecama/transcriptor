@@ -2643,6 +2643,31 @@ def transcribe_reel_task(self, reel_id):
     return {"ok": True, "transcript": transcript_text}
 
 
+@celery_app.task(name="tasks.attach_transcript_to_idea")
+def attach_transcript_to_idea_task(idea_id, reel_id):
+    """«Guardar idea con datos» (David): transcribe el reel si falta (reusa transcribe_reel_task,
+    síncrono DENTRO del worker → sin gateway) y copia el transcript al snapshot de la idea, para
+    que la idea guardada conserve sus datos aunque el reel envejezca y salga del pool. Best-effort,
+    idempotente (si ya estaba transcrito, transcribe_reel_task devuelve el cacheado)."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    try:
+        transcribe_reel_task.apply(args=[reel_id])   # eager en el worker: descarga+Groq sin gateway
+    except Exception as e:
+        logger.warning("[idea_transcript] transcribe failed reel=%s: %s", reel_id, e)
+    try:
+        reel = (db.table("creator_reels_global").select("transcript, transcript_status")
+                  .eq("id", reel_id).single().execute()).data or {}
+        if reel.get("transcript_status") == "ok" and (reel.get("transcript") or "").strip():
+            db.table("ideas").update({"transcript_snapshot": reel["transcript"].strip()}).eq("id", idea_id).execute()
+            logger.info("[idea_transcript] attached idea=%s reel=%s", idea_id, reel_id)
+            return {"ok": True, "attached": True}
+    except Exception as e:
+        logger.warning("[idea_transcript] attach failed idea=%s: %s", idea_id, e)
+    return {"ok": True, "attached": False}
+
+
 _BACKFILL_FORMAT_BATCH = int(os.environ.get("BACKFILL_FORMAT_BATCH", "60"))
 
 

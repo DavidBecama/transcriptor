@@ -129,7 +129,7 @@
   var GEN_TITLE = { script:"Cocinando el guion…", hooks:"Buscando tu hook", carousel:"Montando el carrusel", linkedin:"Pasando a LinkedIn", x:"Tejiendo el hilo", serie:"Creando tu serie" };
   // econ (economia-creditos.md): 1 guión = 3 créditos. hooks "3 más" = 2 gratis/día
   // luego 1 (ver hooksUnitsToday). "Llena mi semana" 5 guiones = 12. Regenerar = 1.
-  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:5, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30, suggmore:3 };   // idea5 = lote de «Generar 3 ideas» (3 ideas, 5 créd.); suggmore = «Ver más» del carrusel de sugerencias
+  var COST = { script:3, regen:1, hooks:1, carousel:1, linkedin:1, x:1, serie:3, record:0, idea5:5, scripts5:12, hooks5:1, fillweek:12, competitor:2, explosion:30, suggmore:3, saveidea:1 };   // idea5 = lote de «Generar 3 ideas» (3 ideas, 5 créd.); suggmore = «Ver más»; saveidea = «Guardar idea con datos» (reel+transcript+métricas)
   var HOOKS_FREE_PER_DAY = 2;   // primeros "3 hooks más" del día gratis (demo + prod)
   function hooksUnitsToday(){   // demo: 0 mientras queden gratis hoy, luego COST.hooks5
     if(typeof S.hooksToday!=="number") S.hooksToday=0;
@@ -1884,6 +1884,7 @@
         (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
         '<div class="stday-acts">'+
           '<button class="btn btn-sm btn-primary stday-rob" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Robar","Steal")+'</button>'+
+          saveIdeaBtnHTML(r.id)+
           '<button class="stday-x" data-act="sugg-dismiss-one" data-id="'+ESC(h)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
           follow+
         '</div>'+
@@ -2109,6 +2110,7 @@
       '</div>'+
       '<div class="crd-txwrap"><span class="crd-tx-lbl">'+L("TRANSCRIPCIÓN · DETECTADA","TRANSCRIPT · DETECTED")+'</span>'+txBody+'</div>'+
       '<button class="btn btn-md btn-primary crd-steal-full" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba la idea","Steal the idea")+'</button>'+
+      saveIdeaBtnHTML(r.id)+
     '</div>';
   }
   // v3 (mockup David · «Competidores en el radar» + galería): fila de chips por
@@ -2272,6 +2274,7 @@
         '<h2 class="feature-cap">'+ESC(r.cap)+'</h2>'+
         '<div class="feature-why">'+IC.spark+'<span>'+ESC(why)+'</span></div>'+
         '<div class="feature-actions"><button class="btn btn-lg btn-primary" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' Roba la idea</button>'+
+          saveIdeaBtnHTML(r.id)+
           '<button class="iconbtn'+(S.favs[r.id]?" on":"")+'" data-act="fav" data-id="'+ESC(r.id)+'" title="Guardar">'+(S.favs[r.id]?IC.star:IC.starO)+'</button></div>'+
         scarce+
       '</div>'+
@@ -6685,6 +6688,39 @@
   function updateFillHost(){ var host=document.getElementById("rsFillHost"); if(host) host.innerHTML=fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase); }
   function toggleFav(id){ S.favs[id]=!S.favs[id]; var m=S.favs[id]?"POST":"DELETE"; if(!isDemo()) fetch("/api/competitors/reels/"+encodeURIComponent(id)+"/favorite",{method:m,credentials:"same-origin"}).catch(function(){}); render(); }
 
+  // «Guardar idea con datos» (David, DE PAGO COST.saveidea): guarda el reel + transcripción +
+  // métricas en «Ideas guardadas» (sin generar guión). Más barato que robar. El favorito simple
+  // (estrella) sigue GRATIS y es aparte. Botón hermano de «Robar guion».
+  function saveIdeaBtnHTML(id){
+    return '<button class="btn btn-sm btn-secondary si-save" data-act="save-idea-data" data-id="'+ESC(id)+'" '+
+      'title="'+L("Guarda el reel + su transcripción y métricas (sin generar guión)","Save the reel + its transcript and metrics (no script)")+'">'+
+      IC.plus+' '+L("Guardar · "+COST.saveidea+" cr","Save · "+COST.saveidea+" cr")+'</button>';
+  }
+  function _optimisticSavedIdea(id, title){
+    // Aparece YA en «Ideas robadas» (el workspace agrupa por inspiredById, incluso sin guion).
+    S.ideas=Array.isArray(S.ideas)?S.ideas:[];
+    if(S.ideas.some(function(i){return i&&i.inspiredById===id&&i.inspiredByType==="reel";})) return;
+    S.ideas.unshift({ id:("tmp-"+id), text:title||"", title:title||L("Idea guardada","Saved idea"),
+      inspiredById:id, inspiredByType:"reel", inspiredByUser:"", notes:"" });
+  }
+  function saveIdeaWithData(id){
+    if(!id) return;
+    if(isDemo()){
+      spend(COST.saveidea); flashSpark(-COST.saveidea);
+      _optimisticSavedIdea(id, L("Idea guardada","Saved idea")); render();
+      return showToast(L("Idea guardada con sus datos (−"+COST.saveidea+" créd.)","Idea saved with its data (−"+COST.saveidea+" cr)"));
+    }
+    var _pid=_pidOf(S.brandId);
+    apiPost("/api/competitors/reels/"+encodeURIComponent(id)+"/save-with-data", _pid?{project_id:_pid}:{}).then(function(r){
+      if(r.status===402){ showError((r.d&&r.d.message)||L("Necesitas créditos para guardar la idea.","You need credits to save the idea.")); try{ if(typeof window.openUpgradeModal==="function") window.openUpgradeModal("credits"); }catch(e){} return; }
+      if(!r.ok){ return showError((r.d&&r.d.message)||L("No pude guardar la idea.","Couldn't save the idea.")); }
+      if(r.d && r.d.already_exists){ _optimisticSavedIdea(id,(r.d&&r.d.title)); render(); return showToast(L("Ya la tenías guardada.","You already saved it.")); }
+      _optimisticSavedIdea(id,(r.d&&r.d.title)); try{ refreshCredits(); }catch(e){} render();
+      showToast(L("Idea guardada con sus datos"+((r.d&&r.d.transcript_pending)?" · transcribiendo…":""),
+                  "Idea saved with its data"+((r.d&&r.d.transcript_pending)?" · transcribing…":"")));
+    });
+  }
+
   /* ── fábrica de ideas ────────────────────────────────────────── */
   function seedIdea(inputId, jumpToIdeas){
     var inp=document.getElementById(inputId); var txt=inp?inp.value.trim():"";
@@ -7782,6 +7818,7 @@
     }
     if(act==="onb-steal-no"){ S.onbStealOffer=null; S.onbCofre=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
     if(act==="steal") return steal(id);
+    if(act==="save-idea-data") return saveIdeaWithData(id);
     if(act==="opt-pick"){ var _rv=S.revealReel||S.reel; if(_rv){ applyScriptOption(_rv, parseInt(k,10)||0, 0); _rv._saved=false; render(); } return; }   // elegir opción de guion → sin guardar
     if(act==="hook-pick"){ var _rh=S.revealReel||S.reel; if(_rh){ applyScriptOption(_rh, _rh.optIdx||0, parseInt(k,10)||0); _rh._saved=false; render(); } return; }   // elegir gancho → sin guardar
     if(act==="save-script-choice") return saveScriptChoice();
