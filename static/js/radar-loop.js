@@ -5811,6 +5811,11 @@
     // terminar DESPUÉS de la carga inicial → sin esto la página queda vacía hasta
     // recargar). Así, al acabar el tutorial, los datos reales ya están detrás del muro.
     if(t==="metrics"){ loadMetricsLight(); }
+    // Self-heal (David 06/07): «guiones» (Ideas robadas) se hidrata SOLO por la ola diferida
+    // (_loadDeferredBrandData, fire-once, .catch→null). Si esa fetch falló → 0 cards sin
+    // reintento hasta recargar/ cambiar de marca. Re-pedir al ENTRAR arregla el vacío
+    // transitorio (mismo patrón que metrics/analizar).
+    if(t==="guiones"){ reloadScripts().then(function(){ render(); }); }
     render();
   }
 

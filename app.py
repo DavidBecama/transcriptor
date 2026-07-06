@@ -4818,7 +4818,14 @@ def list_scripts():
     project_id = request.args.get("project_id")
     q = db.table("scripts").select("*").eq("user_id", user["id"])
     if project_id:
-        q = q.eq("project_id", project_id)
+        # Guard anti-invisibilidad (David 06/07): al filtrar por marca incluye TAMBIÉN los
+        # robos SIN marca (project_id NULL) → un huérfano nunca queda invisible en una vista
+        # de proyecto. La creación ya asigna project_id (ab5cf80); esto cubre legacy/regresiones.
+        try:
+            _uuid.UUID(str(project_id))   # valida UUID (col es uuid → un no-UUID 500-earía en Postgres)
+        except (ValueError, AttributeError, TypeError):
+            return jsonify([])            # project_id malformado → sin marca que casar (evita 500)
+        q = q.or_("project_id.eq.%s,project_id.is.null" % project_id)
     rows = q.order("created_at", desc=True).limit(100).execute()
     return jsonify(rows.data)
 
