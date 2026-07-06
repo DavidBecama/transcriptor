@@ -12630,11 +12630,13 @@ def radar_refresh_now():
 
     # 4) Chord: scrape forzado de cada elegible + finalize (reembolsa si TODO falla,
     #    invalida la caché del feed para que entren los reels nuevos). charge_id → idempotencia.
+    refresh_task_id = None
     try:
         from tasks import scrape_creator_task, finalize_manual_refresh
         from celery import chord, group
-        chord(group(scrape_creator_task.s(c) for c in eligible))(
+        _chord_res = chord(group(scrape_creator_task.s(c) for c in eligible))(
             finalize_manual_refresh.s(uid, project_id, charged_amount, is_paid_unlimited, charge_id))
+        refresh_task_id = getattr(_chord_res, "id", None)   # el front lo pollea → mensaje + reembolso sin recargar
     except Exception as e:
         logger.error("refresh_now: chord enqueue failed uid=%s: %s", uid, e, exc_info=True)
         _refresh_now_refund(uid, charged_amount, is_paid_unlimited, cd_key)  # no se lanzó → no cobramos
@@ -12643,8 +12645,35 @@ def radar_refresh_now():
     track_event("radar_refresh_now", uid,
                 {"queued": len(eligible), "charged": charged_amount, "project_id": project_id})
     return jsonify({"ok": True, "queued": len(eligible), "charged": bool(charged_amount),
+                    "refresh_task_id": refresh_task_id,
                     "retry_after_s": (0 if is_courtesy else REFRESH_NOW_COOLDOWN_S),
                     "message": "Trayendo lo nuevo de tus competidores…"}), 202
+
+
+@app.route("/task/refresh/<task_id>", methods=["GET"])
+@require_auth
+def refresh_task_status(task_id):
+    """Desenlace del refresh-now de PAGO (callback finalize_manual_refresh). El front lo pollea
+    para mostrar «X nuevos» o «no hay nada nuevo, vuelve mañana» y reflejar el reembolso — todo
+    sin recargar. new_count=0 ⇒ el finalize ya reembolsó (contrato «no cobrar por vacío»)."""
+    from tasks import finalize_manual_refresh  # noqa: E402
+    task = finalize_manual_refresh.AsyncResult(task_id)
+    st = task.state
+    if st == "SUCCESS":
+        res = task.result or {}
+        payload = {"state": "success",
+                   "new_count": int((res or {}).get("new_count") or 0),
+                   "refunded": bool((res or {}).get("refunded"))}
+        user = current_user()
+        if user:
+            try:
+                payload["credits_cents"] = get_profile(user["id"]).get("credits_cents")
+            except Exception:
+                pass
+        return jsonify(payload)
+    if st == "FAILURE":
+        return jsonify({"state": "error"})
+    return jsonify({"state": "progress"})
 
 
 @app.route("/api/radar/suggestions/dismiss", methods=["POST"])

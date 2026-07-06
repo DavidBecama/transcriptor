@@ -4356,8 +4356,42 @@
   }
   // Refresco manual de PAGO (v1): ÚNICA vía de scrape on-demand. Cuesta créditos y tiene
   // cooldown (429) por usuario+marca. El re-rank diario sigue siendo gratis y automático.
+  // Desenlace del refresh-now de PAGO: pollea /task/refresh/<id> hasta que finalize resuelve.
+  // new_count>0 → «X nuevos» + repinta feed+sugerencias+posibles-competidores (loadBrandData).
+  // new_count==0 → «no hay nada nuevo, vuelve mañana» + refleja el REEMBOLSO (refreshCredits).
+  // Cierra el bug de David: ni cobra por vacío ni deja la UI stale sin recargar.
+  function _pollRefreshOutcome(tid, tries){
+    tries=tries||0;
+    apiGet("/task/refresh/"+encodeURIComponent(tid)).then(function(r){
+      var d=(r&&r.d)||{};
+      if(d.state==="success"){
+        try{ refreshCredits(); }catch(e){}   // reembolso (nada nuevo) o cobro real (hubo nuevos)
+        if((d.new_count||0)>0){
+          showToast(L("Radar actualizado · "+d.new_count+" nuevo"+(d.new_count>1?"s":""),
+                      "Radar updated · "+d.new_count+" new"));
+        } else {
+          showToast(L("No hay nada nuevo aún. Vuelve mañana — el radar se renueva solo.",
+                      "Nothing new yet. Come back tomorrow — the radar refreshes on its own."));
+        }
+        loadBrandData();   // repinta feed + «Sugerencias de hoy» + «Posibles competidores»
+        return;
+      }
+      if(d.state==="error"){ loadBrandData(); return; }
+      if(tries<20){ setTimeout(function(){ _pollRefreshOutcome(tid, tries+1); }, 3000); }
+      else { loadBrandData(); }   // timeout de seguridad (~60s)
+    });
+  }
   function refreshRadar(){
-    if(isDemo()){ if(typeof applyDemoBrand==="function") applyDemoBrand(); render(); return showToast(L("Radar actualizado.","Radar refreshed.")); }
+    if(isDemo()){
+      // Contrato David (harness): un refresh que NO trae nada nuevo → mensaje honesto y SIN
+      // cobro. Forzable con ?refresh=empty para pinnearlo en verify-island (el resto = normal).
+      if(/[?&]refresh=empty/.test(location.search)){
+        return showToast(L("No hay nada nuevo aún. Vuelve mañana — el radar se renueva solo.",
+                           "Nothing new yet. Come back tomorrow — the radar refreshes on its own."));
+      }
+      if(typeof applyDemoBrand==="function") applyDemoBrand(); render();
+      return showToast(L("Radar actualizado.","Radar refreshed."));
+    }
     var _pid=_pidOf(S.brandId);
     var go=function(){
       showToast(L("Trayendo lo nuevo de tus competidores…","Pulling what's new from your competitors…"));
@@ -4370,9 +4404,12 @@
         }
         if(!r.ok){ return showError((r.d&&r.d.message)||L("No pude refrescar el radar.","Couldn't refresh the radar.")); }
         var n=(r.d&&r.d.queued)||0;
+        var tid=(r.d&&r.d.refresh_task_id)||null;
         showToast((r.d&&r.d.message)||L("Trayendo lo nuevo…","Pulling what's new…"));
         if(n){ try{ refreshCredits(); }catch(e){} }
-        setTimeout(loadBrandData, n?5000:300);   // da tiempo al scrape; entra lo nuevo
+        // n==0 (sin competidores / ya al día): el backend NO cobró → mensaje del server, sin poll.
+        if(tid && n){ _pollRefreshOutcome(tid); }
+        else { setTimeout(loadBrandData, 300); }   // fallback: nada encolado o sin task id
       });
     };
     // Confirm de coste (idiom confirmModal). ~REFRESH_NOW_UNITS créditos (server-side).
