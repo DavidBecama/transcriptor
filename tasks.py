@@ -949,7 +949,7 @@ SCRAPE_TIMEOUT_SEC = 240
 SCRAPE_STUCK_MIN = int(os.environ.get("SCRAPE_STUCK_MIN", "10"))
 # SPEC-fase-accion-radar #4 (Fathom 18/06): pre-transcripción top-N al primer scrape.
 # N=3 confirmado por David (presupuesto conservador). Ajustable por env.
-_PRETRANSCRIBE_TOP_N = int(os.environ.get("PRETRANSCRIBE_TOP_N", "3"))
+_PRETRANSCRIBE_TOP_N = int(os.environ.get("PRETRANSCRIBE_TOP_N", "4"))
 
 
 @celery_app.task(name="tasks.scrape_creator")
@@ -1178,11 +1178,12 @@ def scrape_creator_task(creator_id: str, results_limit: int = 10) -> dict:
         except Exception:
             logger.warning("scrape_creator: feed cache invalidate failed creator=%s", creator_id)
 
-    # SPEC #4 — PRE-TRANSCRIPCIÓN top-N (Fathom 18/06, N=3): al primer scrape, encola
-    # la transcripción de los 3 reels con más views → el primer «Roba la idea» es
-    # cache-hit (instantáneo). Solo primer scrape (acota coste). transcribe_reel_task
-    # ya es idempotente (salta si ya hay transcript). Best-effort, nunca rompe el scrape.
-    if final_status == "ok" and reels_count > 0 and was_first_scrape:
+    # PERF #2 (David): PRE-TRANSCRIPCIÓN top-N en CADA scrape (antes solo el primero → los
+    # reels de los refrescos y del 4º en adelante nunca se pre-transcribían: 75% del pool sin
+    # transcript). Ahora cada scrape encola los top-N por views SIN transcript → «Roba» = cache-hit.
+    # transcribe_reel_task es idempotente (salta si ya hay transcript) → solo transcribe lo NUEVO,
+    # coste acotado a ≤N por scrape. Best-effort, nunca rompe el scrape.
+    if final_status == "ok" and reels_count > 0:
         try:
             top = (db.table("creator_reels_global")
                      .select("id, transcript")
@@ -2097,6 +2098,12 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             logger.warning("gen_script_task release_lock failed reel=%s user=%s: %s", reel_id, user_id, _e)
 
     try:
+        # PERF (instrumentación David): desglose real del robo — transcripción vs LLM pro.
+        # Greppeable [steal_timing]; live_transcribe=1 ⇒ pagó transcripción en vivo (reel sin cache).
+        _t0 = time.time()
+        _did_live_transcribe = False
+        _t_tr_start = _t0
+        _t_llm0 = _t_llm1 = None
         # 1. Cargar reel.
         try:
             rr = (db.table("creator_reels_global")
@@ -2141,6 +2148,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         self.update_state(state="PROGRESS", meta={"step": "preparing"})
 
         # 3. Anti-race + stale guard.
+        _t_tr_start = time.time()
         transcript_text = (reel.get("transcript") or "").strip()
         transcript_status = reel.get("transcript_status")
 
@@ -2199,6 +2207,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             # Solo descarga+transcribe quien tiene el lock y aún no tiene texto.
             if have_lock and not transcript_text:
                 self.update_state(state="PROGRESS", meta={"step": "transcribing"})
+                _did_live_transcribe = True   # instrumentación: este robo paga transcripción en vivo
                 url = "https://www.instagram.com/reel/{}/".format(reel["ig_reel_id"])
                 try:
                     with tempfile.TemporaryDirectory() as tmpdir:
@@ -2248,6 +2257,7 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             else:
                 return _fail("transcribe_error", "Este reel no tiene audio transcribible ni texto suficiente para generar.")
 
+        _t_tr_end = time.time()   # fin de la fase transcripción (cache-hit ⇒ ~0s)
         # 4. Generar guion vía adapt_with_ai (lazy import).
         self.update_state(state="PROGRESS", meta={"step": "generating_script"})
         today_str = datetime.now(timezone.utc).strftime("%-d de %B de %Y")
@@ -2340,7 +2350,9 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         try:
             # 2 OPCIONES en paralelo (modelo de generación = pro), por MARCA.
             from app import _generate_script_options, _shape_script_option  # lazy import (circular).
+            _t_llm0 = time.time()
             raw_opts = _generate_script_options(user_content, style_arg, custom_prompt, user_id, project_id, n=2)
+            _t_llm1 = time.time()
         except Exception as e:
             logger.exception("gen_script_task LLM failed reel=%s: %s", reel_id, e)
             # v0.15.7.b: mensaje contextual si custom + empty content.
@@ -2358,6 +2370,16 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         _alt_hooks = (options[0]["hooks"][1:] or None)             # los 2 hooks alternativos de la A
         llm_title = options[0]["title"]
         result = options[0]["script"]                              # se guarda la opción A
+
+        # PERF (instrumentación David): desglose real transcripción vs LLM pro. Grep [steal_timing].
+        try:
+            logger.info("[steal_timing] reel=%s live_transcribe=%d transcribe_sec=%.1f llm_sec=%.1f total_sec=%.1f",
+                        reel_id, 1 if _did_live_transcribe else 0,
+                        (_t_tr_end - _t_tr_start),
+                        ((_t_llm1 or _t_tr_end) - (_t_llm0 or _t_tr_end)),
+                        time.time() - _t0)
+        except Exception:
+            pass
 
         today_short = datetime.now(timezone.utc).strftime("%d %b %Y").lower()
         script_title = llm_title or ("Guion desde @" + ig_username + " · " + today_short)

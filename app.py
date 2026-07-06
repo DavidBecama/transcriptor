@@ -9763,6 +9763,34 @@ def _sugg_record_served(uid, project_id, reel_ids):
         pass
 
 
+def _pretranscribe_served(reel_ids):
+    """PERF (David #2): pre-transcribe en BACKGROUND los reels SERVIDOS en sugerencias → el reel
+    que el usuario va a robar ya está transcrito al pulsar «Roba» (quita el cuello de la
+    transcripción en vivo, que hoy pega el 75% de los reels del pool). Idempotente
+    (transcribe_reel_task salta si ya está 'ok'); throttle Redis por reel (1h) para no re-encolar
+    en cada carga y que un reel popular se transcriba 1×/h como mucho. Gated + killable."""
+    if os.environ.get("RADAR_PRETRANSCRIBE_ON_SERVE", "1") != "1":
+        return
+    ids = [str(i) for i in (reel_ids or []) if i][:int(os.environ.get("PRETRANSCRIBE_SERVE_MAX", "8"))]
+    if not ids:
+        return
+    try:
+        from tasks import transcribe_reel_task  # noqa: E402
+    except Exception:
+        return
+    for rid in ids:
+        if rds is not None:
+            try:
+                if not rds.set("pretr:%s" % rid, "1", nx=True, ex=3600):
+                    continue   # ya encolado hace <1h → no re-encolar
+            except Exception:
+                pass
+        try:
+            transcribe_reel_task.delay(rid)
+        except Exception:
+            pass
+
+
 @app.route("/api/radar/suggestions", methods=["GET"])
 @require_auth
 @limiter.limit("60 per hour")
@@ -9798,7 +9826,9 @@ def radar_suggestions():
         # Agotamiento honesto (contrato punto 5): 0 frescos AHORA pero el usuario YA vio algo hoy
         # → «has visto todo lo fresco», no vacío mudo. (Sin nada servido aún ⇒ marca sin pool.)
         exhausted = (len(batch) == 0 and bool(excl_reels))
-        _sugg_record_served(uid, project_id, [x.get("id") for x in batch])
+        _served_ids = [x.get("id") for x in batch]
+        _sugg_record_served(uid, project_id, _served_ids)
+        _pretranscribe_served(_served_ids)   # PERF #2: transcribe en bg lo servido → robo instantáneo
         # #2/#3b «posibles competidores»: creadores que petan de forma consistente (worth_follow),
         # no seguidos, del nicho. Foto = iniciales en el front (el payload no trae avatar).
         # #3 (David 05/07): TODOS los creadores del nicho no seguidos, por explosión (antes
@@ -9916,7 +9946,9 @@ def radar_suggestions_more():
     err, _refund, _st = _charge_units_locked(uid, SUGG_MORE_UNITS, user)
     if err:
         return err
-    _sugg_record_served(uid, project_id, [x.get("id") for x in reels])
+    _more_ids = [x.get("id") for x in reels]
+    _sugg_record_served(uid, project_id, _more_ids)
+    _pretranscribe_served(_more_ids)   # PERF #2: transcribe en bg también las tandas de «ver más»
     track_event("sugg_more", uid, {"project_id": project_id, "n": len(reels), "units": SUGG_MORE_UNITS})
     # has_more real: el probe (+1) trajo más que la tanda → quedan frescos tras cobrar. Si no,
     # la siguiente vista muestra la card de agotamiento (no un botón de pago que lleva a vacío).
