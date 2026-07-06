@@ -171,7 +171,9 @@ CREATE TABLE IF NOT EXISTS public.ideas (
   source                TEXT NOT NULL DEFAULT 'manual',  -- 'manual' | 'suggestion'
   inspired_by_username  TEXT,
   generation_reasoning  TEXT,
-  notes                 TEXT    -- notas del usuario en el workspace de «Ideas robadas»
+  notes                 TEXT,   -- notas del usuario en el workspace de «Ideas robadas»
+  transcript_snapshot   TEXT,   -- «Guardar idea con datos»: copia del transcript del reel (sobrevive al pool)
+  metrics_snapshot      JSONB   -- «Guardar idea con datos»: snapshot de métricas del reel (views/likes/…)
 );
 
 -- ════════════════════════════════════════════════════════════
