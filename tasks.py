@@ -1092,6 +1092,7 @@ def scrape_creator_task(creator_id: str, results_limit: int = 10) -> dict:
 
     # 4. UPSERT reels si tenemos items y status ok.
     reels_count = 0
+    new_reels = 0   # net-new (David refresh-now): ig_reel_id que NO existían → «contenido nuevo»
     if final_status == "ok" and items:
         rows = []
         for item in items:
@@ -1119,6 +1120,20 @@ def scrape_creator_task(creator_id: str, results_limit: int = 10) -> dict:
                 "fetched_at": datetime.now(timezone.utc).isoformat(),
             })
         if rows:
+            # NET-NEW: el upsert re-escribe también los reels viejos (actualiza views), así
+            # reels_count NO indica «trajo algo nuevo». Contamos los ig_reel_id que NO estaban
+            # antes → señal fiable para el reembolso del refresh-now de pago (contrato David).
+            try:
+                _scraped_ids = [r["ig_reel_id"] for r in rows if r.get("ig_reel_id")]
+                _existing = set()
+                for _i in range(0, len(_scraped_ids), 100):
+                    _ex = (db.table("creator_reels_global").select("ig_reel_id")
+                             .eq("creator_id", creator_id)
+                             .in_("ig_reel_id", _scraped_ids[_i:_i + 100]).execute())
+                    _existing |= {x.get("ig_reel_id") for x in (_ex.data or [])}
+                new_reels = sum(1 for s in _scraped_ids if s not in _existing)
+            except Exception:
+                new_reels = 0
             def _upsert(rs):
                 db.table("creator_reels_global").upsert(rs, on_conflict="creator_id,ig_reel_id").execute()
             try:
@@ -1214,6 +1229,7 @@ def scrape_creator_task(creator_id: str, results_limit: int = 10) -> dict:
     out = {"status": final_status, "creator_id": creator_id, "ig_username": ig_username}
     if final_status == "ok":
         out["reels_count"] = reels_count
+        out["new_reels"] = new_reels
     if last_error:
         out["error"] = last_error
     return out
@@ -1538,8 +1554,13 @@ def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_un
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     _db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     statuses = [(_r or {}).get("status") for _r in (results or []) if isinstance(_r, dict)]
+    new_total = sum(int((_r or {}).get("new_reels") or 0)
+                    for _r in (results or []) if isinstance(_r, dict))
     hard_fail = {"failed", "creator_not_found"}
     all_failed = bool(statuses) and all(s in hard_fail for s in statuses)
+    # CONTRATO David: reembolsar si TODO falló O si el refresh NO trajo NADA nuevo. Cobrar por
+    # vacío (competidores sin novedades) es inaceptable → el usuario recupera sus créditos.
+    nothing_new = (new_total == 0)
     pid = project_id or "_"
     day = datetime.now(timezone.utc).strftime("%Y%m%d")
     try:
@@ -1554,7 +1575,7 @@ def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_un
         except Exception:
             pass
     refunded = False
-    if charged_amount and all_failed:
+    if charged_amount and (all_failed or nothing_new):
         # Guard de idempotencia POR COBRO (no por-día): cada cobro tiene su nonce → dos
         # fallos totales el mismo día se reembolsan ambos. Si falta charge_id (compat),
         # cae a la clave por-día (comportamiento previo).
@@ -1581,8 +1602,10 @@ def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_un
             except Exception:
                 logger.warning("finalize_manual_refresh: refund failed uid=%s", uid)
             # NO se limpia el cooldown: el scrape golpeó Apify; mantenerlo capa ese coste.
-    logger.info("finalize_manual_refresh uid=%s statuses=%s refunded=%s", uid, statuses, refunded)
-    return {"refunded": refunded, "statuses": statuses}
+    logger.info("finalize_manual_refresh uid=%s statuses=%s new=%d refunded=%s reason=%s",
+                uid, statuses, new_total, refunded,
+                ("all_failed" if all_failed else ("nothing_new" if nothing_new else "-")))
+    return {"ok": True, "refunded": refunded, "new_count": new_total, "statuses": statuses}
 
 
 @celery_app.task(name="tasks.scrape_user_profiles")

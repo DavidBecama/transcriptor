@@ -434,6 +434,27 @@ async function main() {
   check("marca muda (b5) muestra estado honesto «poblando tu radar»",
         muteState.honest && /poblando|populating/i.test(muteState.txt), JSON.stringify(muteState));
 
+  /* ═══ Contrato David · «Refrescar ahora» NO cobra por vacío ═══
+     Un refresh que no trae nada nuevo debe mostrar mensaje HONESTO («no hay nada nuevo, vuelve
+     mañana») y NO tocar los créditos. Se fuerza el caso «sin novedades» con ?refresh=empty. Rojo
+     si el refresh vacío muestra «Radar actualizado» (falso positivo) o si cambian los créditos. */
+  console.log("\n■ Refresh honesto · no cobrar por vacío");
+  await nav(`${BASE}/profile/radar?plan=creador&refresh=empty`);
+  const credBefore = await evaluate(`(function(){var m=document.body.textContent.match(/([\\d.]+)\\s*cr[eé]ditos/i);return m?m[1]:null;})()`);
+  const clicked = await click('#radarRoot [data-act="refresh-radar"]');
+  await sleep(500);
+  const refreshOut = await evaluate(`(function(){
+    var t=document.getElementById('rsToast');
+    var m=document.body.textContent.match(/([\\d.]+)\\s*cr[eé]ditos/i);
+    return { toast:(t&&t.textContent||'').trim().slice(0,90), creds:(m?m[1]:null) };
+  })()`);
+  const honestMsg = /nada nuevo|vuelve mañana|nothing new|come back tomorrow/i.test(refreshOut.toast);
+  const notFakeSuccess = !/radar actualizado|radar (updated|refreshed)/i.test(refreshOut.toast);
+  check("refresh sin novedades: mensaje honesto (no «actualizado»)",
+        clicked && honestMsg && notFakeSuccess, JSON.stringify(refreshOut));
+  check("refresh sin novedades: créditos sin cambio (no cobra por vacío)",
+        credBefore !== null && refreshOut.creds === credBefore, `${credBefore} -> ${refreshOut.creds}`);
+
   console.log(`\n═══ RESULTADO: ${passed} ✓ · ${failed} ✗ ═══`);
   if (fails.length) { console.log(fails.map((f) => "  ✗ " + f).join("\n")); }
   process.exitCode = failed ? 1 : 0;
