@@ -2371,10 +2371,13 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
             return _fail("assistant_too_short", msg)
 
         try:
-            # 2 OPCIONES en paralelo (modelo de generación = pro), por MARCA.
-            from app import _generate_script_options, _shape_script_option  # lazy import (circular).
+            # 2 OPCIONES en paralelo (modelo de generación = pro), por MARCA. Timeout LARGO:
+            # corre en el worker (sin gateway), así pro (40-90s) termina sin cortar ni caer a groq.
+            from app import (_generate_script_options, _shape_script_option,  # lazy import (circular).
+                             GENERATION_LLM_TIMEOUT)
             _t_llm0 = time.time()
-            raw_opts = _generate_script_options(user_content, style_arg, custom_prompt, user_id, project_id, n=2)
+            raw_opts = _generate_script_options(user_content, style_arg, custom_prompt, user_id,
+                                                project_id, n=2, timeout=GENERATION_LLM_TIMEOUT)
             _t_llm1 = time.time()
         except Exception as e:
             logger.exception("gen_script_task LLM failed reel=%s: %s", reel_id, e)

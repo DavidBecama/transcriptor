@@ -6355,10 +6355,10 @@
     // Respuesta inesperada → fallback al caption.
     r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},600);
   }
-  // Polling del task de generación async (steal cache-miss). Máx ~150s (la transcripción
-  // por Apify+Groq puede tardar; 90s se quedaba corto y daba "No pude terminar").
+  // Polling del task de generación async (AHORA todos los robos, no solo cache-miss). Máx ~180s:
+  // pro tarda 40-90s y la transcripción Apify+Groq puede sumar; margen para no cortar antes de tiempo.
   function pollScriptTask(taskId, r, t0, cb){
-    var tries=0, MAX=75;
+    var tries=0, MAX=90;
     (function loop(){
       tries++;
       apiGet("/task/script/"+encodeURIComponent(taskId)).then(function(rr){
