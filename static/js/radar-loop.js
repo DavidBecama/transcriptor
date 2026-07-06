@@ -1242,7 +1242,11 @@
   function onbStealOfferHTML(){
     if(!S.onbStealOffer) return "";
     var cof=S.onbCofre||{phase:'choose',selected:-1};
-    var reels=_cofreReels(); if(!reels.length) return "";
+    var reels=_cofreReels();
+    // NO cortar aquí: la AVALANCHA dibuja thumbs SINTÉTICOS (no necesita reels reales) y en
+    // cuentas reales los reels cargan en 2º plano → si devolvíamos "" mientras tanto, la
+    // pantalla quedaba EN BLANCO (solo el fondo .onb-fs) toda la carga. El guard de reels
+    // solo aplica a «elegir» (esa sí necesita las 3 cartas reales). Bug Leo 05-jul.
     var inner;
     if(cof.phase==='avalanche'){
       inner='<div class="cofre-av">'+
@@ -1252,6 +1256,7 @@
         '<div class="cofre-bar"><div class="cofre-bar-fill" id="rsCofreBar"></div></div>'+
       '</div>';
     } else {
+      if(!reels.length) return "";   // «elegir» sin cartas reales no tiene sentido (la avalancha sí)
       var cards=reels.slice(0,3).map(function(r,i){ return _cofreCard(r,i,cof.selected); }).join("");
       var selR=cof.selected>=0?reels[cof.selected]:null;
       inner='<div class="cofre-choose">'+
