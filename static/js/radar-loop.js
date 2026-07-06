@@ -1889,12 +1889,7 @@
     // sigue siendo toggle y Esc cierra). Si el reel abierto no es una sugerencia (feed), dr=null.
     var dr=S.detailReelId?list.filter(function(x){return x.id===S.detailReelId;})[0]:null;
     var isMob=(S.device==="mobile");
-    var panel='';
-    if(dr){
-      var _head='<div class="stday-side-head"><span class="stday-side-t">'+IC.bolt+' '+L("Detalle del reel","Reel detail")+'</span>'+
-        '<button class="stday-side-x" data-act="close-reel-detail" aria-label="'+L("Cerrar","Close")+'">'+IC.x+'</button></div>';
-      panel=_head+reelDetailHTML(dr);
-    }
+    var panel=dr?suggDetailHTML(dr):'';
     var side=(dr&&!isMob)?'<aside class="stday-side">'+panel+'</aside>':'';
     var overlay=(dr&&isMob)?'<div class="stday-overlay" data-act="close-reel-detail"><div class="stday-sheet" data-act="stday-noop">'+panel+'</div></div>':'';
     return '<section class="stday-sec'+(dr&&!isMob?' stday-sec--split':'')+'">'+
@@ -5909,6 +5904,51 @@
       txBody+
     '</div>';
   }
+  // #4 (David 06/07): DETALLE de sugerencia para PANEL LATERAL (desktop) / OVERLAY (móvil).
+  // Layout dedicado (NO reusa reel-inline, que asume ancho completo y se estruja en el panel):
+  //   IZQ  = vídeo (badge explosión) + @autor + título (2-3 líneas, «ver más») + Ocultar + robar-mini
+  //   DCHA = métricas 2×2 (Explosión·Views·Likes·Comentarios) + TRANSCRIPCIÓN + «Roba la idea» grande
+  function suggDetailHTML(r){
+    if(!r) return '';
+    var exp=(r.explosionTxt!=null?r.explosionTxt+"×":"–");
+    var mets=[["Explosión",exp],["Views",r.views],["Likes",r.likes],["Comentarios",(r.comments!=null?r.comments:"–")]];
+    var metsHTML='<div class="suggd-mets">'+mets.map(function(m){
+      return '<div class="suggd-met"><div class="suggd-met-k">'+ESC(m[0].toUpperCase())+'</div><div class="suggd-met-v">'+ESC(String(m[1]!=null?m[1]:"–"))+'</div></div>'; }).join("")+'</div>';
+    var tx=S._tx&&S._tx.id===r.id?S._tx:{status:"idle"};
+    var txStat, txBody;
+    if(tx.status==="ok"){ txStat=L("lista","ready"); txBody='<div class="suggd-tx-text">'+ESC(tx.text)+'</div>'; }
+    else if(tx.status==="loading"){ txStat=L("transcribiendo…","transcribing…"); txBody='<div class="suggd-tx-wait"><span class="rs-ldr"></span>'+L("Transcribiendo el audio… (~30-60s la 1ª vez; queda cacheada)","Transcribing audio… (~30-60s first time; then cached)")+'</div>'; }
+    else if(tx.status==="error"){ txStat=L("no disponible","unavailable"); txBody='<div class="suggd-tx-wait">'+L("No se pudo transcribir este reel.","Couldn't transcribe this reel.")+' <button class="btn btn-sm btn-secondary" data-act="reel-tx" data-id="'+ESC(r.id)+'">'+L("Reintentar","Retry")+'</button></div>'; }
+    else { txStat=L("pulsa para verla","tap to view"); txBody='<button class="btn btn-md btn-secondary suggd-tx-btn" data-act="reel-tx" data-id="'+ESC(r.id)+'">'+IC.doc+' '+L("Ver transcripción","View transcript")+'</button>'; }
+    var cap=r.cap||"", capLong=cap.length>110, capFull=(S._suggCapFull===r.id);
+    var capHTML=cap?'<div class="suggd-cap'+((capLong&&!capFull)?' clamp':'')+'">'+ESC(cap)+'</div>'+
+      (capLong?'<button class="suggd-cap-more" data-act="sugg-cap-more" data-id="'+ESC(r.id)+'">'+(capFull?L("ver menos","less"):L("ver más","more"))+'</button>':''):'';
+    var who=(r.creator&&r.creator.handle)?'@'+ESC(r.creator.handle):'';
+    return '<div class="suggd"><div class="suggd-cols">'+
+      '<div class="suggd-l">'+
+        '<div class="suggd-video" style="background:'+_galGrad(r.id)+'" data-act="reel-open" data-id="'+ESC(r.id)+'" role="button" tabindex="0" title="'+L("Abrir el reel original ↗","Open original reel ↗")+'">'+
+          '<span class="suggd-exp">'+IC.spark+' '+ESC(exp)+'</span>'+
+          (r.thumb?'<img src="'+ESC(r.thumb)+'" alt="">':'')+
+          '<span class="suggd-play">'+_icPlay+'</span>'+
+          '<span class="suggd-open">↗</span>'+
+        '</div>'+
+        '<div class="suggd-who">'+who+'</div>'+
+        capHTML+
+        '<div class="suggd-lacts">'+
+          '<button class="suggd-hide" data-act="close-reel-detail">'+L("Ocultar","Hide")+'</button>'+
+          '<button class="suggd-robmini" data-act="steal" data-id="'+ESC(r.id)+'" aria-label="'+L("Roba la idea","Steal the idea")+'" title="'+L("Roba la idea","Steal the idea")+'">'+IC.bolt+'</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="suggd-r">'+
+        metsHTML+
+        '<div class="suggd-txwrap">'+
+          '<div class="suggd-tx-k">'+L("TRANSCRIPCIÓN","TRANSCRIPT")+' <span class="suggd-tx-st">· '+txStat+'</span></div>'+
+          txBody+
+        '</div>'+
+        '<button class="btn btn-primary suggd-steal" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba la idea","Steal the idea")+'</button>'+
+      '</div>'+
+    '</div></div>';
+  }
   // Una card + su detalle inline si está abierto (se usa en feed y en vista de competidor).
   function reelRowHTML(r){
     return reelCardHTML(r)+(S.detailReelId===r.id?reelDetailHTML(r):'');
@@ -7600,6 +7640,7 @@
       return;
     }
     if(act==="close-reel-detail"){ S.detailReelId=null; return render(); }   // #4: cerrar panel/overlay del detalle
+    if(act==="sugg-cap-more"){ S._suggCapFull=(S._suggCapFull===id?null:id); return render(); }   // #4: caption «ver más»/«ver menos»
     if(act==="stday-noop"){ return; }   // #4: la hoja del overlay no cierra al tocarla (solo el backdrop)
     if(act==="reshuffle-feed"){   // «↻ otras» GRATIS del feed del radar: re-baraja sin scrape
       if(isDemo()) return;

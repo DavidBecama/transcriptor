@@ -10916,6 +10916,49 @@ def _user_owns_reel(uid: str, reel_id: str) -> bool:
     return bool(own_r.data)
 
 
+def _reel_matches_user_niche(uid: str, reel_id: str) -> bool:
+    """El reel es de un creador del NICHO del user (perfil o alguna marca) aunque NO lo
+    siga. Base para autorizar acciones baratas (transcribir) sobre reels de SUGERENCIAS —
+    que por definición son de creadores no seguidos. Criterio laxo, alineado con el pool de
+    sugerencias: nicho coarse igual o solape de subnichos."""
+    try:
+        rr = (db.table("creator_reels_global").select("creator_id")
+                .eq("id", reel_id).single().execute())
+        cid = (rr.data or {}).get("creator_id")
+        if not cid:
+            return False
+        cr = (db.table("creators_global").select("niche, subniches")
+                .eq("id", cid).single().execute()).data or {}
+        c_niche = _norm_tag(cr.get("niche") or "")
+        c_subs = {t for t in (_norm_tag(s) for s in (cr.get("subniches") or [])) if t}
+        wanted_niches, wanted_subs = set(), set()
+        prof = get_profile(uid) or {}
+        if prof.get("niche"):
+            wanted_niches.add(_norm_tag(prof["niche"]))
+        for s in (prof.get("subniches") or []):
+            t = _norm_tag(s)
+            if t:
+                wanted_subs.add(t)
+        try:
+            for p in (db.table("projects").select("niche, subniches")
+                        .eq("user_id", uid).execute()).data or []:
+                if p.get("niche"):
+                    wanted_niches.add(_norm_tag(p["niche"]))
+                for s in (p.get("subniches") or []):
+                    t = _norm_tag(s)
+                    if t:
+                        wanted_subs.add(t)
+        except Exception:
+            pass
+        if c_niche and c_niche in wanted_niches:
+            return True
+        if c_subs and (c_subs & (wanted_subs | wanted_niches)):
+            return True
+        return False
+    except Exception:
+        return False
+
+
 @app.route("/api/competitors/reels/<reel_id>/transcript", methods=["GET"])
 @require_auth
 @limiter.limit("30 per minute")
@@ -10929,7 +10972,9 @@ def get_competitor_reel_transcript(reel_id: str):
     transcript_status + sweeper de stale)."""
     user = current_user()
     uid = user["id"]
-    if not _user_owns_reel(uid, reel_id):
+    # Autoriza reels SEGUIDOS o de SUGERENCIAS (creadores del nicho no seguidos): antes solo
+    # los seguidos → las sugerencias daban 404 y no se podían transcribir (David 06/07).
+    if not (_user_owns_reel(uid, reel_id) or _reel_matches_user_niche(uid, reel_id)):
         return jsonify({"error": "reel_not_found"}), 404
     try:
         rr = (db.table("creator_reels_global")
