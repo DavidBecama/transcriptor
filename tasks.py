@@ -1364,8 +1364,11 @@ def refresh_suggestion_pools():
     """Pool de sugerencias VIVO: re-scrapea creadores de NICHOS ACTIVOS (nicho canónico
     de algún proyecto o perfil). No excluye seguidos: el doble scrape lo evita solo la
     staleness (84h aquí vs 48h del job de tracked). Stalest-first + cap diario."""
-    if os.environ.get("RADAR_POOL_REFRESH_ENABLED", "0") != "1":
-        logger.info("refresh_suggestion_pools: OFF (RADAR_POOL_REFRESH_ENABLED != 1)")
+    # Default ON desde v0.44 (decisión David #2): el pool de nicho se refresca solo (stalest-first
+    # + cap diario _POOL_DAILY_CAP) → las sugerencias no se agotan sin remedio. Killable con
+    # RADAR_POOL_REFRESH_ENABLED=0 en el .env del VPS si dispara el coste Apify.
+    if os.environ.get("RADAR_POOL_REFRESH_ENABLED", "1") != "1":
+        logger.info("refresh_suggestion_pools: OFF (RADAR_POOL_REFRESH_ENABLED=0)")
         return {"status": "disabled"}
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")

@@ -1810,6 +1810,7 @@
       // Contrato «ninguna marca muda»: ready|populating|empty|exhausted|needs_niche. populating
       // ⇒ nicho de catálogo aún sin reels (el backend ya disparó la siembra) → estado honesto + poll.
       S._suggPoolStatus=(r&&r.d&&r.d.pool_status)||'';
+      S._suggPoolRefreshable=!!(r&&r.d&&r.d.pool_refreshable);   // #2: agotado + pool con creadores stale → ofrecer «Refrescar sugerencias 5cr»
       // Son REELS (normReel-compat): los normalizo y marco suggestion=true (para robar SIN
       // seguir vía no_follow) + worthFollow (para ofrecer «+ Añadir competidor» solo en esos).
       S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions)) ? r.d.suggestions.map(_normSugg) : [];
@@ -1892,9 +1893,15 @@
   // Sección «Sugerencias de hoy» (carrusel de REELS con flechas ←/→). Oculta en demo/vacío.
   function suggestionsTodayHTML(){
     if(S._stDismissed) return '';
+    // Demo/harness: forzar el estado AGOTADO para pinnear el guardarraíl #2 (pago solo si el pool
+    // es refrescable). ?sugg=exhausted → refrescable (botón); ?sugg=exhausted-norefresh → «vuelve
+    // mañana» SIN botón. Nunca vender aire.
+    if(isDemo() && /[?&]sugg=exhausted/.test(location.search)){
+      S._suggExhausted=true; S._suggToday=[]; S._suggPoolRefreshable=!/norefresh/.test(location.search);
+    }
     // En demo la sección normal (reels/competidores del backend) se suprime, PERO el estado
-    // HONESTO «poblando/añadiendo nicho» sí se muestra para la marca muda (lo verifica el harness).
-    if(isDemo() && S._suggPoolStatus!=="populating" && S._suggPoolStatus!=="empty") return '';
+    // HONESTO «poblando/añadiendo nicho» y el AGOTADO forzado sí se muestran (los verifica el harness).
+    else if(isDemo() && S._suggPoolStatus!=="populating" && S._suggPoolStatus!=="empty") return '';
     // Sin nicho (ni en perfil ni en proyecto) → pedir definirlo en vez de quedarse vacío.
     // El texto/acción se adaptan: marca con proyecto → su nicho; marca default → tu nicho.
     if(S._suggNeedsNiche){
@@ -1954,12 +1961,18 @@
       // Contrato punto 5: agotado de verdad → «has visto todo lo fresco» + CTA (no vacío mudo).
       // Sin agotar (cargando / pool sin nicho) → no se pinta (regla de vacíos).
       if(S._suggExhausted){
+        // #2 (David): esto refresca el POOL DE NICHO (sugerencias), NO tus competidores. Guardarraíl:
+        // botón de pago SOLO si un scrape del pool puede traer algo (pool_refreshable); si no, «vuelve
+        // mañana» SIN botón (no vender aire). El reembolso on-empty sigue de red de seguridad.
+        var _exhCta=S._suggPoolRefreshable
+          ? '<button class="stday-exh-cta" data-act="refresh-pool">'+IC.repeat+' '+L("Refrescar sugerencias · 5 cr","Refresh suggestions · 5 cr")+'</button>'+
+            '<div class="stday-exh-sub">'+L("scrapeo lo último de tu nicho · o vuelve mañana (el pool se renueva solo)","pull the latest from your niche · or come back tomorrow (the pool refreshes on its own)")+'</div>'
+          : '<div class="stday-exh-sub">'+L("Vuelve mañana — el pool de tu nicho se renueva solo.","Come back tomorrow — your niche pool refreshes on its own.")+'</div>';
         return '<section class="stday-sec">'+
           '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span>'+_stdayMiniActs()+'</div>'+
           '<div class="stday-exhausted-full">'+
             '<div class="stday-exh-t">'+L("Has visto todo lo fresco de hoy","You\'ve seen all today\'s fresh reels")+'</div>'+
-            '<button class="stday-exh-cta" data-act="refresh-radar">'+IC.repeat+' '+L("Refrescar ahora · 5 cr","Refresh now · 5 cr")+'</button>'+
-            '<div class="stday-exh-sub">'+L("o vuelve mañana — el radar se renueva solo","or come back tomorrow — the radar refreshes on its own")+'</div>'+
+            _exhCta+
           '</div>'+
         '</section>';
       }
@@ -1972,8 +1985,10 @@
     var moreCard=S._suggExhausted
       ? '<div class="stday-card stday-exhausted">'+
           '<span class="stday-exh-t">'+L("Has visto todo lo fresco de hoy","You\'ve seen all today\'s fresh reels")+'</span>'+
-          '<button class="stday-exh-cta" data-act="refresh-radar">'+IC.repeat+' '+L("Refrescar ahora · 5 cr","Refresh now · 5 cr")+'</button>'+
-          '<span class="stday-exh-sub">'+L("o vuelve mañana","or come back tomorrow")+'</span>'+
+          (S._suggPoolRefreshable   // #2: pago solo si el pool puede traer algo; si no, «vuelve mañana» sin botón
+            ? '<button class="stday-exh-cta" data-act="refresh-pool">'+IC.repeat+' '+L("Refrescar sugerencias · 5 cr","Refresh suggestions · 5 cr")+'</button>'+
+              '<span class="stday-exh-sub">'+L("o vuelve mañana","or come back tomorrow")+'</span>'
+            : '<span class="stday-exh-sub">'+L("vuelve mañana — el pool se renueva solo","come back tomorrow — the pool refreshes on its own")+'</span>')+
         '</div>'
       : (S._suggHasMore
         ? '<button class="stday-card stday-morecard" data-act="sugg-more" data-offset="'+list.length+'">'+
@@ -2463,7 +2478,7 @@
         // renueva gratis también.
         '<div class="rdr-refresh-row">'+
           '<button class="rdr-reshuffle-cta" data-act="reshuffle-feed" title="'+L("Baraja otras del pool que ya tienes — gratis, sin scrape","Shuffle others from the pool you already have — free, no scrape")+'">'+IC.repeat+' '+L("Otras · gratis","Others · free")+'</button>'+
-          '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus competidores AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your competitors\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar ahora · 5 créditos","Refresh now · 5 credits")+'</button>'+
+          '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus COMPETIDORES AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your COMPETITORS\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar competidores · 5 créditos","Refresh competitors · 5 credits")+'</button>'+
           // Reorganización 04/07: «Añadir/Analizar reel» SUBEN al hero como botones visibles
           // (antes links enterrados en la addbar a media página). Secundarios a propósito:
           // la única primaria sobre el fold sigue siendo «Roba la idea» (T1).
@@ -4418,6 +4433,41 @@
         title:L("Refrescar ahora","Refresh now"),
         body:L("Traigo lo último de tus competidores en vivo (scrape). Cuesta ~5 créditos. El radar se renueva solo cada día gratis.",
                "I pull your competitors' latest live (scrape). Costs ~5 credits. The radar auto-refreshes daily for free."),
+        confirmText:L("Sí, refrescar","Yes, refresh"), cancelText:L("Ahora no","Not now")
+      }).then(function(ok){ if(ok) go(); });
+    } else { go(); }
+  }
+  // #2 (David): «Refrescar sugerencias» — scrapea el POOL DE NICHO (no tus competidores) para
+  // traer reels nuevos al carrusel. Guardarraíl en backend (refreshable=false → no cobra). Reusa
+  // el poll del desenlace (reembolso on-empty). Distinto de refreshRadar (competidores/feed).
+  function refreshPool(){
+    if(isDemo()){
+      // Demo/harness: forzar el caso «no refrescable» → mensaje honesto SIN cobro con ?pool=norefresh.
+      return showToast(L("No hay reels nuevos en tu nicho ahora. Vuelve mañana.","Nothing new in your niche right now. Come back tomorrow."));
+    }
+    var _pid=_pidOf(S.brandId);
+    var go=function(){
+      apiPost("/api/radar/refresh-pool", _pid?{project_id:_pid}:{}).then(function(r){
+        if(r.status===429){ return showError((r.d&&r.d.message)||L("Acabas de refrescar. Prueba más tarde.","You just refreshed. Try again later.")); }
+        if(r.status===402){
+          showError((r.d&&r.d.message)||L("Necesitas créditos para refrescar.","You need credits to refresh."));
+          try{ if(typeof window.openUpgradeModal==="function") window.openUpgradeModal("credits"); }catch(e){}
+          return;
+        }
+        if(!r.ok){ return showError((r.d&&r.d.message)||L("No pude refrescar las sugerencias.","Couldn't refresh suggestions.")); }
+        // Guardarraíl backend: refreshable=false → NO cobró → mensaje honesto, sin poll.
+        if(r.d && r.d.refreshable===false){ return showToast((r.d.message)||L("No hay nada nuevo en tu nicho ahora. Vuelve mañana.","Nothing new in your niche right now. Come back tomorrow.")); }
+        var tid=(r.d&&r.d.refresh_task_id)||null, n=(r.d&&r.d.queued)||0;
+        showToast((r.d&&r.d.message)||L("Buscando reels nuevos en tu nicho…","Looking for new reels in your niche…"));
+        if(n){ try{ refreshCredits(); }catch(e){} }
+        if(tid && n){ _pollRefreshOutcome(tid); }
+      });
+    };
+    if(typeof window.confirmModal==="function"){
+      window.confirmModal({
+        title:L("Refrescar sugerencias","Refresh suggestions"),
+        body:L("Traigo lo último de tu NICHO en vivo (scrape del pool de sugerencias). Cuesta ~5 créditos. Si no hay nada nuevo, se te devuelven.",
+               "I pull the latest from your NICHE live (suggestions pool scrape). Costs ~5 credits. If nothing's new, you get them back."),
         confirmText:L("Sí, refrescar","Yes, refresh"), cancelText:L("Ahora no","Not now")
       }).then(function(ok){ if(ok) go(); });
     } else { go(); }
@@ -7951,6 +8001,7 @@
     if(act==="dns-feed"){ var _t=document.querySelector(".opp, .feature, .rgal"); if(_t) _t.scrollIntoView({behavior:"smooth", block:"center"}); return; }   // #8: «ver mi radar» → baja a las oportunidades
     if(act==="comp-add-submit") return submitAddComp();
     if(act==="refresh-radar") return refreshRadar();
+    if(act==="refresh-pool") return refreshPool();
     if(act==="open-plans"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("free_limit"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
     // Pill de créditos del topbar → abre el modal de planes/upgrade (camino de cobro).
     if(act==="credits-pill"){ if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("credits_pill"); }catch(e){ showError(L("No pude abrir los planes. Recarga la página.","Couldn't open plans. Reload the page.")); } } return; }
