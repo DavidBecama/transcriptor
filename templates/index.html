@@ -3044,7 +3044,7 @@ const LANGS = {
     "ideas.save": "Guardar",
     "ideas.saved_toast": "Idea guardada",
     "ideas.develop_toggle": "Desarrollar con IA",
-    "ideas.save_develop": "Guardar y desarrollar",
+    "ideas.save_develop": "Guardar y desarrollar · 1 cr",
     "ideas.save_only": "Guardar",
     // v0.14.26 — Suggest Ideas Phase 1
     "ideas.discard": "Descartar",
@@ -3546,7 +3546,7 @@ const LANGS = {
     "ideas.save": "Save",
     "ideas.saved_toast": "Idea saved",
     "ideas.develop_toggle": "Develop with AI",
-    "ideas.save_develop": "Save & develop",
+    "ideas.save_develop": "Save & develop · 1 cr",
     "ideas.save_only": "Save",
     // v0.14.26 — Suggest Ideas Phase 1
     "ideas.discard": "Discard",
@@ -9665,8 +9665,15 @@ async function developIdeaNow(id) {
       }
       await loadIdeas();
     } else {
-      const d = await res.json();
-      showToast(d.error || "Error");
+      const d = await res.json().catch(() => ({}));
+      // econ (David 06/07): desarrollar cuesta 1 crédito → sin saldo el backend responde 402.
+      // Muro de recarga en vez de un error crudo.
+      if (res.status === 402 || (d && d.error === "no_credits")) {
+        if (typeof openUpgradeModal === "function") openUpgradeModal("ideas_develop");
+        showToast(d.message || "Necesitas 1 crédito para desarrollar esta idea.");
+      } else {
+        showToast(d.error || "Error");
+      }
     }
   } catch {
     _btnRotateStop(btn, _rot);
@@ -10843,7 +10850,13 @@ async function saveIdeaCapture() {
     const d = await res.json();
 
     if (!res.ok && res.status !== 200) {
-      showToast(d.error || t("toast.error_save"));
+      // econ (David 06/07): «Guardar y desarrollar» cuesta 1 crédito → 402 sin saldo → muro.
+      if (res.status === 402 || (d && d.error === "no_credits")) {
+        if (typeof openUpgradeModal === "function") openUpgradeModal("ideas_develop");
+        showToast((d && d.message) || "Necesitas 1 crédito para desarrollar la idea.");
+      } else {
+        showToast(d.error || t("toast.error_save"));
+      }
       return;
     }
 
