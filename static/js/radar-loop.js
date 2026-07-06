@@ -5544,7 +5544,9 @@
     else if(S.view==="editor") html+=scriptEditorHTML();   // v3: editor completo (mockup David), desde «Abrir guion»
     else if(S.view==="result") html+=overlayShellHTML(formatResultHTML(S.resultKind),"Listo","back-script",false);
     else if(S.view==="perf") html+=overlayShellHTML(guiPerfHTML(),"Rendimiento del guion","close-feed",true);
-    else if(S.view==="prompter") html+=teleprompterHTML();
+    // teleprompter unificado (David 06/07): S.view==="prompter" RETIRADO — el loop abre el
+    // teleprompter REAL vía window.tpOpen (openLoopPrompter). teleprompterHTML() (mock) queda
+    // muerto y sin invocar; no se borra su def por compartir helpers (_icLock) con otras vistas.
     else if(S.view==="fillweek") html+='<div class="overlay" role="dialog" aria-modal="true" aria-label="Llena mi semana"><div class="obar"><button class="back" data-act="close-feed" aria-label="Cerrar">'+IC.x+'</button><span class="otitle">Llena mi semana</span></div><div class="oscroll" id="rsFillHost">'+fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase)+'</div></div>';
     if(S.communityInfo) html+=communityInfoModalHTML();   // mini-modal «Más información» Comunidad
     if(S.levelup) html+=levelupHTML();   // pantalla de animación al subir de nivel el Cerebro
@@ -6316,7 +6318,7 @@
   function openLoopPrompter(){
     var r=S.reel||{}; var txt=_tpTextOf(r.script);
     if(typeof window.tpOpen==="function"){ window.tpOpen(txt, {fromLoop:true, onDone:function(){ recorded(); }}); return; }
-    S.view="prompter"; render();   // fallback defensivo si el teleprompter real no está cargado
+    showError(L("No pude abrir el teleprompter. Recarga la página.","Couldn't open the teleprompter. Reload the page."));   // el real (index.html) no cargó — no debería pasar
   }
   /* growth-3 · PAYWALL CONTEXTUAL — el research dice que el paywall convierte
      MEJOR después del primer éxito, nunca antes. Este nudge SOLO se dispara

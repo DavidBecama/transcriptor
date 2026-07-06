@@ -303,14 +303,16 @@ async function main() {
   await nav(`${BASE}/profile/radar?plan=creador`);
   await click('.feature [data-act="steal"]'); await sleep(2300);   // espera teatral 1.7s
   const reveal2 = await evaluate(`!!document.querySelector('#radarRoot .script-hook')`);
-  await click('[data-act="chain"][data-k="record"]'); await sleep(300);
-  const prompter = await evaluate(`!!document.querySelector('#radarRoot .overlay.prompter')`);
-  await click('[data-act="recorded"]'); await sleep(300);
+  await click('[data-act="chain"][data-k="record"]'); await sleep(600);
+  // teleprompter UNIFICADO: el loop abre el teleprompter REAL (#tpOverlay), NO el mock (.overlay.prompter).
+  const prompter = await evaluate(`(function(){var ov=document.getElementById('tpOverlay');return !!(ov&&ov.classList.contains('on')) && !document.querySelector('#radarRoot .overlay.prompter');})()`);
+  await click('#tpDoneBtn'); await sleep(400);   // «Ya lo grabé» (botón de modo loop → recorded())
   const closed = await evaluate(`(function(){
-    return { feed: !document.querySelector('#radarRoot .overlay'),
+    var ov=document.getElementById('tpOverlay');
+    return { feed: !(ov&&ov.classList.contains('on')),
              toast: (document.getElementById('rsToastMsg')||{}).textContent||"" };
   })()`);
-  check("robo → reveal → teleprompter → «Ya lo grabé» cierra el loop",
+  check("robo → reveal → teleprompter REAL → «Ya lo grabé» cierra el loop",
     reveal2 && prompter && closed.feed && /Grabado/.test(closed.toast),
     JSON.stringify({ reveal2, prompter, closed }));
 
