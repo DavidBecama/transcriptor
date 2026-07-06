@@ -9665,8 +9665,15 @@ async function developIdeaNow(id) {
       }
       await loadIdeas();
     } else {
-      const d = await res.json();
-      showToast(d.error || "Error");
+      const d = await res.json().catch(() => ({}));
+      // econ (David 06/07): desarrollar cuesta 1 crédito → sin saldo el backend responde 402.
+      // Muro de recarga en vez de un error crudo.
+      if (res.status === 402 || (d && d.error === "no_credits")) {
+        if (typeof openUpgradeModal === "function") openUpgradeModal("ideas_develop");
+        showToast(d.message || "Necesitas 1 crédito para desarrollar esta idea.");
+      } else {
+        showToast(d.error || "Error");
+      }
     }
   } catch {
     _btnRotateStop(btn, _rot);

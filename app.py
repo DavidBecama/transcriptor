@@ -130,6 +130,7 @@ COST_CENTS       = 18   # $0.18 por uso de pago (~7 usos por $1.29)
 # Los sinks de "mirar" (Radar, métricas, refresh diario) son GRATIS por diseño.
 SCRIPT_UNITS          = 3    # generar guión (Roba la idea / desde idea / desde competidor)
 REGEN_UNITS           = 1    # regenerar guión (re-tira del mismo reel)
+DEVELOP_UNITS         = 1    # desarrollar idea (draft→developed, llama al LLM) — David 06/07 (antes gratis = fuga)
 HOOKS_EXTRA_UNITS     = 1    # "3 hooks más" tras agotar el cupo diario gratis
 HOOKS_FREE_PER_DAY    = 2    # hooks-extra gratis por usuario y día
 FILL_WEEK_UNITS       = 12   # "Llena mi semana" (5 guiones de golpe; vs 15 sueltos)
@@ -5950,9 +5951,15 @@ def create_idea():
             assistant_id = prof.data[0]["default_idea_assistant"]
 
     if develop:
+        # econ (David 06/07): crear-con-desarrollo llama al LLM → cuesta DEVELOP_UNITS. La isla
+        # SIEMPRE manda develop:false (draft gratis); esto cubre call-sites legacy con develop:true.
+        err, refund, _ = _charge_units_locked(user["id"], DEVELOP_UNITS, user)
+        if err:
+            return err
         try:
             result = develop_idea(raw_text, assistant_id, user["id"], language)
         except Exception as e:
+            refund()   # cae a draft → no se entregó desarrollo, devuelve el crédito
             logger.error(f"Idea development failed: {e}", exc_info=True)
             # Fallback: save as draft instead of failing
             row = db.table("ideas").insert({
@@ -6097,11 +6104,17 @@ def develop_idea_endpoint(idea_id):
     assistant_id = body.get("assistant_id") or idea.get("assistant_id")
     language = body.get("language", "es")
 
+    # econ (David 06/07): desarrollar llama al LLM → cuesta DEVELOP_UNITS (antes GRATIS = fuga).
+    # Refund si el LLM falla (no cobrar por un desarrollo que no se entregó).
+    err, refund, _ = _charge_units_locked(user["id"], DEVELOP_UNITS, user)
+    if err:
+        return err
     try:
         result = develop_idea(idea["raw_text"], assistant_id, user["id"], language)
     except json.JSONDecodeError as e:
         # v0.14.15a: LLM returned malformed/truncated JSON. Keep idea as draft,
         # don't return 502 — user retries vs. seeing a hard error.
+        refund()
         logger.error(f"develop_idea JSON parse failed: {e}", exc_info=True)
         return jsonify({
             "ok": False,
@@ -6109,6 +6122,7 @@ def develop_idea_endpoint(idea_id):
             "message": "La idea sigue guardada como borrador. Inténtalo de nuevo en unos minutos."
         }), 200
     except Exception as e:
+        refund()
         logger.error(f"Idea development failed: {e}", exc_info=True)
         return jsonify({"error": "Failed to develop. Try again."}), 502
 
