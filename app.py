@@ -92,6 +92,13 @@ OPENROUTER_MODEL      = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-fl
 # Modelo SOLO para la GENERACIÓN del guion (calidad > coste: ~€0,04/guion; el gasto gordo
 # es el scraping). La clasificación de formato y el resto siguen en OPENROUTER_MODEL (flash).
 GENERATION_MODEL      = os.environ.get("GENERATION_MODEL", "google/gemini-2.5-pro")
+# Timeout (s) de la llamada LLM de GENERACIÓN — SOLO en la tarea async (Celery, sin gateway):
+# pro tarda 40-90s; con los 60s por defecto cortaba y caía a groq → 2 opciones en paralelo →
+# 429 → «Failed to generate script». 120s deja terminar a pro y encaja bajo el poll del front (150s).
+GENERATION_LLM_TIMEOUT = int(os.environ.get("GENERATION_LLM_TIMEOUT", "120"))
+# Robo SIEMPRE async (Celery + poll): el flow SYNC generaba pro (40-90s) DENTRO del request →
+# el gateway cortaba → 502. Se desactiva por defecto; STEAL_SYNC_GEN=1 lo reactiva (no recomendado).
+STEAL_SYNC_GEN_ENABLED = os.environ.get("STEAL_SYNC_GEN", "0") == "1"
 SUPABASE_URL          = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_KEY", "")
 APIFY_TOKEN           = os.environ.get("APIFY_TOKEN", "")
@@ -3611,9 +3618,12 @@ def _parse_ai_json(raw: str, style: str) -> dict:
 
 
 def _llm_call_provider(provider: str, system: str, user_content: str,
-                       temperature: float, max_tokens: int, model: str = None) -> str:
+                       temperature: float, max_tokens: int, model: str = None,
+                       timeout: int = 60) -> str:
     """Una llamada a UN proveedor (openrouter | groq). Devuelve texto crudo o levanta.
-    `model` overridea el modelo de OpenRouter (p.ej. pro para generación); Groq usa el suyo."""
+    `model` overridea el modelo de OpenRouter (p.ej. pro para generación); Groq usa el suyo.
+    `timeout` (s): 60 para callers sync (bajo el gateway); la generación async lo sube (pro
+    tarda 40-90s → con 60s cortaba y caía a groq → 2 opciones en paralelo → 429 → robo caído)."""
     if provider == "openrouter":
         api_key = OPENROUTER_API_KEY
         url = OPENROUTER_URL
@@ -3651,7 +3661,16 @@ def _llm_call_provider(provider: str, system: str, user_content: str,
         payload["response_format"] = {"type": "json_object"}
 
     def _do_request(pl):
-        resp = requests.post(url, headers=headers, json=pl, timeout=60)
+        resp = requests.post(url, headers=headers, json=pl, timeout=timeout)
+        # Groq 429 (rate limit): al caer 2 opciones en paralelo al fallback groq colisionan →
+        # 1 reintento con backoff corto en vez de reventar el robo. Respeta Retry-After si viene.
+        if provider == "groq" and resp.status_code == 429:
+            try:
+                _wait = float(resp.headers.get("retry-after") or 2)
+            except (TypeError, ValueError):
+                _wait = 2.0
+            _cfg_time.sleep(min(_wait, 8))
+            resp = requests.post(url, headers=headers, json=pl, timeout=timeout)
         resp.raise_for_status()
         return resp.json()
 
@@ -3682,7 +3701,8 @@ def _llm_call_provider(provider: str, system: str, user_content: str,
     return content.strip()
 
 
-def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_tokens: int = 20000, model: str = None) -> str:
+def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_tokens: int = 20000,
+              model: str = None, timeout: int = 60) -> str:
     """Genera con el LLM principal (OpenRouter) y, si falla, CAE A GROQ.
 
     Motivo (2026-06): OpenRouter se queda sin saldo y las peticiones grandes
@@ -3700,7 +3720,7 @@ def _call_llm(system: str, user_content: str, temperature: float = 0.8, max_toke
     last_err = None
     for i, prov in enumerate(providers):
         try:
-            return _llm_call_provider(prov, system, user_content, temperature, max_tokens, model)
+            return _llm_call_provider(prov, system, user_content, temperature, max_tokens, model, timeout)
         except Exception as e:
             last_err = e
             has_more = i + 1 < len(providers)
@@ -4295,7 +4315,8 @@ def underperformers_signal(user_id):
 
 
 def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, user_id=None, brand_id=None,
-                  model: str = None, temperature: float = 0.8, extra_directive: str = "") -> dict:
+                  model: str = None, temperature: float = 0.8, extra_directive: str = "",
+                  timeout: int = 60) -> dict:
     if style == "custom":
         if not custom_prompt:
             raise ValueError("Escribe tus instrucciones en el campo Custom")
@@ -4332,7 +4353,7 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
     if extra_directive:
         system += "\n\n" + extra_directive
 
-    raw = _call_llm(system, text, temperature=temperature, model=model)
+    raw = _call_llm(system, text, temperature=temperature, model=model, timeout=timeout)
     return _parse_ai_json(raw, style)
 
 
@@ -4349,17 +4370,18 @@ def _shape_script_option(res):
             "body": [str(x) for x in body], "closing": str(closing), "script": flat}
 
 
-def _generate_script_options(user_content, style_arg, custom_prompt, uid, brand_id, n=2):
+def _generate_script_options(user_content, style_arg, custom_prompt, uid, brand_id, n=2, timeout=60):
     """Genera N opciones de guion COMPLETAS en PARALELO (modelo de generación = pro),
     reusando método + voz + few-shot. La opción B pide un ángulo/estructura distintos.
     recording_format + pov_text se toman de la opción A. Wall-time ≈ una sola llamada.
-    Si B falla, degrada a 1 opción. La voz se lee UNA vez y se comparte (menos DB)."""
+    Si B falla, degrada a 1 opción. La voz se lee UNA vez y se comparte (menos DB).
+    `timeout`: la generación async (Celery, sin gateway) lo sube a GENERATION_LLM_TIMEOUT."""
     import concurrent.futures
     voice = get_voice_profile(uid, brand_id)
     def _gen(temp, directive):
         return adapt_with_ai(user_content, style_arg, custom_prompt, voice=voice,
                              user_id=uid, brand_id=brand_id, model=GENERATION_MODEL,
-                             temperature=temp, extra_directive=directive)
+                             temperature=temp, extra_directive=directive, timeout=timeout)
     dirB = ("Esta es la OPCIÓN B (alternativa para que el usuario elija): usa un ÁNGULO de "
             "entrada y una ESTRUCTURA claramente DISTINTOS a una versión estándar — otro tipo "
             "de gancho, otro desarrollo — igual de potente. No repitas la versión obvia.")
@@ -10830,11 +10852,13 @@ def generate_script_from_competitor_reel(reel_id: str):
                            uid, reel_id, e)
 
     # 5. Decisión sync vs async:
-    #    'ok' → flow sync (transcript ya cacheado).
-    #    Cualquier otro estado → flow async (encolar Celery).
+    #    FIX 502 (David): el flow SYNC generaba pro (40-90s) DENTRO del request → el gateway
+    #    cortaba → «Failed to generate script». Empeorado por la pre-transcripción v0.43.0 (más
+    #    reels cacheados → más robos por el path sync). Ahora SIEMPRE async (el worker no está
+    #    tras el gateway; el front ya pollea 150s). STEAL_SYNC_GEN=1 lo reactiva (no recomendado).
     transcript_ok = reel.get("transcript_status") == "ok" and (reel.get("transcript") or "").strip()
 
-    if transcript_ok:
+    if transcript_ok and STEAL_SYNC_GEN_ENABLED:
         # ── Flow síncrono ──────────────────────────────────────────────
         # Generar guion ahora con caption + transcript cacheado.
         from datetime import datetime as _dt
