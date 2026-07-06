@@ -167,11 +167,12 @@ REFRESH_NOW_UNITS         = int(os.environ.get("REFRESH_NOW_UNITS", "5"))   # ~5
 REFRESH_NOW_COST          = REFRESH_NOW_UNITS * COST_CENTS
 REFRESH_NOW_COOLDOWN_S    = int(os.environ.get("REFRESH_NOW_COOLDOWN_S", str(8 * 3600)))  # 8h
 PER_USER_REFRESH_CAP      = int(os.environ.get("PER_USER_REFRESH_CAP", "10"))  # cap Apify/refresh
-# «Sugerencias de hoy»: paginado del carrusel. Primeras SUGG_FREE_N gratis (2 tandas de 4);
-# a partir de ahí «ver más» CUESTA créditos (monetización, CERO scrape — el pool ya está).
-SUGG_FREE_N               = int(os.environ.get("SUGG_FREE_N", "8"))    # reels gratis (2×4)
-SUGG_MORE_BATCH           = int(os.environ.get("SUGG_MORE_BATCH", "4"))  # tanda de «ver más»
-SUGG_MORE_UNITS           = int(os.environ.get("SUGG_MORE_UNITS", "3"))  # ~3 créditos/tanda
+# «Sugerencias de hoy»: paginado del carrusel. La tanda inicial (SUGG_FREE_N) es GRATIS; a
+# partir de ahí cada «Ver más» CUESTA SUGG_MORE_UNITS créditos y trae una tanda COMPLETA
+# (SUGG_MORE_BATCH) — David 06/07. CERO scrape (el pool ya está); solo se cobra si hay frescos.
+SUGG_FREE_N               = int(os.environ.get("SUGG_FREE_N", "8"))    # reels gratis (tanda inicial)
+SUGG_MORE_BATCH           = int(os.environ.get("SUGG_MORE_BATCH", "8"))  # tanda de «ver más» (completa, como la inicial)
+SUGG_MORE_UNITS           = int(os.environ.get("SUGG_MORE_UNITS", "3"))  # 3 créditos/tanda de «ver más»
 SUGG_MORE_COST            = SUGG_MORE_UNITS * COST_CENTS
 SUGG_MAX_TOTAL            = int(os.environ.get("SUGG_MAX_TOTAL", "40"))  # techo absoluto del carrusel
 # Si el overlap FUERTE de subnichos da menos de esto (reels que pasan el listón), top-up por
@@ -9580,10 +9581,14 @@ def _stolen_reel_ids(uid):
 
 
 def _sugg_day_seed(uid, project_id):
-    """Semilla de ROTACIÓN DIARIA de sugerencias por (uid, marca, día): mismo orden todo
-    el día (paginado estable entre el GET y «ver más»), orden distinto cada mañana. Solo
-    fecha, cero Redis/estado → no puede colgar (#231)."""
-    return "%s:%s:%s" % (uid, project_id or "_", datetime.now(timezone.utc).strftime("%Y%m%d"))
+    """Semilla de ROTACIÓN de sugerencias por (uid, marca, MEDIO DÍA): mismo orden dentro de
+    cada franja (paginado estable entre el GET y «ver más»), orden distinto mañana y tarde
+    → sensación de recambio 2×/día (David 06/07). Solo fecha+franja, cero Redis/estado → no
+    puede colgar (#231). La exclusión dura de servidos-hoy (día completo) sigue vigente: la
+    franja de tarde re-baraja el pool que aún no se ha servido, nunca repite."""
+    now = datetime.now(timezone.utc)
+    half = "0" if now.hour < 12 else "1"   # mañana / tarde (UTC)
+    return "%s:%s:%s%s" % (uid, project_id or "_", now.strftime("%Y%m%d"), half)
 
 
 def _sugg_seen_yesterday(uid, project_id):
@@ -9740,15 +9745,21 @@ def radar_suggestions_more():
                                     exclude_reel_ids=excl_reels)
     reels = batch[:SUGG_MORE_BATCH]
     if not reels:
-        # Contrato punto 5: agotado de verdad → dilo, no repitas.
+        # Contrato punto 5: agotado de verdad → dilo, no repitas. NO se cobra (agotamiento honesto).
         return jsonify({"ok": True, "suggestions": [], "has_more": False, "exhausted": True}), 200
+    # «Ver más» DE PAGO (David 06/07): la tanda inicial es gratis; cada «Ver más» cuesta
+    # SUGG_MORE_UNITS créditos. Solo se cobra AQUÍ, cuando hay reels frescos que entregar (si
+    # está agotado, arriba, es gratis). Cero scrape (el pool ya está). Sin saldo → 402 (muro).
+    err, _refund, _st = _charge_units_locked(uid, SUGG_MORE_UNITS, user)
+    if err:
+        return err
     _sugg_record_served(uid, project_id, [x.get("id") for x in reels])
-    track_event("sugg_more", uid, {"project_id": project_id, "n": len(reels)})
-    # has_more=True mientras esta tanda trajo algo → el botón sigue hasta que un «Ver más»
-    # devuelva 0 y muestre la card de agotamiento (contrato punto 5: el mensaje SIEMPRE aparece).
+    track_event("sugg_more", uid, {"project_id": project_id, "n": len(reels), "units": SUGG_MORE_UNITS})
+    # has_more real: el probe (+1) trajo más que la tanda → quedan frescos tras cobrar. Si no,
+    # la siguiente vista muestra la card de agotamiento (no un botón de pago que lleva a vacío).
     return jsonify({"ok": True, "suggestions": reels,
-                    "has_more": len(reels) > 0, "exhausted": False,
-                    "more_batch": SUGG_MORE_BATCH}), 200
+                    "has_more": len(batch) > SUGG_MORE_BATCH, "exhausted": False,
+                    "more_batch": SUGG_MORE_BATCH, **_credits_display(uid)}), 200
 
 
 @app.route("/api/niche/subniche-suggestions", methods=["GET"])
