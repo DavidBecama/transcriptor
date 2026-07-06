@@ -12640,3 +12640,12 @@
     .rs .stday-exh-cta:hover { background:color-mix(in srgb, var(--brand-500) 10%, transparent); }
     .rs .stday-exh-cta svg { width:13px; height:13px; }
     .rs .stday-exh-sub { font-size:11px; color:var(--text-tertiary); }
+    /* Contrato B1 «ninguna marca nace muda»: estado HONESTO «poblando tu radar» (nicho aún sin
+       reels; la siembra corre en background y el poll llena esto solo, sin recargar). */
+    .rs .stday-pop { display:flex; align-items:center; gap:14px; padding:18px 16px; border:1px dashed var(--border-default); border-radius:14px; }
+    .rs .stday-pop-tx { flex:1 1 auto; min-width:0; }
+    .rs .stday-pop-t { font-size:14px; font-weight:600; color:var(--text-secondary); }
+    .rs .stday-pop-sub { font-size:12px; color:var(--text-tertiary); margin-top:3px; }
+    .rs .stday-pop .btn { flex:0 0 auto; }
+    .rs .stday-pop-spin { flex:0 0 auto; width:22px; height:22px; border-radius:50%; border:2.5px solid var(--border-default); border-top-color:var(--brand-500); animation:stday-pop-spin .8s linear infinite; }
+    @keyframes stday-pop-spin { to { transform:rotate(360deg); } }

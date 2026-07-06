@@ -175,7 +175,11 @@
       {id:"b1", name:"David Automatiza", handle:"davidautomatiza", color:"#4f7cff", level:3, voice:64, reels:23, exploded:4, competitors:4, reelsAnalyzed:42, scripts:12},
       {id:"b2", name:"Clínica Nórdica",  handle:"clinicanordica",  color:"#12a37c", level:2, voice:41, reels:9,  exploded:1, competitors:3, reelsAnalyzed:18, scripts:4},
       {id:"b3", name:"Estudio Lumen",    handle:"estudiolumen",    color:"#6d6bf6", level:4, voice:78, reels:6,  exploded:0, competitors:5, reelsAnalyzed:67, scripts:21},
-      {id:"b4", name:"Bufete Vidal",     handle:"bufetevidal",     color:"#e0556b", level:2, voice:52, reels:14, exploded:5, competitors:6, reelsAnalyzed:23, scripts:7}
+      {id:"b4", name:"Bufete Vidal",     handle:"bufetevidal",     color:"#e0556b", level:2, voice:52, reels:14, exploded:5, competitors:6, reelsAnalyzed:23, scripts:7},
+      // Marca de NICHO FINO recién creada, pool aún poblándose: 0 reels / 0 competidores.
+      // NUNCA debe quedar muda → estado honesto «poblando tu radar» (contrato B1, lo verifica
+      // el harness: «ninguna marca servida sin señales/competidores o estado honesto»).
+      {id:"b5", name:"nuquemepongo",     handle:"nuquemepongo",    color:"#c026d3", level:1, voice:0,  reels:0,  exploded:0, competitors:0, reelsAnalyzed:0,  scripts:0, mute:true}
     ];
   }
   // una marca "pide atención" si tiene mucho explosivo sin capitalizar o voz baja.
@@ -907,7 +911,16 @@
     var pid=_pidOf(S.brandId);
     var post=function(url,body){ return fetch(url,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}); };
     post("/metrics/ig-profile", pid?{username:h,project_id:pid}:{username:h})
-      .then(function(){ post("/metrics/analyze", pid?{project_id:pid}:{}).catch(function(){}); })
+      .then(function(){
+        // REACTIVIDAD (Bloque 2.6): refleja la conexión SIN recargar. Antes era
+        // fire-and-forget → la card «Conecta Instagram» seguía hasta un reload. (409 =
+        // ya vinculado → fetch resuelve igual, y marcar conectado es correcto.)
+        S.igConnected=true;
+        try{ render(); }catch(e){}
+        post("/metrics/analyze", pid?{project_id:pid}:{})
+          .then(function(){ try{ if(typeof refreshMetrics==="function") refreshMetrics(); }catch(e){} })
+          .catch(function(){});
+      })
       .catch(function(){});
   }
   // Trae la FOTO de perfil de IG (base64 vía Apify, endpoint /api/onboarding/ig-avatar) y
@@ -1739,6 +1752,43 @@
   // «Sugerencias de hoy»: sección PROPIA (no en el feed) con creadores NUEVOS del nicho
   // que petan y el user no sigue. Carga 1 vez (real; demo no la muestra). Excluye seguidos
   // y descartados en backend; el front re-filtra seguidos por si acaba de añadir uno.
+  // REACTIVIDAD (Bloque 2.6/2.7): reconcilia el estado de conexión IG al VOLVER a la pestaña.
+  // La conexión sólo se hidrataba una vez al montar (loadBrandData) → conectar por otra vía
+  // (onboarding, panel legacy, otra pestaña/dispositivo) dejaba la UI stale hasta recargar.
+  // Refetch barato de /metrics/summary; debounced (<20s no re-pregunta); render/refresh SÓLO si cambió.
+  function _reconcileConnection(){
+    if(isDemo()) return;
+    var now=Date.now();
+    if(S._connReconAt && (now-S._connReconAt)<20000) return;
+    S._connReconAt=now;
+    var pid=_pidOf(S.brandId);
+    var q=pid?("?project_id="+encodeURIComponent(pid)):"";
+    fetch("/metrics/summary"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).then(function(met){
+      if(!met) return;
+      var conn=!!met.connected;
+      if(conn!==!!S.igConnected){
+        S.igConnected=conn;
+        if(conn && typeof refreshMetrics==="function"){ try{ refreshMetrics(); }catch(e){} }   // trae reels/insights → render
+        else { try{ render(); }catch(e){} }
+      }
+    }).catch(function(){});
+  }
+  // Bloque 2.8 (cierra el círculo con la siembra): mientras el pool del nicho se puebla en
+  // background (siembra al crear la marca), re-consulta las sugerencias hasta que aterrizan →
+  // la pestaña pasa de «poblando» a llena SOLA, sin recargar. Acotado (SUGG_POLL_MAX) para no
+  // sondear indefinidamente si el nicho queda genuinamente vacío.
+  var SUGG_POLL_MS=18000, SUGG_POLL_MAX=12;
+  function _clearSuggPoll(){ if(S._suggPollT){ clearTimeout(S._suggPollT); S._suggPollT=null; } }
+  function _scheduleSuggPoll(){
+    if(S._suggPoolStatus!=="populating"){ _clearSuggPoll(); S._suggPollN=0; return; }
+    if((S._suggPollN||0)>=SUGG_POLL_MAX){ _clearSuggPoll(); return; }
+    if(S._suggPollT) return;
+    S._suggPollT=setTimeout(function(){
+      S._suggPollT=null; S._suggPollN=(S._suggPollN||0)+1;
+      S._suggToday=undefined; S._stLoading=false;   // fuerza re-fetch limpio del pool
+      loadSuggestionsToday();
+    }, SUGG_POLL_MS);
+  }
   function _normSugg(raw){ var n=normReel(raw); n.worthFollow=!!raw.worth_follow; n.why=raw.why||""; n.suggestion=true; return n; }
   function loadSuggestionsToday(){
     if(isDemo() || S._stDismissed || S._stLoading || Array.isArray(S._suggToday)) return;
@@ -1752,12 +1802,16 @@
       S._suggHasMore=!!(r&&r.d&&r.d.has_more);                 // ¿quedan MÁS frescos («Ver más» gratis)?
       S._suggExhausted=!!(r&&r.d&&r.d.exhausted);              // contrato punto 5: visto todo lo fresco
       S._suggMoreBatch=(r&&r.d&&r.d.more_batch)||4;
+      // Contrato «ninguna marca muda»: ready|populating|empty|exhausted|needs_niche. populating
+      // ⇒ nicho de catálogo aún sin reels (el backend ya disparó la siembra) → estado honesto + poll.
+      S._suggPoolStatus=(r&&r.d&&r.d.pool_status)||'';
       // Son REELS (normReel-compat): los normalizo y marco suggestion=true (para robar SIN
       // seguir vía no_follow) + worthFollow (para ofrecer «+ Añadir competidor» solo en esos).
       S._suggToday=(r&&r.ok&&r.d&&Array.isArray(r.d.suggestions)) ? r.d.suggestions.map(_normSugg) : [];
       // #3b «posibles competidores»: creadores del nicho (worth_follow) que no sigues.
       S._suggCompetitors=(r&&r.d&&Array.isArray(r.d.possible_competitors)) ? r.d.possible_competitors : [];
       if(S.tab==="dashboard") bgRender();
+      _scheduleSuggPoll();   // Bloque 2.8: si sigue poblando, re-consulta hasta que aterrice
     });
   }
   // #3b: sección pequeña «Posibles competidores» — creadores del nicho que petan consistente
@@ -1832,7 +1886,10 @@
   }
   // Sección «Sugerencias de hoy» (carrusel de REELS con flechas ←/→). Oculta en demo/vacío.
   function suggestionsTodayHTML(){
-    if(isDemo() || S._stDismissed) return '';
+    if(S._stDismissed) return '';
+    // En demo la sección normal (reels/competidores del backend) se suprime, PERO el estado
+    // HONESTO «poblando/añadiendo nicho» sí se muestra para la marca muda (lo verifica el harness).
+    if(isDemo() && S._suggPoolStatus!=="populating" && S._suggPoolStatus!=="empty") return '';
     // Sin nicho (ni en perfil ni en proyecto) → pedir definirlo en vez de quedarse vacío.
     // El texto/acción se adaptan: marca con proyecto → su nicho; marca default → tu nicho.
     if(S._suggNeedsNiche){
@@ -1861,6 +1918,34 @@
       _seen[r.id]=1; list.push(r);
     });
     if(!list.length){
+      // Contrato B1 «ninguna marca nace muda»: pool del nicho aún poblándose (siembra en
+      // background al crear la marca) → estado HONESTO, no vacío mudo. El poll lo llena solo.
+      if(S._suggPoolStatus==="populating"){
+        return '<section class="stday-sec stday-pop-sec" aria-live="polite">'+
+          '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span></div>'+
+          '<div class="stday-pop">'+
+            '<div class="stday-pop-spin" aria-hidden="true"></div>'+
+            '<div class="stday-pop-tx">'+
+              '<div class="stday-pop-t">'+L("Estamos poblando tu radar","We\'re populating your radar")+'</div>'+
+              '<div class="stday-pop-sub">'+L("Buscando los reels que petan en tu nicho. Aparecen aquí en unos minutos — sin recargar.","Finding the reels blowing up in your niche. They\'ll show up here in a few minutes — no reload needed.")+'</div>'+
+            '</div>'+
+          '</div>'+
+        '</section>';
+      }
+      // Nicho de texto libre fuera del catálogo → honesto (lo estamos añadiendo) + CTA a añadir
+      // un competidor a mano para arrancar YA. Nunca una pestaña muda.
+      if(S._suggPoolStatus==="empty"){
+        return '<section class="stday-sec stday-pop-sec">'+
+          '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span></div>'+
+          '<div class="stday-pop">'+
+            '<div class="stday-pop-tx">'+
+              '<div class="stday-pop-t">'+L("Estamos añadiendo tu nicho al radar","We\'re adding your niche to the radar")+'</div>'+
+              '<div class="stday-pop-sub">'+L("Aún no seguimos cuentas de este nicho. Añade un competidor para empezar ya.","We don\'t track accounts in this niche yet. Add a competitor to start right now.")+'</div>'+
+            '</div>'+
+            '<button class="btn btn-sm btn-secondary" data-act="add-comp">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
+          '</div>'+
+        '</section>';
+      }
       // Contrato punto 5: agotado de verdad → «has visto todo lo fresco» + CTA (no vacío mudo).
       // Sin agotar (cargando / pool sin nicho) → no se pinta (regla de vacíos).
       if(S._suggExhausted){
@@ -2418,11 +2503,18 @@
       if(showOnboarding()){
         return '<div class="scroll"><div class="canvas">'+head+onboardingHTML()+'</div></div>';
       }
+      // Contrato B1 «ninguna marca nace muda»: con el feed vacío, mostrar el estado HONESTO de
+      // sugerencias (populating «poblando tu radar» / empty / exhausted / needs_niche) + los
+      // «posibles competidores» (fallback seed → nunca vacío). Solo si no hay estado honesto se
+      // cae al texto genérico «Sin reels todavía».
+      var _honest=suggestionsTodayHTML();
       return '<div class="scroll"><div class="canvas">'+head+""+statbarHTML()+
         manageCompetitorsHTML(true)+   // añadir competidor SIEMPRE accesible; ABIERTO: con el radar vacío es LA acción
+        _honest+                       // estado honesto «poblando»/«añadiendo nicho» (o '' si no aplica)
+        suggestedCompetitorsHTML()+    // posibles competidores (mínimo garantizado por fallback seed)
         voiceOnboardCardHTML()+   // B6: en first-run sin reels, el banner de voz es lo primero que aporta
         nextSeriesHTML("dash")+   // B1+T1: CTA secundario en el Dashboard
-        '<div class="rs-empty">'+(S.filter==="fav"?"Sin favoritos aún. Toca la estrella en una señal.":"Sin reels todavía. Añade un competidor arriba o pulsa «Actualizar radar» — sus reels entrarán solos.")+'</div>'+
+        (_honest?'':'<div class="rs-empty">'+(S.filter==="fav"?"Sin favoritos aún. Toca la estrella en una señal.":"Sin reels todavía. Añade un competidor arriba o pulsa «Actualizar radar» — sus reels entrarán solos.")+'</div>')+
       '</div></div>';
     }
 
@@ -5605,7 +5697,12 @@
     // «Sugerencias de hoy» (sección propia): creadores nuevos del nicho que petan. Carga 1
     // vez cuando ya sigues a alguien (si no, el radar entero es seed). Reemplaza el viejo
     // descubrimiento/sugerencia intercalado en el feed.
-    if(S.tab==="dashboard" && !_onbBusy && Array.isArray(S.tracked) && S.tracked.length>0 && !S.radarSeed) loadSuggestionsToday();
+    // Carga sugerencias cuando ya sigues a alguien (comportamiento previo) O cuando el feed
+    // está VACÍO (marca de nicho mudo): así el pool_status del backend puede reportar «populating»
+    // y la pestaña muestra estado honesto + se llena sola, en vez de quedarse muda (contrato B1).
+    var _feedEmpty=!(Array.isArray(S.reels) && S.reels.length>0);
+    if(S.tab==="dashboard" && !_onbBusy && !S._stDismissed &&
+       ((Array.isArray(S.tracked) && S.tracked.length>0 && !S.radarSeed) || _feedEmpty)) loadSuggestionsToday();
     // House-tour: lo arranca la ISLA la 1ª vez que aterrizas en el dashboard SIN onboarding
     // (post-cofre, o un usuario que ya onboardeó y no lo ha visto). Robusto: re-chequea los
     // targets justo antes. Sustituye al auto-start de index.html (que se colaba por timing).
@@ -5762,6 +5859,16 @@
   // En prod esto vendrá de /api/radar/stats?brand= y /api/tracked-creators/reels?brand=.
   function applyDemoBrand(){
     var b=brand();
+    // Marca muda (nicho fino recién creado, pool poblándose): 0 señales/competidores → estado
+    // honesto «poblando tu radar» (contrato B1). El resto de marcas limpian ese estado.
+    var muda=!!(b.mute || ((b.reels||0)===0 && (b.competitors||0)===0));
+    S._suggPoolStatus = muda ? "populating" : "";
+    S._suggDismissed=false; S._stDismissed=false;
+    if(muda){
+      S.stats={competitors:0, reels_week:0, exploded_week:0, stolen_today:0};
+      S.reels=[]; S.favs={};
+      return;
+    }
     S.stats={competitors:b.competitors||4, reels_week:b.reels||0, exploded_week:b.exploded||0, stolen_today:0};
     if(S._reelPool&&S._reelPool.length){
       var ids=S.brands.map(function(x){return x.id;}); var idx=ids.indexOf(b.id); if(idx<0) idx=0;
@@ -7999,6 +8106,7 @@
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: al cambiar de marca no arrastres la vista de otro competidor
     S._lbReal=null;   // ranking por-marca: fuerza recarga de /api/leaderboard de ESTA marca (no caché de la anterior)
     S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false; S._suggExhausted=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
+    S._suggPoolStatus=''; S._suggPollN=0; _clearSuggPoll();   // resetea el poll de «poblando» al cambiar de marca
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");   // grid rail+work YA en el skeleton (si no, el rail sale centrado sobre negro)
     // Onboarding pendiente (o demo ?onb=1) → loader full-screen limpio, sin que asome la
     // chrome de la app antes de montar el onboarding. Si ya pasó el onboarding → skeleton normal.
@@ -8171,7 +8279,12 @@
       // vieja (sidebar, subtabs). Las secciones legacy (Analizar/Configuración) se
       // alcanzan desde el rail. Siempre activo (ya no solo en demo).
       try{ document.body.classList.add("rs-takeover"); }catch(e){}
-      if(!S._wired){ document.addEventListener("click", onClick); document.addEventListener("keydown", onKeydown); window.addEventListener("resize", function(){ var d=S.device; setDevice(); if(d!==S.device) render(); }); S._wired=true; }
+      if(!S._wired){ document.addEventListener("click", onClick); document.addEventListener("keydown", onKeydown); window.addEventListener("resize", function(){ var d=S.device; setDevice(); if(d!==S.device) render(); });
+        // Bloque 2.6/2.7: al volver a la pestaña/ventana, reconcilia el estado de conexión IG
+        // (conectar por otra vía dejaba la UI stale hasta recargar). Debounced en _reconcileConnection.
+        document.addEventListener("visibilitychange", function(){ if(!document.hidden) _reconcileConnection(); });
+        window.addEventListener("focus", function(){ _reconcileConnection(); });
+        S._wired=true; }
       loadAll();
     },
     // T2: puente para que el CRUD legacy de asistentes (modal en index.html)

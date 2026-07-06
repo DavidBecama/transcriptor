@@ -184,6 +184,20 @@ SUGG_POOL_TARGET          = int(os.environ.get("SUGG_POOL_TARGET", "16"))
 # seguidos, por explosión; worth_follow queda como flag «recomendado». Cap 12 (llena la fila
 # en todas las marcas: pools reales dan 9-22 creadores únicos).
 SUGG_COMPETITORS_N        = int(os.environ.get("SUGG_COMPETITORS_N", "12"))
+# Mínimo garantizado de «posibles competidores» por marca (contrato «ninguna marca muda»): si
+# el pool por reels da menos, se COMPLETA con creadores seed del nicho (curados, NO necesitan
+# reels scrapeados) → la sección nunca queda vacía en un nicho de catálogo.
+SUGG_MIN_COMPETITORS      = int(os.environ.get("SUGG_MIN_COMPETITORS", "3"))
+# ── Siembra del pool al CREAR/DEFINIR una marca (contrato «ninguna marca nace muda») ─────────
+# El motor de sugerencias escanea el pool COMPARTIDO por nicho (creator_reels_global), no los
+# creadores trackeados del brand — de hecho los EXCLUYE. Así que «sembrar una marca» = SCRAPEAR
+# en BACKGROUND los seed creators de su nicho que aún no tienen reels frescos → «Sugerencias de
+# hoy» + «posibles competidores» se llenan solos (nicho mudo → poblado en minutos), sin auto-
+# seguir a nadie (seguirlos los sacaría de las sugerencias). Acotado y killable:
+RADAR_SEED_ON_CREATE_ENABLED = os.environ.get("RADAR_SEED_ON_CREATE_ENABLED", "1") == "1"
+SEED_SCRAPE_N             = int(os.environ.get("RADAR_SEED_SCRAPE_N", "6"))    # scrapes bg máx por siembra (coste Apify acotado)
+SEED_SCRAPE_STALE_H      = int(os.environ.get("RADAR_SEED_SCRAPE_STALE_H", "168"))  # re-scrape solo si >7d sin scrapear
+SEED_THROTTLE_S          = int(os.environ.get("RADAR_SEED_THROTTLE_S", "600"))  # 1 siembra activa por nicho / 10 min (anti-spam del safety-net)
 
 # Flash por-usuario (economia-creditos.md §4): tras chocar el PRIMER muro, el Pack 300
 # baja a TOPUP_FLASH_EUR € (vs 49 €) durante TOPUP_FLASH_HOURS h. Urgencia + ancla.
@@ -5050,7 +5064,15 @@ def create_project():
         "subniches": [t for t in (_norm_tag(s) for s in (body.get("subniches") or [])) if t][:8],
     }
     row = db.table("projects").insert(payload).execute()
-    return jsonify(row.data[0] if row.data else {"ok": True})
+    proj = row.data[0] if row.data else {}
+    # Contrato «ninguna marca nace muda»: siembra el pool del nicho en background al crear.
+    try:
+        if proj.get("id") and (payload.get("niche") or payload.get("subniches")):
+            _seed_brand_pool(user["id"], proj["id"], payload.get("niche"),
+                             payload.get("subniches"), source="create")
+    except Exception:
+        logger.warning("[seed_brand] create seeding failed", exc_info=True)
+    return jsonify(proj or {"ok": True})
 
 
 @app.route("/projects/<project_id>", methods=["DELETE"])
@@ -5112,6 +5134,13 @@ def update_project(project_id):
     if not updates:
         return jsonify({"error": "Nothing to update"}), 400
     db.table("projects").update(updates).eq("id", project_id).eq("user_id", user["id"]).execute()
+    # Si cambió el nicho/subnichos de la marca, re-siembra su pool (nicho nuevo → poblado solo).
+    try:
+        if "niche" in updates or "subniches" in updates:
+            _seed_brand_pool(user["id"], project_id, updates.get("niche"),
+                             updates.get("subniches"), source="update")
+    except Exception:
+        logger.warning("[seed_brand] update seeding failed", exc_info=True)
     return jsonify({"ok": True})
 
 
@@ -8537,6 +8566,79 @@ def _seed_competitors(niche, subniches, exclude_handles=None, exclude_ids=None, 
     return out
 
 
+def _seed_brand_pool(uid, project_id, niche, subniches, source="create"):
+    """Contrato «ninguna marca nace muda»: al fijar el nicho de una marca, POBLAR su radar
+    desde la capa global. El motor de sugerencias escanea el pool COMPARTIDO por nicho (no
+    los trackeados del brand — de hecho los EXCLUYE, ver _sugg_exclude), así que sembrar =
+    SCRAPEAR en background los seed creators del nicho SIN reels frescos → «Sugerencias de
+    hoy» y «posibles competidores» se llenan solos. NO auto-sigue a nadie (los sacaría de las
+    sugerencias). Widening: si el nicho amplio da pocos candidatos, amplía a subnichos. Acotado
+    a SEED_SCRAPE_N scrapes; idempotente (throttle Redis por nicho + scrape_creator_task dedup
+    por creador); degrada a no-op ante cualquier fallo. Gated: RADAR_SEED_ON_CREATE_ENABLED.
+    Devuelve el nº de scrapes encolados (0 = nada que sembrar / throttled / desactivado)."""
+    if not RADAR_SEED_ON_CREATE_ENABLED:
+        return 0
+    pn = _pool_niche_canon(niche or "")
+    tags = [t for t in (_norm_tag(s) for s in (subniches or [])) if t]
+    if pn and pn not in tags:
+        tags.append(pn)
+    if not pn and not tags:
+        return 0     # nicho de texto libre fuera de catálogo → no hay pool que sembrar
+    # Throttle por nicho: una siembra activa por nicho cada SEED_THROTTLE_S. scrape_creator_task
+    # ya dedup por creador; esto ahorra además las queries de candidatos en cada GET del safety-net.
+    if rds is not None:
+        try:
+            if not rds.set("seedbg:%s" % (pn or tags[0]), "1", nx=True, ex=SEED_THROTTLE_S):
+                return 0
+        except Exception:
+            pass
+    sel = "id, ig_username, niche, subniches, scrape_status, last_scraped_at"
+    cands = {}
+    try:
+        if pn:
+            for x in (db.table("creators_global").select(sel)
+                        .eq("niche", pn).limit(200).execute()).data or []:
+                if x.get("id"):
+                    cands[x["id"]] = x
+        if tags and len(cands) < SEED_SCRAPE_N * 4:   # widening: amplía a subnichos si el nicho da poco
+            for x in (db.table("creators_global").select(sel)
+                        .overlaps("subniches", tags).limit(200).execute()).data or []:
+                if x.get("id"):
+                    cands.setdefault(x["id"], x)
+    except Exception:
+        logger.warning("[seed_brand] candidate query failed uid=%s pn=%s", uid, pn, exc_info=True)
+        return 0
+    now = datetime.now(timezone.utc)
+    to_scrape = []
+    for c in cands.values():
+        if c.get("scrape_status") in ("private", "not_found", "scraping"):
+            continue
+        last = c.get("last_scraped_at")
+        stale = True
+        if last:
+            try:
+                age_h = (now - datetime.fromisoformat(str(last).replace("Z", "+00:00"))).total_seconds() / 3600.0
+                stale = age_h > SEED_SCRAPE_STALE_H
+            except Exception:
+                stale = True
+        if stale:
+            to_scrape.append(c["id"])
+        if len(to_scrape) >= SEED_SCRAPE_N:
+            break
+    if not to_scrape:
+        return 0
+    try:
+        from tasks import scrape_creator_task  # noqa: E402
+        for cid in to_scrape:
+            scrape_creator_task.delay(cid)
+    except Exception as e:
+        logger.warning("[seed_brand] enqueue failed uid=%s: %s", uid, e)
+        return 0
+    logger.info("[seed_brand] uid=%s pid=%s niche=%r pn=%s enqueued=%d source=%s",
+                uid, project_id, niche, pn, len(to_scrape), source)
+    return len(to_scrape)
+
+
 @app.route("/api/onboarding/suggest-competitors", methods=["POST"])
 @require_auth
 @limiter.limit("12 per hour;40 per day")
@@ -9668,7 +9770,8 @@ def radar_suggestions():
         niche, subs = _resolve_brand_niche(uid, project_id)
         if not subs and not niche:
             # Sin nicho en NINGÚN sitio → needs_niche (la UI pide definirlo, no vacío en silencio).
-            return jsonify({"suggestions": [], "total": 0, "needs_niche": True}), 200
+            return jsonify({"suggestions": [], "total": 0, "needs_niche": True,
+                            "pool_status": "needs_niche"}), 200
         # EXCLUSIÓN DURA por reel-id (contrato): servidos HOY (sesión) ∪ robados (permanente).
         excl_reels = _sugg_seen_today(uid, project_id) | _stolen_reel_ids(uid)
         # Pool amplio (hasta SUGG_MAX_TOTAL) en UNA llamada, ya SIN los excluidos: de ahí salen
@@ -9710,10 +9813,41 @@ def radar_suggestions():
                 by_creator[h]["worth_follow"] = True
         competitors = sorted(by_creator.values(),
                              key=lambda c: -(c["explosion_score"] or 0))[:SUGG_COMPETITORS_N]
+        # Contrato «ninguna marca muda»: MÍNIMO garantizado de «posibles competidores». Si el
+        # pool por reels da menos que el cap (nicho aún sin scrapear), COMPLETA con creadores
+        # seed del nicho (curados, NO necesitan reels) → la sección nunca queda vacía en un nicho
+        # de catálogo. _seed_competitors ya hace el widening nicho→subnicho.
+        if len(competitors) < SUGG_COMPETITORS_N:
+            have = {c["handle"] for c in competitors}
+            for s in _seed_competitors(niche, subs, exclude_ids=exclude,
+                                       exclude_handles=list(have), limit=SUGG_COMPETITORS_N):
+                if s["handle"].lower() in have:
+                    continue
+                competitors.append({"handle": s["handle"], "creator_id": s["id"],
+                                    "avatar_url": "/img/creator/%s" % s["id"],
+                                    "explosion_score": 0, "thumb_reel_id": None,
+                                    "formato": None, "worth_follow": False, "seed": True})
+                have.add(s["handle"].lower())
+                if len(competitors) >= SUGG_COMPETITORS_N:
+                    break
+        # pool_status (contrato + reactividad Bloque 2): ready | exhausted | populating | empty.
+        #   populating ⇒ nicho de catálogo SIN reels aún → dispara siembra en background
+        #   (idempotente/throttled) y la UI muestra «poblando tu radar» + hace polling hasta ready
+        #   (pestaña se llena SOLA, sin recargar). empty ⇒ nicho de texto libre fuera de catálogo.
+        if batch:
+            pool_status = "ready"
+        elif exhausted:
+            pool_status = "exhausted"
+        elif _pool_niche_canon(niche) or subs:
+            _seed_brand_pool(uid, project_id, niche, subs, source="suggestions")
+            pool_status = "populating"
+        else:
+            pool_status = "empty"
         return jsonify({"suggestions": batch, "total": len(batch),
                         "free_n": SUGG_FREE_N, "has_more": has_more, "exhausted": exhausted,
                         "more_units": SUGG_MORE_UNITS, "more_batch": SUGG_MORE_BATCH,
-                        "possible_competitors": competitors}), 200
+                        "possible_competitors": competitors,
+                        "pool_status": pool_status}), 200
     except Exception:
         logger.warning("[sugg] radar_suggestions falló uid=%s pid=%s", uid, project_id, exc_info=True)
         return jsonify({"suggestions": [], "total": 0, "error": True}), 200
@@ -10932,6 +11066,49 @@ def _user_owns_reel(uid: str, reel_id: str) -> bool:
     return bool(own_r.data)
 
 
+def _reel_matches_user_niche(uid: str, reel_id: str) -> bool:
+    """El reel es de un creador del NICHO del user (perfil o alguna marca) aunque NO lo
+    siga. Base para autorizar acciones baratas (transcribir, favorito) sobre reels de
+    SUGERENCIAS — que por definición son de creadores no seguidos. Criterio laxo, alineado
+    con el pool de sugerencias: nicho coarse igual o solape de subnichos."""
+    try:
+        rr = (db.table("creator_reels_global").select("creator_id")
+                .eq("id", reel_id).single().execute())
+        cid = (rr.data or {}).get("creator_id")
+        if not cid:
+            return False
+        cr = (db.table("creators_global").select("niche, subniches")
+                .eq("id", cid).single().execute()).data or {}
+        c_niche = _norm_tag(cr.get("niche") or "")
+        c_subs = {t for t in (_norm_tag(s) for s in (cr.get("subniches") or [])) if t}
+        wanted_niches, wanted_subs = set(), set()
+        prof = get_profile(uid) or {}
+        if prof.get("niche"):
+            wanted_niches.add(_norm_tag(prof["niche"]))
+        for s in (prof.get("subniches") or []):
+            t = _norm_tag(s)
+            if t:
+                wanted_subs.add(t)
+        try:
+            for p in (db.table("projects").select("niche, subniches")
+                        .eq("user_id", uid).execute()).data or []:
+                if p.get("niche"):
+                    wanted_niches.add(_norm_tag(p["niche"]))
+                for s in (p.get("subniches") or []):
+                    t = _norm_tag(s)
+                    if t:
+                        wanted_subs.add(t)
+        except Exception:
+            pass
+        if c_niche and c_niche in wanted_niches:
+            return True
+        if c_subs and (c_subs & (wanted_subs | wanted_niches)):
+            return True
+        return False
+    except Exception:
+        return False
+
+
 @app.route("/api/competitors/reels/<reel_id>/transcript", methods=["GET"])
 @require_auth
 @limiter.limit("30 per minute")
@@ -10945,7 +11122,9 @@ def get_competitor_reel_transcript(reel_id: str):
     transcript_status + sweeper de stale)."""
     user = current_user()
     uid = user["id"]
-    if not _user_owns_reel(uid, reel_id):
+    # Autoriza reels SEGUIDOS o de SUGERENCIAS (creadores del nicho no seguidos): antes solo
+    # los seguidos → las sugerencias daban 404 y no se podían transcribir (David 06/07).
+    if not (_user_owns_reel(uid, reel_id) or _reel_matches_user_niche(uid, reel_id)):
         return jsonify({"error": "reel_not_found"}), 404
     try:
         rr = (db.table("creator_reels_global")

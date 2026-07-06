@@ -406,6 +406,34 @@ async function main() {
   check("móvil agencia: selector de marca ≥44px", bsw >= 44, String(bsw));
   await send("Emulation.clearDeviceMetricsOverride", {}, sid);
 
+  /* ═══ Contrato B1 · ninguna marca nace MUDA (señales suficientes o estado honesto) ═══
+     Recorre TODAS las marcas del portfolio de agencia. Cada una debe servir O bien señales
+     (reels/sugerencias/competidores en pantalla) O bien el estado HONESTO «poblando tu radar»
+     (nicho aún sin pool). Se pone ROJO si una marca renderiza un dashboard en blanco. La marca
+     b5 (nicho fino recién creado, 0 reels/0 competidores) es la trampa: debe caer en el estado
+     honesto, nunca en blanco. */
+  console.log("\n■ B1 · ninguna marca servida muda");
+  for (const b of ["b1", "b2", "b3", "b4", "b5"]) {
+    await nav(`${BASE}/profile/radar?plan=agencia&b=${b}`);
+    await sleep(250);
+    const st = await evaluate(`(function(){
+      var root=document.querySelector('#radarRoot');
+      var signals=root.querySelectorAll('.feature, .row, .stday-card, .disc-card, .pcomp-card').length;
+      var pop=root.querySelector('.stday-pop-sec, .seed-banner');
+      return { signals: signals, honest: !!pop };
+    })()`);
+    check(`marca ${b}: señales suficientes o estado honesto (no muda)`, st.signals >= 2 || st.honest, JSON.stringify(st));
+  }
+  // La marca de nicho fino (b5) DEBE resolver en el estado honesto «poblando», no en blanco.
+  await nav(`${BASE}/profile/radar?plan=agencia&b=b5`);
+  await sleep(250);
+  const muteState = await evaluate(`(function(){
+    var pop=document.querySelector('#radarRoot .stday-pop-sec');
+    return { honest: !!pop, txt: (pop&&pop.textContent||'').replace(/\\s+/g,' ').trim().slice(0,90) };
+  })()`);
+  check("marca muda (b5) muestra estado honesto «poblando tu radar»",
+        muteState.honest && /poblando|populating/i.test(muteState.txt), JSON.stringify(muteState));
+
   console.log(`\n═══ RESULTADO: ${passed} ✓ · ${failed} ✗ ═══`);
   if (fails.length) { console.log(fails.map((f) => "  ✗ " + f).join("\n")); }
   process.exitCode = failed ? 1 : 0;
