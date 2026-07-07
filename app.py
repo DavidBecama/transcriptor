@@ -3852,6 +3852,12 @@ def voice_prompt_block(vp) -> str:
     ww = raw.get("what_works") or []
     if ww:
         parts.append("LO QUE MÁS FUNCIONA en su cuenta (priorízalo): " + " · ".join(str(w) for w in ww[:4]))
+    # OPT-IN «Alimentar el cerebro» (MÁXIMA prioridad): guiones/análisis que el creador
+    # eligió A MANO para enseñar su voz. Pesa por encima del top-por-vistas automático.
+    fed = raw.get("fed_samples") or []
+    if fed:
+        parts.append("\n=== EL CREADOR ELIGIÓ ESTOS COMO SU VOZ (imita ESTE molde antes que nada) ===\n"
+                     + "\n--- (otro) ---\n".join(str(s)[:600] for s in fed[:3]))
     # SEED (onboarding/auto-derive): así escribe ÉL de verdad — sus propios reels.
     samples = raw.get("samples") or []
     if samples:
@@ -4481,6 +4487,97 @@ def api_voice_get():
         "confidence": vp.get("confidence") or 0,        # = "voz al N%"
         "source_count": vp.get("source_count") or 0,
         "evidence": (raw.get("evidence") or []),         # bullets de qué aprendió
+    })
+
+
+# ── «Alimentar el cerebro» (opt-in): el creador elige a mano qué guiones/análisis
+#    DEFINEN la voz de la marca. Pesa por encima del top-por-vistas automático. ──
+def _brain_feed_content(user_id, brand_id, source_type, source_id):
+    """Texto del guion/análisis, AISLADO por marca (debe pertenecer a ESTA marca)."""
+    try:
+        if source_type == "script":
+            q = (db.table("scripts").select("script, project_id")
+                   .eq("id", source_id).eq("user_id", user_id).limit(1).execute())
+            txt_key = "script"
+        else:  # analysis → transcriptions (id bigint)
+            q = (db.table("transcriptions").select("text, project_id")
+                   .eq("id", int(source_id)).eq("user_id", user_id).limit(1).execute())
+            txt_key = "text"
+    except Exception:
+        return None
+    row = (q.data or [None])[0] if q else None
+    if not row:
+        return None
+    if (brand_id or None) != ((row.get("project_id")) or None):   # aislamiento por marca
+        return None
+    return ((row.get(txt_key) or "").strip()) or None
+
+
+def _brain_feed_rebuild_voice(user_id, brand_id):
+    """Relee brain_food de la marca → fija raw.fed_samples y sube la confianza (opt-in
+    explícito = señal fuerte → cruza el umbral e ENCIENDE la voz de la marca). Best-effort."""
+    try:
+        q = db.table("brain_food").select("content, created_at").eq("user_id", user_id)
+        q = q.eq("project_id", brand_id) if brand_id else q.is_("project_id", "null")
+        rows = (q.order("created_at", desc=True).limit(12).execute().data) or []
+    except Exception:
+        logger.warning("brain_feed rebuild read failed", exc_info=True)
+        return None
+    fed = [(r.get("content") or "").strip() for r in rows if (r.get("content") or "").strip()][:8]
+    vp = get_voice_profile(user_id, brand_id) or {}
+    raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else {}
+    raw["fed_samples"] = fed
+    vp["raw"] = raw
+    n = len(fed)
+    if n:   # opt-in explícito = señal fuerte; sin comida NO inflamos la confianza.
+        vp["confidence"]   = max(int(vp.get("confidence") or 0), min(90, 45 + n * 8))
+        vp["source_count"] = max(int(vp.get("source_count") or 0), n)
+    save_voice_profile(user_id, vp, brand_id=brand_id)
+    return {"count": n, "confidence": vp["confidence"]}
+
+
+@app.route("/api/brain/feed", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
+def api_brain_feed():
+    user = current_user()
+    body = request.get_json() or {}
+    st  = (body.get("source_type") or "").strip()
+    sid = str(body.get("source_id") or "").strip()
+    if st not in ("script", "analysis") or not sid:
+        return jsonify({"error": "bad_request"}), 400
+    brand_id = _req_project_id() or None
+    content = _brain_feed_content(user["id"], brand_id, st, sid)
+    if not content:
+        return jsonify({"error": "not_found"}), 404
+    try:
+        db.table("brain_food").insert({
+            "user_id": user["id"], "project_id": brand_id,
+            "source_type": st, "source_id": sid, "content": content[:4000],
+        }).execute()
+    except Exception as e:   # unique → ya alimentado: no es error, reconstruimos igual.
+        if not any(k in str(e).lower() for k in ("duplicate", "unique", "23505")):
+            logger.warning("brain_feed insert failed: %s", e)
+    res = _brain_feed_rebuild_voice(user["id"], brand_id) or {}
+    return jsonify({"ok": True, "fed": True,
+                    "confidence": res.get("confidence"), "count": res.get("count")})
+
+
+@app.route("/api/brain/fed", methods=["GET"])
+@require_auth
+def api_brain_fed():
+    """IDs ya alimentados de la marca activa → el front pinta el botón «Alimentado»."""
+    user = current_user()
+    brand_id = _req_project_id() or None
+    try:
+        q = db.table("brain_food").select("source_type, source_id").eq("user_id", user["id"])
+        q = q.eq("project_id", brand_id) if brand_id else q.is_("project_id", "null")
+        rows = (q.limit(500).execute().data) or []
+    except Exception:
+        rows = []
+    return jsonify({
+        "script_ids":   [r["source_id"] for r in rows if r.get("source_type") == "script"],
+        "analysis_ids": [r["source_id"] for r in rows if r.get("source_type") == "analysis"],
     })
 
 
