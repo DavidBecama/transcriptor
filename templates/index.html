@@ -6687,7 +6687,7 @@ function settingsSaveVoice(){
 // ROBOS (la acción/unidad de valor) para que se lea el valor real, no un nº abstracto.
 const SETTINGS_PLANS = [
   { key:"trial",   name:"Trial",          price:"0€",   feat:"3 días Pro · 30 créditos (~10 robos) · sin tarjeta" },
-  { key:"free",    name:"Free",           price:"0€",   feat:"9 créditos/mes (~3 robos) · radar y métricas gratis" },
+  { key:"free",    name:"Free",           price:"0€",   feat:"15 créditos/mes (~5 robos) · radar y métricas gratis" },
   { key:"basic",   name:"Basic",          price:"19,99€",  feat:"120 créditos/mes (~40 robos) · voz · métricas", featured:true },
   { key:"estudio", name:"Content Creator",price:"39,99€",  feat:"360 créditos/mes (~120 robos) · 3 marcas · prioridad" },
   { key:"agency",  name:"Agency",         price:"79€",  feat:"960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra" },
@@ -13312,6 +13312,14 @@ function openUpgradeModal(source) {
     }
   } catch (e) {}
   openModal("upgradeOverlay");
+  // Guard defensivo: bug reportado (David) de toggle Mensual/Anual invisible en Ajustes para
+  // algún usuario logueado que headless no reproduce (sin causa hallable en CSS/JS/caché/tema).
+  // Forzamos el toggle de ciclo visible al abrir — no-op si ya lo estaba, contrarresta cualquier
+  // ocultación externa (extensión, override) que le deje solo la opción anual.
+  try {
+    var _bt = document.querySelector("#upgradeOverlay .billing-toggle");
+    if (_bt) { _bt.style.display = "flex"; _bt.style.visibility = "visible"; _bt.style.opacity = "1"; }
+  } catch (e) {}
   try { window.track && window.track.upgradeModalOpened && window.track.upgradeModalOpened({ source: source || "unknown", plan: st.plan }); } catch(e){}
 }
 
