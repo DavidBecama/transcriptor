@@ -2154,8 +2154,11 @@
         '<div class="gal-menu-list">'+rows+'</div></div>'):'';
       moreWrap='<span class="rgal-more-wrap"><button class="rgal-chip rgal-morebtn'+(S.galMenu?' on':'')+'" data-act="gal-menu">+'+hidden.length+' '+IC.chev+'</button>'+dd+'</span>';
     }
-    // reels mostrados: feed (respeta filtro explosión/recientes/fav) + filtro de competidor
-    var reels=feedReels(); if(active) reels=reels.filter(function(r){ return (r.creator&&r.creator.handle)===active; });
+    // reels mostrados: feed (respeta filtro explosión/recientes/fav) + filtro de competidor.
+    // Dedup (David 07/07): fuera los 3 del carrusel «Oportunidad» de arriba (no repetir).
+    var _heroIds=S._heroReelIds||[];
+    var reels=feedReels().filter(function(r){ return _heroIds.indexOf(r.id)<0; });
+    if(active) reels=reels.filter(function(r){ return (r.creator&&r.creator.handle)===active; });
     var activeLabel=active?("@"+active):L("todos los competidores","all competitors");
     var arrows='<div class="rgal-arrows">'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
@@ -2540,6 +2543,8 @@
 
     // Fathom 18/06: el día enseña 2-3 oportunidades en carrusel (no una sola).
     var heroN=sorted.slice(0,Math.min(3,sorted.length)), rest=sorted.slice(heroN.length);
+    // David 07/07: dedup — la galería de abajo NO repite los reels del carrusel «Oportunidad» de arriba.
+    S._heroReelIds=heroN.map(function(r){return r.id;});
     var fillCount=Math.min(5,S.reels.length)||5;
 
     // Reorganización 04/07 (plan David, «flujo continuo sin apartados»): arriba lo
