@@ -1868,6 +1868,8 @@ def transcribe():
         user
         and get_profile(user["id"]).get("plan", "free") in ("pro", "creator", "agency")
     )
+    # #5 (David): etiqueta el análisis con la marca activa → /history lo aísla por marca.
+    _analyze_pid = (request.get_json(silent=True) or {}).get("project_id") or None
     task = transcribe_task.delay(
         url,
         language,
@@ -1875,6 +1877,7 @@ def transcribe():
         get_client_ip() if not user else None,
         is_paid,
         charge,
+        _analyze_pid,
     )
 
     return jsonify({"task_id": task.id, "cost_cents": cost_cents})
@@ -2001,17 +2004,25 @@ def task_status(task_id):
 @require_auth
 def history():
     user = current_user()
-    rows = (
+    project_id = request.args.get("project_id")
+    q = (
         db.table("transcriptions")
         .select(
             "id, url, platform, language, text, cost_cents, created_at, thumbnail_b64, "
-            "author_username, views, likes, comments, shares, published_at, metrics_updated_at"
+            "author_username, views, likes, comments, shares, published_at, metrics_updated_at, project_id"
         )
         .eq("user_id", user["id"])
-        .order("id", desc=True)
-        .limit(50)
-        .execute()
     )
+    # #5 clase de bug (David): AISLAMIENTO por marca de «Análisis guardados». Con marca activa,
+    # solo los análisis DE ESA marca (strict eq — NO incluimos los NULL como en /scripts: aquí el
+    # objetivo es que cliente A no vea lo de cliente B; los legacy sin marca viven en «default»).
+    if project_id:
+        try:
+            _uuid.UUID(str(project_id))
+        except (ValueError, AttributeError, TypeError):
+            return jsonify([])   # project_id malformado → evita 500
+        q = q.eq("project_id", project_id)
+    rows = q.order("id", desc=True).limit(50).execute()
     return jsonify(rows.data)
 
 
@@ -11426,11 +11437,15 @@ def add_favorite_reel(reel_id: str):
     uid = user["id"]
     if not _user_owns_reel(uid, reel_id):
         return jsonify({"error": "reel_not_found"}), 404
+    # #5: favorito POR MARCA (aislamiento). Check-then-insert (el ON CONFLICT no casa con NULL
+    # en un índice funcional). Idempotente por (user, reel, project_id).
+    project_id = (request.get_json(silent=True) or {}).get("project_id") or None
     try:
-        db.table("user_favorite_reels").upsert(
-            {"user_id": uid, "reel_id": reel_id},
-            on_conflict="user_id,reel_id",
-        ).execute()
+        cq = (db.table("user_favorite_reels").select("id").eq("user_id", uid).eq("reel_id", reel_id))
+        cq = cq.eq("project_id", project_id) if project_id else cq.is_("project_id", "null")
+        if not (cq.limit(1).execute().data or []):
+            db.table("user_favorite_reels").insert(
+                {"user_id": uid, "reel_id": reel_id, "project_id": project_id}).execute()
     except Exception as e:
         logger.error("add_favorite_reel failed user=%s reel=%s err=%s", uid, reel_id, e)
         return jsonify({"error": "internal"}), 500
@@ -11446,12 +11461,11 @@ def remove_favorite_reel(reel_id: str):
     uid = user["id"]
     # No requerimos ownership para DELETE — un user siempre puede quitar SU
     # favorito aunque haya des-trackeado al creador entretanto.
+    project_id = (request.get_json(silent=True) or {}).get("project_id") or None
     try:
-        (db.table("user_favorite_reels")
-           .delete()
-           .eq("user_id", uid)
-           .eq("reel_id", reel_id)
-           .execute())
+        dq = (db.table("user_favorite_reels").delete().eq("user_id", uid).eq("reel_id", reel_id))
+        dq = dq.eq("project_id", project_id) if project_id else dq.is_("project_id", "null")   # #5: quita solo el favorito DE ESTA marca
+        dq.execute()
     except Exception as e:
         logger.error("remove_favorite_reel failed user=%s reel=%s err=%s", uid, reel_id, e)
         return jsonify({"error": "internal"}), 500
@@ -12336,10 +12350,11 @@ def get_tracked_creators_reels():
     uid = user["id"]
 
     # 1. v0.15.6: set de reel_ids favoritos del user (para flag + filtro).
-    fav_r = (db.table("user_favorite_reels")
-               .select("reel_id")
-               .eq("user_id", uid)
-               .execute())
+    # #5 aislamiento: favoritos POR MARCA (la estrella de una marca no marca la de otra).
+    project_id = request.args.get("project_id")
+    _fq = db.table("user_favorite_reels").select("reel_id").eq("user_id", uid)
+    _fq = _fq.eq("project_id", project_id) if project_id else _fq.is_("project_id", "null")
+    fav_r = _fq.execute()
     fav_ids = {f["reel_id"] for f in (fav_r.data or [])}
 
     favorites_only = (request.args.get("favorites") or "").lower() == "true"
@@ -12348,8 +12363,7 @@ def get_tracked_creators_reels():
 
     # 2. Set de creator_ids activos del user (deduplicado).
     # P0 aislamiento por marca: filtrar por project_id (mismo patrón que
-    # GET /api/tracked-creators). Sin parámetro → todas (marca "default").
-    project_id = request.args.get("project_id")
+    # GET /api/tracked-creators). Sin parámetro → todas (marca "default"). (project_id ya leído arriba.)
     tq = (db.table("user_tracked_creators")
             .select("creator_id")
             .eq("user_id", uid)

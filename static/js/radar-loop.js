@@ -3093,8 +3093,8 @@
     }).join("");
     return '<section class="guiu"><div class="guiu-head">'+
       '<span class="guiu-ic">'+IC.bulb+'</span>'+
-      '<span class="guiu-t">'+L("Sin desarrollar","Undeveloped")+'</span>'+
-      '<span class="guiu-c">'+L("ideas en bruto que apuntaste · "+raw.length,"raw ideas you jotted · "+raw.length)+'</span>'+
+      '<span class="guiu-t">'+L("Ideas apuntadas","Jotted ideas")+'</span>'+   // #destino David: grupo etiquetado (vs «Ideas robadas»)
+      '<span class="guiu-c">'+L("las que apuntaste a mano · "+raw.length,"the ones you jotted by hand · "+raw.length)+'</span>'+
     '</div><div class="guiu-cards">'+cards+'</div></section>';
   }
   // v3 (mockup David) — «Explosión creativa»: CTA «Generar 5 ideas» + rejilla de
@@ -6691,7 +6691,10 @@
     updateFillHost();
   }
   function updateFillHost(){ var host=document.getElementById("rsFillHost"); if(host) host.innerHTML=fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase); }
-  function toggleFav(id){ S.favs[id]=!S.favs[id]; var m=S.favs[id]?"POST":"DELETE"; if(!isDemo()) fetch("/api/competitors/reels/"+encodeURIComponent(id)+"/favorite",{method:m,credentials:"same-origin"}).catch(function(){}); render(); }
+  function toggleFav(id){ S.favs[id]=!S.favs[id]; var m=S.favs[id]?"POST":"DELETE";
+    // #5: favorito POR MARCA — manda el project_id para que la estrella no cruce entre clientes.
+    var _pid=(S.brandId&&S.brandId!=="default")?S.brandId:null;
+    if(!isDemo()) fetch("/api/competitors/reels/"+encodeURIComponent(id)+"/favorite",{method:m,credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({project_id:_pid})}).catch(function(){}); render(); }
 
   // «Guardar idea con datos» (David, DE PAGO COST.saveidea): guarda el reel + transcripción +
   // métricas en «Ideas guardadas» (sin generar guión). Más barato que robar. El favorito simple
@@ -6733,20 +6736,25 @@
   /* ── fábrica de ideas ────────────────────────────────────────── */
   function seedIdea(inputId, jumpToIdeas){
     var inp=document.getElementById(inputId); var txt=inp?inp.value.trim():"";
-    if(!txt){ if(jumpToIdeas){ S.tab="ideas"; render(); } return; }
+    // #destino David: «Apunta una idea» → grupo «Ideas apuntadas» en GUIONES (no una pestaña
+    // fantasma «ideas»). Toast + enlace: el usuario nunca pregunta «¿dónde fue mi idea?».
+    if(!txt){ if(jumpToIdeas){ S.tab="guiones"; render(); } return; }
     if(isDemo()){
       S.ideas.unshift(makeIdea(txt, txt.length+S.ideas.length));
-      if(jumpToIdeas) S.tab="ideas";
-      render(); return;
+      if(jumpToIdeas) S.tab="guiones";
+      render();
+      showToast(L("Apuntada en Guiones · Ideas apuntadas","Jotted in Scripts · Jotted ideas"), L("Verla","See it"), "goto-saved-ideas");
+      return;
     }
-    // Prod: persiste como draft (develop:false) → POST /ideas. El id real vuelve
-    // del backend para poder generar guiones después (/ideas/{id}/scripts/...).
+    // Prod: persiste como draft (develop:false) → POST /ideas CON project_id (aislamiento por marca).
     if(txt.length<5){ showToast("Escribe una idea un poco más larga."); return; }
     if(inp) inp.value="";
-    if(jumpToIdeas) S.tab="ideas";
+    if(jumpToIdeas) S.tab="guiones";
     var tmp=makeIdea(txt, txt.length+S.ideas.length); tmp._saving=true; S.ideas.unshift(tmp); render();
-    apiPost("/ideas",{raw_text:txt, language:rsLang(), develop:false}).then(function(r){
-      if(r.ok && r.d && r.d.id){ tmp.id=r.d.id; tmp._server=true; tmp._scriptsLoaded=true; tmp._saving=false; render(); }
+    var _pid=(S.brandId&&S.brandId!=="default")?S.brandId:null;
+    apiPost("/ideas",{raw_text:txt, language:rsLang(), develop:false, project_id:_pid}).then(function(r){
+      if(r.ok && r.d && r.d.id){ tmp.id=r.d.id; tmp._server=true; tmp._scriptsLoaded=true; tmp._saving=false; render();
+        showToast(L("Apuntada en Guiones · Ideas apuntadas","Jotted in Scripts · Jotted ideas"), L("Verla","See it"), "goto-saved-ideas"); }
       else { tmp._saving=false; showToast((r.d&&r.d.error)||"No pude guardar la idea."); render(); }
     });
   }
@@ -7047,7 +7055,7 @@
   }
   function analyzeReelGetText(url){
     showToast("Analizando el reel…");
-    apiPost("/transcribe",{url:url}).then(function(res){
+    apiPost("/transcribe",{url:url, project_id:(S.brandId&&S.brandId!=="default"?S.brandId:null)}).then(function(res){
       if(!res.ok){ return showError((res.d&&res.d.error)||"No pude analizar el reel. Revisa el link."); }
       var taskId=res.d&&res.d.task_id;
       if(!taskId) return showError("No pude encolar el análisis. Inténtalo de nuevo.");
@@ -7091,13 +7099,29 @@
         views:182000, likes:9400, comments:210, text:DEMO_REEL_TRANSCRIPT, thumbnail_b64:null },
       { id:"d2", author_username:"hormozi", platform:"instagram", created_at:"2026-06-18T17:30:00Z",
         views:540000, likes:31000, comments:880, thumbnail_b64:null,
-        text:"El error número uno al empezar: intentar gustar a todos. Habla para una sola persona y serás magnético para miles. Define a quién le hablas, ponle nombre, y escribe cada guion como si fuera un mensaje para esa persona." }
+        text:"El error número uno al empezar: intentar gustar a todos. Habla para una sola persona y serás magnético para miles. Define a quién le hablas, ponle nombre, y escribe cada guion como si fuera un mensaje para esa persona." },
+      // #5 LEAK CANARY: análisis de OTRA marca (project_id ajeno). NUNCA debe aparecer en «Análisis
+      // guardados» de la marca activa. El harness lo verifica (aislamiento por marca).
+      { id:"anz_canary", author_username:"cliente_ajeno", platform:"instagram", created_at:"2026-06-10T09:00:00Z",
+        views:1000, likes:10, comments:1, thumbnail_b64:null, project_id:"__otra_marca__",
+        text:"CANARY · análisis de otra marca — si ves esto, hay fuga entre clientes." }
     ];
   }
   function loadAnalyses(){
-    if(isDemo()){ if(!S.analyses) S.analyses=analyzeDemoSeed(); if(S.tab==="analizar") render(); return; }
-    apiGet("/history").then(function(r){
-      S.analyses=(r&&Array.isArray(r.d))?r.d:[];
+    if(isDemo()){
+      if(!S._analysesRaw) S._analysesRaw=analyzeDemoSeed();
+      // #5: los análisis demo sin marca siguen a la marca activa; el canary (marca ajena) se filtra.
+      var _bd=(S.brandId||"default");
+      S.analyses=S._analysesRaw.filter(function(a){ return (a&&(a.project_id||_bd))===_bd; });
+      if(S.tab==="analizar") render(); return;
+    }
+    // #5 (David): AISLAMIENTO por marca de «Análisis guardados». Backend filtra por project_id
+    // (strict); el filtro cliente es defensa en profundidad (por si una carga arrastra otra marca).
+    var _pq=(S.brandId&&S.brandId!=="default")?("?project_id="+encodeURIComponent(S.brandId)):"";
+    var _b=(S.brandId||"default");
+    apiGet("/history"+_pq).then(function(r){
+      var all=(r&&Array.isArray(r.d))?r.d:[];
+      S.analyses=all.filter(function(a){ return (a&&(a.project_id||"default"))===_b; });
       if(S.tab==="analizar") render();
     });
   }
@@ -7167,7 +7191,7 @@
       return;
     }
     S.analyzeLoading=true; S.analyzeStep=L("Encolando…","Queuing…"); render();
-    apiPost("/transcribe",{url:url}).then(function(res){
+    apiPost("/transcribe",{url:url, project_id:(S.brandId&&S.brandId!=="default"?S.brandId:null)}).then(function(res){
       if(!res.ok){ S.analyzeLoading=false; S.analyzeErr=(res.d&&res.d.error)||L("No pude analizar el reel. Revisa el link.","Couldn't analyze it. Check the link."); return render(); }
       var taskId=res.d&&res.d.task_id;
       if(!taskId){ S.analyzeLoading=false; S.analyzeErr=L("No pude encolar el análisis.","Couldn't queue it."); return render(); }
@@ -7311,7 +7335,7 @@
      Si la task falla, el backend REEMBOLSA el análisis (charge→refund en transcribe_task). */
   function analyzeAndFollow(url){
     showToast("Analizando el reel…");
-    apiPost("/transcribe",{url:url}).then(function(res){
+    apiPost("/transcribe",{url:url, project_id:(S.brandId&&S.brandId!=="default"?S.brandId:null)}).then(function(res){
       if(!res.ok){ return showError((res.d&&res.d.error)||"No pude analizar el reel. Revisa el link."); }
       var taskId=res.d&&res.d.task_id;
       if(!taskId) return showError("No pude encolar el análisis. Inténtalo de nuevo.");
@@ -8470,6 +8494,8 @@
         var qp=qs.get("plan"); if(qp==="creador"){ S.plan="creador"; S.user.credits=120; S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab="dashboard"; } else if(qp==="agencia"){ S.plan="agencia"; S.user.credits=960; S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="dashboard"; }
         var qb=qs.get("b"); if(qb && S.brands.some(function(x){return x.id===qb;})){ S.brandId=qb; S.tab="dashboard"; }
         var qt=qs.get("t"); if(qt==="perf"){ S.tab="guiones"; S.view="perf"; S.perfGuion="gd1"; } else if(qt){ S.tab=qt; }
+        // #5: entrar por deep-link a «analizar» debe CARGAR los análisis (el harness lo verifica).
+        if(qt==="analizar" && typeof loadAnalyses==="function"){ try{ loadAnalyses(); }catch(e){} }
         // ?onb=1 → fuerza el onboarding v2 en demo (sin tocar el flujo normal/harness)
         if(qs.get("onb")==="1"){ S.onb._force=true; S.onb.skipped=false; S.onb.step="handle"; S.reels=[]; S.tracked=[]; }
         // ?free=1 → simula plan FREE en demo (para ver el muro borroso de métricas)

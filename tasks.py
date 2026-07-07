@@ -802,7 +802,7 @@ def _refund_transcribe_charge(db, user_id, ip, charge):
 
 
 @celery_app.task(bind=True)
-def transcribe_task(self, url, language, user_id, ip, is_paid=False, charge=None):
+def transcribe_task(self, url, language, user_id, ip, is_paid=False, charge=None, project_id=None):
     """v0.14.7: is_paid=True (plan pro/creator/agency) → guarda métricas
     Apify (views/likes/comments/shares/published_at) en la fila.
     addreel: `charge` = lo que /transcribe cobró por adelantado
@@ -880,6 +880,7 @@ def transcribe_task(self, url, language, user_id, ip, is_paid=False, charge=None
         "cost_cents": COST_CENTS if user_id else 0,
         "thumbnail_b64": thumb_b64,
         "author_username": author_username,
+        "project_id": project_id,   # #5: «analizado por esta marca» → aislamiento en /history
     }
     # Métricas para TODOS los planes: el dato (views/likes/comments/shares) ya viene
     # en el `apify_item` de la propia transcripción (Instagram) → guardarlo es gratis y

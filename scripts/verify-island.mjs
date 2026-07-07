@@ -523,6 +523,19 @@ async function main() {
   })()`);
   check("guion robado de OTRA marca NO aparece (sin fuga entre clientes)", !iso.leak, JSON.stringify(iso));
 
+  /* ═══ #5 CLASE (David) · aislamiento de «Análisis guardados» por marca ═══
+     La página Analizar mostraba análisis de OTRAS marcas (en IA salían moda/salud/viajes). El demo
+     siembra una CANARY (análisis de marca ajena) que DEBE filtrarse. Rojo si se cuela. */
+  console.log("\n■ #5 clase · aislamiento «Análisis guardados» (marca)");
+  await nav(`${BASE}/profile/radar?plan=agencia&t=analizar`);
+  await sleep(400);
+  const anzIso = await evaluate(`(function(){
+    var root=document.querySelector('#radarRoot');
+    return { leak: /CANARY|análisis de otra marca|fuga entre clientes/i.test(root.textContent||''),
+             cards: root.querySelectorAll('.anz-card').length };
+  })()`);
+  check("análisis de OTRA marca NO aparece en «Análisis guardados»", !anzIso.leak, JSON.stringify(anzIso));
+
   console.log(`\n═══ RESULTADO: ${passed} ✓ · ${failed} ✗ ═══`);
   if (fails.length) { console.log(fails.map((f) => "  ✗ " + f).join("\n")); }
   process.exitCode = failed ? 1 : 0;
