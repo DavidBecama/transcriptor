@@ -9129,6 +9129,16 @@
       transform: scaleX(-1);
       display: block;
     }
+    /* bug1: botón para activar la cámara cuando aún no hay stream (respeta la privacidad) */
+    .tp-cam-enable {
+      position: absolute; inset: 0; margin: auto;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+      width: 100%; height: 100%;
+      background: #000; border: none; color: rgba(255,255,255,.82);
+      font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .tp-cam-enable svg { opacity: .85; }
+    .tp-cam-enable:hover { background: #0a0a0a; color: #fff; }
     .tp-resize-handle {
       position: absolute; width: 16px; height: 16px;
       background: transparent; z-index: 51; touch-action: none;
