@@ -1545,7 +1545,6 @@ def rerank_radar_daily():
     return {"warmed": warmed, "groups": len(groups)}
 
 
-@celery_app.task(name="tasks.finalize_manual_refresh")
 def _niche_has_unseen_recent(_db, uid, niche_pn, days):
     """#3 (David): ¿el nicho tiene reels ≤`days` que el user NO ha robado? → hay algo RECIENTE que
     servir en «Sugerencias de hoy» aunque el scrape no trajera nada nuevo-nuevo. El refresh-pool
@@ -1583,6 +1582,7 @@ def _niche_has_unseen_recent(_db, uid, niche_pn, days):
         return False
 
 
+@celery_app.task(name="tasks.finalize_manual_refresh")
 def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_unlimited,
                             charge_id=None, pool_niche=None):
     """Callback del chord del refresco manual de PAGO. `results` = lista de dicts de

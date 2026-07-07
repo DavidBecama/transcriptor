@@ -5102,28 +5102,38 @@ def script_source(script_id):
     if not sc_r.data:
         return jsonify({"error": "not_found"}), 404
     sc = sc_r.data[0]
-    url = thumb = None
+    url = thumb = transcript = caption = None
+    views = likes = comments = shares = None
     rid = sc.get("from_competitor_reel_id")
     tid = sc.get("transcription_id")
     try:
         if rid:
-            rr = (db.table("creator_reels_global").select("ig_reel_id, thumb_b64")
+            rr = (db.table("creator_reels_global")
+                    .select("ig_reel_id, thumb_b64, transcript, caption, views, likes, comments, shares")
                     .eq("id", rid).limit(1).execute())
             if rr.data:
                 x = rr.data[0]
                 thumb = x.get("thumb_b64")
                 if x.get("ig_reel_id"):
                     url = "https://www.instagram.com/reel/%s/" % x["ig_reel_id"]
+                transcript = x.get("transcript"); caption = x.get("caption")
+                views = x.get("views"); likes = x.get("likes")
+                comments = x.get("comments"); shares = x.get("shares")
         elif tid:
-            tt = (db.table("transcriptions").select("url, thumbnail_b64")
+            tt = (db.table("transcriptions")
+                    .select("url, thumbnail_b64, text, views, likes, comments, shares")
                     .eq("id", tid).eq("user_id", user["id"]).limit(1).execute())
             if tt.data:
                 x = tt.data[0]
-                url = x.get("url")
-                thumb = x.get("thumbnail_b64")
+                url = x.get("url"); thumb = x.get("thumbnail_b64")
+                transcript = x.get("text")
+                views = x.get("views"); likes = x.get("likes")
+                comments = x.get("comments"); shares = x.get("shares")
     except Exception:
         logger.warning("script_source lookup failed sid=%s", script_id, exc_info=True)
-    return jsonify({"url": url, "thumb_b64": thumb})
+    return jsonify({"url": url, "thumb_b64": thumb,
+                    "transcript": transcript, "caption": caption,
+                    "views": views, "likes": likes, "comments": comments, "shares": shares})
 
 
 @app.route("/scripts", methods=["POST"])

@@ -2899,6 +2899,25 @@
       if(S.tab==="guiones"&&(d.thumb_b64||d.url)) render();
     });
   }
+  // #8 (David): transcripción + métricas del reel ORIGINAL en el workspace de la idea.
+  // Resuelve BAJO DEMANDA vía /scripts/<sid>/source (FKs que scripts ya guarda). Cacheado
+  // por grupo (S._detailByKey) — 1 fetch por idea, no por render.
+  function loadGroupDetail(grp){
+    if(!grp || isDemo()) return;
+    var c=S._detailByKey=S._detailByKey||{};
+    var e=c[grp.key];
+    if(e){ if(!e.loading){ grp.srcTranscript=e.transcript; grp.srcCaption=e.caption; grp.srcMetrics=e.metrics; } return; }
+    var g=(grp.guiones||[]).filter(function(x){return x._sid;})[0];
+    if(!g) return;
+    c[grp.key]={loading:true};
+    apiGet("/scripts/"+encodeURIComponent(g._sid)+"/source").then(function(r){
+      var d=(r&&r.ok&&r.d)||{};
+      var metrics={views:d.views,likes:d.likes,comments:d.comments,shares:d.shares};
+      c[grp.key]={loading:false, transcript:d.transcript||null, caption:d.caption||null, metrics:metrics};
+      grp.srcTranscript=d.transcript||null; grp.srcCaption=d.caption||null; grp.srcMetrics=metrics;
+      if(S.view==="ideaws") render();
+    });
+  }
   // Notas del workspace: fuente de verdad en sesión (S._notesByKey) con fallback al
   // ancla persistida (fila de `ideas` con inspired_by_id == origen del grupo).
   function _groupNotesVal(key){
@@ -3005,6 +3024,7 @@
         '<div class="guic-empty"><span class="guic-empty-s">'+L("Esta idea ya no existe.","This idea no longer exists.")+'</span></div></div></div>';
     }
     loadGroupSource(grp);
+    loadGroupDetail(grp);   // #8: métricas + transcripción del original
     var n=grp.guiones.length;
     var handle=(grp.handle||"").replace(/^@/,"");
     var thumb=grp.thumb?('<img src="'+ESC(grp.thumb)+'" alt="" loading="lazy">'):('<div class="igc-ph" style="background:'+_galGrad(grp.key)+'"></div>');
@@ -3013,6 +3033,17 @@
       ? '<a class="btn btn-sm btn-secondary" href="'+ESC(grp.url)+'" target="_blank" rel="noopener noreferrer">'+IC.eye+' '+L("Ver original","View original")+'</a>'
       : (rSrc?'<button class="btn btn-sm btn-secondary" data-act="reel-original" data-id="'+ESC(grp.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>':'');
     var stealAgain=rSrc?('<button class="btn btn-md btn-secondary" data-act="ws-steal-again" data-id="'+ESC(grp.id)+'">'+IC.bolt+' '+L("Robar otro guion de este reel · "+COST.script+" créd.","Steal another script from this reel · "+COST.script+" cr.")+'</button>'):'';
+    // #8: métricas + transcripción del original (loadGroupDetail). Fallback a lo que el guion ya trae.
+    var M=grp.srcMetrics||{};
+    var _mv=(M.views!=null&&M.views!=="")?M.views:((grp.guiones[0]&&grp.guiones[0].srcViews)||null);
+    var _ml=(M.likes!=null&&M.likes!=="")?M.likes:((grp.guiones[0]&&grp.guiones[0].srcLikes)||null);
+    var metParts=[];
+    if(_mv) metParts.push('<span class="ws-met">'+IC.eye+' '+_anzNum(_mv)+'</span>');
+    if(_ml) metParts.push('<span class="ws-met">'+IC.heart+' '+_anzNum(_ml)+'</span>');
+    if(M.comments) metParts.push('<span class="ws-met">'+IC.chat+' '+_anzNum(M.comments)+'</span>');
+    var metricsRow=metParts.length?('<div class="ws-src-mets">'+metParts.join("")+'</div>'):'';
+    var _tx=grp.srcTranscript||grp.srcCaption||"";
+    var txBlock=_tx?('<details class="ws-transcript"><summary>'+IC.doc+' '+L("Transcripción del original","Original transcript")+(grp.srcTranscript?'':' · '+L("caption","caption"))+'</summary><div class="ws-transcript-tx">'+ESC(_tx)+'</div></details>'):'';
     var cards=n
       ? '<div class="guic-grid">'+grp.guiones.map(guiCardHTML).join("")+'</div>'
       : '<div class="guic-empty"><span class="guic-empty-s">'+L("Aún no hay guiones de esta idea.","No scripts from this idea yet.")+'</span></div>';
@@ -3023,9 +3054,11 @@
         '<div class="ws-src-info">'+
           '<div class="ws-src-k">'+L("IDEA ROBADA","STOLEN IDEA")+(handle?(' · '+L("de","from")+' <b>@'+ESC(handle)+'</b>'):'')+'</div>'+
           '<h1 class="guic-hook ws-title">'+ESC(grp.title)+'</h1>'+
+          metricsRow+
           '<div class="ws-src-acts">'+origBtn+'</div>'+
         '</div>'+
       '</div>'+
+      txBlock+
       '<div class="ws-notes-block">'+
         '<div class="ws-notes-head"><span class="ws-notes-k">'+L("› tus notas","› your notes")+'</span><span class="ws-notes-save" id="rsWsNotesSave"></span></div>'+
         '<textarea id="rsWsNotes" class="ws-notes" rows="3" placeholder="'+L("Ángulos, CTA, dónde grabarlo… tus notas de esta idea.","Angles, CTA, where to shoot it… your notes for this idea.")+'" oninput="try{window.RadarLoop.wsNotes(this.value)}catch(e){}">'+ESC(_groupNotesVal(grp.key))+'</textarea>'+
