@@ -11041,7 +11041,7 @@ const TP = {
   isOpen: false, isPlaying: false, currentY: 0, speed: 60,
   fontSize: 48, mirrorX: false, textColor: "#fff",
   countdown: true, countdownSec: 3,
-  layout: "free", textY: 5, textH: 40,
+  layout: "fullcam", textY: 5, textH: 40,
   rafId: null, lastTime: 0, totalHeight: 0, autoHideTimer: null,
   _boxesInitialized: false, settingsOpen: false,
 };
@@ -11051,6 +11051,15 @@ function tpLoadSettings() {
     const s = JSON.parse(localStorage.getItem("teleprompter_settings"));
     if (s) Object.assign(TP, s);
   } catch {}
+  // Migración v2 (David 07/07): fullcam por defecto = texto SOBRE la cámara (eyeline al objetivo).
+  // El default viejo era «free» (cajas separadas apiladas) → confuso y clipaba. Una sola vez;
+  // después respeta si el usuario elige «free» a mano.
+  try {
+    if (!localStorage.getItem("tp_layout_v2")) {
+      TP.layout = "fullcam";
+      localStorage.setItem("tp_layout_v2", "1");
+    }
+  } catch (e) {}
 }
 let _tpSaveTimer = null;
 function tpSaveSettings() {
@@ -11093,6 +11102,7 @@ function tpOpen(text, opts) {
   tpSyncSettingsUI();
   tpStartAutoHide();
   tpRecInit();
+  tpStartPreview();   // bug1: monta la PREVIEW de cámara al abrir (antes: negro hasta pulsar grabar)
   // #loop: «Ya lo grabé» (cierra el loop → workspace) solo en modo loop, en header + fin.
   var _dbtn = document.getElementById("tpDoneBtn"); if (_dbtn) _dbtn.style.display = TP.fromLoop ? "" : "none";
   var _edbtn = document.getElementById("tpEndDoneBtn"); if (_edbtn) _edbtn.style.display = TP.fromLoop ? "" : "none";
@@ -11594,12 +11604,37 @@ const TPR = {
 
 function tpRouteCameraToLayout() {
   const v = document.getElementById("tpCamBoxVideo");
-  if (v && TPR.stream) v.srcObject = TPR.stream;
+  if (v && TPR.stream) {
+    v.srcObject = TPR.stream;
+    try { v.play(); } catch (e) {}
+    const eb = document.getElementById("tpCamEnable"); if (eb) eb.style.display = "none";
+  }
 }
 
 function tpRecInit() {
   const btn = document.getElementById("tpRecBtn");
   if (btn) btn.style.display = TPR.supported ? "" : "none";
+}
+
+// bug1 (David 07/07): la cámara estaba NEGRA al abrir porque getUserMedia solo se pedía al
+// pulsar grabar. Monta la PREVIEW al abrir: si ya consintió privacidad → pide cámara y se ve;
+// si no → botón «activar cámara» (respeta el gate de privacidad, sin forzar el prompt).
+function tpStartPreview() {
+  const eb = document.getElementById("tpCamEnable");
+  if (!TPR.supported) { if (eb) eb.style.display = "none"; return; }
+  if (TPR.stream) { tpRouteCameraToLayout(); return; }
+  if (localStorage.getItem("tp_rec_privacy")) {
+    tpRecRequestPermissions();               // recurrente → cámara directa (preview al abrir)
+  } else {
+    // 1ª vez (desktop Mac incluido): consentimiento limpio automático → al aceptar monta la
+    // cámara. El botón queda de fallback si cierra el aviso sin aceptar.
+    const pv = document.getElementById("tpPrivacy"); if (pv) pv.classList.add("on");
+    if (eb) eb.style.display = "";
+  }
+}
+function tpEnableCamera() {
+  if (!localStorage.getItem("tp_rec_privacy")) { document.getElementById("tpPrivacy").classList.add("on"); return; }
+  tpRecRequestPermissions();
 }
 
 // ── MIME type — MP4 first for iOS ─────────────────────────────────────────
@@ -15101,6 +15136,10 @@ async function removeCompetitor(trackingId, username) {
     </div>
     <div class="tp-box-content tp-cam-content">
       <video id="tpCamBoxVideo" autoplay playsinline muted></video>
+      <button id="tpCamEnable" class="tp-cam-enable" onclick="tpEnableCamera()" style="display:none">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <span data-i18n-es="Toca para activar la cámara" data-i18n-en="Tap to enable camera">Toca para activar la cámara</span>
+      </button>
     </div>
     <div class="tp-resize-handle tp-resize-br"></div>
   </div>
