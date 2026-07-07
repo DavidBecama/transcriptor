@@ -11624,9 +11624,12 @@ function tpStartPreview() {
   if (!TPR.supported) { if (eb) eb.style.display = "none"; return; }
   if (TPR.stream) { tpRouteCameraToLayout(); return; }
   if (localStorage.getItem("tp_rec_privacy")) {
-    tpRecRequestPermissions();
-  } else if (eb) {
-    eb.style.display = "";
+    tpRecRequestPermissions();               // recurrente → cámara directa (preview al abrir)
+  } else {
+    // 1ª vez (desktop Mac incluido): consentimiento limpio automático → al aceptar monta la
+    // cámara. El botón queda de fallback si cierra el aviso sin aceptar.
+    const pv = document.getElementById("tpPrivacy"); if (pv) pv.classList.add("on");
+    if (eb) eb.style.display = "";
   }
 }
 function tpEnableCamera() {
