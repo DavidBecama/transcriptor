@@ -377,7 +377,7 @@
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/core.css?v=6">
+  <link rel="stylesheet" href="/static/css/core.css?v=7">
 
   {% if clarity_project_id %}
   <script type="text/javascript">
@@ -451,15 +451,15 @@
       <a class="lang-btn{% if lang|default('es') == 'es' %} active{% endif %}" href="/es/">ES</a>
       <a class="lang-btn{% if lang|default('es') == 'en' %} active{% endif %}" href="/en/">EN</a>
     </div>
-    <a href="/affiliate" id="navAffiliate" style="display:none;color:var(--text3);font-size:.78rem;font-weight:500;text-decoration:none;transition:color .2s" onmouseover="this.style.color='var(--brand)'" onmouseout="this.style.color='var(--text3)'">Earn 30% &rarr;</a>
+    <a href="/affiliate" id="navAffiliate" style="display:none;padding:5px 13px;border:1px solid var(--brand);border-radius:999px;color:var(--brand);font-size:.8rem;font-weight:700;text-decoration:none;transition:all .18s" onmouseover="this.style.background='var(--brand)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--brand)'" data-i18n-es="Gana 30% &rarr;" data-i18n-en="Earn 30% &rarr;">Gana 30% &rarr;</a>
     {# v0.14.30.a-2: #btnWorkspace y los CTA mobile siempre en DOM. JS
        renderLoggedIn/Out controla visibilidad. Antes: guard {% if not workspace %}
        los excluía cuando se renderizaba /profile/*, dejando al user sin botón
        "Ir a mi app" tras navegación SPA hacia la landing. #}
-    <a class="btn-nav hi" id="btnWorkspace" href="/app" onclick="ctaWorkspaceClick()" style="display:none;text-decoration:none" data-i18n="nav.workspace">Ir a mi app →</a>
+    <a class="btn-nav hi" id="btnWorkspace" href="/app" onclick="ctaWorkspaceClick()" style="display:none;text-decoration:none" data-i18n="nav.workspace">Ir al panel</a>
     <button class="btn-nav" id="btnLogin" onclick="openAuth('login','nav_login')" data-i18n="nav.login">Log in</button>
     <button class="btn-nav hi" id="btnReg" onclick="openAuth('register','nav_login')" data-i18n="nav.register">Free →</button>
-    <a class="nav-mob-cta nav-mob-cta-primary" id="navMobApp" href="/app" onclick="ctaWorkspaceClick()" style="display:none" data-i18n-es="Entrar app" data-i18n-en="Open app">Entrar app</a>
+    <a class="nav-mob-cta nav-mob-cta-primary" id="navMobApp" href="/app" onclick="ctaWorkspaceClick()" style="display:none" data-i18n-es="Ir al panel" data-i18n-en="Go to panel">Ir al panel</a>
     <button class="nav-mob-cta" id="navMobLoginBtn" onclick="openAuth('login','nav_mob')" data-i18n-es="Entrar" data-i18n-en="Sign in">Entrar</button>
     <button class="nav-mob-cta nav-mob-cta-primary" id="navMobRegBtn" onclick="openAuth('register','nav_mob')" data-i18n-es="Empezar gratis" data-i18n-en="Get started">Empezar gratis</button>
     {% if workspace %}<button class="nav-upgrade-btn" id="navUpgradeBtn" onclick="upgradeNextPlan('nav')" style="display:none">✦ Mejorar plan</button>{% endif %}
@@ -851,7 +851,7 @@
   </div>
 
   <!-- ═══ POR DENTRO (clips reales de la app) ═══ -->
-  <section style="padding-top:40px">
+  <section id="rslLoop" style="padding-top:40px">
     <div class="rsl-wrap" style="text-align:center">
       <span class="rsl-eyebrow" data-i18n-en="Inside">Por dentro</span>
       <h2 class="rsl-rise" data-i18n-en="Every part, actually working.">Cada parte, funcionando de verdad.</h2>
@@ -2862,7 +2862,7 @@ window.__NEXT_URL__ = {{ next_url|tojson if next_url else 'null' }};
 // ── i18n ─────────────────────────────────────────────────────────────────
 const LANGS = {
   es: {
-    "nav.login": "Entrar", "nav.register": "Gratis →", "nav.profile": "Mi perfil", "nav.logout": "Cerrar sesión", "nav.earn": "Ganar 30%", "nav.theme": "Tema", "nav.navigation": "Navegación", "nav.account": "Cuenta", "nav.home": "Inicio", "nav.buy_credits": "Comprar créditos", "nav.workspace": "Ir a mi app →", "nav.my_account": "Mi cuenta", "nav.my_plan": "Mi plan", "nav.dark_mode": "Modo oscuro", "nav.language": "Idioma", "nav.affiliates": "Afiliados", "nav.public_web": "Ver web pública",
+    "nav.login": "Iniciar sesión", "nav.register": "Gratis →", "nav.profile": "Mi perfil", "nav.logout": "Cerrar sesión", "nav.earn": "Ganar 30%", "nav.theme": "Tema", "nav.navigation": "Navegación", "nav.account": "Cuenta", "nav.home": "Inicio", "nav.buy_credits": "Comprar créditos", "nav.workspace": "Ir al panel", "nav.my_account": "Mi cuenta", "nav.my_plan": "Mi plan", "nav.dark_mode": "Modo oscuro", "nav.language": "Idioma", "nav.affiliates": "Afiliados", "nav.public_web": "Ver web pública",
     "hero.badge": "5 gratis al día · Sin tarjeta · Sin suscripción",
     "hero.h1": 'Pega la URL.<br><span class="grad-txt">Obtén el guión.</span>',
     "hero.sub": "Transcribe reels de Instagram y TikTok al instante con IA.",
@@ -3364,7 +3364,7 @@ const LANGS = {
     "auth.forgot": "¿Olvidaste tu contraseña?",
   },
   en: {
-    "nav.login": "Log in", "nav.register": "Free →", "nav.profile": "My profile", "nav.logout": "Log out", "nav.earn": "Earn 30%", "nav.theme": "Theme", "nav.navigation": "Navigation", "nav.account": "Account", "nav.home": "Home", "nav.buy_credits": "Buy credits", "nav.workspace": "Go to the app →", "nav.my_account": "My account", "nav.my_plan": "My plan", "nav.dark_mode": "Dark mode", "nav.language": "Language", "nav.affiliates": "Affiliates", "nav.public_web": "View public site",
+    "nav.login": "Log in", "nav.register": "Free →", "nav.profile": "My profile", "nav.logout": "Log out", "nav.earn": "Earn 30%", "nav.theme": "Theme", "nav.navigation": "Navigation", "nav.account": "Account", "nav.home": "Home", "nav.buy_credits": "Buy credits", "nav.workspace": "Go to panel", "nav.my_account": "My account", "nav.my_plan": "My plan", "nav.dark_mode": "Dark mode", "nav.language": "Language", "nav.affiliates": "Affiliates", "nav.public_web": "View public site",
     "hero.badge": "5 free/day · No card · No subscription",
     "hero.h1": 'Paste the URL.<br><span class="grad-txt">Get the script.</span>',
     "hero.sub": "Transcribe Instagram and TikTok reels instantly with AI.",
@@ -15694,6 +15694,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=179"></script>
+<script src="/static/js/radar-loop.js?v=181"></script>
 </body>
 </html>
