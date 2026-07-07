@@ -11364,13 +11364,13 @@
        ════════════════════════════════════════════════════════════════ */
     .rs.app { display:grid; grid-template-columns:64px 1fr; overflow:hidden; position:relative; }
     /* ── RAIL lateral ── */
-    .rs .rail { position:relative; display:flex; flex-direction:column; align-items:center; gap:9px; padding:16px 0; background:var(--surface-base); border-right:1px solid var(--border-subtle); z-index:8; height:100%; }
+    .rs .rail { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 0; background:var(--surface-base); border-right:1px solid var(--border-subtle); z-index:8; height:100%; }
     .rs .rail-logo { width:32px; height:32px; margin-bottom:10px; display:block; background:url("/static/img/branding/isotipo-white-128.png") center/contain no-repeat; }
     .rs[data-theme="light"] .rail-logo { background-image:url("/static/img/branding/isotipo-color-128.png"); }
-    .rs .rail-btn { position:relative; width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--text-tertiary); cursor:pointer; transition:color .14s var(--ease), background .14s var(--ease); }
+    .rs .rail-btn { position:relative; width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--text-tertiary); cursor:pointer; transition:color .14s var(--ease), background .14s var(--ease); }
     .rs .rail-btn:hover { color:var(--text-secondary); background:var(--surface-raised); }
     .rs .rail-btn.on { color:var(--text-primary); background:var(--surface-overlay); }
-    .rs .rail-btn.on::before { content:""; position:absolute; left:-16px; top:15px; bottom:15px; width:3px; border-radius:0 3px 3px 0; background:var(--brand-500); opacity:.9; }
+    .rs .rail-btn.on::before { content:""; position:absolute; left:-14px; top:12px; bottom:12px; width:3px; border-radius:0 3px 3px 0; background:var(--brand-500); }
     .rs .rail-btn svg { width:20px; height:20px; }
     .rs .rail-btn .tip { position:absolute; left:54px; top:50%; transform:translateY(-50%) translateX(-4px); padding:5px 9px; border-radius:6px; background:var(--surface-overlay); border:1px solid var(--border-strong); color:var(--text-primary); font-size:12px; font-weight:500; white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .14s var(--ease), transform .14s var(--ease); box-shadow:var(--shadow-md); z-index:20; font-family:var(--font-body); }
     .rs .rail-btn:hover .tip { opacity:1; transform:translateY(-50%) translateX(0); }
@@ -12048,15 +12048,6 @@
       .rs .searchbox, .rs .cmd-streak { display:none; }
       .rs .cmd-idea .cmd-idea-t { display:none; }   /* móvil: solo la bombilla… */
       .rs .cmd-idea { height:44px; min-width:44px; justify-content:center; padding:0 12px; }  /* …con target táctil ≥44px */
-      /* CMD móvil ORDENADO en 2 filas (antes los chips quedaban descuadrados):
-         fila 1 = marca + /TAB + bombilla · fila 2 = CTA Cerebro (crece, centrado) +
-         créditos, ambos a 40px de alto. El order empuja cerebro+créditos a la 2ª fila. */
-      .rs .cmd { padding-left:14px; padding-right:14px; gap:10px; }
-      .rs .cmd .brand-static, .rs .cmd .brand { min-width:0; }
-      .rs .cmd .brand-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:40vw; }
-      .rs .cmd-brain-center { order:10; flex:1 1 auto; display:flex; min-width:0; }
-      .rs .cmd-brain-center .brain-cmd { width:100%; justify-content:center; height:40px; }
-      .rs .cmd .spark { order:11; height:40px; }
       .rs .canvas { padding:24px 16px 100px; } .rs .h-title { font-size:30px; }
       .rs .row { grid-template-columns:48px 1fr auto; } .rs .row-thumb, .rs .row-when { display:none; }
     }
@@ -12107,10 +12098,6 @@
     body.rs-takeover .panel-header,
     body.rs-takeover .ideas-tabs,
     body.rs-takeover .prof-bottom-tab,
-    /* …y el CONTENEDOR de la barra inferior legacy: solo se ocultaban sus botones
-       (.prof-bottom-tab) → en móvil quedaba una franja negra vacía fija (z:1000)
-       asomando bajo el rail de la isla. Bug Leo 07-jul. */
-    body.rs-takeover .prof-bottom-bar,
     body.rs-takeover #profSidebarNav { display:none !important; }
     /* Excepción: las vistas legacy reparentadas en la isla (#rsLegacy) conservan su
        .panel-header (lleva el título de la sección). El ID gana al hide de arriba. */
