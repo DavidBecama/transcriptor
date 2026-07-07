@@ -2824,7 +2824,9 @@
     var gancho=(g.hook&&g.hook!==g.title)?g.hook:((g.beats&&g.beats[0])||g.sum||"");
     // Petición usuario: en la card solo Aprobar (agencia) / Descartar; lo demás
     // (rendimiento, ver guión completo, hooks alternativos) se accede desde el editor.
+    var _fsid=g._sid||(isDemo()?g.id:null);
     var moreRow='<div class="guic-more">'+aprBtn+
+        (_fsid?feedBtnHTML("script",_fsid):"")+
         '<button class="gui-hooks-toggle guic-discard" data-act="gui-discard" data-id="'+g.id+'" title="Descartar">'+IC.x+' '+L("Descartar","Discard")+'</button>'+
       '</div>';
     return '<div class="guic-wrap"><div class="guic'+(rec?" is-rec":"")+'">'+
@@ -4030,9 +4032,9 @@
     }
     var go=function(){
       showToast("Transcribiendo tus reels y aprendiendo tu voz… (~1 min)");
-      apiPost("/api/voice/from-urls",{urls:reels.slice(0,6)}).then(function(r){
+      apiPost("/api/voice/from-urls",{urls:reels.slice(0,6), project_id:_pidOf(S.brandId)}).then(function(r){
         if(r.ok && r.d && r.d.ok){
-          return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
+          return fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
             S.voice=v; render(); showToast("Voz aprendida de "+(r.d.source_count||n)+" reels — te conozco al "+(r.d.confidence||v.confidence||0)+"%.");
             setTimeout(brainLevelPulse,1600);
           });
@@ -4726,6 +4728,31 @@
     }catch(e){}
     var orb=document.querySelector(".brain-orb"); if(orb){ orb.classList.remove("feast"); void orb.offsetWidth; orb.classList.add("feast"); setTimeout(function(){ orb.classList.remove("feast"); }, 1200); }
   }
+  // ── Opt-in «Alimentar el cerebro»: el creador elige a mano qué guion/análisis
+  //    define la voz de ESTA marca. Anima (brainFeast) + sube la voz%. ──────────
+  function _isFed(kind, id){ var m=(kind==="analysis"?S.fedAnalyses:S.fedScripts)||{}; return !!m[String(id)]; }
+  function feedBtnHTML(kind, id){
+    if(!id) return '';
+    var fed=_isFed(kind,id);
+    return '<button class="btn btn-sm btn-ghost brain-feed-btn'+(fed?' fed':'')+'" data-act="brain-feed" data-fk="'+kind+'" data-id="'+ESC(String(id))+'"'+(fed?' disabled aria-disabled="true"':'')+' title="'+L("Enseña esto a la voz de "+brand().name,"Teach this to "+brand().name+"’s voice")+'">'+IC.spark+' '+(fed?L("En el cerebro ✓","In the brain ✓"):L("Alimentar el cerebro","Feed the brain"))+'</button>';
+  }
+  function brainFeedItem(kind, id, btn){
+    if(!id || _isFed(kind,id)) return;
+    var mark=function(conf){
+      var m=(kind==="analysis"?(S.fedAnalyses=S.fedAnalyses||{}):(S.fedScripts=S.fedScripts||{})); m[String(id)]=true;
+      if(conf!=null){ S.voice=S.voice||{}; S.voice.has_profile=true; S.voice.confidence=Math.max(S.voice.confidence||0, conf); }
+      brainFeast(12);
+      showToast(L("Alimentado. La voz de "+brand().name+" aprende de esto.","Fed. "+brand().name+"’s voice learns from this."));
+      render();
+    };
+    if(isDemo()) return mark(Math.min(90,((S.voice&&S.voice.confidence)||45)+8));
+    if(btn){ btn.disabled=true; }
+    var _b={source_type:kind, source_id:String(id)}; var _p=_pidOf(S.brandId); if(_p) _b.project_id=_p;
+    apiPost("/api/brain/feed", _b).then(function(rr){
+      if(rr&&rr.ok&&rr.d&&rr.d.ok){ mark(rr.d.confidence!=null?rr.d.confidence:null); }
+      else { if(btn) btn.disabled=false; showError(L("No pude alimentar el cerebro. Reintenta.","Couldn’t feed the brain. Try again.")); }
+    }).catch(function(){ if(btn) btn.disabled=false; showError(L("No pude alimentar el cerebro. Reintenta.","Couldn’t feed the brain. Try again.")); });
+  }
   function brainFeedPick(key){ S.feedType=key; S._ceReward=null; render(); var ta=document.getElementById("rsFeedMe"); if(ta) try{ ta.focus(); }catch(e){} }
   function brainFeedMe(key){
     key=key||S.feedType||"guion"; var def=brainFeedDef(key);
@@ -5348,6 +5375,7 @@
             // F2: puente REAL al guion recién creado — nada de «te espera en Guiones» sin link.
             '<button class="btn btn-md btn-secondary" data-act="ws-open" data-id="r:'+ESC(r.id)+'">'+L("Ver la idea →","See the idea →")+'</button>'
           : '<button class="btn btn-md btn-primary script-save-btn" data-act="save-script-choice">'+IC.check+' '+L("Guardar guion","Save script")+'</button>')+
+        ((r._sid||isDemo())?feedBtnHTML("script", r._sid||(isDemo()?r.id:null)):"")+
       '</div>';
     var sideHTML = recFormatCardHTML(r)+conveyorHTML();
     return '<div class="script-wrap'+(_firstPaint?' fade-in':' no-entry')+'">'+
@@ -7151,6 +7179,7 @@
         '<div class="anz-acts">'+
           '<button class="btn btn-sm btn-secondary" data-act="analyze-view" data-id="'+ESC(a.id)+'">'+IC.eye+' '+L("Ver","View")+'</button>'+
           '<button class="btn btn-sm btn-ghost" data-act="analyze-copy" data-id="'+ESC(a.id)+'">'+L("Copiar","Copy")+'</button>'+
+          ((a.text&&String(a.text).trim())?feedBtnHTML("analysis",a.id):'')+
           (a.author_username?'<button class="btn btn-sm btn-ghost" data-act="analyze-follow" data-h="'+ESC(String(a.author_username).replace(/^@+/,""))+'">'+L("Seguir","Follow")+'</button>':'')+
           '<button class="btn btn-sm btn-ghost anz-del" data-act="analyze-del" data-id="'+ESC(a.id)+'">'+L("Borrar","Delete")+'</button>'+
         '</div>'+
@@ -7429,11 +7458,11 @@
       var b=brand(); b.voice=62; render(); showToast("Voz aprendida — te conozco al 62%."); setTimeout(brainLevelPulse,1600); return;
     }
     showToast("Aprendiendo tu voz…");
-    fetch("/api/voice/onboard",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({texts:[txt]})})
+    fetch("/api/voice/onboard",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({texts:[txt], project_id:_pidOf(S.brandId)})})
       .then(function(r){ return r.json().catch(function(){return{};}); })
       .then(function(d){
         if(d&&d.ok){
-          return fetch("/api/voice",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(v){
+          return fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(v){
             S.voice=v; render(); showToast("Voz aprendida — te conozco al "+(v.confidence||0)+"%."); setTimeout(brainLevelPulse,1600);
           });
         }
@@ -7464,7 +7493,7 @@
       var go=function(){
         showToast("Derivando tu voz de tus reels… (~1-2 min si hay que transcribir)");
         var done=function(d){
-          return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
+          return fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
             S.voice=v; render();
             showToast("Voz derivada de "+(d.source_count||0)+" reels — te conozco al "+(d.confidence||v.confidence||0)+"%.");
             setTimeout(brainLevelPulse,1600);
@@ -7526,9 +7555,9 @@
     }
     var go=function(){
       showToast("Transcribiendo y refinando tu voz… (~1 min)");
-      apiPost("/api/voice/from-urls",{urls:reels.slice(0,6)}).then(function(r){
+      apiPost("/api/voice/from-urls",{urls:reels.slice(0,6), project_id:_pidOf(S.brandId)}).then(function(r){
         if(r.ok && r.d && r.d.ok){
-          return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
+          return fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
             S.voice=v; render(); showToast("Voz refinada — ahora te conozco al "+(r.d.confidence||v.confidence||0)+"%."); setTimeout(brainLevelPulse,1600);
           });
         }
@@ -7791,6 +7820,7 @@
       window.location.href="/"+(document.documentElement.lang||"es")+"/"; return;
     }
     if(act==="legacy-back") return closeLegacy();
+    if(act==="brain-feed"){ return brainFeedItem(btn.getAttribute("data-fk"), id, btn); }
     if(act==="brand-toggle"){ S.brandMenu=!S.brandMenu; return render(); }
     if(act==="brand-close"){ S.brandMenu=false; return render(); }
     if(act==="brand") return openBrand(id);
@@ -8380,17 +8410,20 @@
   function _loadDeferredBrandData(q, _pq){
     Promise.all([
       fetch("/metrics/summary"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch("/api/voice",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/api/metrics/insights"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/metrics/videos"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       // Contenido REAL del usuario (solo prod): ideas guardadas + guiones persistidos.
       // /ideas y /scripts filtran por project_id (no por "brand"); la marca de la isla
       // es un project. Marca "default" (sin projects) → sin filtro (todo el user).
       isDemo()?Promise.resolve(null):fetch("/ideas"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      isDemo()?Promise.resolve(null):fetch("/scripts"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
+      isDemo()?Promise.resolve(null):fetch("/scripts"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      // «Alimentar el cerebro»: ids ya alimentados de ESTA marca → pintar el botón.
+      isDemo()?Promise.resolve(null):fetch("/api/brain/fed"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
     ]).then(function(res){
-      var met=res[0], ins=res[2], vids=res[3], ideasRows=res[4], scriptRows=res[5];
+      var met=res[0], ins=res[2], vids=res[3], ideasRows=res[4], scriptRows=res[5], fed=res[6];
       if(res[1]) S.voice=res[1];   // perfil de voz real (moat) — null en demo dummy
+      if(fed){ var _fs={}, _fa={}; (fed.script_ids||[]).forEach(function(x){_fs[String(x)]=true;}); (fed.analysis_ids||[]).forEach(function(x){_fa[String(x)]=true;}); S.fedScripts=_fs; S.fedAnalyses=_fa; }
       // Métricas: NO tocar en demo (seedDemoContent ya sembró S.metrics con datos falsos).
       if(!isDemo()){
         if(met){ S.metrics=met; S.igConnected=!!(met && met.connected); }

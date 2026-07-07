@@ -10359,6 +10359,10 @@
     .rs .guic-acts { display:flex; align-items:center; gap:10px; margin-top:2px; flex-wrap:wrap; }
     .rs .guic-more { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-top:10px; border-top:1px solid var(--border-subtle); margin-top:2px; }
     .rs .guic-more .guic-discard { color:var(--text-tertiary); }
+    /* «Alimentar el cerebro» (opt-in de voz por marca) */
+    .rs .brain-feed-btn { color:var(--accent, #7c5cff); border-color:color-mix(in srgb, var(--accent, #7c5cff) 40%, transparent); }
+    .rs .brain-feed-btn:hover { background:color-mix(in srgb, var(--accent, #7c5cff) 12%, transparent); }
+    .rs .brain-feed-btn.fed { color:var(--success-fg, #1a7f4b); border-color:color-mix(in srgb, var(--success-fg, #1a7f4b) 40%, transparent); opacity:.85; cursor:default; }
     /* cocinando */
     .rs .guic-skel { display:flex; flex-direction:column; gap:11px; }
     .rs .gsk { height:14px; border-radius:6px; background:linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-sunken) 37%, var(--surface-overlay) 63%); background-size:200% 100%; animation:gShimmer 1.4s linear infinite; }

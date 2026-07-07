@@ -93,6 +93,11 @@ OPENROUTER_MODEL      = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-fl
 # (robo lentísimo) → flash ~5-8s. El env GENERATION_MODEL es el FLAG REVERTIBLE: poner
 # "google/gemini-2.5-pro" en el .env del VPS revierte a pro sin tocar código si la calidad no vale.
 GENERATION_MODEL      = os.environ.get("GENERATION_MODEL", "google/gemini-2.5-flash")
+# CEREBRO POR MARCA (David): voz + few-shot + anti-patrón se acotan a la marca (project_id). Cada
+# marca aprende solo de lo suyo. Gated REVERSIBLE (off = comportamiento previo per-user). La voz se
+# considera «lista» (se inyecta) solo con confidence ≥ umbral; por debajo → neutro (nada de fingir).
+BRAIN_PER_BRAND_ENABLED    = os.environ.get("BRAIN_PER_BRAND_ENABLED", "1") == "1"
+BRAIN_VOICE_MIN_CONFIDENCE = int(os.environ.get("BRAIN_VOICE_MIN_CONFIDENCE", "30"))
 # Timeout (s) de la llamada LLM de GENERACIÓN — SOLO en la tarea async (Celery, sin gateway):
 # pro tarda 40-90s; con los 60s por defecto cortaba y caía a groq → 2 opciones en paralelo →
 # 429 → «Failed to generate script». 120s deja terminar a pro y encaja bajo el poll del front (150s).
@@ -3847,6 +3852,12 @@ def voice_prompt_block(vp) -> str:
     ww = raw.get("what_works") or []
     if ww:
         parts.append("LO QUE MÁS FUNCIONA en su cuenta (priorízalo): " + " · ".join(str(w) for w in ww[:4]))
+    # OPT-IN «Alimentar el cerebro» (MÁXIMA prioridad): guiones/análisis que el creador
+    # eligió A MANO para enseñar su voz. Pesa por encima del top-por-vistas automático.
+    fed = raw.get("fed_samples") or []
+    if fed:
+        parts.append("\n=== EL CREADOR ELIGIÓ ESTOS COMO SU VOZ (imita ESTE molde antes que nada) ===\n"
+                     + "\n--- (otro) ---\n".join(str(s)[:600] for s in fed[:3]))
     # SEED (onboarding/auto-derive): así escribe ÉL de verdad — sus propios reels.
     samples = raw.get("samples") or []
     if samples:
@@ -4286,13 +4297,16 @@ def next_series_suggestion(user_id, project_id=None):
     }
 
 
-def top_scripts_for_voice(user_id, n=2, max_chars=700):
+def top_scripts_for_voice(user_id, n=2, max_chars=700, brand_id=None):
     """Tus guiones que MÁS reventaron (mayor views_count) con cuerpo → molde few-shot.
-    Truncados para no inflar el prompt (riesgo content=null)."""
+    Truncados para no inflar el prompt (riesgo content=null).
+    Cerebro-por-marca: acotado a la marca (project_id) → cada marca aprende de SUS ganadores."""
     try:
-        r = (db.table("scripts").select("script, views_count")
-               .eq("user_id", user_id).not_.is_("views_count", "null")
-               .order("views_count", desc=True).limit(n * 4).execute())
+        q = (db.table("scripts").select("script, views_count")
+               .eq("user_id", user_id).not_.is_("views_count", "null"))
+        if BRAIN_PER_BRAND_ENABLED:
+            q = q.eq("project_id", brand_id) if brand_id else q.is_("project_id", "null")
+        r = q.order("views_count", desc=True).limit(n * 4).execute()
     except Exception:
         return []
     out = []
@@ -4306,12 +4320,16 @@ def top_scripts_for_voice(user_id, n=2, max_chars=700):
     return out
 
 
-def underperformers_signal(user_id):
+def underperformers_signal(user_id, brand_id=None):
     """Patrón breve de lo que NO te rinde (guiones muy por debajo de tu mediana).
-    Solo el PATRÓN (hook), nunca los textos enteros. Devuelve str corto o None."""
+    Solo el PATRÓN (hook), nunca los textos enteros. Devuelve str corto o None.
+    Cerebro-por-marca: acotado a la marca (project_id)."""
     try:
-        r = (db.table("scripts").select("script, views_count")
-               .eq("user_id", user_id).not_.is_("views_count", "null").limit(80).execute())
+        q = (db.table("scripts").select("script, views_count")
+               .eq("user_id", user_id).not_.is_("views_count", "null"))
+        if BRAIN_PER_BRAND_ENABLED:
+            q = q.eq("project_id", brand_id) if brand_id else q.is_("project_id", "null")
+        r = q.limit(80).execute()
     except Exception:
         return None
     rows = [x for x in (r.data or []) if (x.get("views_count") or 0) > 0]
@@ -4354,16 +4372,18 @@ def adapt_with_ai(text: str, style: str, custom_prompt: str = "", voice=None, us
     system = method + "\n\n=== REGISTRO / TONO PEDIDO ===\n" + registro
 
     # Moat: CONTEXTO de estilo (no cambia el formato de salida). Se reafirma el JSON al final.
+    # Cerebro-por-marca: la voz SOLO se inyecta si está «lista» (confidence ≥ umbral); por debajo →
+    # NEUTRO (método base, sin fingir voz). Few-shot/anti-patrón acotados a la marca (brand_id).
     ctx = ""
-    if voice:
+    if voice and (not BRAIN_PER_BRAND_ENABLED or int((voice or {}).get("confidence") or 0) >= BRAIN_VOICE_MIN_CONFIDENCE):
         ctx += voice_prompt_block(voice)                      # voz + what_works (ya existente)
     if user_id:
-        wins = top_scripts_for_voice(user_id)                 # aprendizaje real: tus ganadores
+        wins = top_scripts_for_voice(user_id, brand_id=brand_id)   # aprendizaje real: tus ganadores DE ESTA marca
         if wins:
             ctx += ("\n\n=== EJEMPLOS DE TUS GUIONES QUE EXPLOTARON — genera en este MOLDE "
                     "(misma cadencia, estructura y tono; NO los copies literalmente) ===\n"
                     + "\n--- (otro) ---\n".join(wins))
-        neg = underperformers_signal(user_id)                 # evita lo que te hunde
+        neg = underperformers_signal(user_id, brand_id=brand_id)   # evita lo que te hunde (de esta marca)
         if neg:
             ctx += "\n\nEVITA (no te ha funcionado): " + neg
         ctx += brain_voice_block(user_id, brand_id)           # gusto del Brain «Entrenar» (👍/👎 + sugerencias), por MARCA
@@ -4434,14 +4454,16 @@ def save_script():
     today_es = datetime.now(timezone.utc).strftime("%d %b %Y").lower()
     base = "Guión adaptado"
     title = f"{base} · {style} · {today_es}" if style else f"{base} · {today_es}"
+    _pid = body.get("project_id") or None
     db.table("scripts").insert({
         "user_id": user["id"],
         "title": title,
         "script": content,
         "assistant_name": assistant_name,
+        "project_id": _pid,   # aislamiento por marca
     }).execute()
     try:
-        refine_voice_from_own_scripts(user["id"])   # loop sin publicar: crear ya afina
+        refine_voice_from_own_scripts(user["id"], _pid)   # loop sin publicar: crear ya afina (por marca)
     except Exception:
         logger.warning("save_script: refine voice failed", exc_info=True)
     return jsonify({"ok": True})
@@ -4452,7 +4474,8 @@ def save_script():
 @require_auth
 def api_voice_get():
     user = current_user()
-    vp = get_voice_profile(user["id"])
+    # Cerebro-por-marca: la voz de la MARCA activa (project_id). Sin él → default (brand_id="").
+    vp = get_voice_profile(user["id"], _req_project_id() or None)
     if not vp:
         return jsonify({"has_profile": False, "confidence": 0, "source_count": 0})
     raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else {}
@@ -4464,6 +4487,97 @@ def api_voice_get():
         "confidence": vp.get("confidence") or 0,        # = "voz al N%"
         "source_count": vp.get("source_count") or 0,
         "evidence": (raw.get("evidence") or []),         # bullets de qué aprendió
+    })
+
+
+# ── «Alimentar el cerebro» (opt-in): el creador elige a mano qué guiones/análisis
+#    DEFINEN la voz de la marca. Pesa por encima del top-por-vistas automático. ──
+def _brain_feed_content(user_id, brand_id, source_type, source_id):
+    """Texto del guion/análisis, AISLADO por marca (debe pertenecer a ESTA marca)."""
+    try:
+        if source_type == "script":
+            q = (db.table("scripts").select("script, project_id")
+                   .eq("id", source_id).eq("user_id", user_id).limit(1).execute())
+            txt_key = "script"
+        else:  # analysis → transcriptions (id bigint)
+            q = (db.table("transcriptions").select("text, project_id")
+                   .eq("id", int(source_id)).eq("user_id", user_id).limit(1).execute())
+            txt_key = "text"
+    except Exception:
+        return None
+    row = (q.data or [None])[0] if q else None
+    if not row:
+        return None
+    if (brand_id or None) != ((row.get("project_id")) or None):   # aislamiento por marca
+        return None
+    return ((row.get(txt_key) or "").strip()) or None
+
+
+def _brain_feed_rebuild_voice(user_id, brand_id):
+    """Relee brain_food de la marca → fija raw.fed_samples y sube la confianza (opt-in
+    explícito = señal fuerte → cruza el umbral e ENCIENDE la voz de la marca). Best-effort."""
+    try:
+        q = db.table("brain_food").select("content, created_at").eq("user_id", user_id)
+        q = q.eq("project_id", brand_id) if brand_id else q.is_("project_id", "null")
+        rows = (q.order("created_at", desc=True).limit(12).execute().data) or []
+    except Exception:
+        logger.warning("brain_feed rebuild read failed", exc_info=True)
+        return None
+    fed = [(r.get("content") or "").strip() for r in rows if (r.get("content") or "").strip()][:8]
+    vp = get_voice_profile(user_id, brand_id) or {}
+    raw = vp.get("raw") if isinstance(vp.get("raw"), dict) else {}
+    raw["fed_samples"] = fed
+    vp["raw"] = raw
+    n = len(fed)
+    if n:   # opt-in explícito = señal fuerte; sin comida NO inflamos la confianza.
+        vp["confidence"]   = max(int(vp.get("confidence") or 0), min(90, 45 + n * 8))
+        vp["source_count"] = max(int(vp.get("source_count") or 0), n)
+    save_voice_profile(user_id, vp, brand_id=brand_id)
+    return {"count": n, "confidence": vp["confidence"]}
+
+
+@app.route("/api/brain/feed", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
+def api_brain_feed():
+    user = current_user()
+    body = request.get_json() or {}
+    st  = (body.get("source_type") or "").strip()
+    sid = str(body.get("source_id") or "").strip()
+    if st not in ("script", "analysis") or not sid:
+        return jsonify({"error": "bad_request"}), 400
+    brand_id = _req_project_id() or None
+    content = _brain_feed_content(user["id"], brand_id, st, sid)
+    if not content:
+        return jsonify({"error": "not_found"}), 404
+    try:
+        db.table("brain_food").insert({
+            "user_id": user["id"], "project_id": brand_id,
+            "source_type": st, "source_id": sid, "content": content[:4000],
+        }).execute()
+    except Exception as e:   # unique → ya alimentado: no es error, reconstruimos igual.
+        if not any(k in str(e).lower() for k in ("duplicate", "unique", "23505")):
+            logger.warning("brain_feed insert failed: %s", e)
+    res = _brain_feed_rebuild_voice(user["id"], brand_id) or {}
+    return jsonify({"ok": True, "fed": True,
+                    "confidence": res.get("confidence"), "count": res.get("count")})
+
+
+@app.route("/api/brain/fed", methods=["GET"])
+@require_auth
+def api_brain_fed():
+    """IDs ya alimentados de la marca activa → el front pinta el botón «Alimentado»."""
+    user = current_user()
+    brand_id = _req_project_id() or None
+    try:
+        q = db.table("brain_food").select("source_type, source_id").eq("user_id", user["id"])
+        q = q.eq("project_id", brand_id) if brand_id else q.is_("project_id", "null")
+        rows = (q.limit(500).execute().data) or []
+    except Exception:
+        rows = []
+    return jsonify({
+        "script_ids":   [r["source_id"] for r in rows if r.get("source_type") == "script"],
+        "analysis_ids": [r["source_id"] for r in rows if r.get("source_type") == "analysis"],
     })
 
 
@@ -4487,7 +4601,7 @@ def api_voice_onboard():
     vp = derive_voice_profile(texts[:5])
     if not vp:
         return jsonify({"error": "No pude derivar tu voz. Prueba con otro reel."}), 502
-    save_voice_profile(user["id"], vp)
+    save_voice_profile(user["id"], vp, brand_id=(body.get("project_id") or None))   # voz de la marca activa
     return jsonify({
         "ok": True,
         "confidence": vp.get("confidence"),
@@ -4517,8 +4631,9 @@ def api_voice_refine():
     if not texts:
         return jsonify({"error": "Pega el texto de al menos 1 reel tuyo."}), 400
 
-    # Acumular: muestras previas (raw.samples) + las nuevas. Cap a 5 (muestra plena).
-    existing = get_voice_profile(user["id"])
+    # Acumular: muestras previas (raw.samples) + las nuevas. Cap a 5 (muestra plena). Por marca.
+    _pid = body.get("project_id") or None
+    existing = get_voice_profile(user["id"], _pid)
     prev_raw = (existing.get("raw") if existing and isinstance(existing.get("raw"), dict) else {})
     prev_samples = [s for s in (prev_raw.get("samples") or []) if isinstance(s, str) and s.strip()]
     all_samples = (prev_samples + texts)[:5]
@@ -4534,7 +4649,7 @@ def api_voice_refine():
     raw["samples"] = all_samples
     vp["raw"] = raw
 
-    save_voice_profile(user["id"], vp)
+    save_voice_profile(user["id"], vp, brand_id=_pid)   # refina la voz de la marca activa
     return jsonify({
         "ok": True,
         "confidence": vp.get("confidence"),
@@ -8042,6 +8157,19 @@ def metrics_link_profile():
         harvest_related_creators_task.delay(username.lstrip("@").lower(), _bn, _bs, pid, "connect_ig")
     except Exception as e:
         logger.warning("[related] harvest enqueue failed (connect_ig): %s", e)
+
+    # CEREBRO POR MARCA (David): cold-start de la VOZ de esta marca desde SU IG recién conectado.
+    # seed_voice_from_handle_task es idempotente (salta si ya hay voz real) y guarda por project_id.
+    # Sin voz aún → el rewrite usa NEUTRO hasta que esto aterrice (nada de fingir).
+    if BRAIN_PER_BRAND_ENABLED:
+        try:
+            _existing_voice = get_voice_profile(user["id"], pid or None)
+            _has_real = bool(_existing_voice and ((_existing_voice.get("raw") or {}).get("samples")))
+            if not _has_real:
+                from tasks import seed_voice_from_handle_task  # noqa: E402
+                seed_voice_from_handle_task.delay(user["id"], username.lstrip("@").lower(), pid or None)
+        except Exception as e:
+            logger.warning("[brain] seed_voice enqueue failed (connect_ig): %s", e)
 
     return jsonify({"ok": True, "ig_profile_id": row.data[0]["id"], "ig_username": username})
 
