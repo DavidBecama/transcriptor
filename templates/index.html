@@ -462,7 +462,7 @@
     <a class="nav-mob-cta nav-mob-cta-primary" id="navMobApp" href="/app" onclick="ctaWorkspaceClick()" style="display:none" data-i18n-es="Entrar app" data-i18n-en="Open app">Entrar app</a>
     <button class="nav-mob-cta" id="navMobLoginBtn" onclick="openAuth('login','nav_mob')" data-i18n-es="Entrar" data-i18n-en="Sign in">Entrar</button>
     <button class="nav-mob-cta nav-mob-cta-primary" id="navMobRegBtn" onclick="openAuth('register','nav_mob')" data-i18n-es="Empezar gratis" data-i18n-en="Get started">Empezar gratis</button>
-    {% if workspace %}<button class="nav-upgrade-btn" id="navUpgradeBtn" onclick="openPlanOrUpgrade('nav')" style="display:none">✦ Mejorar plan</button>{% endif %}
+    {% if workspace %}<button class="nav-upgrade-btn" id="navUpgradeBtn" onclick="upgradeNextPlan('nav')" style="display:none">✦ Mejorar plan</button>{% endif %}
     <button class="theme-btn" id="themeBtn" title="Theme">🌙</button>
     <div class="user-menu-wrap">
       <div class="user-pill" id="userPill" onclick="toggleUserMenu(event)" style="cursor:pointer" data-tour="user-profile">
@@ -13205,6 +13205,41 @@ function openPlanOrUpgrade(source) {
     return;
   }
   openUpgradeModal(source);
+}
+
+// P1.5 conversión: siguiente plan Whop en la escalera (free→creator/Basic →estudio/
+// Content Creator →agency). Devuelve null en el tope.
+function _nextWhopPlan(plan) {
+  const p = plan || "free";
+  if (p === "agency") return null;
+  if (p === "estudio") return "agency";
+  if (p === "creator" || p === "pro" || p === "basic") return "estudio";
+  return "creator"; // free / trial / otros
+}
+
+// P1.5: el botón fijo "Mejorar" de la barra va DIRECTO al checkout MENSUAL del
+// siguiente plan (mínimos clics hasta el pago), no al comparador. Agency → gestionar.
+// Sin plan_id resoluble o proveedor no-whop → cae al modal (sin dead-end).
+async function upgradeNextPlan(source) {
+  if (!st.user) { openAuth("register", "nav_upgrade"); return; }
+  if (st.plan === "agency") {
+    if (typeof profTab === "function") profTab("settings");
+    if (typeof loadSubscriptionInfo === "function") loadSubscriptionInfo();
+    return;
+  }
+  const next = _nextWhopPlan(st.plan);
+  if (!next) { openUpgradeModal(source); return; }
+  try {
+    const cfg = await billingCfg();
+    if (cfg && cfg.provider === "whop") {
+      const pid = whopPlanId(cfg, next, "month", CUR);
+      if (pid) return whopCheckout(pid);
+    } else if (cfg && cfg.provider === "paddle") {
+      const pid = paddlePrice(cfg, next, "month", CUR);
+      if (pid) return paddleCheckoutOpen(pid);
+    }
+  } catch (e) {}
+  openUpgradeModal(source); // fallback: comparador con el plan preseleccionado
 }
 
 function openUpgradeModal(source) {
