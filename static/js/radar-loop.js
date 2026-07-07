@@ -64,7 +64,7 @@
       // P1: opciones/hooks/POV del robo persistidos → el reveal se reconstruye
       // también tras recargar. chosen==null → elección pendiente (robo en background).
       genOptions:(s.gen_options&&typeof s.gen_options==="object")?s.gen_options:null,
-      brand:brand().name, type:"guión",
+      brand:brand().name, _brand:(s.project_id||"default"), type:"guión",   // #5: aislamiento por marca (project_id)
       approval:(s.approval_status==="approved"?"approved":"pending"),   // B3: aprobación
       status:(s.recording_status==="recorded"?"recorded":(s.recording_status==="discarded"?"discarded":"draft")) };
   }
@@ -2581,6 +2581,10 @@
   // La fábrica muestra solo las ideas de la marca activa (en prod /ideas ya viene
   // filtrado por project_id; esto además aísla las ideas en memoria del demo).
   function ideaBelongsToActiveBrand(idea){ return (idea._brand||"default") === (S.brandId||"default"); }
+  // #5 (David): AISLAMIENTO POR MARCA de guiones robados. Un guion pertenece a UNA marca
+  // (project_id) y NO debe verse en otra (cliente A ≠ cliente B). Antes stolenGroups filtraba las
+  // ideas pero NO los guiones → fuga entre marcas. Mismo criterio que ideaBelongsToActiveBrand.
+  function guionBelongsToActiveBrand(g){ return (g._brand||"default") === (S.brandId||"default"); }
   function ideasZoneHTML(){
     var ideas=(S.ideas||[]).filter(ideaBelongsToActiveBrand);   // solo la marca activa
     var raw=ideas.filter(function(i){ return !ideaIsDeveloped(i); });
@@ -2649,7 +2653,7 @@
     var g={ id:gid("g"), seq:++_gseq, title:(p.title||p.hook||"Guión"),
       hook:p.hook||"", beats:p.beats||[], close:p.close||"",
       hooks:p.hooks||[], expanded:false,
-      from:p.from||null, brand:brand().name, type:p.type||"guión", status:"draft",
+      from:p.from||null, brand:brand().name, _brand:(S.brandId||"default"), type:p.type||"guión", status:"draft",   // #5: el guion robado pertenece a la marca activa
       // fuente del reel robado → miniatura/URL/stats reales en el editor (persisten en sesión).
       thumb:p.thumb||null, url:p.url||null, srcViews:p.srcViews||"", srcLikes:p.srcLikes||"",
       // origen («Ideas robadas»): mismo id que las FKs de backend → el guion cae en su grupo
@@ -2851,6 +2855,7 @@
     var map={}, order=[], others=[];
     var add=function(key){ if(!map[key]){ map[key]={key:key, kind:key.charAt(0), id:key.slice(2), guiones:[], idea:null, handle:"", thumb:null, url:null, mult:null, title:""}; order.push(map[key]); } return map[key]; };
     (S.guiones||[]).filter(function(g){return g.status!=="discarded";}).forEach(function(g){
+      if(!guionBelongsToActiveBrand(g)) return;   // #5: guion de OTRA marca NO se muestra aquí (aislamiento agencia)
       var k=guionGroupKey(g);
       if(!k){ others.push(g); return; }
       var grp=add(k); grp.guiones.push(g);
@@ -8260,9 +8265,19 @@
           hook:"El año pasado perdí 2.000€ en facturas que olvidé enviar. Este año, imposible.",
           beats:["Monté un sistema de la propuesta a la factura cobrada.","Se genera sola y manda recordatorios.","Yo solo me entero cuando entra el dinero."],
           close:"Si facturas a mano, guárdate esto.",
-          from:"@marcbuilds", brand:brand().name, type:"guión", status:"draft", hooks:[] }
+          from:"@marcbuilds", brand:brand().name, type:"guión", status:"draft", hooks:[] },
+        // #5 LEAK CANARY: guion robado de OTRA marca (project_id ajeno). NUNCA debe aparecer en
+        // «Ideas robadas» de la marca activa. El harness lo verifica (aislamiento agencia).
+        { id:"canary_other", seq:98, title:"CANARY · guion de otra marca (NO debe verse)",
+          hook:"Si ves esto, hay fuga entre marcas.", beats:["fuga"], close:"",
+          from:"@cliente_ajeno", brand:"Otra Marca", _brand:"__otra_marca__", type:"guión",
+          status:"draft", hooks:[], reelId:"canary_reel_ajeno" }
       ];
     }
+    // Los guiones demo «gd*» siguen a la marca que ves (demo sin persistencia real); el canary
+    // conserva su _brand ajeno para probar el aislamiento. Los robados (addGuion) ya llevan su marca.
+    var _ab=(S.brandId||"default");
+    (S.guiones||[]).forEach(function(g){ if(g && typeof g.id==="string" && g.id.indexOf("gd")===0) g._brand=_ab; });
     S.igConnected=true;
     S.metrics={
       connected:true, analyses_left:"1/1",

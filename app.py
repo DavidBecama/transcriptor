@@ -167,7 +167,10 @@ RADAR_FEED_CACHE_TTL      = 26 * 3600
 RADAR_FEED_SERVED_N    = 24
 RADAR_FEED_SEEN_PENALTY = 0.45       # ×score a los reels servidos ayer (los desbanca)
 RADAR_FEED_SEEN_TTL     = 3 * 86400
-RADAR_SUGG_MAX_AGE_DAYS = 30         # frescura: «Sugerencias de hoy» solo reels ≤30 días
+# Frescura (#3 David): VENTANA MÓVIL de 14 días. «Sugerencias de hoy» sirve reels ≤14 días que el
+# user no haya visto — no hace falta contenido 100% nuevo; se dan ideas recientes igual. El
+# refresh-pool usa la misma ventana para decidir si reembolsar («no vender aire»). Env-configurable.
+RADAR_SUGG_MAX_AGE_DAYS = int(os.environ.get("RADAR_SUGG_MAX_AGE_DAYS", "14"))
 # Rotación diaria de sugerencias (fase0 feed-vivo): mismo motor que el feed — jitter
 # sembrado por (uid,marca,día) + penalización a lo servido ayer (set Redis suggserved:).
 RADAR_SUGG_SEEN_PENALTY = 0.45       # ×score a las sugerencias servidas ayer (las desbanca)
@@ -12909,14 +12912,15 @@ def radar_refresh_pool():
         finally:
             release_credit_lock(uid, tok)
 
-    # 3) Chord: scrape del pool de nicho stale + finalize (reembolsa si NADA nuevo — red de
-    #    seguridad v0.43.1). Las sugerencias se leen en vivo → los reels nuevos entran solos.
+    # 3) Chord: scrape del pool de nicho stale + finalize. #3 (David): pasa pool_niche=pn → el
+    #    reembolso NO exige net-new, solo que no haya reels ≤14d sin robar que servir («se dan ideas
+    #    recientes igual»; mantiene «no vender aire»). Las sugerencias se leen en vivo.
     refresh_task_id = None
     try:
         from tasks import scrape_creator_task, finalize_manual_refresh
         from celery import chord, group
         _chord_res = chord(group(scrape_creator_task.s(c) for c in stale_ids))(
-            finalize_manual_refresh.s(uid, project_id, charged_amount, is_paid_unlimited, charge_id))
+            finalize_manual_refresh.s(uid, project_id, charged_amount, is_paid_unlimited, charge_id, pn))
         refresh_task_id = getattr(_chord_res, "id", None)
     except Exception as e:
         logger.error("refresh_pool: chord enqueue failed uid=%s: %s", uid, e, exc_info=True)
