@@ -3038,9 +3038,9 @@
     var _mv=(M.views!=null&&M.views!=="")?M.views:((grp.guiones[0]&&grp.guiones[0].srcViews)||null);
     var _ml=(M.likes!=null&&M.likes!=="")?M.likes:((grp.guiones[0]&&grp.guiones[0].srcLikes)||null);
     var metParts=[];
-    if(_mv) metParts.push('<span class="ws-met">'+IC.eye+' '+_anzNum(_mv)+'</span>');
-    if(_ml) metParts.push('<span class="ws-met">'+IC.heart+' '+_anzNum(_ml)+'</span>');
-    if(M.comments) metParts.push('<span class="ws-met">'+IC.chat+' '+_anzNum(M.comments)+'</span>');
+    if(_mv) metParts.push('<span class="ws-met">'+IC.eye+'<b>'+_anzNum(_mv)+'</b><em>'+L("views","views")+'</em></span>');
+    if(_ml) metParts.push('<span class="ws-met">'+IC.heart+'<b>'+_anzNum(_ml)+'</b><em>'+L("likes","likes")+'</em></span>');
+    if(M.comments) metParts.push('<span class="ws-met">'+IC.chat+'<b>'+_anzNum(M.comments)+'</b><em>'+L("coment.","comments")+'</em></span>');
     var metricsRow=metParts.length?('<div class="ws-src-mets">'+metParts.join("")+'</div>'):'';
     var _tx=grp.srcTranscript||grp.srcCaption||"";
     var txBlock=_tx?('<details class="ws-transcript"><summary>'+IC.doc+' '+L("Transcripción del original","Original transcript")+(grp.srcTranscript?'':' · '+L("caption","caption"))+'</summary><div class="ws-transcript-tx">'+ESC(_tx)+'</div></details>'):'';
@@ -5859,9 +5859,11 @@
     // Carga sugerencias cuando ya sigues a alguien (comportamiento previo) O cuando el feed
     // está VACÍO (marca de nicho mudo): así el pool_status del backend puede reportar «populating»
     // y la pestaña muestra estado honesto + se llena sola, en vez de quedarse muda (contrato B1).
-    var _feedEmpty=!(Array.isArray(S.reels) && S.reels.length>0);
-    if(S.tab==="dashboard" && !_onbBusy && !S._stDismissed &&
-       ((Array.isArray(S.tracked) && S.tracked.length>0 && !S.radarSeed) || _feedEmpty)) loadSuggestionsToday();
+    // Cargar SIEMPRE en el dashboard: el backend ya reporta pool_status por marca (ready/
+    // populating/empty/exhausted) y loadSuggestionsToday deduplica (guard S._suggToday) + se
+    // resetea por marca en loadBrandData. El gate viejo (tracked>0 || feed_vacío) dejaba MUDAS
+    // las marcas con feed-seed y 0 competidores (radarSeed + reels) → «unas marcas salen, otras no».
+    if(S.tab==="dashboard" && !_onbBusy && !S._stDismissed) loadSuggestionsToday();
     // House-tour: lo arranca la ISLA la 1ª vez que aterrizas en el dashboard SIN onboarding
     // (post-cofre, o un usuario que ya onboardeó y no lo ha visto). Robusto: re-chequea los
     // targets justo antes. Sustituye al auto-start de index.html (que se colaba por timing).
@@ -7976,22 +7978,25 @@
       return;
     }
     if(act==="st-dismiss-all"){ S._stDismissed=true; showToast(L("Vale, lo oculto.","Okay, hiding it.")); return render(); }
-    if(act==="reshuffle-sugg"){   // «↻ otras» GRATIS: pide al SERVER otras de verdad del pool
-      // (criterio David 04/07 — lo ya servido hoy va al final en backend, suggserved:).
-      // El apilado de re-fetches que colgaba prod (#231) lo evita el guard de 1 petición
-      // en vuelo; el endpoint además ya es hang-proof (try/except, sin nonce Redis en GET).
-      if(isDemo()) return;   // la demo no muestra sugerencias (loadSuggestionsToday corta)
+    if(act==="reshuffle-sugg"){   // «↻ otras» GRATIS: baraja DE VERDAD el pool del nicho
+      // (1) sube el nonce → el GET re-ordena el pool al vuelo; (2) ?shuffle=1 → re-baraja el
+      // pool COMPLETO (solo excluye robados) → renueva de verdad, repetir un visto-hoy es lo
+      // esperado en un shuffle. Guard de 1 petición en vuelo (evita el apilado del #231).
+      if(isDemo()) return;
       if(S._suggReloading) return;
       S._suggReloading=true;
-      showToast(L("Trayendo otras…","Fetching others…"));
+      showToast(L("Barajando otras…","Shuffling others…"));
       var _rp=_pidOf(S.brandId);
-      apiGet("/api/radar/suggestions"+(_rp?("?project_id="+encodeURIComponent(_rp)):"")).then(function(r){
+      apiPost("/api/radar/reshuffle", _rp?{project_id:_rp}:{}).then(function(){
+        return apiGet("/api/radar/suggestions"+(_rp?("?project_id="+encodeURIComponent(_rp)+"&"):"?")+"shuffle=1");
+      }).then(function(r){
         S._suggReloading=false;
-        if(!r.ok||!r.d||!Array.isArray(r.d.suggestions)) return showError(L("No pude traer otras.","Couldn't fetch others."));
+        if(!r||!r.ok||!r.d||!Array.isArray(r.d.suggestions)) return showError(L("No pude traer otras.","Couldn't fetch others."));
         S._suggToday=r.d.suggestions.map(_normSugg);
-        S._suggHasMore=!!r.d.has_more;
+        S._suggHasMore=!!r.d.has_more; S._suggExhausted=!!r.d.exhausted;
+        S._suggPoolStatus=(r.d.pool_status)||''; S._suggNeedsNiche=!!r.d.needs_niche;
         render();
-      });
+      }).catch(function(){ S._suggReloading=false; showError(L("No pude traer otras.","Couldn't fetch others.")); });
       return;
     }
     if(act==="sugg-more"){   // «Ver más» DE PAGO (David 06/07): la tanda inicial (8) es gratis;

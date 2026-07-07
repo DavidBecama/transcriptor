@@ -10020,7 +10020,10 @@ def _sugg_day_seed(uid, project_id):
     franja de tarde re-baraja el pool que aún no se ha servido, nunca repite."""
     now = datetime.now(timezone.utc)
     half = "0" if now.hour < 12 else "1"   # mañana / tarde (UTC)
-    return "%s:%s:%s%s" % (uid, project_id or "_", now.strftime("%Y%m%d"), half)
+    # «↻ otras» (botón shuffle): el nonce de re-baraja entra en la semilla → pulsar shuffle
+    # re-ordena el pool al vuelo (antes el GET lo ignoraba y devolvía el MISMO set).
+    nonce = _reshuffle_nonce(uid, project_id)
+    return "%s:%s:%s%s:%s" % (uid, project_id or "_", now.strftime("%Y%m%d"), half, nonce)
 
 
 def _sugg_seen_yesterday(uid, project_id):
@@ -10143,7 +10146,11 @@ def radar_suggestions():
             return jsonify({"suggestions": [], "total": 0, "needs_niche": True,
                             "pool_status": "needs_niche"}), 200
         # EXCLUSIÓN DURA por reel-id (contrato): servidos HOY (sesión) ∪ robados (permanente).
-        excl_reels = _sugg_seen_today(uid, project_id) | _stolen_reel_ids(uid)
+        # shuffle («↻ otras»): re-baraja el pool COMPLETO (solo excluye ROBADOS) → renueva de
+        # verdad; repetir un reel ya visto hoy es lo esperado en un shuffle (David 07/07). La
+        # carga normal mantiene la exclusión dura de servidos-hoy (contrato «no repetir en sesión»).
+        _is_shuffle = bool(request.args.get("shuffle"))
+        excl_reels = _stolen_reel_ids(uid) if _is_shuffle else (_sugg_seen_today(uid, project_id) | _stolen_reel_ids(uid))
         # Pool amplio (hasta SUGG_MAX_TOTAL) en UNA llamada, ya SIN los excluidos: de ahí salen
         # la ventana gratis y los «posibles competidores» (mismo pool ya scoreado).
         pool = _niche_suggestion_reels(subs, niche, exclude, SUGG_MAX_TOTAL,
