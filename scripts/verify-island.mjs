@@ -511,6 +511,18 @@ async function main() {
   })()`);
   check("idea guardada APARECE en su lista (Guiones · Ideas robadas)", inList.tab || inList.groups > 0, JSON.stringify(inList));
 
+  /* ═══ #5 (David) · AISLAMIENTO POR MARCA — fuga entre clientes (crítico agencia) ═══
+     El demo siembra una CANARY: un guion robado de OTRA marca (_brand ajeno). stolenGroups DEBE
+     filtrarlo → NUNCA aparece en «Ideas robadas» de la marca activa. Rojo si se cuela (fuga). */
+  console.log("\n■ #5 · aislamiento por marca (cliente A no ve lo de cliente B)");
+  await nav(`${BASE}/profile/radar?plan=agencia&t=guiones`);
+  await sleep(400);
+  const iso = await evaluate(`(function(){
+    var root=document.querySelector('#radarRoot');
+    return { leak: /CANARY|fuga entre marcas/i.test(root.textContent||'') };
+  })()`);
+  check("guion robado de OTRA marca NO aparece (sin fuga entre clientes)", !iso.leak, JSON.stringify(iso));
+
   console.log(`\n═══ RESULTADO: ${passed} ✓ · ${failed} ✗ ═══`);
   if (fails.length) { console.log(fails.map((f) => "  ✗ " + f).join("\n")); }
   process.exitCode = failed ? 1 : 0;
