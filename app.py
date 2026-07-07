@@ -284,8 +284,8 @@ def admin_required(f):
 # (1 «Hazlo mío» · 3 análisis · 1 competidor — nada resetea).
 PLANS = {
     "free": {
-        # econ 2026-06-20 (economia-creditos.md): Free 9 cr/mes ≈ 3 guiones (guión=3cr).
-        "credits_month": 9,
+        # econ 2026-07-07 (David): Free 15 cr/mes, alineado con FREE_MONTHLY_CENTS (=15cr, el reload real).
+        "credits_month": 15,
         # reverse-trial: tras los 7 días de Pro, el FREE es MENSUAL (resetea cada mes),
         # ya no una cata de por vida. Contadores: free_lifetime_uses=guiones del mes,
         # free_analysis_uses=análisis del mes (reset por free_month_reset_at).
