@@ -499,6 +499,17 @@ async function main() {
     return { toast:(t&&t.textContent||'').trim().slice(0,70) };
   })()`);
   check("«Guardar idea» confirma el guardado con datos", /guardada|saved/i.test(saved.toast), JSON.stringify(saved));
+  // #2 (David): la idea guardada DEBE aparecer en su lista (Guiones → Ideas robadas). El bug
+  // era que la inserción optimista no llevaba _brand → invisible en marcas ≠ default. Navega a
+  // Guiones y comprueba que hay al menos un grupo de «Ideas robadas» (la que acabamos de guardar).
+  await click('#radarRoot [data-act="goto-saved-ideas"]');
+  await sleep(500);
+  const inList = await evaluate(`(function(){
+    var root=document.querySelector('#radarRoot');
+    return { tab: !!root.querySelector('.igc, .ws-canvas, .idea-group, [data-act="ws-open"]'),
+             groups: root.querySelectorAll('.igc, .idea-group').length };
+  })()`);
+  check("idea guardada APARECE en su lista (Guiones · Ideas robadas)", inList.tab || inList.groups > 0, JSON.stringify(inList));
 
   console.log(`\n═══ RESULTADO: ${passed} ✓ · ${failed} ✗ ═══`);
   if (fails.length) { console.log(fails.map((f) => "  ✗ " + f).join("\n")); }

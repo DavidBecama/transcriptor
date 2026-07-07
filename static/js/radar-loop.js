@@ -6698,26 +6698,30 @@
   }
   function _optimisticSavedIdea(id, title){
     // Aparece YA en «Ideas robadas» (el workspace agrupa por inspiredById, incluso sin guion).
+    // _brand OBLIGATORIO: ideaBelongsToActiveBrand filtra por (_brand===S.brandId); sin él la idea
+    // quedaba invisible en cualquier marca ≠ default (bug #2 «no se ve por ningún lado»).
     S.ideas=Array.isArray(S.ideas)?S.ideas:[];
     if(S.ideas.some(function(i){return i&&i.inspiredById===id&&i.inspiredByType==="reel";})) return;
     S.ideas.unshift({ id:("tmp-"+id), text:title||"", title:title||L("Idea guardada","Saved idea"),
-      inspiredById:id, inspiredByType:"reel", inspiredByUser:"", notes:"" });
+      inspiredById:id, inspiredByType:"reel", inspiredByUser:"", notes:"", _brand:(S.brandId||"default") });
   }
   function saveIdeaWithData(id){
     if(!id) return;
     if(isDemo()){
       spend(COST.saveidea); flashSpark(-COST.saveidea);
       _optimisticSavedIdea(id, L("Idea guardada","Saved idea")); render();
-      return showToast(L("Idea guardada con sus datos (−"+COST.saveidea+" créd.)","Idea saved with its data (−"+COST.saveidea+" cr)"));
+      return showToast(L("Idea guardada con sus datos (−"+COST.saveidea+" créd.)","Idea saved with its data (−"+COST.saveidea+" cr)"),
+                       L("Ver en Guiones","See in Scripts"), "goto-saved-ideas");
     }
     var _pid=_pidOf(S.brandId);
     apiPost("/api/competitors/reels/"+encodeURIComponent(id)+"/save-with-data", _pid?{project_id:_pid}:{}).then(function(r){
       if(r.status===402){ showError((r.d&&r.d.message)||L("Necesitas créditos para guardar la idea.","You need credits to save the idea.")); try{ if(typeof window.openUpgradeModal==="function") window.openUpgradeModal("credits"); }catch(e){} return; }
       if(!r.ok){ return showError((r.d&&r.d.message)||L("No pude guardar la idea.","Couldn't save the idea.")); }
-      if(r.d && r.d.already_exists){ _optimisticSavedIdea(id,(r.d&&r.d.title)); render(); return showToast(L("Ya la tenías guardada.","You already saved it.")); }
+      if(r.d && r.d.already_exists){ _optimisticSavedIdea(id,(r.d&&r.d.title)); render(); return showToast(L("Ya la tenías guardada.","You already saved it."), L("Ver en Guiones","See in Scripts"), "goto-saved-ideas"); }
       _optimisticSavedIdea(id,(r.d&&r.d.title)); try{ refreshCredits(); }catch(e){} render();
-      showToast(L("Idea guardada con sus datos"+((r.d&&r.d.transcript_pending)?" · transcribiendo…":""),
-                  "Idea saved with its data"+((r.d&&r.d.transcript_pending)?" · transcribing…":"")));
+      showToast(L("Guardada en Ideas robadas (Guiones)"+((r.d&&r.d.transcript_pending)?" · transcribiendo…":""),
+                  "Saved to Stolen ideas (Scripts)"+((r.d&&r.d.transcript_pending)?" · transcribing…":"")),
+                L("Verla","See it"), "goto-saved-ideas");
     });
   }
 
@@ -7819,6 +7823,7 @@
     if(act==="onb-steal-no"){ S.onbStealOffer=null; S.onbCofre=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
     if(act==="steal") return steal(id);
     if(act==="save-idea-data") return saveIdeaWithData(id);
+    if(act==="goto-saved-ideas"){ S.tab="guiones"; if(typeof reloadScripts==="function"){ try{ reloadScripts(); }catch(e){} } render(); return; }   // #2: lleva a la idea guardada (Ideas robadas)
     if(act==="opt-pick"){ var _rv=S.revealReel||S.reel; if(_rv){ applyScriptOption(_rv, parseInt(k,10)||0, 0); _rv._saved=false; render(); } return; }   // elegir opción de guion → sin guardar
     if(act==="hook-pick"){ var _rh=S.revealReel||S.reel; if(_rh){ applyScriptOption(_rh, _rh.optIdx||0, parseInt(k,10)||0); _rh._saved=false; render(); } return; }   // elegir gancho → sin guardar
     if(act==="save-script-choice") return saveScriptChoice();

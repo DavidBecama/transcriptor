@@ -89,9 +89,10 @@ GROQ_URL              = "https://api.groq.com/openai/v1/audio/transcriptions"
 OPENROUTER_API_KEY    = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_URL        = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL      = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
-# Modelo SOLO para la GENERACIÓN del guion (calidad > coste: ~€0,04/guion; el gasto gordo
-# es el scraping). La clasificación de formato y el resto siguen en OPENROUTER_MODEL (flash).
-GENERATION_MODEL      = os.environ.get("GENERATION_MODEL", "google/gemini-2.5-pro")
+# Modelo SOLO para la GENERACIÓN del guion. FLASH por defecto (David 06/07): pro tardaba 40-90s
+# (robo lentísimo) → flash ~5-8s. El env GENERATION_MODEL es el FLAG REVERTIBLE: poner
+# "google/gemini-2.5-pro" en el .env del VPS revierte a pro sin tocar código si la calidad no vale.
+GENERATION_MODEL      = os.environ.get("GENERATION_MODEL", "google/gemini-2.5-flash")
 # Timeout (s) de la llamada LLM de GENERACIÓN — SOLO en la tarea async (Celery, sin gateway):
 # pro tarda 40-90s; con los 60s por defecto cortaba y caía a groq → 2 opciones en paralelo →
 # 429 → «Failed to generate script». 120s deja terminar a pro y encaja bajo el poll del front (150s).
@@ -11208,6 +11209,16 @@ def _build_competitor_script_user_content(ig_username: str, caption: str,
         f"— los ejemplos salen del reel o son claramente hipotéticos. Si el "
         f"guion final pierde la especificidad del original y podría valer para "
         f"cualquier nicho, está mal: reescríbelo.\n\n"
+        # #4 (David): el core es «reescrito en TU voz», NO reformatear la transcripción en cajas.
+        f"REESCRITURA OBLIGATORIA — NO es reformateo ni paráfrasis: el body NO puede ser un "
+        f"LISTADO ni un resumen frase-a-frase de la transcripción. Entra por un ÁNGULO PROPIO "
+        f"(un giro, una tensión, un insight o reencuadre que el original NO explicita — 'el problema "
+        f"no era lo obvio'), REORDENA los puntos y REESCRIBE cada frase con tu estructura y tus "
+        f"palabras. Prohibido enumerar lo que menciona el reel ('X, Y y Z son must'). Si una frase "
+        f"del guion comparte estructura, orden o vocabulario con la transcripción, está MAL: "
+        f"reescríbela desde otro ángulo. Conserva SOLO los hechos (cifras, nombres, herramientas); "
+        f"la ejecución (hook, desarrollo, giro, cierre) es 100% tuya. Un lector NO debe poder "
+        f"adivinar la transcripción original leyendo tu guion.\n\n"
         f"Total: 100-140 palabras, mínimo 8 frases en body."
         + _out_lang_instruction(out_lang)
     )
