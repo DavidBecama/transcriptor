@@ -13312,6 +13312,14 @@ function openUpgradeModal(source) {
     }
   } catch (e) {}
   openModal("upgradeOverlay");
+  // Guard defensivo: bug reportado (David) de toggle Mensual/Anual invisible en Ajustes para
+  // algún usuario logueado que headless no reproduce (sin causa hallable en CSS/JS/caché/tema).
+  // Forzamos el toggle de ciclo visible al abrir — no-op si ya lo estaba, contrarresta cualquier
+  // ocultación externa (extensión, override) que le deje solo la opción anual.
+  try {
+    var _bt = document.querySelector("#upgradeOverlay .billing-toggle");
+    if (_bt) { _bt.style.display = "flex"; _bt.style.visibility = "visible"; _bt.style.opacity = "1"; }
+  } catch (e) {}
   try { window.track && window.track.upgradeModalOpened && window.track.upgradeModalOpened({ source: source || "unknown", plan: st.plan }); } catch(e){}
 }
 
