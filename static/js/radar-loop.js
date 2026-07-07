@@ -3093,8 +3093,8 @@
     }).join("");
     return '<section class="guiu"><div class="guiu-head">'+
       '<span class="guiu-ic">'+IC.bulb+'</span>'+
-      '<span class="guiu-t">'+L("Sin desarrollar","Undeveloped")+'</span>'+
-      '<span class="guiu-c">'+L("ideas en bruto que apuntaste · "+raw.length,"raw ideas you jotted · "+raw.length)+'</span>'+
+      '<span class="guiu-t">'+L("Ideas apuntadas","Jotted ideas")+'</span>'+   // #destino David: grupo etiquetado (vs «Ideas robadas»)
+      '<span class="guiu-c">'+L("las que apuntaste a mano · "+raw.length,"the ones you jotted by hand · "+raw.length)+'</span>'+
     '</div><div class="guiu-cards">'+cards+'</div></section>';
   }
   // v3 (mockup David) — «Explosión creativa»: CTA «Generar 5 ideas» + rejilla de
@@ -6691,7 +6691,10 @@
     updateFillHost();
   }
   function updateFillHost(){ var host=document.getElementById("rsFillHost"); if(host) host.innerHTML=fillWeekHTML(fillReels(),S._fillPhase==null?0:S._fillPhase); }
-  function toggleFav(id){ S.favs[id]=!S.favs[id]; var m=S.favs[id]?"POST":"DELETE"; if(!isDemo()) fetch("/api/competitors/reels/"+encodeURIComponent(id)+"/favorite",{method:m,credentials:"same-origin"}).catch(function(){}); render(); }
+  function toggleFav(id){ S.favs[id]=!S.favs[id]; var m=S.favs[id]?"POST":"DELETE";
+    // #5: favorito POR MARCA — manda el project_id para que la estrella no cruce entre clientes.
+    var _pid=(S.brandId&&S.brandId!=="default")?S.brandId:null;
+    if(!isDemo()) fetch("/api/competitors/reels/"+encodeURIComponent(id)+"/favorite",{method:m,credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({project_id:_pid})}).catch(function(){}); render(); }
 
   // «Guardar idea con datos» (David, DE PAGO COST.saveidea): guarda el reel + transcripción +
   // métricas en «Ideas guardadas» (sin generar guión). Más barato que robar. El favorito simple
@@ -6733,20 +6736,25 @@
   /* ── fábrica de ideas ────────────────────────────────────────── */
   function seedIdea(inputId, jumpToIdeas){
     var inp=document.getElementById(inputId); var txt=inp?inp.value.trim():"";
-    if(!txt){ if(jumpToIdeas){ S.tab="ideas"; render(); } return; }
+    // #destino David: «Apunta una idea» → grupo «Ideas apuntadas» en GUIONES (no una pestaña
+    // fantasma «ideas»). Toast + enlace: el usuario nunca pregunta «¿dónde fue mi idea?».
+    if(!txt){ if(jumpToIdeas){ S.tab="guiones"; render(); } return; }
     if(isDemo()){
       S.ideas.unshift(makeIdea(txt, txt.length+S.ideas.length));
-      if(jumpToIdeas) S.tab="ideas";
-      render(); return;
+      if(jumpToIdeas) S.tab="guiones";
+      render();
+      showToast(L("Apuntada en Guiones · Ideas apuntadas","Jotted in Scripts · Jotted ideas"), L("Verla","See it"), "goto-saved-ideas");
+      return;
     }
-    // Prod: persiste como draft (develop:false) → POST /ideas. El id real vuelve
-    // del backend para poder generar guiones después (/ideas/{id}/scripts/...).
+    // Prod: persiste como draft (develop:false) → POST /ideas CON project_id (aislamiento por marca).
     if(txt.length<5){ showToast("Escribe una idea un poco más larga."); return; }
     if(inp) inp.value="";
-    if(jumpToIdeas) S.tab="ideas";
+    if(jumpToIdeas) S.tab="guiones";
     var tmp=makeIdea(txt, txt.length+S.ideas.length); tmp._saving=true; S.ideas.unshift(tmp); render();
-    apiPost("/ideas",{raw_text:txt, language:rsLang(), develop:false}).then(function(r){
-      if(r.ok && r.d && r.d.id){ tmp.id=r.d.id; tmp._server=true; tmp._scriptsLoaded=true; tmp._saving=false; render(); }
+    var _pid=(S.brandId&&S.brandId!=="default")?S.brandId:null;
+    apiPost("/ideas",{raw_text:txt, language:rsLang(), develop:false, project_id:_pid}).then(function(r){
+      if(r.ok && r.d && r.d.id){ tmp.id=r.d.id; tmp._server=true; tmp._scriptsLoaded=true; tmp._saving=false; render();
+        showToast(L("Apuntada en Guiones · Ideas apuntadas","Jotted in Scripts · Jotted ideas"), L("Verla","See it"), "goto-saved-ideas"); }
       else { tmp._saving=false; showToast((r.d&&r.d.error)||"No pude guardar la idea."); render(); }
     });
   }
