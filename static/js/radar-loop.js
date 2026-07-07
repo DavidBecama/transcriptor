@@ -3198,11 +3198,11 @@
   var AJ_TIERS=[
     {k:"trial",   whop:null,      name:"Trial",           price:"0€",   cap:30,  feat:L("5 días Pro · 30 créditos (~10 robos) · sin tarjeta","5-day Pro · 30 credits (~10 steals) · no card")},
     {k:"free",    whop:null,      name:"Free",            price:"0€",   cap:9,   feat:L("9 créditos/mes (~3 robos) · radar y métricas gratis","9 credits/mo (~3 steals) · radar & metrics free")},
-    {k:"basic",   whop:"creator", name:"Basic",           price:"29€",  cap:120, feat:L("120 créditos/mes (~40 robos) · voz · métricas","120 credits/mo (~40 steals) · voice · metrics"), featured:true},
-    {k:"estudio", whop:"estudio", name:"Content Creator", price:"59€",  cap:360, feat:L("360 créditos/mes (~120 robos) · 3 marcas · prioridad","360 credits/mo (~120 steals) · 3 brands · priority")},
-    {k:"agency",  whop:"agency",  name:"Agency",          price:"129€", cap:960, feat:L("960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra","960 credits/mo (~320 steals) · 10 brands · +96 cr/extra")}
+    {k:"basic",   whop:"creator", name:"Basic",           price:"19€",  cap:120, feat:L("120 créditos/mes (~40 robos) · voz · métricas","120 credits/mo (~40 steals) · voice · metrics"), featured:true},
+    {k:"estudio", whop:"estudio", name:"Content Creator", price:"39€",  cap:360, feat:L("360 créditos/mes (~120 robos) · 3 marcas · prioridad","360 credits/mo (~120 steals) · 3 brands · priority")},
+    {k:"agency",  whop:"agency",  name:"Agency",          price:"79€",  cap:960, feat:L("960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra","960 credits/mo (~320 steals) · 10 brands · +96 cr/extra")}
   ];
-  function _ajPrice(k){ return ({trial:0,free:0,basic:29,estudio:59,agency:129})[k]||0; }
+  function _ajPrice(k){ return ({trial:0,free:0,basic:19,estudio:39,agency:79})[k]||0; }
   function _ajCurTier(){ var p=(S.user.plan||"free"); if(p==="creator"||p==="pro"||p==="basic")return"basic"; if(p==="estudio")return"estudio"; if(p==="agency")return"agency"; if(p==="trial")return"trial"; return"free"; }
   function _ajTier(k){ for(var i=0;i<AJ_TIERS.length;i++){ if(AJ_TIERS[i].k===k) return AJ_TIERS[i]; } return AJ_TIERS[1]; }
   function ajPlanHTML(){
@@ -3382,7 +3382,7 @@
      con countdown HONESTO (deadline fijo en localStorage → no se resetea al recargar).
      En prod el price a 29€ lo crea David en Whop (env WHOP_TOPUP_300_FLASH_*). El estado
      real llega en /auth/me.topup_flash; en demo arranca al cruzar el muro. */
-  var FLASH_HOURS=48, FLASH_PLAN_PCT=40, FLASH_PLAN_EUR=29;
+  var FLASH_HOURS=48, FLASH_PLAN_PCT=40, FLASH_PLAN_EUR=19;
   var FLASH_PACK_CR=300, FLASH_PACK_EUR=29, FLASH_PACK_WAS=49;
   function flashKey(){ return isDemo()?"rs_flash_demo":"rs_flash_v1"; }
   function flashDeadline(){
@@ -3412,7 +3412,7 @@
   // no hace"), WELCOME auto-aplicado; el top-up 300 queda como alternativa secundaria.
   function flashBannerHTML(){
     if(!flashActive()) return '';
-    var now=Math.round(FLASH_PLAN_EUR*(1-FLASH_PLAN_PCT/100)*100)/100;        // 29 → 17.40
+    var now=Math.round(FLASH_PLAN_EUR*(1-FLASH_PLAN_PCT/100)*100)/100;        // 19 → 11.40
     var nowTxt=(now%1?String(now.toFixed(2)).replace(".",","):String(now));
     return '<div class="flash-offer" data-act="flash-cta" role="button" tabindex="0" aria-label="Oferta: Creator a −40% el primer mes">'+
       '<span class="flash-badge">−'+FLASH_PLAN_PCT+'%</span>'+
