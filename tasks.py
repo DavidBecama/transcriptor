@@ -1545,7 +1545,45 @@ def rerank_radar_daily():
 
 
 @celery_app.task(name="tasks.finalize_manual_refresh")
-def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_unlimited, charge_id=None):
+def _niche_has_unseen_recent(_db, uid, niche_pn, days):
+    """#3 (David): ¿el nicho tiene reels ≤`days` que el user NO ha robado? → hay algo RECIENTE que
+    servir en «Sugerencias de hoy» aunque el scrape no trajera nada nuevo-nuevo. El refresh-pool
+    usa esto para el reembolso: si SÍ hay reciente sin ver, la refresh «dio algo» (no reembolsa);
+    si el nicho no tiene nada reciente sin robar, reembolsa («no vender aire»). Conservador: ante
+    cualquier error → False (reembolsa)."""
+    if not niche_pn:
+        return False
+    try:
+        cids = [c["id"] for c in (_db.table("creators_global").select("id")
+                                    .eq("niche", niche_pn).limit(600).execute()).data or [] if c.get("id")]
+        if not cids:
+            return False
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=int(days or 14))).isoformat()
+        recent = []
+        for i in range(0, len(cids), 100):
+            rr = (_db.table("creator_reels_global").select("id")
+                    .in_("creator_id", cids[i:i + 100]).eq("is_archived", False)
+                    .gte("posted_at", cutoff).limit(500).execute()).data or []
+            recent.extend([str(x["id"]) for x in rr if x.get("id")])
+        if not recent:
+            return False
+        stolen = set()
+        try:
+            for r in (_db.table("scripts").select("from_competitor_reel_id")
+                        .eq("user_id", uid).not_.is_("from_competitor_reel_id", "null")
+                        .limit(4000).execute()).data or []:
+                if r.get("from_competitor_reel_id"):
+                    stolen.add(str(r["from_competitor_reel_id"]))
+        except Exception:
+            pass
+        return any(rid not in stolen for rid in recent)
+    except Exception:
+        logger.warning("[pool_refresh] servable check failed niche=%s", niche_pn, exc_info=True)
+        return False
+
+
+def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_unlimited,
+                            charge_id=None, pool_niche=None):
     """Callback del chord del refresco manual de PAGO. `results` = lista de dicts de
     scrape_creator_task. Reembolsa SOLO si TODO fue fallo duro (failed/creator_not_found);
     ok/private/not_found/in_progress = trabajo hecho → NO reembolsa. Siempre invalida la
@@ -1564,6 +1602,15 @@ def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_un
     # CONTRATO David: reembolsar si TODO falló O si el refresh NO trajo NADA nuevo. Cobrar por
     # vacío (competidores sin novedades) es inaceptable → el usuario recupera sus créditos.
     nothing_new = (new_total == 0)
+    # #3 (David): en el refresh del POOL DE NICHO (pool_niche), NO exigir net-new — «se dan ideas
+    # recientes igual»: reembolsa solo si el nicho no tiene reels ≤14d SIN robar que servir. En el
+    # refresh de COMPETIDORES (pool_niche=None) se mantiene la regla net-new (v0.43.1).
+    if pool_niche:
+        _servable = _niche_has_unseen_recent(
+            _db, uid, pool_niche, int(os.environ.get("RADAR_SUGG_MAX_AGE_DAYS", "14")))
+        should_refund_core = all_failed or (not _servable)
+    else:
+        should_refund_core = all_failed or nothing_new
     pid = project_id or "_"
     day = datetime.now(timezone.utc).strftime("%Y%m%d")
     try:
@@ -1578,7 +1625,7 @@ def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_un
         except Exception:
             pass
     refunded = False
-    if charged_amount and (all_failed or nothing_new):
+    if charged_amount and should_refund_core:
         # Guard de idempotencia POR COBRO (no por-día): cada cobro tiene su nonce → dos
         # fallos totales el mismo día se reembolsan ambos. Si falta charge_id (compat),
         # cae a la clave por-día (comportamiento previo).
@@ -1605,9 +1652,8 @@ def finalize_manual_refresh(results, uid, project_id, charged_amount, is_paid_un
             except Exception:
                 logger.warning("finalize_manual_refresh: refund failed uid=%s", uid)
             # NO se limpia el cooldown: el scrape golpeó Apify; mantenerlo capa ese coste.
-    logger.info("finalize_manual_refresh uid=%s statuses=%s new=%d refunded=%s reason=%s",
-                uid, statuses, new_total, refunded,
-                ("all_failed" if all_failed else ("nothing_new" if nothing_new else "-")))
+    logger.info("finalize_manual_refresh uid=%s pool=%s statuses=%s new=%d refunded=%s",
+                uid, pool_niche or "-", statuses, new_total, refunded)
     return {"ok": True, "refunded": refunded, "new_count": new_total, "statuses": statuses}
 
 
