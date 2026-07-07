@@ -3196,7 +3196,7 @@
   // Naming Whop (lo que cobra): Basic/Content Creator/Agency. `whop` = key del plan en
   // /api/billing/config (basic→creator). trial/free no se compran (alta o cancelación).
   var AJ_TIERS=[
-    {k:"trial",   whop:null,      name:"Trial",           price:"0€",   cap:30,  feat:L("3 días Pro · 30 créditos (~10 robos) · sin tarjeta","3-day Pro · 30 credits (~10 steals) · no card")},
+    {k:"trial",   whop:null,      name:"Trial",           price:"0€",   cap:30,  feat:L("5 días Pro · 30 créditos (~10 robos) · sin tarjeta","5-day Pro · 30 credits (~10 steals) · no card")},
     {k:"free",    whop:null,      name:"Free",            price:"0€",   cap:9,   feat:L("9 créditos/mes (~3 robos) · radar y métricas gratis","9 credits/mo (~3 steals) · radar & metrics free")},
     {k:"basic",   whop:"creator", name:"Basic",           price:"29€",  cap:120, feat:L("120 créditos/mes (~40 robos) · voz · métricas","120 credits/mo (~40 steals) · voice · metrics"), featured:true},
     {k:"estudio", whop:"estudio", name:"Content Creator", price:"59€",  cap:360, feat:L("360 créditos/mes (~120 robos) · 3 marcas · prioridad","360 credits/mo (~120 steals) · 3 brands · priority")},
@@ -5806,6 +5806,7 @@
     if(S.tab==="dashboard" && !_onbBusy && !S._tourArmed){
       try{
         var _seen=false; try{ _seen=localStorage.getItem("onboarding_completed")==="true"; }catch(e){}
+        if(S.user && S.user.onbV2Done) _seen=true;   // #4 (07/07): onboardeó en SERVIDOR → no re-disparar el tour del dashboard en otro device (localStorage es por-device; se veía «Paso 1 de 11 · Tu Radar» en móvil tras onboardear en desktop)
         var _tovA=document.querySelector('.tour-overlay');
         if(!_seen && typeof window.startTour==="function" && (!_tovA || _tovA.style.display==='none')){
           S._tourArmed=true;
