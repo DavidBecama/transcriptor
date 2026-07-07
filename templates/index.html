@@ -4399,6 +4399,11 @@ window.addEventListener("DOMContentLoaded", async () => {
             }
             sessionStorage.setItem("rs_just_logged_in", "1");
           } catch(e){}
+          // P0: intención de plan de la landing sobrevive el round-trip de Google → checkout directo.
+          try {
+            const _pendG = sessionStorage.getItem("rs_pending_plan");
+            if (_pendG && st.user) { sessionStorage.removeItem("rs_pending_plan"); await goPendingCheckout(JSON.parse(_pendG)); return; }
+          } catch(e){}
           window.location.assign(window.__NEXT_URL__ || "/app");
           return;
         }
@@ -4423,6 +4428,13 @@ window.addEventListener("DOMContentLoaded", async () => {
       window.track && window.track.workspaceEntered({ source, plan: st.plan });
       // v0.14.5a: load mini-grid stats for #profPanelOverview
       if (typeof loadOverviewMiniGrid === "function") loadOverviewMiniGrid();
+      // P0 fallback: si el checkout no se pudo resolver tras el alta, abrimos el modal de plan (sin dead-end).
+      try {
+        if (sessionStorage.getItem("rs_open_upgrade")) {
+          sessionStorage.removeItem("rs_open_upgrade");
+          if (typeof openUpgradeModal === "function") setTimeout(function(){ openUpgradeModal("post_register"); }, 500);
+        }
+      } catch(e){}
     }
   } catch(e){}
   animateCounter();
@@ -12229,6 +12241,19 @@ function openAuth(mode, trigger) {
   document.getElementById("authErr").classList.remove("on");
   openModal("authOverlay");
   setTimeout(() => document.getElementById("authEmail").focus(), 100);
+  // P0 conversión: si el CTA viene de una tarjeta de plan de la landing, recordamos
+  // {plan, ciclo} para llevar la intención hasta el checkout tras el alta (email o Google).
+  // El CTA "Free" limpia cualquier intención previa.
+  try {
+    var _pm = /^landing_plan_(creator|estudio|agency)$/.exec(trigger || "");
+    if (_pm) {
+      var _cyBtn = document.querySelector(".rsl-toggle button.rsl-on");
+      var _cy = (_cyBtn && _cyBtn.dataset.cycle === "month") ? "month" : "year";
+      sessionStorage.setItem("rs_pending_plan", JSON.stringify({ plan: _pm[1], cycle: _cy }));
+    } else if (trigger === "landing_plan_free") {
+      sessionStorage.removeItem("rs_pending_plan");
+    }
+  } catch(e){}
   try { window.track && window.track.signupPrompted({ mode: authMode, trigger: trigger || "unknown" }); } catch(e){}
 }
 
@@ -12296,6 +12321,15 @@ async function submitAuth() {
       }
     }
     sessionStorage.setItem("rs_just_logged_in", "1");
+  } catch(e){}
+  // P0: si hay plan elegido en la landing, al checkout directo (no a /app).
+  try {
+    const _pend = sessionStorage.getItem("rs_pending_plan");
+    if (_pend && st.user) {
+      sessionStorage.removeItem("rs_pending_plan");
+      await goPendingCheckout(JSON.parse(_pend));
+      return;
+    }
   } catch(e){}
   window.location.assign(window.__NEXT_URL__ || "/app");
 }
@@ -12775,6 +12809,38 @@ window.addEventListener("focus", () => {
   if (typeof loadSubscriptionInfo === "function") loadSubscriptionInfo();
 });
 
+// P0 conversión: puente registro→checkout. Tras el alta (ya con sesión), lleva la
+// intención de plan de la landing directo a la pantalla de pago de Whop en la MISMA
+// pestaña (nada de popup: aquí ya no hay gesto de usuario y el bloqueador lo mataría).
+// Si no se puede resolver, cae al workspace abriendo el modal de plan (sin dead-end).
+async function goPendingCheckout(pp) {
+  try {
+    if (pp && pp.plan) {
+      const cfg = await billingCfg();
+      if (cfg && cfg.provider === "whop") {
+        const pid = whopPlanId(cfg, pp.plan, pp.cycle === "month" ? "month" : "year", CUR);
+        if (pid) {
+          const r = await fetch("/whop/checkout-session", {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ plan_id: pid }),
+          });
+          const d = await r.json();
+          if (r.ok && d && d.url) {
+            let url = d.url;
+            if (pp.promo) url += (url.indexOf("?") >= 0 ? "&" : "?") + WHOP_PROMO.param + "=" + encodeURIComponent(WHOP_PROMO.code);
+            window.location.assign(url);
+            return;
+          }
+        }
+      }
+    }
+  } catch (e) {}
+  // Fallback: al workspace y abrimos el modal de plan (rs_open_upgrade lo consume el init).
+  try { sessionStorage.setItem("rs_open_upgrade", JSON.stringify(pp || {})); } catch (e) {}
+  window.location.assign(window.__NEXT_URL__ || "/app");
+}
+
 async function submitTopup() {
   const btn = document.getElementById("btnTopupOk");
   const err = document.getElementById("topupErr");
@@ -12844,7 +12910,7 @@ async function subscribePlanFromCard(planKey) {
 // Sin sesión → registro primero (el alta lleva al checkout). Con sesión → checkout directo.
 async function rsFlashSubscribe(planKey) {
   planKey = planKey || "creator";
-  if (!st.user) { try { sessionStorage.setItem("rs_flash_promo", "1"); } catch (e) {} openAuth("register", "flash_promo"); return; }
+  if (!st.user) { try { sessionStorage.setItem("rs_pending_plan", JSON.stringify({ plan: planKey, cycle: "month", promo: true })); } catch (e) {} openAuth("register", "flash_promo"); return; }
   const cfg = await billingCfg();
   if (cfg.provider === "whop") return whopCheckout(whopPlanId(cfg, planKey, "month", CUR), { promo: true });
   if (cfg.provider === "paddle") return paddleCheckoutOpen(paddlePrice(cfg, planKey, "month", CUR));
