@@ -7047,7 +7047,7 @@
   }
   function analyzeReelGetText(url){
     showToast("Analizando el reel…");
-    apiPost("/transcribe",{url:url}).then(function(res){
+    apiPost("/transcribe",{url:url, project_id:(S.brandId&&S.brandId!=="default"?S.brandId:null)}).then(function(res){
       if(!res.ok){ return showError((res.d&&res.d.error)||"No pude analizar el reel. Revisa el link."); }
       var taskId=res.d&&res.d.task_id;
       if(!taskId) return showError("No pude encolar el análisis. Inténtalo de nuevo.");
@@ -7091,13 +7091,29 @@
         views:182000, likes:9400, comments:210, text:DEMO_REEL_TRANSCRIPT, thumbnail_b64:null },
       { id:"d2", author_username:"hormozi", platform:"instagram", created_at:"2026-06-18T17:30:00Z",
         views:540000, likes:31000, comments:880, thumbnail_b64:null,
-        text:"El error número uno al empezar: intentar gustar a todos. Habla para una sola persona y serás magnético para miles. Define a quién le hablas, ponle nombre, y escribe cada guion como si fuera un mensaje para esa persona." }
+        text:"El error número uno al empezar: intentar gustar a todos. Habla para una sola persona y serás magnético para miles. Define a quién le hablas, ponle nombre, y escribe cada guion como si fuera un mensaje para esa persona." },
+      // #5 LEAK CANARY: análisis de OTRA marca (project_id ajeno). NUNCA debe aparecer en «Análisis
+      // guardados» de la marca activa. El harness lo verifica (aislamiento por marca).
+      { id:"anz_canary", author_username:"cliente_ajeno", platform:"instagram", created_at:"2026-06-10T09:00:00Z",
+        views:1000, likes:10, comments:1, thumbnail_b64:null, project_id:"__otra_marca__",
+        text:"CANARY · análisis de otra marca — si ves esto, hay fuga entre clientes." }
     ];
   }
   function loadAnalyses(){
-    if(isDemo()){ if(!S.analyses) S.analyses=analyzeDemoSeed(); if(S.tab==="analizar") render(); return; }
-    apiGet("/history").then(function(r){
-      S.analyses=(r&&Array.isArray(r.d))?r.d:[];
+    if(isDemo()){
+      if(!S._analysesRaw) S._analysesRaw=analyzeDemoSeed();
+      // #5: los análisis demo sin marca siguen a la marca activa; el canary (marca ajena) se filtra.
+      var _bd=(S.brandId||"default");
+      S.analyses=S._analysesRaw.filter(function(a){ return (a&&(a.project_id||_bd))===_bd; });
+      if(S.tab==="analizar") render(); return;
+    }
+    // #5 (David): AISLAMIENTO por marca de «Análisis guardados». Backend filtra por project_id
+    // (strict); el filtro cliente es defensa en profundidad (por si una carga arrastra otra marca).
+    var _pq=(S.brandId&&S.brandId!=="default")?("?project_id="+encodeURIComponent(S.brandId)):"";
+    var _b=(S.brandId||"default");
+    apiGet("/history"+_pq).then(function(r){
+      var all=(r&&Array.isArray(r.d))?r.d:[];
+      S.analyses=all.filter(function(a){ return (a&&(a.project_id||"default"))===_b; });
       if(S.tab==="analizar") render();
     });
   }
@@ -7167,7 +7183,7 @@
       return;
     }
     S.analyzeLoading=true; S.analyzeStep=L("Encolando…","Queuing…"); render();
-    apiPost("/transcribe",{url:url}).then(function(res){
+    apiPost("/transcribe",{url:url, project_id:(S.brandId&&S.brandId!=="default"?S.brandId:null)}).then(function(res){
       if(!res.ok){ S.analyzeLoading=false; S.analyzeErr=(res.d&&res.d.error)||L("No pude analizar el reel. Revisa el link.","Couldn't analyze it. Check the link."); return render(); }
       var taskId=res.d&&res.d.task_id;
       if(!taskId){ S.analyzeLoading=false; S.analyzeErr=L("No pude encolar el análisis.","Couldn't queue it."); return render(); }
@@ -7311,7 +7327,7 @@
      Si la task falla, el backend REEMBOLSA el análisis (charge→refund en transcribe_task). */
   function analyzeAndFollow(url){
     showToast("Analizando el reel…");
-    apiPost("/transcribe",{url:url}).then(function(res){
+    apiPost("/transcribe",{url:url, project_id:(S.brandId&&S.brandId!=="default"?S.brandId:null)}).then(function(res){
       if(!res.ok){ return showError((res.d&&res.d.error)||"No pude analizar el reel. Revisa el link."); }
       var taskId=res.d&&res.d.task_id;
       if(!taskId) return showError("No pude encolar el análisis. Inténtalo de nuevo.");
@@ -8470,6 +8486,8 @@
         var qp=qs.get("plan"); if(qp==="creador"){ S.plan="creador"; S.user.credits=120; S.brands=[demoBrands()[0]]; S.brandId=S.brands[0].id; S.tab="dashboard"; } else if(qp==="agencia"){ S.plan="agencia"; S.user.credits=960; S.brands=demoBrands(); S.brandId=S.brands[0].id; S.tab="dashboard"; }
         var qb=qs.get("b"); if(qb && S.brands.some(function(x){return x.id===qb;})){ S.brandId=qb; S.tab="dashboard"; }
         var qt=qs.get("t"); if(qt==="perf"){ S.tab="guiones"; S.view="perf"; S.perfGuion="gd1"; } else if(qt){ S.tab=qt; }
+        // #5: entrar por deep-link a «analizar» debe CARGAR los análisis (el harness lo verifica).
+        if(qt==="analizar" && typeof loadAnalyses==="function"){ try{ loadAnalyses(); }catch(e){} }
         // ?onb=1 → fuerza el onboarding v2 en demo (sin tocar el flujo normal/harness)
         if(qs.get("onb")==="1"){ S.onb._force=true; S.onb.skipped=false; S.onb.step="handle"; S.reels=[]; S.tracked=[]; }
         // ?free=1 → simula plan FREE en demo (para ver el muro borroso de métricas)
