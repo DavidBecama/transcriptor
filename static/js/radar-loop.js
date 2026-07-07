@@ -4029,9 +4029,9 @@
     }
     var go=function(){
       showToast("Transcribiendo tus reels y aprendiendo tu voz… (~1 min)");
-      apiPost("/api/voice/from-urls",{urls:reels.slice(0,6)}).then(function(r){
+      apiPost("/api/voice/from-urls",{urls:reels.slice(0,6), project_id:_pidOf(S.brandId)}).then(function(r){
         if(r.ok && r.d && r.d.ok){
-          return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
+          return fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
             S.voice=v; render(); showToast("Voz aprendida de "+(r.d.source_count||n)+" reels — te conozco al "+(r.d.confidence||v.confidence||0)+"%.");
             setTimeout(brainLevelPulse,1600);
           });
@@ -7427,11 +7427,11 @@
       var b=brand(); b.voice=62; render(); showToast("Voz aprendida — te conozco al 62%."); setTimeout(brainLevelPulse,1600); return;
     }
     showToast("Aprendiendo tu voz…");
-    fetch("/api/voice/onboard",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({texts:[txt]})})
+    fetch("/api/voice/onboard",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({texts:[txt], project_id:_pidOf(S.brandId)})})
       .then(function(r){ return r.json().catch(function(){return{};}); })
       .then(function(d){
         if(d&&d.ok){
-          return fetch("/api/voice",{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(v){
+          return fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(r){return r.json();}).then(function(v){
             S.voice=v; render(); showToast("Voz aprendida — te conozco al "+(v.confidence||0)+"%."); setTimeout(brainLevelPulse,1600);
           });
         }
@@ -7462,7 +7462,7 @@
       var go=function(){
         showToast("Derivando tu voz de tus reels… (~1-2 min si hay que transcribir)");
         var done=function(d){
-          return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
+          return fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
             S.voice=v; render();
             showToast("Voz derivada de "+(d.source_count||0)+" reels — te conozco al "+(d.confidence||v.confidence||0)+"%.");
             setTimeout(brainLevelPulse,1600);
@@ -7524,9 +7524,9 @@
     }
     var go=function(){
       showToast("Transcribiendo y refinando tu voz… (~1 min)");
-      apiPost("/api/voice/from-urls",{urls:reels.slice(0,6)}).then(function(r){
+      apiPost("/api/voice/from-urls",{urls:reels.slice(0,6), project_id:_pidOf(S.brandId)}).then(function(r){
         if(r.ok && r.d && r.d.ok){
-          return fetch("/api/voice",{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
+          return fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(x){return x.json();}).then(function(v){
             S.voice=v; render(); showToast("Voz refinada — ahora te conozco al "+(r.d.confidence||v.confidence||0)+"%."); setTimeout(brainLevelPulse,1600);
           });
         }
@@ -8378,7 +8378,7 @@
   function _loadDeferredBrandData(q, _pq){
     Promise.all([
       fetch("/metrics/summary"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch("/api/voice",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch("/api/voice"+(_pidOf(S.brandId)?("?project_id="+encodeURIComponent(_pidOf(S.brandId))):""),{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/api/metrics/insights"+_pq,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch("/metrics/videos"+q,{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       // Contenido REAL del usuario (solo prod): ideas guardadas + guiones persistidos.
