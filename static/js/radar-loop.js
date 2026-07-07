@@ -5762,6 +5762,23 @@
         '<div class="rs-toast rs-err" id="rsErr" role="alert" aria-live="assertive"><span class="tdot err"></span><span id="rsErrMsg"></span><button class="rs-err-x" data-act="err-close" title="Cerrar" aria-label="Cerrar el error">'+IC.x+'</button></div>';
       view=document.getElementById("rsView");
     }
+    // FAST-PATH del reveal del guion (S.view==="script"): si la vista NO cambió y el
+    // overlay ya está montado, se repinta SOLO el contenido scrolleable (.oscroll).
+    // El overlay NO se recrea → no re-anima rsSheetUp (el "la ventana se reinicia/
+    // parpadea") y el scroll se queda EXACTAMENTE donde estaba (el nodo que scrollea
+    // no se destruye). Los clics dentro del reveal (elegir opción/gancho, guardar) y
+    // las cargas async (referencias del formato) pasan por aquí. Bug Leo 07-jul (PC).
+    // Lo de detrás del overlay queda como estaba: se repinta entero al cerrarlo.
+    var _fpKey=S.tab+"|"+(S.view||"feed")+"|"+(S.creatorFilter?S.creatorFilter.id:"");
+    if(S.view==="script" && S._scKey===_fpKey){
+      var _fpSc=view.querySelector(".overlay .oscroll");
+      if(_fpSc && _fpSc.querySelector(".script-wrap")){
+        var _fpTop=_fpSc.scrollTop;
+        _fpSc.innerHTML=scriptRevealHTML();
+        _fpSc.style.scrollBehavior="auto"; _fpSc.scrollTop=_fpTop; _fpSc.style.scrollBehavior="";
+        return;
+      }
+    }
     // «Ideas robadas» absorbe la vieja sección Ideas: cualquier ruta/deep-link
     // heredado (/profile/ideas, ?t=ideas) aterriza en la nueva sección.
     if(S.tab==="ideas") S.tab="guiones";
