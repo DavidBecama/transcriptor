@@ -565,12 +565,14 @@
     var _hv=(S.onb.handle||"").replace(/^@+/,"");
     var _ok=/^[a-zA-Z0-9._]{2,30}$/.test(_hv);
     var okChip='<span class="onb-handle-ok'+(_ok?' on':'')+'">'+IC.check+' '+L("cuenta válida","valid handle")+'</span>';
-    return onbCardWrap(onbEyebrow(L("empecemos","let's start")),L("¿Cuál es tu Instagram?","What's your Instagram?"),
-      L("Lo leo para entender tu voz y de qué va lo tuyo. No publico nada por ti, tranquilo.","I read it to understand your voice and what you're about. I don't post anything for you, promise."),
+    return onbCardWrap(onbEyebrow(L("tu cerebro","your brain")),
+      L("Entrena tu Cerebro con lo tuyo.","Train your Brain on your own stuff."),
+      L("Guiones con tu cara, no de molde. Para eso el Cerebro lee TUS reels — no los de ChatGPT ni los del vecino. Mete tu Instagram y empezamos afinados.","Scripts with your face, not from a mold. For that the Brain reads YOUR reels — not ChatGPT's. Add your Instagram and we start sharp."),
       '<div class="onb-pform"><div class="onb-handle"><span class="onb-at">@</span>'+
         '<input id="rsOnbHandle" class="onb-input" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="'+L("tu_usuario","your_handle")+'" value="'+ESC(S.onb.handle||"")+'" aria-label="'+L("Tu usuario de Instagram","Your Instagram handle")+'">'+okChip+'</div></div>'+
       onbErr()+
-      '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-handle-next">'+IC.arr+' '+L("Continuar","Continue")+'</button>');
+      '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-handle-next">'+IC.arr+' '+L("Conectar mi Instagram","Connect my Instagram")+'</button>'+
+      '<button class="onb-skip" data-act="onb-handle-skip">'+L("Ahora no, lo hago luego","Not now, I'll do it later")+'</button>');
   }
   // Emoji por nicho (David 26-jun: «la M de moda es genérica, que tengan emoji»). Key
   // por _norm (sin acentos, minúsculas), cubre ES y EN. Fallback a la inicial si no hay.
@@ -778,6 +780,19 @@
       '<button class="onb-skip" data-act="onb-confirm-edit">'+L("No, cambiar mi usuario","No, change my handle")+'</button>'+
     '</section>';
   }
+  // (b) Paso opcional FUSIONADO en «myreels»: pegar el resultado de un prompt-nuestro de
+  // ChatGPT/Claude (estilo/tono/temas) → se suma al Cerebro (POST /api/brain/instructions,
+  // mismo saneado+guardarraíl que el campo permanente). Vía alternativa a leer tus reels.
+  var ONB_CTX_PROMPT="Analiza mi estilo como creador de reels para pasárselo a otro guionista. En 6-8 líneas y sin relleno: mi tema, mi tono, mis muletillas, lo que EVITO, y mi estructura típica de reel.";
+  function onbCtxHTML(){
+    return '<div class="onb-ctx">'+
+      '<div class="onb-ctx-t">'+L("O descríbete tú en 1 minuto","Or describe yourself in 1 minute")+'</div>'+
+      '<p class="onb-ctx-lead">'+L("Copia esto en ChatGPT o Claude (pégale 2-3 de tus reels o su idea) y trae aquí lo que te devuelva. El Cerebro lo suma a tu estilo.","Paste this into ChatGPT or Claude (with 2-3 of your reels) and bring back what it returns. The Brain adds it to your style.")+'</p>'+
+      '<div class="onb-ctx-prompt"><code>'+ESC(ONB_CTX_PROMPT)+'</code><button class="onb-ctx-copy" data-act="onb-ctx-copy">'+L("Copiar","Copy")+'</button></div>'+
+      '<textarea id="rsOnbCtx" class="vc-ta" rows="4" maxlength="2000" placeholder="'+L("Pega aquí lo que te devuelva ChatGPT/Claude…","Paste what ChatGPT/Claude returns…")+'">'+ESC(S.onb.pastedCtx||"")+'</textarea>'+
+      '<button class="btn btn-md btn-secondary" data-act="onb-ctx-save">'+IC.spark+' '+L("Sumar mi estilo al Cerebro","Add my style to the Brain")+'</button>'+
+    '</div>';
+  }
   // «Tus vídeos» (David 24-jun): tras «este eres tú», enseña 3 reels suyos (del MISMO
   // scrape Apify, latestPosts) + botón «Alimentar el Cerebro» → aprende su tono de los
   // captions. Si el scrape aún no acabó → skeletons + botón deshabilitado.
@@ -801,15 +816,17 @@
     var cta = noReels
       ? '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-feed-skip">'+L("Continuar","Continue")+'</button>'
       : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-feed-myreels"'+(loading?' disabled':'')+'>'+IC.bolt+' '+(loading?L("Leyendo tus vídeos…","Reading your videos…"):L("Alimentar el Cerebro","Feed the Brain"))+'</button>';
+    var _skipped=!!S.onb._handleSkipped;   // (a) saltó el handle → sin reels, solo el paso (b)
     return '<section class="onb-step onb-myreels">'+
       onbBackBtn()+
-      '<div class="onbmr-eyebrow"><span class="pip"></span>'+L("HE LEÍDO TUS REELS","I READ YOUR REELS")+'</div>'+
-      '<h2 class="onb-h">'+L("Tu Cerebro ya te está leyendo","Your Brain is reading you")+'</h2>'+
-      '<p class="onb-sub">'+sub+'</p>'+
-      '<div class="onbmr-grid">'+cards+'</div>'+
+      '<div class="onbmr-eyebrow"><span class="pip"></span>'+(_skipped?L("SIN INSTAGRAM","NO INSTAGRAM"):L("HE LEÍDO TUS REELS","I READ YOUR REELS"))+'</div>'+
+      '<h2 class="onb-h">'+(_skipped?L("Dile al Cerebro cómo hablas","Tell the Brain how you talk"):L("Tu Cerebro ya te está leyendo","Your Brain is reading you"))+'</h2>'+
+      '<p class="onb-sub">'+(_skipped?L("Sin tu Instagram no puedo leer tus reels. Descríbete aquí abajo — o salta y lo entrenas luego en el Cerebro.","Without your Instagram I can't read your reels. Describe yourself below — or skip and train it later in the Brain."):sub)+'</p>'+
+      (_skipped?'':'<div class="onbmr-grid">'+cards+'</div>')+
       onbErr()+
-      cta+
-      (noReels?'':'<button class="onb-skip" data-act="onb-feed-skip">'+L("Saltar este paso","Skip this step")+'</button>')+
+      (_skipped?'':cta)+
+      onbCtxHTML()+
+      '<button class="onb-skip" data-act="onb-feed-skip">'+(_skipped?L("Saltar — lo entreno luego","Skip — I'll train it later"):L("Saltar este paso","Skip this step"))+'</button>'+
     '</section>';
   }
   function onbFeedMyReels(){
@@ -903,6 +920,13 @@
     // tú» y en la carga). Idempotente por handle; ya pudo dispararse al teclear (head start).
     onbFetchAvatar(h);
     onbNext();
+  }
+  // (a) El handle deja de bloquear (recomendación fuerte, no muro). Al saltar vamos a
+  // «myreels» en estado SIN reels — ahí vive el paso opcional (b) de pegar tu contexto.
+  // _profileDone=true evita el loading infinito (no hay scrape que espere).
+  function onbHandleSkip(){
+    S.onb.error=null; S.onb._profileDone=true; S.onb._handleSkipped=true;
+    onbTrack("onb_handle_skipped"); onbGoto("myreels");
   }
   // Conecta el Instagram del usuario y lanza el análisis de su perfil en SEGUNDO PLANO.
   // Reusa /metrics/ig-profile + /metrics/analyze (el camino real de métricas). 409 al
@@ -5093,8 +5117,43 @@
     '</div>';
   }
 
+  // ── «Tus instrucciones»: texto libre del creador que se suma al Cerebro (por marca).
+  //    Guarda en POST /api/brain/instructions (saneado + guardarraíl CUSTOM_BASE server-side).
+  var BRAIN_INSTR_MAX=2000;
+  var BRAIN_TPLS=[
+    {k:"educador",   label:"Educador técnico",     text:"Explico [mi tema] a [mi público]. Tono claro y directo, cero postureo. Voy a lo concreto: datos, pasos y ejemplos reales. Evito tecnicismos sin explicar y la motivación vacía. Estructura: hook que promete un aprendizaje → 3 ideas con ejemplo → cierre que lo resume en una frase."},
+    {k:"storyteller",label:"Storyteller personal", text:"Cuento historias de [mi vida/trabajo] para llegar a [mi público]. Primera persona, detalle concreto, algo de vulnerabilidad. Muletilla: «te lo cuento porque…». Evito moralejas de coach. Estructura: escena que engancha → conflicto → giro → lo que aprendí, sin sermón."},
+    {k:"contrarian", label:"Contrarian de nicho",  text:"Reto las creencias comunes de [mi nicho]. Provocador pero con datos, nunca gratuito. Empiezo señalando el error que todos repiten. Evito el humo y el «depende». Estructura: afirmación polémica → por qué el consenso falla → mi tesis con prueba → qué hacer en su lugar."},
+    {k:"cercano",    label:"Cercano/honesto",      text:"Hablo de [mi tema] como un colega que ya pasó por ahí. Cercano, sin postureo de gurú. Tuteo, frases cortas, algo de humor. Evito «tú puedes» y la motivación de cartel. Estructura: te veo en tu problema → lo que a mí me funcionó → un paso pequeño para hoy."}
+  ];
+  var BRAIN_INSTR_EX="P.ej.: «Hablo de finanzas personales para gente de 25-35 que no sabe por dónde empezar. Directo, sin tecnicismos. Cifras reales y ejemplos del día a día. Muletillas: “vamos al grano”, “esto nadie te lo cuenta”. Evito: promesas de hacerse rico y jerga de banca. Estructura: hook con un dato que incomoda → 2-3 ideas accionables → cierre con el siguiente paso.»";
+  try{ window._rsBrainInstrCount=function(el){ var c=document.getElementById("rsBrainInstrN"); if(c) c.textContent=el.value.length+"/"+BRAIN_INSTR_MAX; }; }catch(e){}
+  function _ensureBrainInstr(){
+    if(S.brainInstr!==undefined) return;
+    if(isDemo()){ S.brainInstr={loaded:true,text:"",saving:false}; return; }
+    S.brainInstr={loaded:false,text:"",saving:false};
+    apiGet("/api/brain/instructions").then(function(r){
+      S.brainInstr={loaded:true, text:((r&&r.d&&r.d.text)||""), saving:false};
+      if(S.tab==="brain") render();
+    });
+  }
+  function brainInstructionsHTML(){
+    var bi=S.brainInstr||{loaded:false,text:"",saving:false};
+    var val=bi.text||"";
+    var tpls=BRAIN_TPLS.map(function(t){ return '<button class="tone-chip" data-act="brain-instr-tpl" data-k="'+ESC(t.k)+'">'+ESC(t.label)+'</button>'; }).join("");
+    return '<div class="ce-card ce-instr">'+
+      '<div class="brain-section-t">Tus instrucciones</div>'+
+      '<p class="tone-note">Dile al Cerebro cómo hablas TÚ — temas, tono, muletillas, lo que evitas. Se aplica en cada guion. Elige una plantilla y edítala, o escribe la tuya.</p>'+
+      '<div class="tone-chips" style="margin:2px 0 10px">'+tpls+'</div>'+
+      '<textarea class="vc-ta" id="rsBrainInstr" rows="6" maxlength="'+BRAIN_INSTR_MAX+'" placeholder="'+ESC(BRAIN_INSTR_EX)+'" oninput="window._rsBrainInstrCount&&window._rsBrainInstrCount(this)">'+ESC(val)+'</textarea>'+
+      '<div class="ce-instr-foot" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px">'+
+        '<span class="vc-hint" id="rsBrainInstrN">'+val.length+'/'+BRAIN_INSTR_MAX+'</span>'+
+        '<button class="btn btn-md btn-primary" data-act="brain-instr-save"'+(bi.saving?' disabled':'')+'>'+IC.spark+' '+(bi.saving?"Guardando…":"Guardar instrucciones")+'</button></div>'+
+    '</div>';
+  }
   function brainHTML(){
     var b=brand();
+    _ensureBrainInstr();
     var v=brainVoice(b);
     // B1: nivel REAL derivado de señales (brainLevel), no del contador cosmético b.level.
     var lv=brainLevel();
@@ -5146,6 +5205,7 @@
       brainHeaderV3HTML()+
       brainHeroV4HTML(lv, voicePct, b, nGuiones)+   // v4: cerebro inmersivo (BrainNet canvas) — reemplaza el anillo SVG
       brainFeedMeHTML()+   // #2/#7: alimentar el Cerebro (ejercicio diario +5%, CD 24h). También en demo para previsualizar la escalera.
+      brainInstructionsHTML()+   // «Tus instrucciones»: texto libre del creador → Cerebro (por marca)
       '<div class="ce-grid">'+brainKnowHTML(v)+brainLevelsHTML(lv)+'</div>'+
       brainMissionsHTML(lv)+
       // v3 (mockup David): el Cerebro queda SOLO con la espina (header + anillo +
@@ -8125,6 +8185,22 @@
     if(act==="onb-confirm-yes") return onbNext();        // «este eres tú» → seguir
     if(act==="onb-confirm-edit") return onbGoto("handle");   // cambiar el @
     if(act==="onb-feed-myreels") return onbFeedMyReels();    // alimentar el Cerebro con tus reels
+    if(act==="onb-handle-skip") return onbHandleSkip();       // (a) handle deja de bloquear
+    if(act==="onb-ctx-copy"){                                 // (b) copiar el prompt para ChatGPT/Claude
+      try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(ONB_CTX_PROMPT); } showToast(L("Prompt copiado. Pégalo en ChatGPT o Claude.","Prompt copied. Paste it into ChatGPT or Claude.")); }catch(e){ showToast(ONB_CTX_PROMPT); }
+      return;
+    }
+    if(act==="onb-ctx-save"){                                 // (b) guardar el estilo pegado → Cerebro
+      var _cta=document.getElementById("rsOnbCtx"); if(!_cta) return;
+      var _ctx=(_cta.value||"").slice(0,2000); S.onb.pastedCtx=_ctx;
+      if(!_ctx.trim()){ return showError(L("Pega antes lo que te devolvió ChatGPT/Claude.","Paste what ChatGPT/Claude returned first.")); }
+      if(isDemo()){ try{ brainFeast(8); }catch(e){} return showToast(L("Estilo sumado al Cerebro (demo).","Style added to the Brain (demo).")); }
+      apiPost("/api/brain/instructions",{text:_ctx}).then(function(r){
+        if(r&&r.ok){ try{ brainFeast(10); }catch(e){} S.brainInstr={loaded:true,text:((r.d&&r.d.text)||_ctx),saving:false}; showToast(L("🧠 Estilo sumado. Tus guiones ya lo usan.","🧠 Style added. Your scripts use it now.")); }
+        else{ showError((r&&r.d&&r.d.error)||L("No pude guardar. Inténtalo de nuevo.","Couldn't save. Try again.")); }
+      });
+      return;
+    }
     if(act==="onb-feed-skip") return onbNext();
     if(act==="onb-pick-niche") return onbPickNiche(btn.getAttribute("data-k"));
     if(act==="onb-niche-next") return onbNicheNext();
@@ -8167,6 +8243,25 @@
     // Tarjeta de plan clicada: subir = checkout Whop del plan; Free = cancelar (acceso
     // hasta fin de periodo, reusa /cancel-subscription vía settingsCancelSub); bajar a un
     // plan de pago más barato = checkout del más barato (Whop hace el cambio).
+    if(act==="brain-instr-tpl"){
+      var _tk=k||btn.getAttribute("data-k"); var _tpl=null;
+      for(var _i=0;_i<BRAIN_TPLS.length;_i++){ if(BRAIN_TPLS[_i].k===_tk){ _tpl=BRAIN_TPLS[_i]; break; } }
+      var _ta=document.getElementById("rsBrainInstr");
+      if(_tpl&&_ta){ _ta.value=_tpl.text; _ta.focus(); if(window._rsBrainInstrCount) window._rsBrainInstrCount(_ta); }
+      return;
+    }
+    if(act==="brain-instr-save"){
+      var _bta=document.getElementById("rsBrainInstr"); if(!_bta) return;
+      var _btxt=(_bta.value||"").slice(0,BRAIN_INSTR_MAX);
+      if(isDemo()){ S.brainInstr={loaded:true,text:_btxt,saving:false}; showToast("Instrucciones guardadas (demo). Tu próximo guion las usa."); return; }
+      S.brainInstr=S.brainInstr||{loaded:true,text:""}; S.brainInstr.text=_btxt; S.brainInstr.saving=true; render();
+      apiPost("/api/brain/instructions",{text:_btxt}).then(function(r){
+        S.brainInstr={loaded:true, text:((r&&r.d&&r.d.text)!=null?r.d.text:_btxt), saving:false}; render();
+        if(r&&r.ok){ showToast("Instrucciones guardadas. Tu próximo guion las usa."); }
+        else{ showError((r&&r.d&&r.d.error)||"No pude guardar las instrucciones."); }
+      });
+      return;
+    }
     if(act==="aj-cycle"){
       // Toggle Mensual/Anual del grid «Cambiar de plan». Fija el ciclo del isla (display) y
       // el billingCycle global de index.html (que usa subscribePlanFromCard en el checkout),
