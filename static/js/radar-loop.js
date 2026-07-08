@@ -1806,6 +1806,7 @@
       S._suggNeedsNiche=!!(r&&r.d&&r.d.needs_niche);
       S._suggHasMore=!!(r&&r.d&&r.d.has_more);                 // ¿quedan MÁS frescos («Ver más» gratis)?
       S._suggExhausted=!!(r&&r.d&&r.d.exhausted);              // contrato punto 5: visto todo lo fresco
+      S._suggRecycled=!!(r&&r.d&&r.d.recycled);                // 100%: agotado el fresco → reciclado (repite algunos). «mostrarlo diferente»
       S._suggMoreBatch=(r&&r.d&&r.d.more_batch)||4;
       // Contrato «ninguna marca muda»: ready|populating|empty|exhausted|needs_niche. populating
       // ⇒ nicho de catálogo aún sin reels (el backend ya disparó la siembra) → estado honesto + poll.
@@ -2011,7 +2012,7 @@
     var side=(dr&&!isMob)?'<aside class="stday-side">'+panel+'</aside>':'';
     var overlay=(dr&&isMob)?'<div class="stday-overlay" data-act="close-reel-detail"><div class="stday-sheet" data-act="stday-noop">'+panel+'</div></div>':'';
     return '<section class="stday-sec'+(dr&&!isMob?' stday-sec--split':'')+'">'+
-      '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+' <span class="stday-tag">'+L("reels que petan en tu nicho","reels blowing up in your niche")+'</span></span>'+
+      '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+' <span class="stday-tag'+(S._suggRecycled?' stday-tag--recycled':'')+'">'+(S._suggRecycled?L("rotando tu nicho · repites algunos","rotating your niche · some repeats"):L("reels que petan en tu nicho","reels blowing up in your niche"))+'</span></span>'+
         arrows+_stdayMiniActs()+'</div>'+
       '<div class="stday-main">'+
         '<div class="stday-row">'+cards+moreCard+'</div>'+
@@ -8421,7 +8422,7 @@
     try{ window.RS_reloadRadar=loadBrandData; }catch(e){}   // puente: el chrome legacy recarga el Radar tras añadir competidor
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: al cambiar de marca no arrastres la vista de otro competidor
     S._lbReal=null;   // ranking por-marca: fuerza recarga de /api/leaderboard de ESTA marca (no caché de la anterior)
-    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false; S._suggExhausted=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
+    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false; S._suggExhausted=false; S._suggRecycled=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
     S._suggPoolStatus=''; S._suggPollN=0; _clearSuggPoll();   // resetea el poll de «poblando» al cambiar de marca
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");   // grid rail+work YA en el skeleton (si no, el rail sale centrado sobre negro)
     // Onboarding pendiente (o demo ?onb=1) → loader full-screen limpio, sin que asome la
