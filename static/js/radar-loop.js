@@ -321,7 +321,9 @@
     // B3: mismo rail para todos (sin Portfolio). El Radar es la pantalla principal;
     // las marcas se cambian con el switcher de la command bar, no con una pantalla aparte.
     var _ana='<svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-3.6-3.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-    var navTabs = [["dashboard",IC.grid,"Radar"],["guiones",IC.doc,L("Ideas robadas","Stolen ideas")],["metrics",IC.chart,"Métricas"],["leaderboard",_tro,"Ranking"],["brain",IC.brain,"Cerebro"],["analizar",_ana,"Analizar"]];
+    // Orden por USO (David 07/07, auditoría: Analizar lo usa el 55%): Radar · Analizar ·
+    // Ideas robadas · Cerebro · Métricas · Ranking.
+    var navTabs = [["dashboard",IC.grid,"Radar"],["analizar",_ana,"Analizar"],["guiones",IC.doc,L("Ideas robadas","Stolen ideas")],["brain",IC.brain,"Cerebro"],["metrics",IC.chart,"Métricas"],["leaderboard",_tro,"Ranking"]];
     return '<nav class="rail">'+
       '<span class="rail-logo" role="img" aria-label="Reelscript"></span>'+   // logo R (theme-aware vía CSS: blanca en oscuro, azul en claro)
       navTabs.map(function(t){return '<button class="rail-btn'+(S.tab===t[0]&&!S.legacy?" on":"")+'" data-act="tab" data-k="'+t[0]+'" data-tour="tab-'+t[0]+'">'+t[1]+'<span class="tip">'+t[2]+'</span></button>';}).join("")+
@@ -371,7 +373,7 @@
         return '<div class="spark pill-stat trial" id="rsSpark" title="Prueba Pro — '+dl+' guion'+(dl===1?'':'es')+' hoy · '+d+' día'+(d===1?'':'s')+' restantes" data-act="tab" data-k="brain" role="button" tabindex="0">'+IC.spark+'<span class="num">Pro</span> · <b id="rsSparkN">'+dl+'</b> hoy · '+d+'d</div>';
       }
       var cr=S.user.trialCreditsLeft||0;
-      return '<div class="spark pill-stat trial" id="rsSpark" title="Prueba Pro — '+cr+' crédito'+(cr===1?'':'s')+' · '+d+' día'+(d===1?'':'s')+' restantes" data-act="tab" data-k="brain" role="button" tabindex="0">'+IC.spark+'<span class="num">Pro</span> · '+cr+' cr</div>';
+      return '<div class="spark pill-stat trial" id="rsSpark" title="Prueba Pro — '+cr+' crédito'+(cr===1?'':'s')+' · '+d+' día'+(d===1?'':'s')+' restantes" data-act="tab" data-k="brain" role="button" tabindex="0">'+IC.spark+'<span class="num">Pro</span> · '+cr+' crédito'+(cr===1?'':'s')+'</div>';
     }
     if(S.user.plan==="free" && !S.user.credits){
       return '<div class="spark pill-stat credits" id="rsSpark" title="Guiones gratis este mes — ver planes" data-act="credits-pill" role="button" tabindex="0">'+IC.spark+'<span class="num"><b id="rsSparkN">'+S.user.freeLeft+'</b></span> este mes</div>';
@@ -1967,7 +1969,7 @@
         // botón de pago SOLO si un scrape del pool puede traer algo (pool_refreshable); si no, «vuelve
         // mañana» SIN botón (no vender aire). El reembolso on-empty sigue de red de seguridad.
         var _exhCta=S._suggPoolRefreshable
-          ? '<button class="stday-exh-cta" data-act="refresh-pool">'+IC.repeat+' '+L("Refrescar sugerencias · 5 cr","Refresh suggestions · 5 cr")+'</button>'+
+          ? '<button class="stday-exh-cta" data-act="refresh-pool">'+IC.repeat+' '+L("Refrescar sugerencias · 5 créd.","Refresh suggestions · 5 cr")+'</button>'+
             '<div class="stday-exh-sub">'+L("scrapeo lo último de tu nicho · o vuelve mañana (el pool se renueva solo)","pull the latest from your niche · or come back tomorrow (the pool refreshes on its own)")+'</div>'
           : '<div class="stday-exh-sub">'+L("Vuelve mañana — el pool de tu nicho se renueva solo.","Come back tomorrow — your niche pool refreshes on its own.")+'</div>';
         return '<section class="stday-sec">'+
@@ -1988,7 +1990,7 @@
       ? '<div class="stday-card stday-exhausted">'+
           '<span class="stday-exh-t">'+L("Has visto todo lo fresco de hoy","You\'ve seen all today\'s fresh reels")+'</span>'+
           (S._suggPoolRefreshable   // #2: pago solo si el pool puede traer algo; si no, «vuelve mañana» sin botón
-            ? '<button class="stday-exh-cta" data-act="refresh-pool">'+IC.repeat+' '+L("Refrescar sugerencias · 5 cr","Refresh suggestions · 5 cr")+'</button>'+
+            ? '<button class="stday-exh-cta" data-act="refresh-pool">'+IC.repeat+' '+L("Refrescar sugerencias · 5 créd.","Refresh suggestions · 5 cr")+'</button>'+
               '<span class="stday-exh-sub">'+L("o vuelve mañana","or come back tomorrow")+'</span>'
             : '<span class="stday-exh-sub">'+L("vuelve mañana — el pool se renueva solo","come back tomorrow — the pool refreshes on its own")+'</span>')+
         '</div>'
@@ -2153,8 +2155,11 @@
         '<div class="gal-menu-list">'+rows+'</div></div>'):'';
       moreWrap='<span class="rgal-more-wrap"><button class="rgal-chip rgal-morebtn'+(S.galMenu?' on':'')+'" data-act="gal-menu">+'+hidden.length+' '+IC.chev+'</button>'+dd+'</span>';
     }
-    // reels mostrados: feed (respeta filtro explosión/recientes/fav) + filtro de competidor
-    var reels=feedReels(); if(active) reels=reels.filter(function(r){ return (r.creator&&r.creator.handle)===active; });
+    // reels mostrados: feed (respeta filtro explosión/recientes/fav) + filtro de competidor.
+    // Dedup (David 07/07): fuera los 3 del carrusel «Oportunidad» de arriba (no repetir).
+    var _heroIds=S._heroReelIds||[];
+    var reels=feedReels().filter(function(r){ return _heroIds.indexOf(r.id)<0; });
+    if(active) reels=reels.filter(function(r){ return (r.creator&&r.creator.handle)===active; });
     var activeLabel=active?("@"+active):L("todos los competidores","all competitors");
     var arrows='<div class="rgal-arrows">'+
       '<button class="rgal-arrow" data-act="rgal-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
@@ -2461,10 +2466,10 @@
     _reels.forEach(function(r){ if((r.explosion||0)>maxMult) maxMult=r.explosion||0; reach+=_parseViews(r.views); });
     var multTxt = maxMult>0 ? (maxMult>=10?Math.round(maxMult):(Math.round(maxMult*10)/10))+"×" : "–";
     var reachTxt = reach>0 ? String(Math.round(reach)).replace(/\B(?=(\d{3})+(?!\d))/g," ") : _fmtK(st.reels_week||0);
+    // David 07/07: fuera el número grande «alcance robable» (ruido) — solo «explotaron hoy» + «mayor explosión».
     var stats=[
       {v:_fmtK(st.exploded_week||0), l:L("explotaron hoy","blew up today"), c:"var(--success-fg)", live:false},
-      {v:multTxt, l:L("la mayor explosión","biggest blow-up"), c:"var(--success-fg)", live:false},
-      {v:reachTxt, l:L("alcance robable · en directo","stealable reach · live"), c:"var(--text-primary)", live:true}
+      {v:multTxt, l:L("la mayor explosión","biggest blow-up"), c:"var(--success-fg)", live:false}
     ];
     var statsH=stats.map(function(s){
       return '<div class="rdr-stat"><span class="rdr-stat-v" style="color:'+s.c+'">'+ESC(String(s.v))+'</span>'+
@@ -2486,7 +2491,7 @@
           // Reorganización 04/07: «Añadir/Analizar reel» SUBEN al hero como botones visibles
           // (antes links enterrados en la addbar a media página). Secundarios a propósito:
           // la única primaria sobre el fold sigue siendo «Roba la idea» (T1).
-          '<button class="rdr-reshuffle-cta" data-act="add-reel">'+IC.plus+' '+L("Añadir reel","Add reel")+'</button>'+
+          '<button class="rdr-reshuffle-cta" data-act="add-reel" title="'+L("Analizo el reel y sigo a su autor en tu radar","I analyze the reel and follow its author in your radar")+'">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button>'+
           '<button class="rdr-reshuffle-cta" data-act="analyze-reel" title="'+L("Transcribe un reel suelto sin seguir a su autor","Transcribe a single reel without following its author")+'">'+IC.doc+' '+L("Analizar un reel","Analyze a reel")+'</button>'+
         '</div>'+
       '</div>'+
@@ -2539,6 +2544,8 @@
 
     // Fathom 18/06: el día enseña 2-3 oportunidades en carrusel (no una sola).
     var heroN=sorted.slice(0,Math.min(3,sorted.length)), rest=sorted.slice(heroN.length);
+    // David 07/07: dedup — la galería de abajo NO repite los reels del carrusel «Oportunidad» de arriba.
+    S._heroReelIds=heroN.map(function(r){return r.id;});
     var fillCount=Math.min(5,S.reels.length)||5;
 
     // Reorganización 04/07 (plan David, «flujo continuo sin apartados»): arriba lo
@@ -2598,7 +2605,7 @@
       : '<div class="rs-empty" style="margin-top:10px">Aún ninguna desarrollada. Desarrolla una de arriba o genera 5 de golpe.</div>';
     return '<section class="ideas-zone">'+
       '<div class="feed-head"><span class="feed-title">'+IC.bulb+' Sin desarrollar'+(raw.length?' <span class="ct">· '+raw.length+'</span>':'')+'</span>'+
-        '<button class="btn btn-sm btn-secondary" data-act="gen5ideas" title="'+L("Cuesta "+COST.idea5+" créditos el lote","Costs "+COST.idea5+" credits per batch")+'">'+IC.spark+' '+L("3 ideas · "+COST.idea5+" créd.","3 ideas · "+COST.idea5+" cr")+'</button>'+
+        '<button class="btn btn-sm btn-secondary" data-act="gen5ideas" title="'+L("Cuesta "+COST.idea5+" créditos el lote","Costs "+COST.idea5+" credits per batch")+'">'+IC.spark+' '+L("3 ideas · "+COST.idea5+" créd.","3 ideas · "+COST.idea5+" cr.")+'</button>'+
       '</div>'+
       '<p class="ideas-zone-sub">Ideas en bruto, guardadas gratis. Desarrolla cuando quieras (cuesta '+COST.scripts5+' créditos).</p>'+
       '<button class="explosion-btn" data-act="explosion"><span class="ex-head">'+IC.spark+' Explosión creativa</span><span class="ex-sub">5 ideas × 5 guiones × 5 hooks — '+COST.explosion+' créditos</span></button>'+
@@ -6773,7 +6780,7 @@
   function saveIdeaBtnHTML(id){
     return '<button class="btn btn-sm btn-secondary si-save" data-act="save-idea-data" data-id="'+ESC(id)+'" '+
       'title="'+L("Guarda el reel + su transcripción y métricas (sin generar guión)","Save the reel + its transcript and metrics (no script)")+'">'+
-      IC.plus+' '+L("Guardar · "+COST.saveidea+" cr","Save · "+COST.saveidea+" cr")+'</button>';
+      IC.plus+' '+L("Guardar · "+COST.saveidea+" créd.","Save · "+COST.saveidea+" cr")+'</button>';
   }
   function _optimisticSavedIdea(id, title){
     // Aparece YA en «Ideas robadas» (el workspace agrupa por inspiredById, incluso sin guion).
@@ -7242,7 +7249,9 @@
     else if(!list.length) body='<div class="anz-empty"><span class="anz-empty-h">'+L("Aún no has analizado ningún reel.","No reels analyzed yet.")+'</span><span class="anz-empty-s">'+L("Pega un link arriba y aparecerá aquí, guardado.","Paste a link above and it shows up here, saved.")+'</span></div>';
     else body='<div class="anz-count">'+L(list.length+" análisis guardados",list.length+" saved analyses")+'</div><div class="anz-grid">'+list.map(analyzeCardHTML).join("")+'</div>';
     return '<div class="scroll"><div class="canvas anz-canvas">'+
-      '<header class="anz-head"><h1 class="h-title">'+L("Analizar un reel","Analyze a reel")+'</h1>'+
+      '<header class="anz-head"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'+
+      '<h1 class="h-title">'+L("Analizar un reel","Analyze a reel")+'</h1>'+
+      '<button class="btn btn-sm btn-secondary" data-act="add-reel" title="'+L("Analizo el reel y sigo a su autor en tu radar","Analyze the reel and follow its author")+'">'+IC.plus+' '+L("Añadir competidor","Add competitor")+'</button></div>'+
       '<p class="h-sub">'+L("Pega cualquier reel y te saco la transcripción y sus métricas. Todo queda guardado aquí.","Paste any reel and I pull its transcript and metrics. Everything is saved here.")+'</p></header>'+
       form+body+
     '</div></div>';
