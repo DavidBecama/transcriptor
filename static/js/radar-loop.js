@@ -3232,16 +3232,17 @@
   // /api/billing/config (basic→creator). trial/free no se compran (alta o cancelación).
   var AJ_TIERS=[
     {k:"trial",   whop:null,      name:"Trial",           price:"0€",   cap:30,  feat:L("5 días Pro · 30 créditos (~10 robos) · sin tarjeta","5-day Pro · 30 credits (~10 steals) · no card")},
-    {k:"free",    whop:null,      name:"Free",            price:"0€",   cap:9,   feat:L("9 créditos/mes (~3 robos) · radar y métricas gratis","9 credits/mo (~3 steals) · radar & metrics free")},
-    {k:"basic",   whop:"creator", name:"Basic",           price:"19,99€",  cap:120, feat:L("120 créditos/mes (~40 robos) · voz · métricas","120 credits/mo (~40 steals) · voice · metrics"), featured:true},
-    {k:"estudio", whop:"estudio", name:"Content Creator", price:"39,99€",  cap:360, feat:L("360 créditos/mes (~120 robos) · 3 marcas · prioridad","360 credits/mo (~120 steals) · 3 brands · priority")},
-    {k:"agency",  whop:"agency",  name:"Agency",          price:"79€",  cap:960, feat:L("960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra","960 credits/mo (~320 steals) · 10 brands · +96 cr/extra")}
+    {k:"free",    whop:null,      name:"Free",            price:"0€",   cap:15,  feat:L("15 créditos/mes (~5 robos) · radar y métricas gratis","15 credits/mo (~5 steals) · radar & metrics free")},
+    {k:"basic",   whop:"creator", name:"Basic",           price:"19,99€",  priceY:"15,08€",  billedY:"180,96€",  cap:120, feat:L("120 créditos/mes (~40 robos) · voz · métricas","120 credits/mo (~40 steals) · voice · metrics"), featured:true},
+    {k:"estudio", whop:"estudio", name:"Content Creator", price:"39,99€",  priceY:"31,25€",  billedY:"374,99€",  cap:360, feat:L("360 créditos/mes (~120 robos) · 3 marcas · prioridad","360 credits/mo (~120 steals) · 3 brands · priority")},
+    {k:"agency",  whop:"agency",  name:"Agency",          price:"79€",  priceY:"63,17€",  billedY:"758€",  cap:960, feat:L("960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra","960 credits/mo (~320 steals) · 10 brands · +96 cr/extra")}
   ];
   function _ajPrice(k){ return ({trial:0,free:0,basic:19.99,estudio:39.99,agency:79})[k]||0; }
   function _ajCurTier(){ var p=(S.user.plan||"free"); if(p==="creator"||p==="pro"||p==="basic")return"basic"; if(p==="estudio")return"estudio"; if(p==="agency")return"agency"; if(p==="trial")return"trial"; return"free"; }
   function _ajTier(k){ for(var i=0;i<AJ_TIERS.length;i++){ if(AJ_TIERS[i].k===k) return AJ_TIERS[i]; } return AJ_TIERS[1]; }
   function ajPlanHTML(){
     var cur=_ajCurTier(); var curMeta=_ajTier(cur);
+    var cyc=(S.ajCycle==="month")?"month":"year";   // ciclo del grid «Cambiar de plan» (default anual, decisión negocio)
     var cr=S.user.credits||0; var cap=curMeta.cap||0; var pct=cap?Math.max(2,Math.min(100,Math.round(cr/cap*100))):0;
     var nGuiones=S.guiones.filter(function(g){return g.status!=="discarded";}).length;
     var usage=[
@@ -3267,7 +3268,7 @@
       return '<button class="aj-tier'+(isCur?" is-current":(t.featured?" featured":""))+'"'+
         (isCur?' disabled aria-disabled="true"':' data-act="plan-pick" data-k="'+t.k+'"')+'>'+
         '<span class="aj-tier-name">'+ESC(t.name)+(t.featured&&!isCur?' <i class="aj-tier-star">'+IC.spark+'</i>':'')+'</span>'+
-        '<span class="aj-tier-price">'+ESC(t.price)+(t.price!=="0€"?'<small> /'+L("mes","mo")+'</small>':'')+'</span>'+
+        '<span class="aj-tier-price">'+ESC((cyc==="year"&&t.priceY)?t.priceY:t.price)+(t.price!=="0€"?'<small> /'+L("mes","mo")+'</small>':'')+((cyc==="year"&&t.billedY)?'<small class="aj-tier-billed"> · '+L("facturado ","billed ")+ESC(t.billedY)+L("/año","/yr")+'</small>':'')+'</span>'+
         '<span class="aj-tier-feat">'+ESC(t.feat)+'</span>'+cta+'</button>';
     }).join("");
     return '<div class="aj-stack">'+
@@ -3283,7 +3284,11 @@
         '<div class="aj-card aj-usage"><span class="aj-card-t">'+L("Este mes","This month")+'</span>'+usage+'</div>'+
       '</div>'+
       '<div class="aj-card aj-tiers-card"><div class="aj-tiers-head"><span class="aj-card-t">'+L("Cambiar de plan","Change plan")+'</span>'+
-        '<span class="aj-tiers-sub">'+L("Sube o baja cuando quieras. Las bajadas se aplican al final de tu periodo.","Move up or down anytime. Downgrades apply at the end of your period.")+'</span></div>'+
+        '<span class="aj-tiers-sub">'+L("Sube o baja cuando quieras. Las bajadas se aplican al final de tu periodo.","Move up or down anytime. Downgrades apply at the end of your period.")+'</span>'+
+        '<div class="billing-toggle aj-cycle-toggle" role="group" style="margin:12px 0 2px;width:max-content">'+
+          '<button type="button" class="billing-toggle-opt'+(cyc==="month"?" on":"")+'" data-act="aj-cycle" data-cyc="month">'+L("Mensual","Monthly")+'</button>'+
+          '<button type="button" class="billing-toggle-opt'+(cyc==="year"?" on":"")+'" data-act="aj-cycle" data-cyc="year">'+L("Anual","Annual")+' <span class="billing-toggle-save">'+L("2 meses gratis","2 months free")+'</span></button>'+
+        '</div></div>'+
         '<div class="aj-tiers">'+grid+'</div></div>'+
     '</div>';
   }
@@ -8152,6 +8157,16 @@
     // Tarjeta de plan clicada: subir = checkout Whop del plan; Free = cancelar (acceso
     // hasta fin de periodo, reusa /cancel-subscription vía settingsCancelSub); bajar a un
     // plan de pago más barato = checkout del más barato (Whop hace el cambio).
+    if(act==="aj-cycle"){
+      // Toggle Mensual/Anual del grid «Cambiar de plan». Fija el ciclo del isla (display) y
+      // el billingCycle global de index.html (que usa subscribePlanFromCard en el checkout),
+      // para que lo que se muestra = lo que se cobra. Default anual (decisión negocio).
+      var c=(btn.getAttribute("data-cyc")==="month")?"month":"year";
+      S.ajCycle=c;
+      try{ if(typeof window.setBillingCycle==="function") window.setBillingCycle(c,"upgradeOverlay"); }catch(e){}
+      render();
+      return;
+    }
     if(act==="plan-pick"){
       var pk=k||btn.getAttribute("data-k"); var cur=_ajCurTier();
       if(!pk||pk===cur) return;
