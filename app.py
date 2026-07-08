@@ -10158,9 +10158,20 @@ def radar_suggestions():
                                        seen_ids=_sugg_seen_yesterday(uid, project_id),
                                        exclude_reel_ids=excl_reels)
         batch = pool[:SUGG_FREE_N]
+        # David 08/07: SUGERENCIAS 100% — NUNCA vacío donde el nicho tiene pool. Si lo fresco se
+        # agotó (servido-hoy), RECICLAMOS: 1º el pool solo-sin-robados (repites vistos-hoy antes que
+        # ver vacío), 2º último recurso el pool crudo. Solo queda vacío si el nicho NO tiene reels
+        # (→ populating/seed). El front puede marcar `recycled` para «mostrarlo diferente».
+        recycled = False
+        if not batch:
+            for _fb_excl in (_stolen_reel_ids(uid), set()):
+                _pool2 = _niche_suggestion_reels(subs, niche, exclude, SUGG_MAX_TOTAL,
+                                                 day_seed=_sugg_day_seed(uid, project_id),
+                                                 seen_ids=set(), exclude_reel_ids=_fb_excl)
+                if _pool2:
+                    pool = _pool2; batch = _pool2[:SUGG_FREE_N]; recycled = True; break
         has_more = len(pool) > SUGG_FREE_N   # frescos REALES restantes (excluidos ya fuera)
-        # Agotamiento honesto (contrato punto 5): 0 frescos AHORA pero el usuario YA vio algo hoy
-        # → «has visto todo lo fresco», no vacío mudo. (Sin nada servido aún ⇒ marca sin pool.)
+        # Agotamiento honesto: SOLO si tras reciclar sigue sin haber nada (nicho realmente sin reels).
         exhausted = (len(batch) == 0 and bool(excl_reels))
         _served_ids = [x.get("id") for x in batch]
         _sugg_record_served(uid, project_id, _served_ids)
@@ -10230,7 +10241,8 @@ def radar_suggestions():
                         "free_n": SUGG_FREE_N, "has_more": has_more, "exhausted": exhausted,
                         "more_units": SUGG_MORE_UNITS, "more_batch": SUGG_MORE_BATCH,
                         "possible_competitors": competitors,
-                        "pool_status": pool_status, "pool_refreshable": pool_refreshable}), 200
+                        "pool_status": pool_status, "pool_refreshable": pool_refreshable,
+                        "recycled": recycled}), 200
     except Exception:
         logger.warning("[sugg] radar_suggestions falló uid=%s pid=%s", uid, project_id, exc_info=True)
         return jsonify({"suggestions": [], "total": 0, "error": True}), 200
