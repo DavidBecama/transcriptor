@@ -1965,18 +1965,15 @@
       // Contrato punto 5: agotado de verdad → «has visto todo lo fresco» + CTA (no vacío mudo).
       // Sin agotar (cargando / pool sin nicho) → no se pinta (regla de vacíos).
       if(S._suggExhausted){
-        // #2 (David): esto refresca el POOL DE NICHO (sugerencias), NO tus competidores. Guardarraíl:
-        // botón de pago SOLO si un scrape del pool puede traer algo (pool_refreshable); si no, «vuelve
-        // mañana» SIN botón (no vender aire). El reembolso on-empty sigue de red de seguridad.
-        var _exhCta=S._suggPoolRefreshable
-          ? '<button class="stday-exh-cta" data-act="refresh-pool">'+IC.repeat+' '+L("Refrescar sugerencias · 5 créd.","Refresh suggestions · 5 cr")+'</button>'+
-            '<div class="stday-exh-sub">'+L("scrapeo lo último de tu nicho · o vuelve mañana (el pool se renueva solo)","pull the latest from your niche · or come back tomorrow (the pool refreshes on its own)")+'</div>'
-          : '<div class="stday-exh-sub">'+L("Vuelve mañana — el pool de tu nicho se renueva solo.","Come back tomorrow — your niche pool refreshes on its own.")+'</div>';
+        // David 08/07: FUERA el dead-end «vuelve mañana». Si de verdad no queda pool que rotar,
+        // ofrece AMPLIAR (Ver más · 3cr = scrapea competidores related NUEVOS; reembolso si 0).
         return '<section class="stday-sec">'+
           '<div class="stday-head"><span class="stday-t">'+IC.bolt+' '+L("Sugerencias de hoy","Today\'s suggestions")+'</span>'+_stdayMiniActs()+'</div>'+
           '<div class="stday-exhausted-full">'+
-            '<div class="stday-exh-t">'+L("Has visto todo lo fresco de hoy","You\'ve seen all today\'s fresh reels")+'</div>'+
-            _exhCta+
+            '<div class="stday-exh-t">'+L("Amplía tu nicho","Expand your niche")+'</div>'+
+            (S._suggScraping
+              ? '<div class="stday-exh-sub"><span class="rs-ldr"></span> '+L("Buscando competidores nuevos…","Finding new competitors…")+'</div>'
+              : '<button class="stday-exh-cta" data-act="sugg-more">'+IC.bolt+' '+L("Ver más · 3 créd — competidores nuevos","See more · 3 cr — new competitors")+'</button>')+
           '</div>'+
         '</section>';
       }
@@ -1986,21 +1983,18 @@
     // Contrato punto 5: si de verdad se agotó lo fresco → dilo + CTA (nunca repetir en silencio).
     // Si quedan frescos → «Ver más» DE PAGO (David 06/07): 3 créditos, tanda completa, cobro
     // DIRECTO sin modal; sin saldo → muro de recarga. Cero scrape (el pool ya está).
-    var moreCard=S._suggExhausted
-      ? '<div class="stday-card stday-exhausted">'+
-          '<span class="stday-exh-t">'+L("Has visto todo lo fresco de hoy","You\'ve seen all today\'s fresh reels")+'</span>'+
-          (S._suggPoolRefreshable   // #2: pago solo si el pool puede traer algo; si no, «vuelve mañana» sin botón
-            ? '<button class="stday-exh-cta" data-act="refresh-pool">'+IC.repeat+' '+L("Refrescar sugerencias · 5 créd.","Refresh suggestions · 5 cr")+'</button>'+
-              '<span class="stday-exh-sub">'+L("o vuelve mañana","or come back tomorrow")+'</span>'
-            : '<span class="stday-exh-sub">'+L("vuelve mañana — el pool se renueva solo","come back tomorrow — the pool refreshes on its own")+'</span>')+
-        '</div>'
-      : (S._suggHasMore
-        ? '<button class="stday-card stday-morecard" data-act="sugg-more" data-offset="'+list.length+'">'+
-            '<span class="stday-more-ic">'+IC.bolt+'</span>'+
-            '<span class="stday-more-t">'+L("Ver más","See more")+'</span>'+
-            '<span class="stday-more-c">'+L("3 créditos","3 credits")+'</span>'+
-          '</button>'
-        : '');
+    // David 08/07: FUERA el dead-end «vuelve mañana». Un solo control: «Ver más · 3cr» = AMPLÍA
+    // scrapeando competidores related NUEVOS (no recicla; la rotación gratis es automática). Si no
+    // hay nada nuevo que scrapear → el server no cobra y avisa. Estado de carga mientras scrapea.
+    var moreCard=S._suggScraping
+      ? '<div class="stday-card stday-morecard stday-morecard--loading"><span class="rs-ldr"></span>'+
+          '<span class="stday-more-t">'+L("Ampliando…","Expanding…")+'</span>'+
+          '<span class="stday-more-c">'+L("buscando competidores nuevos","finding new competitors")+'</span></div>'
+      : '<button class="stday-card stday-morecard" data-act="sugg-more">'+
+          '<span class="stday-more-ic">'+IC.bolt+'</span>'+
+          '<span class="stday-more-t">'+L("Ver más","See more")+'</span>'+
+          '<span class="stday-more-c">'+L("3 créd · nuevos","3 cr · new")+'</span>'+
+        '</button>';
     var arrows='<div class="stday-arrows">'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="prev" aria-label="'+L("Anterior","Previous")+'">'+IC.arrL+'</button>'+
       '<button class="stday-arrow" data-act="stday-scroll" data-dir="next" aria-label="'+L("Siguiente","Next")+'">'+IC.arr+'</button>'+
@@ -2026,7 +2020,9 @@
   // Acciones de cabecera de «Sugerencias de hoy»: «↻ otras» (re-baraja GRATIS, sin scrape) +
   // «✎ nicho» (editar nicho de la marca SIEMPRE) + «Ocultar». Compartidas por los 3 estados.
   function _stdayMiniActs(){
-    return '<button class="stday-mini" data-act="reshuffle-sugg" title="'+L("Baraja otras del mismo nicho — gratis, sin scrape","Shuffle others from the same niche — free, no scrape")+'">'+IC.repeat+' '+L("otras","others")+'</button>'+
+    // David 08/07: fuera «↻ otras» — la rotación gratis es AUTOMÁTICA (day_seed franja + reciclado).
+    // El único control de ampliar es «Ver más · 3cr» (scrapea related nuevo).
+    return ''+
       '<button class="stday-mini" data-act="set-brand-niche" title="'+L("Editar el nicho de esta marca","Edit this brand\'s niche")+'">'+IC.gear+' '+L("nicho","niche")+'</button>'+
       '<button class="sugg-hide" data-act="st-dismiss-all">'+L("Ocultar","Hide")+'</button>';
   }
@@ -4451,6 +4447,25 @@
       if(d.state==="error"){ loadBrandData(); return; }
       if(tries<20){ setTimeout(function(){ _pollRefreshOutcome(tid, tries+1); }, 3000); }
       else { loadBrandData(); }   // timeout de seguridad (~60s)
+    });
+  }
+  // «Ver más · 3cr»: poll del scrape de related. En éxito repinta SOLO las sugerencias (los
+  // nuevos related van arriba por RELATED_BOOST). Reembolso/cobro los resuelve finalize.
+  function _pollSuggMore(tid, tries){
+    tries=tries||0;
+    apiGet("/task/refresh/"+encodeURIComponent(tid)).then(function(r){
+      var d=(r&&r.d)||{};
+      if(d.state==="success"){
+        S._suggScraping=false;
+        try{ refreshCredits(); }catch(e){}
+        if((d.new_count||0)>0){ showToast(L("+"+d.new_count+" en tus sugerencias","+"+d.new_count+" in your suggestions")); }
+        else { showToast(L("Sin nada nuevo ahora — no te cobro.","Nothing new now — not charged.")); }
+        S._suggToday=undefined; S._stLoading=false; loadSuggestionsToday();   // repinta con los nuevos arriba
+        return;
+      }
+      if(d.state==="error"){ S._suggScraping=false; S._suggToday=undefined; S._stLoading=false; loadSuggestionsToday(); return; }
+      if(tries<24){ setTimeout(function(){ _pollSuggMore(tid, tries+1); }, 3000); }
+      else { S._suggScraping=false; S._suggToday=undefined; S._stLoading=false; loadSuggestionsToday(); }   // timeout ~72s
     });
   }
   function refreshRadar(){
@@ -8014,33 +8029,27 @@
       }).catch(function(){ S._suggReloading=false; showError(L("No pude traer otras.","Couldn't fetch others.")); });
       return;
     }
-    if(act==="sugg-more"){   // «Ver más» DE PAGO (David 06/07): la tanda inicial (8) es gratis;
-      // cada «Ver más» = COST.suggmore créditos y trae una tanda COMPLETA. Cobro DIRECTO, sin
-      // modal. Sin saldo → muro de recarga. Cero scrape (el pool ya está); nunca repite.
+    if(act==="sugg-more"){   // «Ver más · 3cr» (David 08/07): AMPLÍA scrapeando related NUEVO (async
+      // Apify). NO recicla ni pagina (eso es gratis/automático). Reembolso si 0 nuevo (server,
+      // finalize). Un solo botón (fuera «↻ otras»). El scroll del bug queda resuelto: al aterrizar
+      // los nuevos van ARRIBA (RELATED_BOOST), así que el carrusel ya muestra lo nuevo al inicio.
       if(isDemo()) return;
-      if(S._suggMoreLoading) return;   // anti doble-clic
-      if((S.user.credits||0) < COST.suggmore){ return showPaywall("no_credits"); }   // muro de recarga
-      S._suggMoreLoading=true;
-      var _mp=_pidOf(S.brandId), _off=parseInt(btn.getAttribute("data-offset")||"8",10)||8;
-      showToast(L("Trayendo más…","Loading more…"));
-      apiPost("/api/radar/suggestions/more", _mp?{project_id:_mp, offset:_off}:{offset:_off}).then(function(r){
+      if(S._suggMoreLoading || S._suggScraping) return;   // anti doble-clic
+      if((S.user.credits||0) < COST.suggmore){ return showPaywall("no_credits"); }
+      S._suggMoreLoading=true; S._suggScraping=true; render();
+      var _mp=_pidOf(S.brandId);
+      showToast(L("Ampliando · buscando competidores nuevos de tu nicho…","Expanding · finding new competitors in your niche…"));
+      apiPost("/api/radar/suggestions/more", _mp?{project_id:_mp}:{}).then(function(r){
         S._suggMoreLoading=false;
-        if(r.status===402 || (r.d&&r.d.error==="no_credits")){ return showPaywall("no_credits"); }
-        if(!r.ok||!r.d){ return showError(L("No pude traer más.","Couldn't load more.")); }
-        var got=(Array.isArray(r.d.suggestions)?r.d.suggestions:[]).map(_normSugg);
-        // DEDUP DURO por id contra lo ya cargado (contrato: ningún reel dos veces en pantalla).
-        var have={}; (Array.isArray(S._suggToday)?S._suggToday:[]).forEach(function(x){ if(x&&x.id) have[x.id]=1; });
-        got=got.filter(function(x){ return x&&x.id&&!have[x.id]; });
-        if(got.length){ S._suggToday=(Array.isArray(S._suggToday)?S._suggToday:[]).concat(got); }
-        // El backend es la fuente de verdad del saldo: sincroniza siempre; anima el gasto solo
-        // si de verdad se cobró (trajo reels; agotado no cobra y no manda credits).
-        if(r.d.credits!=null){ applyCredits(r.d, got.length?COST.suggmore:0); }
-        S._suggHasMore=!!r.d.has_more;
-        S._suggExhausted=!!r.d.exhausted;   // agotado → la card de agotamiento sustituye a «Ver más»
-        render();
-        // Tras el re-render el carrusel vuelve al inicio → desplazo para revelar las nuevas.
-        if(got.length){ try{ var _rw=(root()||document).querySelector(".stday-row"); if(_rw) _rw.scrollTo({left:_rw.scrollWidth, behavior:"smooth"}); }catch(e){} }
-      });
+        if(r.status===402 || (r.d&&r.d.error==="no_credits")){ S._suggScraping=false; render(); return showPaywall("no_credits"); }
+        if(r.status===429 || (r.d&&r.d.cooldown)){ S._suggScraping=false; render(); return showError((r.d&&r.d.message)||L("Acabas de ampliar. Prueba en un momento.","You just expanded. Try again shortly.")); }
+        if(r.d && r.d.nothing_new){ S._suggScraping=false; render(); return showToast(L("No hay competidores nuevos que traer ahora. Rotamos gratis lo que ya tienes.","No new competitors to pull now. We rotate what you have for free.")); }
+        if(!r.ok||!r.d){ S._suggScraping=false; render(); return showError(L("No pude ampliar.","Couldn't expand.")); }
+        try{ refreshCredits(); }catch(e){}   // cobrado; finalize reembolsa si 0 nuevo
+        var tid=(r.d.refresh_task_id)||null, n=(r.d.queued)||0;
+        if(tid && n){ _pollSuggMore(tid); }
+        else { S._suggScraping=false; S._suggToday=undefined; S._stLoading=false; setTimeout(loadSuggestionsToday,300); }
+      }).catch(function(){ S._suggMoreLoading=false; S._suggScraping=false; render(); showError(L("No pude ampliar.","Couldn't expand.")); });
       return;
     }
     if(act==="close-reel-detail"){ S.detailReelId=null; return render(); }   // #4: cerrar panel/overlay del detalle
@@ -8431,7 +8440,7 @@
     try{ window.RS_reloadRadar=loadBrandData; }catch(e){}   // puente: el chrome legacy recarga el Radar tras añadir competidor
     S.creatorFilter=null; S.creatorReels=null; S.detailReelId=null;   // A+B: al cambiar de marca no arrastres la vista de otro competidor
     S._lbReal=null;   // ranking por-marca: fuerza recarga de /api/leaderboard de ESTA marca (no caché de la anterior)
-    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false; S._suggExhausted=false; S._suggRecycled=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
+    S._suggToday=undefined; S._stLoading=false; S._stDismissed=false; S._suggNeedsNiche=false; S._suggExhausted=false; S._suggScraping=false; S._suggRecycled=false;   // sugerencias POR MARCA: recarga para el nicho de ESTA marca
     S._suggPoolStatus=''; S._suggPollN=0; _clearSuggPoll();   // resetea el poll de «poblando» al cambiar de marca
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");   // grid rail+work YA en el skeleton (si no, el rail sale centrado sobre negro)
     // Onboarding pendiente (o demo ?onb=1) → loader full-screen limpio, sin que asome la
