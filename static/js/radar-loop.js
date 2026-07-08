@@ -8028,6 +8028,7 @@
         if(r.status===402 || (r.d&&r.d.error==="no_credits")){ return showPaywall("no_credits"); }
         if(!r.ok||!r.d){ return showError(L("No pude traer más.","Couldn't load more.")); }
         var got=(Array.isArray(r.d.suggestions)?r.d.suggestions:[]).map(_normSugg);
+        var _oldN=(Array.isArray(S._suggToday)?S._suggToday.length:0);   // bug UI: índice del 1er reel NUEVO
         // DEDUP DURO por id contra lo ya cargado (contrato: ningún reel dos veces en pantalla).
         var have={}; (Array.isArray(S._suggToday)?S._suggToday:[]).forEach(function(x){ if(x&&x.id) have[x.id]=1; });
         got=got.filter(function(x){ return x&&x.id&&!have[x.id]; });
@@ -8038,8 +8039,14 @@
         S._suggHasMore=!!r.d.has_more;
         S._suggExhausted=!!r.d.exhausted;   // agotado → la card de agotamiento sustituye a «Ver más»
         render();
-        // Tras el re-render el carrusel vuelve al inicio → desplazo para revelar las nuevas.
-        if(got.length){ try{ var _rw=(root()||document).querySelector(".stday-row"); if(_rw) _rw.scrollTo({left:_rw.scrollWidth, behavior:"smooth"}); }catch(e){} }
+        // Bug UI (David 08/07): tras el re-render el carrusel volvía al INICIO y parecía que no
+        // funcionó. Difiero al paint (rAF) y hago scroll al PRIMER reel NUEVO (no al final).
+        if(got.length){ requestAnimationFrame(function(){ try{
+          var _rw=(root()||document).querySelector(".stday-row"); if(!_rw) return;
+          var _cards=_rw.querySelectorAll(".stday-card:not(.stday-morecard)");
+          var _first=_cards[_oldN];
+          _rw.scrollTo({left:(_first?Math.max(0,_first.offsetLeft-24):_rw.scrollWidth), behavior:"smooth"});
+        }catch(e){} }); }
       });
       return;
     }
