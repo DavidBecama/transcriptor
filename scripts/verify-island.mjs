@@ -457,29 +457,23 @@ async function main() {
   check("refresh sin novedades: créditos sin cambio (no cobra por vacío)",
         credBefore !== null && refreshOut.creds === credBefore, `${credBefore} -> ${refreshOut.creds}`);
 
-  /* ═══ Contrato David #2 · «Refrescar sugerencias» guardarraíl (nunca vender aire) ═══
-     Estado agotado del carrusel: el botón de PAGO «Refrescar sugerencias 5cr» solo aparece si el
-     pool puede traer algo (?sugg=exhausted); si no (?sugg=exhausted-norefresh) → «vuelve mañana»
-     SIN botón de pago. Rojo si vende aire (botón de pago cuando no hay nada que refrescar). */
-  console.log("\n■ Refrescar sugerencias · guardarraíl anti-vender-aire");
-  await nav(`${BASE}/profile/radar?plan=creador&sugg=exhausted`);
-  const exhRefreshable = await evaluate(`(function(){
-    var root=document.querySelector('#radarRoot');
-    return { payBtn: !!root.querySelector('[data-act="refresh-pool"]'),
-             compBtn: !!root.querySelector('.stday-sec [data-act="refresh-radar"]'),
-             txt: (root.textContent.match(/Has visto todo lo fresco/)||[])[0]||'' };
-  })()`);
-  check("agotado + pool refrescable: ofrece «Refrescar sugerencias» (pool, no competidores)",
-        exhRefreshable.payBtn && !exhRefreshable.compBtn, JSON.stringify(exhRefreshable));
-  await nav(`${BASE}/profile/radar?plan=creador&sugg=exhausted-norefresh`);
-  const exhHonest = await evaluate(`(function(){
-    var root=document.querySelector('#radarRoot');
-    var sec=root.querySelector('.stday-sec');
-    return { payBtn: !!root.querySelector('[data-act="refresh-pool"]'),
-             honest: /vuelve mañana|come back tomorrow/i.test((sec&&sec.textContent)||'') };
-  })()`);
-  check("agotado + pool NO refrescable: «vuelve mañana» SIN botón de pago (no vender aire)",
-        !exhHonest.payBtn && exhHonest.honest, JSON.stringify(exhHonest));
+  /* ═══ Contrato David 08/07 · sugerencias NUNCA dead-end ═══
+     Estado agotado del carrusel: FUERA el dead-end «vuelve mañana» y el «Refrescar sugerencias 5cr».
+     Único control de ampliar = «Ver más · 3cr» (data-act=sugg-more, scrapea competidores related
+     NUEVOS; reembolso si 0). Rojo si aparece el dead-end o el viejo refresh-pool. */
+  console.log("\n■ Sugerencias agotadas · sin dead-end, ofrece «Ver más · 3cr»");
+  for (const q of ["sugg=exhausted", "sugg=exhausted-norefresh"]) {
+    await nav(`${BASE}/profile/radar?plan=creador&${q}`);
+    const exh = await evaluate(`(function(){
+      var root=document.querySelector('#radarRoot');
+      var sec=root.querySelector('.stday-sec');
+      return { moreBtn: !!root.querySelector('[data-act="sugg-more"]'),
+               oldPay: !!root.querySelector('[data-act="refresh-pool"]'),
+               deadEnd: /vuelve mañana|come back tomorrow/i.test((sec&&sec.textContent)||'') };
+    })()`);
+    check(`${q}: ofrece «Ver más · 3cr» y NO dead-end/refresh-pool`,
+          exh.moreBtn && !exh.oldPay && !exh.deadEnd, JSON.stringify(exh));
+  }
 
   /* ═══ Feature David · «Guardar idea con datos» (de pago, junto a «Robar guion») ═══
      Botón hermano de «Robar» que guarda el reel + datos sin generar guión. Rojo si no aparece

@@ -197,6 +197,7 @@ SUGG_FREE_N               = int(os.environ.get("SUGG_FREE_N", "8"))    # reels g
 SUGG_MORE_BATCH           = int(os.environ.get("SUGG_MORE_BATCH", "8"))  # tanda de «ver más» (completa, como la inicial)
 SUGG_MORE_UNITS           = int(os.environ.get("SUGG_MORE_UNITS", "3"))  # 3 créditos/tanda de «ver más»
 SUGG_MORE_COST            = SUGG_MORE_UNITS * COST_CENTS
+SUGG_MORE_COOLDOWN_S      = int(os.environ.get("SUGG_MORE_COOLDOWN_S", "60"))  # anti doble-cobro del «Ver más» (scrape)
 SUGG_MAX_TOTAL            = int(os.environ.get("SUGG_MAX_TOTAL", "40"))  # techo absoluto del carrusel
 # Si el overlap FUERTE de subnichos da menos de esto (reels que pasan el listón), top-up por
 # nicho canónico amplio → volumen para ROTAR de verdad (fix 05/07: IA daba 7 reels fuertes y
@@ -10286,48 +10287,132 @@ def radar_reshuffle():
     return jsonify({"ok": True, "queued": 0, "nonce": nonce, "message": "Otras sugerencias."}), 200
 
 
+def _related_to_scrape(niche, subs):
+    """«Ver más · 3cr» (David 08/07): related (relatedProfiles del grafo REAL de IG) on-niche que
+    aún NO se han scrapeado o están stale (>POOL_REFRESH_MIN_AGE_H) → un scrape trae reels NUEVOS.
+    Cap PER_USER_REFRESH_CAP. Vacío ⇒ nada nuevo → «Ver más» NO cobra (no vender aire)."""
+    subs_n = [t for t in (_norm_tag(s) for s in (subs or [])) if t][:16]
+    nnorm = _norm_tag(niche or "")
+    if nnorm and nnorm not in subs_n:
+        subs_n = [nnorm] + subs_n
+    if not subs_n:
+        return []
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=POOL_REFRESH_MIN_AGE_H)).isoformat()
+    try:
+        rows = (db.table("creators_global").select("id, last_scraped_at, scrape_status")
+                  .eq("niche_source", "related").overlaps("subniches", subs_n)
+                  .limit(200).execute()).data or []
+    except Exception:
+        logger.warning("[suggmore] related read failed", exc_info=True)
+        return []
+    out = []
+    for c in rows:
+        if c.get("scrape_status") in ("private", "not_found", "scraping"):
+            continue
+        last = c.get("last_scraped_at")
+        if not last or str(last) < cutoff:   # nunca scrapeado o stale → puede traer nuevo
+            out.append(c["id"])
+    return out[:PER_USER_REFRESH_CAP]
+
+
 @app.route("/api/radar/suggestions/more", methods=["POST"])
 @require_auth
 @limiter.limit("20 per minute")
 def radar_suggestions_more():
-    """«Ver más» del carrusel: pagina el pool YA scrapeado. GRATIS y SIN modal. Devuelve SOLO
-    reels frescos (exclusión DURA de servidos-hoy + robados → contrato «no repetir en sesión»);
-    cuando no quedan frescos → `exhausted:True`, jamás repite. El offset del cliente ya no
-    gobierna nada (la exclusión por id sí): se ignora salvo para telemetría."""
+    """«Ver más · 3cr» (David 08/07): AMPLÍA scrapeando related (relatedProfiles) aún sin reels
+    frescos → contenido NUEVO real, más relevante. NO recicla ni pagina (eso es gratis/automático).
+    Async (Apify lento): chord scrape + finalize con REEMBOLSO on-empty (no vender aire). Si no hay
+    related que scrapear → NO cobra. Cooldown por (user,nicho). «Refrescar competidores 5cr»
+    (radar_refresh_pool) es OTRA acción, intacta. [Espejo del path de dinero de refresh_pool.]"""
     user = current_user()
     uid = user["id"]
+    email = (user.get("email") or "").lower()
     body = request.get_json(silent=True) or {}
     project_id = body.get("project_id") or None
+    is_courtesy = email in UNLIMITED_EMAILS
     niche, subs = _resolve_brand_niche(uid, project_id)
     if not subs and not niche:
         return jsonify({"ok": False, "error": "no_niche"}), 400
-    exclude = _sugg_exclude(uid, project_id)
-    # EXCLUSIÓN DURA por id: servidos HOY (GET + tandas previas) ∪ robados → nunca se repiten.
-    excl_reels = _sugg_seen_today(uid, project_id) | _stolen_reel_ids(uid)
-    # +1 sobre el batch para saber si quedan MÁS frescos tras esta tanda (has_more real).
-    batch = _niche_suggestion_reels(subs, niche, exclude, SUGG_MORE_BATCH + 1,
-                                    day_seed=_sugg_day_seed(uid, project_id),
-                                    seen_ids=_sugg_seen_yesterday(uid, project_id),
-                                    exclude_reel_ids=excl_reels)
-    reels = batch[:SUGG_MORE_BATCH]
-    if not reels:
-        # Contrato punto 5: agotado de verdad → dilo, no repitas. NO se cobra (agotamiento honesto).
-        return jsonify({"ok": True, "suggestions": [], "has_more": False, "exhausted": True}), 200
-    # «Ver más» DE PAGO (David 06/07): la tanda inicial es gratis; cada «Ver más» cuesta
-    # SUGG_MORE_UNITS créditos. Solo se cobra AQUÍ, cuando hay reels frescos que entregar (si
-    # está agotado, arriba, es gratis). Cero scrape (el pool ya está). Sin saldo → 402 (muro).
-    err, _refund, _st = _charge_units_locked(uid, SUGG_MORE_UNITS, user)
-    if err:
-        return err
-    _more_ids = [x.get("id") for x in reels]
-    _sugg_record_served(uid, project_id, _more_ids)
-    _pretranscribe_served(_more_ids)   # PERF #2: transcribe en bg también las tandas de «ver más»
-    track_event("sugg_more", uid, {"project_id": project_id, "n": len(reels), "units": SUGG_MORE_UNITS})
-    # has_more real: el probe (+1) trajo más que la tanda → quedan frescos tras cobrar. Si no,
-    # la siguiente vista muestra la card de agotamiento (no un botón de pago que lleva a vacío).
-    return jsonify({"ok": True, "suggestions": reels,
-                    "has_more": len(batch) > SUGG_MORE_BATCH, "exhausted": False,
-                    "more_batch": SUGG_MORE_BATCH, **_credits_display(uid)}), 200
+    pn = _pool_niche_canon(niche or "") or (_norm_tag(niche or "") or "_")
+    to_scrape = _related_to_scrape(niche, subs)
+    if not to_scrape:
+        # Nada NUEVO que traer → NO se cobra (la rotación/reciclado gratis ya cubre «nunca vacío»).
+        return jsonify({"ok": True, "queued": 0, "exhausted": True, "nothing_new": True, "charged": False}), 200
+
+    cd_key = "suggmore:%s:%s" % (uid, pn)
+    if not is_courtesy and rds is not None:
+        try:
+            ttl = rds.ttl(cd_key)
+        except Exception:
+            ttl = -2
+        if ttl and ttl > 0:
+            return jsonify({"ok": False, "cooldown": True, "retry_after_s": int(ttl),
+                            "message": "Acabas de ampliar. Vuelve en %s." % _fmt_cooldown(ttl)}), 429
+
+    profile = get_profile(uid)
+    plan = profile.get("plan", "free")
+    is_paid_unlimited = plan in ("pro", "creator", "estudio", "agency")
+    charged_amount = 0
+    charge_id = _uuid.uuid4().hex
+    if not is_courtesy:
+        if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SUGG_MORE_COST:
+            return jsonify({"error": "no_credits",
+                            "message": "Necesitas %d créditos para ver más." % SUGG_MORE_UNITS}), 402
+        tok = acquire_credit_lock(uid)
+        if tok is None:
+            return jsonify({"error": "busy", "message": "Otra operación en curso. Inténtalo de nuevo."}), 409
+        try:
+            profile = get_profile(uid)
+            if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SUGG_MORE_COST:
+                return jsonify({"error": "no_credits", "message": "Sin créditos suficientes."}), 402
+            if rds is not None:
+                try:
+                    got = rds.set(cd_key, "1", nx=True, ex=SUGG_MORE_COOLDOWN_S)
+                except Exception:
+                    got = True
+                if not got:
+                    return jsonify({"ok": False, "cooldown": True, "retry_after_s": SUGG_MORE_COOLDOWN_S,
+                                    "message": "Acabas de ampliar. Vuelve en un momento."}), 429
+            try:
+                if is_paid_unlimited:
+                    db.table("profiles").update({
+                        "monthly_usage": (profile.get("monthly_usage") or 0) + SUGG_MORE_UNITS
+                    }).eq("id", uid).execute()
+                    charged_amount = SUGG_MORE_UNITS
+                else:
+                    db.table("profiles").update({
+                        "credits_cents": (profile.get("credits_cents") or 0) - SUGG_MORE_COST
+                    }).eq("id", uid).execute()
+                    charged_amount = SUGG_MORE_COST
+            except Exception as e:
+                logger.error("suggmore: charge failed uid=%s: %s", uid, e, exc_info=True)
+                if rds is not None:
+                    try:
+                        rds.delete(cd_key)
+                    except Exception:
+                        pass
+                return jsonify({"ok": False, "message": "No pude cobrar. Inténtalo de nuevo."}), 500
+        finally:
+            release_credit_lock(uid, tok)
+
+    # Chord: scrape de los related + finalize con REEMBOLSO on-empty (finalize_manual_refresh
+    # reembolsa si el scrape no deja reels ≤14d sin robar que servir → «no vender aire»).
+    refresh_task_id = None
+    try:
+        from tasks import scrape_creator_task, finalize_manual_refresh
+        from celery import chord, group
+        _chord_res = chord(group(scrape_creator_task.s(c) for c in to_scrape))(
+            finalize_manual_refresh.s(uid, project_id, charged_amount, is_paid_unlimited, charge_id, pn))
+        refresh_task_id = getattr(_chord_res, "id", None)
+    except Exception as e:
+        logger.error("suggmore: chord enqueue failed uid=%s: %s", uid, e, exc_info=True)
+        _refresh_now_refund(uid, charged_amount, is_paid_unlimited, cd_key)
+        return jsonify({"ok": False, "message": "No pude ampliar. Inténtalo de nuevo."}), 500
+
+    track_event("sugg_more_scrape", uid,
+                {"queued": len(to_scrape), "charged": charged_amount, "niche": pn, "project_id": project_id})
+    return jsonify({"ok": True, "queued": len(to_scrape), "charged": bool(charged_amount),
+                    "refresh_task_id": refresh_task_id, **_credits_display(uid)}), 200
 
 
 @app.route("/api/niche/subniche-suggestions", methods=["GET"])
