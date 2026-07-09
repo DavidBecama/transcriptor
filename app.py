@@ -6844,6 +6844,143 @@ def idea_to_script(idea_id):
     return jsonify({"script": result, "idea_id": idea_id, "script_id": script_id})
 
 
+# ── Bucle robar→desarrollar: DESARROLLAR una idea robada (guion, 3 cr, async + cola) ──
+# El estado transitorio «en cola/desarrollando» vive en REDIS (no en ideas.status: su CHECK
+# solo admite draft/developed/scripted/draft_suggested → no meto un valor nuevo ni migro).
+# La idea queda 'draft' mientras se desarrolla y pasa a 'scripted' cuando el guion aterriza.
+_DEV_MARK_TTL = 900   # 15 min: cubre un desarrollo (40-90s) + margen; la task lo limpia al terminar.
+def _dev_mark_key(idea_id):
+    return "rs:dev:" + str(idea_id)
+def _dev_in_flight(idea_id):
+    try:
+        return bool(rds and rds.exists(_dev_mark_key(idea_id)))
+    except Exception:
+        return False
+def _dev_mark_set(idea_id):
+    try:
+        if rds:
+            rds.setex(_dev_mark_key(idea_id), _DEV_MARK_TTL, "1")
+    except Exception:
+        pass
+def _dev_mark_clear(idea_id):
+    try:
+        if rds:
+            rds.delete(_dev_mark_key(idea_id))
+    except Exception:
+        pass
+
+
+@app.route("/ideas/<idea_id>/develop-script", methods=["POST"])
+@require_auth
+@limiter.limit("15 per minute")
+def idea_develop_script(idea_id):
+    """DESARROLLAR (nuevo bucle): encola la generación del guion de una idea ROBADA. Cobra
+    3 cr AL ENCOLAR (decisión David) y reembolsa si la task falla. Async + ENCOLABLE: el
+    usuario desarrolla varias y salen una a una (flash) sin bloquear. Sin saldo → 402 (no
+    encola). Distinto de /develop (fleshear draft→developed, 1 cr) y de /to-script (guion
+    SÍNCRONO): este es el desarrollar-guion del bucle, en cola. El front pollea /develop-status."""
+    user = current_user()
+    uid = user["id"]
+    try:
+        row = db.table("ideas").select("*").eq("id", idea_id).eq("user_id", uid).single().execute()
+        idea = row.data
+    except Exception:
+        idea = None
+    if not idea:
+        return jsonify({"error": "not_found"}), 404
+
+    # Ya en cola / desarrollando → idempotente (no re-cobra ni duplica el encolado).
+    if _dev_in_flight(idea_id):
+        return jsonify({"ok": True, "queued": True, "already": True, "idea_id": idea_id}), 200
+
+    body = request.get_json(silent=True) or {}
+    profile = get_profile(uid)
+    is_paid_unlimited = paid_features_active(profile, user)
+
+    # Tope diario FREE = DESARROLLOS (David): se cuenta por guiones creados hoy (trial_scripts_today
+    # cuenta filas en `scripts`). Robar solo crea `ideas` → no cuenta. Nada que sumar aquí.
+    if not is_paid_unlimited and trial_scripts_today(uid) >= FREE_DAILY_SCRIPTS:
+        return jsonify({"error": "daily_limit",
+                        "message": "Has desarrollado tus " + str(FREE_DAILY_SCRIPTS) +
+                                   " guiones de hoy. Vuelve mañana o sube de plan."}), 402
+
+    # Resolver asistente → style/custom/label (idéntico a idea_to_script: body > idea > default).
+    assistant_id = body.get("assistant_id") or idea.get("assistant_id")
+    if not assistant_id and profile.get("default_idea_assistant"):
+        assistant_id = profile["default_idea_assistant"]
+    style_arg, custom_prompt, style_label = "viral", "", "viral"
+    if assistant_id in _BUILTIN_SCRIPT_STYLES:
+        style_arg = style_label = assistant_id
+    elif assistant_id:
+        try:
+            ar = db.table("assistants").select("name, instructions").eq("id", assistant_id).eq("user_id", uid).execute()
+            if ar.data and ar.data[0].get("instructions"):
+                style_arg = "custom"
+                custom_prompt = ar.data[0]["instructions"]
+                style_label = ar.data[0].get("name") or "custom"
+        except Exception as e:
+            logger.warning("idea_develop_script: asst lookup failed user=%s asst=%s err=%s", uid, assistant_id, e)
+    if _custom_too_short(style_arg, custom_prompt):
+        return _assistant_too_short_response(style_label)
+
+    # COBRAR AL ENCOLAR (3 cr). El refund cross-process (si la task falla) usa `state`.
+    err, refund, state = _charge_units_locked(uid, SCRIPT_UNITS, user)
+    if err:
+        return err
+
+    # Marca «en vuelo» (Redis) + encola. Si el enqueue falla, refund inmediato + limpia marca.
+    _dev_mark_set(idea_id)
+    try:
+        from tasks import develop_idea_task  # noqa: E402
+        language = (body.get("language") or request.accept_languages.best_match(["es", "en"]) or "es")
+        develop_idea_task.delay(idea_id, uid, style_arg, custom_prompt, style_label, language,
+                                state.get("mode", "free"), state.get("units", SCRIPT_UNITS),
+                                state.get("credits_charged", 0))
+    except Exception as e:
+        logger.error("idea_develop_script: enqueue failed idea=%s user=%s err=%s", idea_id, uid, e, exc_info=True)
+        _dev_mark_clear(idea_id)
+        refund()
+        return jsonify({"error": "internal", "message": "No pude encolar el desarrollo. Inténtalo de nuevo."}), 500
+
+    # Activación (David: medir AMBOS). El 1.er desarrollo = North Star (activación fuerte).
+    try:
+        from emails import track as _ph_track
+        _nth = (db.table("scripts").select("id", count="exact").eq("user_id", uid).execute()).count or 0
+        _ph_track("develop_enqueued", uid, {"idea_id": idea_id, "nth": _nth})
+        if _nth == 0:
+            _ph_track("activated_develop", uid, {"idea_id": idea_id})
+    except Exception:
+        pass
+
+    return jsonify({"ok": True, "queued": True, "idea_id": idea_id, **_credits_display(uid)}), 200
+
+
+@app.route("/ideas/<idea_id>/develop-status", methods=["GET"])
+@require_auth
+@limiter.limit("120 per minute")
+def idea_develop_status(idea_id):
+    """Estado del desarrollo de una idea, DERIVADO en el server (reload-safe) para la cola del
+    front: 'ready' (+script_id) si ya aterrizó el guion · 'developing' si sigue en la cola/marca
+    Redis · 'idle' si aún no se ha desarrollado (o falló y se reembolsó → sin guion, sin marca)."""
+    user = current_user()
+    uid = user["id"]
+    try:
+        row = db.table("ideas").select("id, status").eq("id", idea_id).eq("user_id", uid).single().execute()
+        idea = row.data
+    except Exception:
+        idea = None
+    if not idea:
+        return jsonify({"error": "not_found"}), 404
+    try:
+        sr = (db.table("scripts").select("id").eq("user_id", uid).eq("idea_id", idea_id)
+                .order("created_at", desc=True).limit(1).execute())
+        if sr.data:
+            return jsonify({"status": "ready", "script_id": sr.data[0]["id"]}), 200
+    except Exception:
+        pass
+    return jsonify({"status": ("developing" if _dev_in_flight(idea_id) else "idle")}), 200
+
+
 # ── v0.14.30: Guionizar desde Transcripción ───────────────────────────────
 
 @app.route("/transcriptions/<int:t_id>/to-script", methods=["POST"])
@@ -12096,7 +12233,7 @@ def save_reel_with_data(reel_id: str):
         existing = (db.table("ideas").select("id, title")
                       .eq("user_id", uid).eq("inspired_by_id", reel_id)
                       .eq("inspired_by_type", "reel").eq("source", "reel_with_data")
-                      .in_("status", ["draft", "developed"]).limit(1).execute())
+                      .in_("status", ["draft", "developed", "scripted"]).limit(1).execute())
         if existing.data:
             return jsonify({"ok": True, "idea_id": existing.data[0]["id"],
                             "title": existing.data[0].get("title"),
@@ -12165,6 +12302,12 @@ def save_reel_with_data(reel_id: str):
     try:
         from emails import track as _ph_track
         _ph_track("idea_saved_with_data", uid, {"reel_id": reel_id, "has_transcript": transcript_ok})
+        # Activación (David: medir AMBOS). ROBAR = activación LIGERA. 1.er robo → activated_rob.
+        _nrob = (db.table("ideas").select("id", count="exact")
+                   .eq("user_id", uid).eq("source", "reel_with_data").execute()).count or 0
+        _ph_track("reel_robbed", uid, {"reel_id": reel_id, "nth": max(0, _nrob - 1)})
+        if _nrob <= 1:
+            _ph_track("activated_rob", uid, {"reel_id": reel_id})
     except Exception:
         pass
     return jsonify({"ok": True, "idea_id": idea_id, "title": title, "already_exists": False,
