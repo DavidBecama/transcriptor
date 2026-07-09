@@ -4365,6 +4365,24 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   } catch(e){}
 
+  // P0.2 (cacería «reloads random»): registra si ESTA carga fue una recarga real de página
+  // (no navegación SPA) con ruta + user-agent + si venía de background. Sin telemetría no
+  // sabemos si los reloads que reportan son reales ni dónde; la hipótesis es tab-discard en
+  // móvil / presión de memoria del WebGL del Cerebro. Los datos de prod lo confirmarán.
+  try {
+    const _nav = (performance.getEntriesByType && performance.getEntriesByType("navigation")[0]) || null;
+    const _navType = _nav ? _nav.type : ((performance.navigation && performance.navigation.type === 1) ? "reload" : "");
+    if (_navType === "reload" && window.posthog && window.posthog.capture) {
+      window.posthog.capture("page_reloaded", {
+        path: location.pathname,
+        referrer: document.referrer || "",
+        ua: navigator.userAgent,
+        viewport: window.innerWidth + "x" + window.innerHeight,
+        was_hidden: document.visibilityState === "hidden",
+      });
+    }
+  } catch (e) {}
+
   // Intercept password recovery token and redirect to reset page
   const hash = window.location.hash.substring(1);
   if (hash && hash.includes("access_token") && hash.includes("type=recovery")) {
@@ -4839,8 +4857,16 @@ async function adaptViaTask(payload) {
 }
 
 async function refreshMe() {
-  const res = await fetch("/auth/me");
-  const d = await res.json();
+  // Resiliencia: un blip de red o un 5xx transitorio de /auth/me NO debe desloguear al
+  // usuario ni expulsarlo de /profile/* (se veía como «se recargó y me echó»). Solo un
+  // 200 con user:null = logout genuino. Ante error transitorio, conserva el estado actual;
+  // el siguiente refreshMe (o navegación) reconcilia.
+  let res, d;
+  try {
+    res = await fetch("/auth/me");
+    d = await res.json();
+  } catch (e) { return; }
+  if (!res.ok) return;
   if (d.user) {
     // Ensure avatar_seed is stored on the user object
     if (d.avatar_seed !== undefined) d.user.avatar_seed = d.avatar_seed;
@@ -15702,6 +15728,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=195"></script>
+<script src="/static/js/radar-loop.js?v=196"></script>
 </body>
 </html>

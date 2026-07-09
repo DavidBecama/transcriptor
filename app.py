@@ -12376,20 +12376,27 @@ def creator_avatar(creator_id):
     """Sirve el AVATAR cacheado del creador (creators_global.profile_data.avatar_b64), como
     /img/reel pero para «posibles competidores». 404 si no hay foto → el front cae a
     iniciales (onerror). Los bytes se cachean al scrapear (la URL del CDN de IG caduca)."""
+    # El MISS también se cachea (1h): sin esto cada re-render de la isla re-pedía el avatar
+    # ausente → una query a Supabase por hit (spam confirmado en QA). 1h (no immutable) deja
+    # que un avatar backfilleado luego aterrice sin arrastrar un 404 clavado un día.
+    def _miss():
+        r404 = app.response_class("", status=404)
+        r404.headers["Cache-Control"] = "public, max-age=3600"
+        return r404
     try:
         r = db.table("creators_global").select("profile_data").eq("id", creator_id).single().execute()
         b64 = (((r.data or {}).get("profile_data") or {}).get("avatar_b64") or "")
     except Exception:
         b64 = ""
     if not isinstance(b64, str) or not b64.startswith("data:image"):
-        return "", 404
+        return _miss()
     try:
         import base64 as _b64
         header, payload = b64.split(",", 1)
         raw = _b64.b64decode(payload)
         mime = header.split(";")[0].split(":", 1)[1] or "image/jpeg"
     except Exception:
-        return "", 404
+        return _miss()
     resp = app.response_class(raw, mimetype=mime)
     resp.headers["Cache-Control"] = "public, max-age=604800, immutable"   # 7 días
     return resp

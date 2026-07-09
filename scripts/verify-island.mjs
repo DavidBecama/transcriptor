@@ -262,7 +262,11 @@ async function main() {
   })()`);
   check("#rsToast sobrevive a un re-render (nodo estable, aria-live fiable)", stable === true, String(stable));
   // Fix review (T2/T6): el texto sin enviar de un sheet sobrevive a un render() de fondo.
-  await click('[data-act="add-reel"]'); await sleep(250);
+  // Estado limpio antes de abrir el sheet: el check anterior clica un .fchip (filtro) que
+  // puede dejar el feed en un estado sin el CTA add-reel → el click caía en vacío («no-sheet»,
+  // flake). Re-navegar (como en T2) hace el trigger determinista.
+  await nav(`${BASE}/profile/radar?plan=creador`);
+  await click('[data-act="add-reel"]'); await sleep(300);
   const kept = await evaluate(`(function(){
     var i=document.getElementById('rsSheetInput'); if(!i) return 'no-sheet';
     i.value='texto a medio escribir';

@@ -1866,7 +1866,7 @@
       if(conn!==!!S.igConnected){
         S.igConnected=conn;
         if(conn && typeof refreshMetrics==="function"){ try{ refreshMetrics(); }catch(e){} }   // trae reels/insights → render
-        else { try{ render(); }catch(e){} }
+        else { try{ bgRender(); }catch(e){} }   // reconcilia en fondo (focus/visibilitychange): coalesce + no roba scroll/foco
       }
     }).catch(function(){});
   }
@@ -4156,7 +4156,7 @@
     var ta=document.getElementById("rsVoiceUrls"); var blob=ta?ta.value:"";
     var urls=(blob.match(/https?:\/\/\S+/g)||[]).filter(function(u){ return /instagram\.com|tiktok\.com/.test(u); });
     var reels=urls.filter(function(u){ return /\/reel\/|\/reels\/|\/p\/|\/tv\/|\/video\/|vm\.tiktok|vt\.tiktok/.test(u); });
-    if(!reels.length){ return showError("Pega URLs de reels concretos tuyos (no el perfil). O conecta tu Instagram en Métricas."); }
+    if(!reels.length){ return showToast("Pega URLs de reels concretos tuyos (no el perfil). O conecta tu Instagram en Métricas."); }
     var n=Math.min(reels.length,6);
     if(isDemo()){
       S.voice={ has_profile:true, tone:"Directo, sin postureo.", phrases:["te lo cuento porque","paso uno… paso dos"], structure:"hook → pasos → cierre", avg_duration:38, avoid:"tecnicismos", confidence:62, source_count:n, evidence:["abres directo","frases cortas","cierras pidiendo guardar"] };
@@ -4466,13 +4466,22 @@
   function submitAddComp(){ var i=document.getElementById("rsCompAddInput"); addCompetitorFromRadar(i?i.value:""); }
   function addCompetitorFromRadar(handle){
     handle=(handle||"").trim().replace(/^@+/,"").toLowerCase();
-    if(!/^[a-zA-Z0-9._]{1,30}$/.test(handle)){ return showError(L("Pon un @usuario de Instagram válido.","Enter a valid Instagram @handle.")); }
+    if(!/^[a-zA-Z0-9._]{1,30}$/.test(handle)){ return showToast(L("Pon un @usuario de Instagram válido.","Enter a valid Instagram @handle.")); }
     S.addCompOpen=false;
     if(isDemo()){   // demo: simula el auto-análisis no bloqueante
       S.analyzing=S.analyzing||{}; S.analyzing[handle]=true; render();
       showToast(L("Analizando a @"+handle+"…","Analyzing @"+handle+"…"));
       setTimeout(function(){ if(S.analyzing) delete S.analyzing[handle]; if(typeof applyDemoBrand==="function") applyDemoBrand(); render(); showToast(L("@"+handle+" ya está en tu radar.","@"+handle+" is now in your radar.")); },2600);
       return;
+    }
+    // Multi-marca (agency): el backend exige una marca concreta. En vez de dejar que el POST
+    // caiga en un error rojo («Elige una marca…»), lo resolvemos aquí: si solo hay UNA marca
+    // real, se auto-selecciona; si hay varias, abrimos el selector y guiamos con un toast
+    // neutro (no un fallo). El backend sigue siendo la red de seguridad más abajo.
+    if(isAgency() && !_pidOf(S.brandId)){
+      var _real=(S.brands||[]).filter(function(b){ return b && b.id && b.id!=="default"; });
+      if(_real.length===1){ S.brandId=_real[0].id; }
+      else { S.brandMenu=true; render(); return showToast(L("Elige la marca a la que sumar a @"+handle+".","Pick the brand to add @"+handle+" to.")); }
     }
     var body={ ig_username:handle, source:"radar" };
     var _pid=_pidOf(S.brandId); if(_pid) body.project_id=_pid;   // B5: aísla por marca activa (agency + estudio)
@@ -4484,7 +4493,7 @@
         if(_e==="tc.error.already_tracking"){ return showToast(L("Ya seguías a @"+handle+".","Already following @"+handle+".")); }
         if(_e==="tc.error.plan_limit_reached"){ return showPaywall("tracked_creators"); }
         // Mensajes claros para los errores que antes caían a un genérico (ítem 2):
-        if(_e==="tc.error.project_required"){ return showError(L("Elige una marca antes de añadir un competidor.","Pick a brand before adding a competitor.")); }
+        if(_e==="tc.error.project_required"){ S.brandMenu=true; render(); return showToast(L("Elige la marca a la que sumar a @"+handle+".","Pick the brand to add @"+handle+" to.")); }
         if(_e==="tc.error.project_limit_reached"){ return showError(L("Tope de competidores de ESTA marca alcanzado ("+((r.d&&r.d.limit)||"")+"). Sube de plan o usa otra marca.","This brand's competitor cap reached. Upgrade or use another brand.")); }
         if(_e==="tc.error.invalid_username"){ return showError(L("Ese @usuario de Instagram no es válido.","That Instagram @handle isn't valid.")); }
         return showError((r.d&&r.d.message)||L("No pude añadir a @"+handle+". Reinténtalo.","Couldn't add @"+handle+". Try again."));
@@ -4904,7 +4913,7 @@
       else { if(btn) btn.disabled=false; showError(L("No pude alimentar el cerebro. Reintenta.","Couldn’t feed the brain. Try again.")); }
     }).catch(function(){ if(btn) btn.disabled=false; showError(L("No pude alimentar el cerebro. Reintenta.","Couldn’t feed the brain. Try again.")); });
   }
-  function brainFeedPick(key){ S.feedType=key; S._ceReward=null; render(); var ta=document.getElementById("rsFeedMe"); if(ta) try{ ta.focus(); }catch(e){} }
+  function brainFeedPick(key){ S.feedType=key; S._ceReward=null; render(); _focusNoScroll(document.getElementById("rsFeedMe")); }
   function brainFeedMe(key){
     key=key||S.feedType||"guion"; var def=brainFeedDef(key);
     var ta=document.getElementById("rsFeedMe"); var note=ta?ta.value.trim():"";
@@ -4925,7 +4934,7 @@
     brainLevelPulse();   // por si llegó al 100% (NO auto-sube: el nivel se reclama con el botón de arriba)
     render();
     try{ if(S._bnInst) S._bnInst.feed(_bnFeedType(def.key)); }catch(e){}   // partículas tipadas → la red neuronal las absorbe
-    var _ta2=document.getElementById("rsFeedMe"); if(_ta2) try{ _ta2.focus(); }catch(e){}   // listo para el siguiente ejercicio
+    _focusNoScroll(document.getElementById("rsFeedMe"));   // listo para el siguiente ejercicio
     showToast(L("+"+def.gain+"% al Cerebro · "+def.label.toLowerCase()+" guardado 🧠","+"+def.gain+"% to your Brain · saved 🧠"));
   }
   function brainTrainHTML(){
@@ -5893,6 +5902,32 @@
   /* ════════════════════════════════════════════════════════════════
      RENDER maestro
      ════════════════════════════════════════════════════════════════ */
+  // Ancla de scroll: el primer hijo con data-id aún visible bajo el borde superior del
+  // contenedor, y su distancia a ese borde. Restaurar por ANCLA (no por píxeles) evita el
+  // salto cuando un render inserta/quita contenido por encima de lo que estás leyendo
+  // (sugerencias que aterrizan, datos diferidos): el ancla baja con el contenido y el
+  // scroll la sigue en vez de quedarse clavado en unos píxeles que ya apuntan a otro sitio.
+  function _scAnchor(sc){
+    if(!sc) return null;
+    var top=sc.getBoundingClientRect().top, kids=sc.querySelectorAll("[data-id]");
+    for(var i=0;i<kids.length;i++){ var r=kids[i].getBoundingClientRect();
+      if(r.bottom>top+4) return { act:kids[i].getAttribute("data-act")||"", id:kids[i].getAttribute("data-id")||"", d:r.top-top }; }
+    return null;
+  }
+  function _scRestore(sc, a, fallbackTop){
+    if(!sc) return;
+    if(a){ var kids=sc.querySelectorAll("[data-id]");
+      for(var i=0;i<kids.length;i++){
+        if((kids[i].getAttribute("data-id")||"")===a.id && (kids[i].getAttribute("data-act")||"")===a.act){
+          var top=sc.getBoundingClientRect().top, r=kids[i].getBoundingClientRect();
+          sc.style.scrollBehavior="auto"; sc.scrollTop=sc.scrollTop+(r.top-top)-a.d; sc.style.scrollBehavior=""; return;
+        } } }
+    if(fallbackTop!=null){ sc.style.scrollBehavior="auto"; sc.scrollTop=fallbackTop; sc.style.scrollBehavior=""; }
+  }
+  // Enfocar sin arrastrar el scroll: un focus() a un campo fuera de pantalla (overlay que
+  // se re-ancla, foco de vuelta al botón que lo abrió) hace saltar el feed. preventScroll
+  // lo evita; fallback al focus() normal en navegadores sin la opción.
+  function _focusNoScroll(elm){ if(!elm) return; try{ elm.focus({preventScroll:true}); }catch(e){ try{ elm.focus(); }catch(_e){} } }
   function render(){
     var el=root(); if(!el) return;
     el.className="rs app "+(S.device==="mobile"?"rs--mobile":"rs--desktop");
@@ -5993,19 +6028,33 @@
     // Teleprónter: preservar la posición de scroll a través del re-render (los toggles
     // de play/velocidad/texto re-pintan; sin esto el scroll saltaría a 0).
     var _tpScroll=null; if(S.view==="prompter"){ var _tpe=document.getElementById("rsTpScroll"); if(_tpe) _tpScroll=_tpe.scrollTop; }
-    // Preservar el scroll del contenedor principal entre repintados (filtros, fav,
-    // expandir, chips… repintan toda la isla y, sin esto, saltaría arriba del todo).
-    // Solo se restaura si sigues en la MISMA pantalla (misma pestaña/vista); al
-    // cambiar de tab o abrir un overlay sí empieza arriba, que es lo esperado.
+    // Preservar el scroll entre repintados. Antes se guardaba el scrollTop en PÍXELES:
+    // bastaba para filtros/fav (el contenido de arriba no cambia), pero si un poll de fondo
+    // INSERTA contenido por encima (sugerencias que aterrizan, datos diferidos), esos mismos
+    // píxeles ya apuntan a otra tarjeta → el usuario «salta». Ahora anclamos a un elemento
+    // visible (_scAnchor) y lo re-fijamos a su distancia del borde. Además, un MAPA por clave
+    // (tab|view|filtro): al VOLVER de un overlay al feed del MISMO tab se restaura donde
+    // estabas (antes empezaba arriba); cambiar de tab sí empieza arriba, que es lo esperado.
     var _scKey=S.tab+"|"+(S.view||"feed")+"|"+(S.creatorFilter?S.creatorFilter.id:"");
-    var _scTop=null; var _scEl=document.querySelector("#radarRoot .work .scroll"); if(_scEl) _scTop=_scEl.scrollTop;
-    // Scroll del OVERLAY (guion, rendimiento…): también sobrevive a re-renders de la misma
-    // vista (p.ej. llegan las referencias del formato con el guion a medio leer → sin esto,
-    // el overlay saltaba arriba). Misma clave _scKey (tab|view).
-    var _osTop=null; var _osEl=document.querySelector("#radarRoot .overlay .oscroll"); if(_osEl) _osTop=_osEl.scrollTop;
+    var _prevKey=(S._scKey==null?null:S._scKey);
+    var _sameTab=(_prevKey!=null && _prevKey.split("|")[0]===_scKey.split("|")[0]);
+    S._scMap=S._scMap||{};
+    // Cap defensivo: en una sesión con muchos filtros (creatorFilter por UUID) el mapa
+    // crecería sin fin. 40 entradas cubren de sobra tab/view/overlay + filtros vivos; al
+    // pasarse se vacía (peor caso: empezar arriba UNA vez, no un salto).
+    if(Object.keys(S._scMap).length>40) S._scMap={};
+    var _scEl=document.querySelector("#radarRoot .work .scroll");
+    if(_scEl && _prevKey!=null) S._scMap[_prevKey]={top:_scEl.scrollTop, a:_scAnchor(_scEl)};
+    var _osEl=document.querySelector("#radarRoot .overlay .oscroll");
+    if(_osEl && _prevKey!=null) S._scMap["ov:"+_prevKey]={top:_osEl.scrollTop, a:_scAnchor(_osEl)};
     view.innerHTML=html;
-    if(_scTop!=null && S._scKey===_scKey){ var _scEl2=document.querySelector("#radarRoot .work .scroll"); if(_scEl2){ _scEl2.style.scrollBehavior="auto"; _scEl2.scrollTop=_scTop; _scEl2.style.scrollBehavior=""; } }
-    if(_osTop!=null && S._scKey===_scKey){ var _osEl2=document.querySelector("#radarRoot .overlay .oscroll"); if(_osEl2){ _osEl2.style.scrollBehavior="auto"; _osEl2.scrollTop=_osTop; _osEl2.style.scrollBehavior=""; } }
+    // Feed: restaura si es el mismo sitio (poll/filtro/fav) o si vuelves de un overlay al
+    // feed del mismo tab. Cambiar de tab (distinto primer segmento) → sin entrada → arriba.
+    var _wantFeed=(_prevKey===_scKey || (_sameTab && S._scMap[_scKey])) ? S._scMap[_scKey] : null;
+    if(_wantFeed){ var _scEl2=document.querySelector("#radarRoot .work .scroll"); _scRestore(_scEl2, _wantFeed.a, _wantFeed.top); }
+    // Overlay (guion, rendimiento…): solo re-render en sitio (p.ej. llegan las referencias
+    // del formato con el guion a medio leer → sin esto el overlay saltaba arriba).
+    if(_prevKey===_scKey){ var _ovS=S._scMap["ov:"+_scKey]; if(_ovS){ var _osEl2=document.querySelector("#radarRoot .overlay .oscroll"); _scRestore(_osEl2, _ovS.a, _ovS.top); } }
     S._scKey=_scKey;
     if(_tpScroll!=null){ var _tpe2=document.getElementById("rsTpScroll"); if(_tpe2) _tpe2.scrollTop=_tpScroll; }
     // T4: el error persistente sobrevive a los re-render mutando el nodo estable.
@@ -6079,11 +6128,11 @@
       var ov=topOverlay(el);
       if(ov && !ov.contains(document.activeElement)){
         var f=ov.querySelector("input,textarea") || ov.querySelector(".back") || ov;
-        try{ f.focus(); }catch(e){}
+        _focusNoScroll(f);
       }
     } else if(was && S._returnSel){
       var rt=null; try{ rt=el.querySelector(S._returnSel); }catch(e){}
-      if(rt){ try{ rt.focus(); }catch(e){} }
+      _focusNoScroll(rt);
       S._returnSel=null;
     }
     S._overlayOpen=open;
@@ -7681,7 +7730,7 @@
       if(err==="tc.error.already_tracking"){ _refreshRadarLight(); return showToast("Reel analizado · ya seguías a @"+handle+"."); }
       if(err==="tc.error.plan_limit_reached") return showError("Reel analizado y guardado. Tu plan ya usa todos sus huecos de competidor — sube de plan para seguir también a @"+handle+".");
       if(err==="tc.error.upgrade_required") return showError("Reel analizado y guardado. Seguir competidores no entra en tu plan actual.");
-      if(err==="tc.error.project_required") return showError("Reel analizado. Entra en una marca concreta para meter a @"+handle+" en su radar.");
+      if(err==="tc.error.project_required") return showToast("Reel analizado. Entra en una marca concreta para meter a @"+handle+" en su radar.");
       showError("Reel analizado, pero no pude seguir a @"+handle+". Añádelo desde el Radar.");
     });
   }
@@ -8342,7 +8391,7 @@
     if(act==="onb-ctx-save"){                                 // (b) guardar el estilo pegado → Cerebro
       var _cta=document.getElementById("rsOnbCtx"); if(!_cta) return;
       var _ctx=(_cta.value||"").slice(0,2000); S.onb.pastedCtx=_ctx;
-      if(!_ctx.trim()){ return showError(L("Pega antes lo que te devolvió ChatGPT/Claude.","Paste what ChatGPT/Claude returned first.")); }
+      if(!_ctx.trim()){ return showToast(L("Pega antes lo que te devolvió ChatGPT/Claude.","Paste what ChatGPT/Claude returned first.")); }
       if(isDemo()){ try{ brainFeast(8); }catch(e){} return showToast(L("Estilo sumado al Cerebro (demo).","Style added to the Brain (demo).")); }
       apiPost("/api/brain/instructions",{text:_ctx}).then(function(r){
         if(r&&r.ok){ try{ brainFeast(10); }catch(e){} S.brainInstr={loaded:true,text:((r.d&&r.d.text)||_ctx),saving:false}; showToast(L("🧠 Estilo sumado. Tus guiones ya lo usan.","🧠 Style added. Your scripts use it now.")); }
@@ -8759,7 +8808,7 @@
           return it;
         });
       }
-      render();
+      bgRender();   // datos diferidos de marca llegan ~1-2s tras el 1er paint: coalesce + no salta el scroll
       brainLevelPulse();   // por si los guiones recién cargados suben el nivel del Cerebro
     });
   }
