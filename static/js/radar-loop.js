@@ -1430,7 +1430,7 @@
     var picked=(S.onb.competitors||[]).filter(function(c){return c.picked;});
     onbTrack("onb_completed",{competitors:picked.length, value_reels:(S.onb.valueReels||[]).length});
     if(isDemo()){
-      S.onb.skipped=true; S.user.onbV2Done=true;
+      S.onb.skipped=true; S.user.onbV2Done=true; S._justOnboarded=true;
       try{ var b=brand(); if(b){ b.voice=Math.max(b.voice||0,50); b.level=Math.max(b.level||1,2); } }catch(e){}
       if(typeof seedDemoContent==="function" && !(S.reels||[]).length){ try{ seedDemoContent(); }catch(e){} }
       // Directo al COFRE (Leo 26-jun: fuera la pantalla «Preparando tu radar»; la
@@ -1443,7 +1443,7 @@
     var body={ handle:S.onb.handle, platform:S.onb.platform, niche:S.onb.niche, subniches:S.onb.subniches||[], goal:S.onb.goal||"", competitors:picked.map(function(c){return c.handle;}) };
     var _pid=_pidOf(S.brandId); if(isAgency()&&_pid) body.project_id=_pid;
     apiPost("/api/onboarding/complete",body).then(function(r){
-      S.onb.busy=false; S.onb.skipped=true; S.user.onbV2Done=true;
+      S.onb.busy=false; S.onb.skipped=true; S.user.onbV2Done=true; S._justOnboarded=true;
       reloadScripts().then(function(){ render(); });   // F9: el guion «aha» persistido server-side aparece en Ideas robadas YA (no tras recargar)
       var v=(r.ok&&r.d&&r.d.voice!=null)?r.d.voice:50;
       try{ brand().voice=Math.max(brand().voice||0,v); }catch(e){}
@@ -1552,7 +1552,11 @@
     var r=(S.reels||[]).filter(function(x){return x.id===id;})[0];
     // #2: los reels de «Sugerencias de hoy» también son buscables → el detalle se abre desde
     // su card. Son normReel-compat (_normSugg → normReel).
-    return r || (S._suggToday||[]).filter(function(x){return x.id===id;})[0]
+    // + los reels del COFRE (S._cofreReels): durante el cofre onbRadarCatchup refresca
+    //   S.reels → el reel robado podía dejar de estar ahí y onbAhaSteal salía sin robar
+    //   (ni carga, ni guion, ni tour). Buscarlo también en el cofre. Bug Leo 09-jul.
+    return r || (S._cofreReels||[]).filter(function(x){return x.id===id;})[0]
+             || (S._suggToday||[]).filter(function(x){return x.id===id;})[0]
              || (S.discover||[]).filter(function(x){return x.id===id;})[0] || null;
   }
   // Real: ranking del nicho por VIEWS medias/reel (no seguidores — el scrape no los
@@ -5969,7 +5973,7 @@
     // Mata el house-tour si se coló por timing durante el onboarding/offer/carga (bug:
     // en incógnito el onboarding monta tarde y el auto-tour de 1500ms arranca encima).
     if(showOnboarding() || S._onbWaiting || S.onbStealOffer){
-      try{ var _tov=document.querySelector('.tour-overlay'); if(_tov && _tov.style.display!=='none' && typeof window.endTour==="function") window.endTour(); }catch(e){}
+      try{ var _tov=document.querySelector('.tour-overlay'); if(_tov && _tov.style.display!=='none' && typeof window.endTour==="function"){ window.endTour(); try{ localStorage.removeItem("onboarding_completed"); }catch(e){} } }catch(e){}
     }
     // A) Onboarding v2 = pantalla dedicada (sin rail/cmd/statbar): el radar vacío
     // (0 rivales · 0 reels) NO se ve detrás. Short-circuit antes de montar la isla.
@@ -6083,10 +6087,10 @@
     // House-tour: lo arranca la ISLA la 1ª vez que aterrizas en el dashboard SIN onboarding
     // (post-cofre, o un usuario que ya onboardeó y no lo ha visto). Robusto: re-chequea los
     // targets justo antes. Sustituye al auto-start de index.html (que se colaba por timing).
-    if(S.tab==="dashboard" && !_onbBusy && !S._tourArmed){
+    if(S.tab==="dashboard" && !_onbBusy && !S._tourArmed && Array.isArray(S.tracked)){   // Array.isArray: NO armar en la carga inicial (tracked aún undefined → showOnboarding falso-negativo → tour se colaba antes del onboarding). Bug Leo 09-jul.
       try{
         var _seen=false; try{ _seen=localStorage.getItem("onboarding_completed")==="true"; }catch(e){}
-        if(S.user && S.user.onbV2Done) _seen=true;   // #4 (07/07): onboardeó en SERVIDOR → no re-disparar el tour del dashboard en otro device (localStorage es por-device; se veía «Paso 1 de 11 · Tu Radar» en móvil tras onboardear en desktop)
+        if(S.user && S.user.onbV2Done && !S._justOnboarded) _seen=true;   // #4 (07/07): onboardeó en SERVIDOR → no re-disparar el tour del dashboard en otro device (localStorage es por-device; se veía «Paso 1 de 11 · Tu Radar» en móvil tras onboardear en desktop)
         var _tovA=document.querySelector('.tour-overlay');
         if(!_seen && typeof window.startTour==="function" && (!_tovA || _tovA.style.display==='none')){
           S._tourArmed=true;
