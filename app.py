@@ -4466,17 +4466,19 @@ def _shape_script_option(res):
             "body": [str(x) for x in body], "closing": str(closing), "script": flat}
 
 
-def _generate_script_options(user_content, style_arg, custom_prompt, uid, brand_id, n=2, timeout=60):
+def _generate_script_options(user_content, style_arg, custom_prompt, uid, brand_id, n=2, timeout=60, model=None):
     """Genera N opciones de guion COMPLETAS en PARALELO (modelo de generación = pro),
     reusando método + voz + few-shot. La opción B pide un ángulo/estructura distintos.
     recording_format + pov_text se toman de la opción A. Wall-time ≈ una sola llamada.
     Si B falla, degrada a 1 opción. La voz se lee UNA vez y se comparte (menos DB).
-    `timeout`: la generación async (Celery, sin gateway) lo sube a GENERATION_LLM_TIMEOUT."""
+    `timeout`: la generación async (Celery, sin gateway) lo sube a GENERATION_LLM_TIMEOUT.
+    `model`: override del modelo (aha del onboarding → flash rápido, n=1, para el <30s honesto)."""
     import concurrent.futures
+    gen_model = model or GENERATION_MODEL
     voice = get_voice_profile(uid, brand_id)
     def _gen(temp, directive):
         return adapt_with_ai(user_content, style_arg, custom_prompt, voice=voice,
-                             user_id=uid, brand_id=brand_id, model=GENERATION_MODEL,
+                             user_id=uid, brand_id=brand_id, model=gen_model,
                              temperature=temp, extra_directive=directive, timeout=timeout)
     dirB = ("Esta es la OPCIÓN B (alternativa para que el usuario elija): usa un ÁNGULO de "
             "entrada y una ESTRUCTURA claramente DISTINTOS a una versión estándar — otro tipo "
@@ -8826,7 +8828,7 @@ def resend_webhook():
 # Agency 15 por marca. base_slots_global = per_brand × nº marcas del plan (techo global);
 # per_project_slots = el límite POR marca que enforcea el gate cuando hay project_id.
 TRACKED_CREATORS_LIMITS = {
-    "free":    {"enabled": True,  "base_slots_global": 2,   "per_project_slots": None, "requires_project": False},   # onboarding sigue seed + 1 afín (decisión Leo)
+    "free":    {"enabled": True,  "base_slots_global": 3,   "per_project_slots": None, "requires_project": False},   # onboarding v2: 3 competidores gratis (paywall suave; el 4º = «con Pro»)
     "pro":     {"enabled": True,  "base_slots_global": 1,   "per_project_slots": None, "requires_project": False},
     "creator": {"enabled": True,  "base_slots_global": 5,   "per_project_slots": 5,    "requires_project": False},  # Basic · 1 marca × 5
     "estudio": {"enabled": True,  "base_slots_global": 36,  "per_project_slots": 12,   "requires_project": False},  # Content Creator · 3 marcas × 12
@@ -10575,7 +10577,7 @@ def onboarding_complete():
     #    RE-LEE del DB en cada llamada, así que repetir este endpoint no acumula
     #    más allá del tope; y cualquier add posterior via POST /api/tracked-creators
     #    re-aplica el cap estricto del plan (free=1, 2>=1 → bloquea).
-    ONBOARDING_GRACE = 2
+    ONBOARDING_GRACE = 3   # onboarding v2: hasta 3 competidores gratis (paywall suave; el 4º = «con Pro»)
     project_id = body.get("project_id")
     try:
         _profile = get_profile(uid)

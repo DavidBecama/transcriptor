@@ -13754,23 +13754,17 @@ const _TOUR_EN = (document.documentElement.lang || "es").toLowerCase().indexOf("
 // tutorial de la página Radar se OMITE (el usuario ya vivió el robo en el cofre).
 // Paso 1 es ephemeral: si su ventana ya no existe (re-runs, ?tour=1 desde el dashboard),
 // renderTourStep lo salta solo y el tour empieza en Guiones.
-// ORDEN pensado para el aha instantáneo (Leo 08-jul): el guion REAL se cocina en 2º
-// plano mientras corre el tour → Guiones va en 4º (tras Cerebro y Ranking) para darle
-// margen; su card muestra «Afinándose en tu voz…» hasta que _ahaSwap lo actualiza EN
-// VIVO. Métricas SIGUE última (el muro Pro del fin del tour, decisión Bernat).
 const TOUR_STEPS = _TOUR_EN ? [
-  {                   target: '.script-wrap', noFrame: true, ephemeral: true, text: "This window opens every time you steal a signal: your script, already written in your voice — hook, body and close, ready to go. It'll happen with every reel you steal." },
-  {                   target: '.script-side .belt', ephemeral: true, text: "And these are your two moves: «Record it now» opens the teleprompter so you read it straight to camera (free), or «Steal the next signal» chains the next script without leaving the loop." },
+  {                   target: '.script-side .belt', ephemeral: true, text: "Your first script is ready — and these are your two moves: «Record it now» opens the teleprompter so you read it straight to camera (free), or «Steal the next signal» chains the next script without leaving the loop." },
+  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Your first script lands right here, in Stolen ideas — you'll have it in seconds, already in your voice. Everything you steal lives here, ready to record and reuse." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Your Brain: it learns your voice. The more you create, the more the next one sounds like you. That's the moat." },
   { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "The ranking: see how you stack up against other creators in your niche — and climb." },
-  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "And here lives everything you steal — your first script is inside (if it still says «polishing», it finishes on its own in a few seconds), ready to record, edit and reuse." },
   { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Metrics: the hooks, hours and topics actually moving your account. Unlock them and double down — with Pro. 👉" },
 ] : [
-  {                   target: '.script-wrap', noFrame: true, ephemeral: true, text: "Esta ventana se abre cada vez que robas una señal: tu guion, ya escrito en tu voz — gancho, desarrollo y cierre, listos. Y pasará con cada reel que robes." },
-  {                   target: '.script-side .belt', ephemeral: true, text: "Y estos son tus dos caminos: «Grábalo ahora» abre el teleprónter y lo lees directo a cámara (gratis), o «Roba la siguiente señal» y encadenas el próximo guion sin salir del bucle." },
+  {                   target: '.script-side .belt', ephemeral: true, text: "Tu primer guión ya está listo — y estos son tus dos caminos: «Grábalo ahora» abre el teleprónter y lo lees directo a cámara (gratis), o «Roba la siguiente señal» y encadenas el próximo guion sin salir del bucle." },
+  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Tu primer guion aterriza aquí, en Ideas robadas — en segundos lo tienes, ya en tu voz. Todo lo que robas vive aquí, listo para grabar y reutilizar." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Tu Cerebro: aprende tu voz. Cuanto más creas, más tuyo suena lo siguiente. Ese es el moat." },
   { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "El ranking: mira cómo vas frente a otros creadores de tu nicho — y sube posiciones." },
-  { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Y aquí vive todo lo que robas — tu primer guión ya está dentro (si aún pone «afinándose», se termina solo en unos segundos), listo para grabar, editar y reutilizar." },
   { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Métricas: los ganchos, horas y temas que de verdad mueven tu cuenta. Destápalos y dóblalos — con Pro. 👉" },
 ];
 
@@ -15708,6 +15702,6 @@ async function removeCompetitor(trackingId, username) {
      (editable sin tocar el monolito). Monta dentro de #radarRoot. -->
 <script src="/static/js/reel-brain.js?v=1"></script>
 <script src="/static/js/brain-net.js?v=1"></script>
-<script src="/static/js/radar-loop.js?v=193"></script>
+<script src="/static/js/radar-loop.js?v=194"></script>
 </body>
 </html>
