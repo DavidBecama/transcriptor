@@ -11055,6 +11055,18 @@ def generate_script_from_competitor_reel(reel_id: str):
     # (igual que /api/metrics/insights). brand_id == project_id; None = marca por defecto.
     gen_pid = _req_project_id()
 
+    # Tutorial (aha): el PRIMER robo del onboarding es GRATIS y nunca toca créditos.
+    # Gate anti-abuso server-side: solo si el user aún NO tiene ningún guion (su primer
+    # robo real) — así no se puede robar gratis en bucle mandando el flag. El front lo
+    # marca con onboarding_aha únicamente en el robo del cofre.
+    _free_aha = False
+    if _body0.get("onboarding_aha"):
+        try:
+            _sc0 = (db.table("scripts").select("id", count="exact").eq("user_id", uid).execute()).count or 0
+            _free_aha = (_sc0 == 0)
+        except Exception:
+            _free_aha = False
+
     # 0. Guard anti doble-cobro: si ya hay un script de este (user, reel) en
     # los últimos 60s, redirigir al existente sin cobrar ni encolar. Cubre
     # double-click, recarga y 2-pestañas. Pasados 60s, regeneración legítima OK.
@@ -11088,15 +11100,15 @@ def generate_script_from_competitor_reel(reel_id: str):
 
     # TOPE DIARIO del FREE (modelo 2026-06-23): 3 robos/día → "vuelve mañana o
     # desbloquéalos". Empuja al hábito y, al 4º, a pagar. Los planes de pago no tienen tope.
-    if not is_paid_unlimited and trial_scripts_today(uid) >= FREE_DAILY_SCRIPTS:
+    if not is_paid_unlimited and not _free_aha and trial_scripts_today(uid) >= FREE_DAILY_SCRIPTS:
         track_event("paywall_shown", uid, {"wall": "free_daily", "plan": plan})
         return jsonify({
             "error": "trial_daily_limit",
             "message": f"Hechos tus {FREE_DAILY_SCRIPTS} guiones de hoy — vuelve mañana o desbloquéalos subiendo de plan."
         }), 402
 
-    # Free: robar SIEMPRE cuesta créditos (3). Sin saldo → muro.
-    if not is_paid_unlimited and (profile.get("credits_cents") or 0) < SCRIPT_COST:
+    # Free: robar SIEMPRE cuesta créditos (3). Sin saldo → muro. (Excepto el aha del tutorial.)
+    if not is_paid_unlimited and not _free_aha and (profile.get("credits_cents") or 0) < SCRIPT_COST:
         track_event("paywall_shown", uid, {"wall": "no_credits", "plan": plan, "after_first_value": True})
         return jsonify({
             "error": "no_credits",
@@ -11308,7 +11320,9 @@ def generate_script_from_competitor_reel(reel_id: str):
             return jsonify({"error": "busy", "message": "Otra generación tuya está en curso. Espera un segundo."}), 429
         try:
             fresh = get_profile(uid)  # estado actual bajo lock (otros workers ya pudieron cobrar)
-            if is_paid_unlimited:
+            if _free_aha:
+                pass  # tutorial (aha): 1er robo del onboarding gratis — sin cobro (ni refund)
+            elif is_paid_unlimited:
                 db.table("profiles").update({
                     "monthly_usage": (fresh.get("monthly_usage") or 0) + SCRIPT_USAGE_UNITS
                 }).eq("id", uid).execute()
@@ -11329,6 +11343,8 @@ def generate_script_from_competitor_reel(reel_id: str):
             release_credit_lock(uid, _clock)
 
         def _refund():
+            if _free_aha:
+                return  # nada que devolver: el aha no cobró
             try:
                 if is_paid_unlimited:
                     db.table("profiles").update({
@@ -11493,7 +11509,7 @@ def generate_script_from_competitor_reel(reel_id: str):
 
     # Encolar task (no cobramos aquí — la task cobra al final si todo OK).
     from tasks import generate_script_competitor_task  # noqa: E402
-    async_result = generate_script_competitor_task.delay(reel["id"], uid, assistant_id, out_lang, gen_pid)
+    async_result = generate_script_competitor_task.delay(reel["id"], uid, assistant_id, out_lang, gen_pid, _free_aha)
     # v0.15.8: anotar task_id en el lock (la task lo libera al final vía try/finally).
     try:
         (db.table("script_generation_locks")
@@ -12783,6 +12799,28 @@ def get_tracked_creators_reels():
         _attach_shares(reels)
         return reels
 
+    # Cofre/variedad (David 08/07): ?pool=1 mezcla el POOL DE NICHO sembrado (seed+related,
+    # ya scrapeado) con los reels del/los competidor(es) del user → variedad instantánea en
+    # el primer robo, no "solo los del único añadido". Los related entran según scrapean.
+    want_pool = (request.args.get("pool") or "") == "1"
+    def _blend_pool(reels):
+        if not want_pool or offset != 0:
+            return reels
+        try:
+            prof = get_profile(uid)
+            pool = _recycled_reels(prof.get("subniches"), prof.get("niche"),
+                                   limit=limit, exclude_creator_ids=creator_ids, rank="explosion")
+        except Exception:
+            return reels
+        if not pool:
+            return reels
+        for r in pool:
+            r["is_favorite"] = r.get("id") in fav_ids
+        seen = {r.get("id") for r in reels}
+        merged = reels + [r for r in pool if r.get("id") not in seen]
+        merged.sort(key=lambda r: (r.get("explosion_score") or 0), reverse=True)
+        return merged[:limit]
+
     # 7a. Orden por explosión = feed diario ROTATIVO (score = explosión × frescura ×
     #     jitter por día). El orden se cachea por día en Redis (CERO scrape). Servimos
     #     solo la página pedida (ids cacheados → fetch ligero, no 200 filas pesadas).
@@ -12811,6 +12849,9 @@ def get_tracked_creators_reels():
         by_id = {r.get("id"): r for r in rows}
         page = [by_id[i] for i in page_ids if i in by_id]   # preserva el orden cacheado
         _annotate(page)
+        if want_pool:
+            page = _blend_pool(page)
+            return jsonify({"reels": page, "total": len(page), "has_more": False})
         has_more = (offset + len(page)) < total
         return jsonify({"reels": page, "total": total, "has_more": has_more})
 

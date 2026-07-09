@@ -2139,7 +2139,9 @@ _BUILTIN_SCRIPT_STYLES_LOCAL = {"viral", "divertido", "storytelling", "hooks"}
 
 
 @celery_app.task(bind=True, name="tasks.generate_script_competitor")
-def generate_script_competitor_task(self, reel_id, user_id, assistant_id, language=None, project_id=None):
+def generate_script_competitor_task(self, reel_id, user_id, assistant_id, language=None, project_id=None, free=False):
+    # free=True → primer robo del onboarding (aha): NO se cobra (ni monthly_usage ni
+    # créditos). El gate anti-abuso (solo si el user no tiene guiones) lo aplica el endpoint.
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
     GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -2540,7 +2542,9 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         #   pago/trial → monthly_usage · free con cuota del mes → free_lifetime_uses
         #   (reset mensual) · resto → créditos.
         try:
-            if is_paid_unlimited:
+            if free:
+                pass  # tutorial (aha): 1er robo del onboarding gratis — sin cobro
+            elif is_paid_unlimited:
                 db.table("profiles").update({
                     "monthly_usage": (profile.get("monthly_usage") or 0) + SCRIPT_UNITS
                 }).eq("id", user_id).execute()
