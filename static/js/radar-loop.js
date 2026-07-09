@@ -2568,11 +2568,10 @@
         '<h1 class="rdr-title">'+L("Señales de hoy","Today's signals")+'</h1>'+
         '<p class="rdr-sub">'+line+'</p>'+
         '<div class="rdr-stats">'+statsH+'</div>'+
-        // Dos refrescos BIEN diferenciados: «↻ otras» GRATIS (re-baraja el pool, sin scrape) y
-        // «Refrescar ahora · 5 cr» (scrape en vivo de competidores, de pago). El job diario
-        // renueva gratis también.
+        // «Refrescar competidores · 5 cr» (scrape en vivo de competidores, de pago). La rotación
+        // gratis es AUTOMÁTICA (day_seed por franja + reciclado + job diario) — David 09/07: fuera
+        // el botón «Otras · gratis» del hero (redundante con la rotación automática).
         '<div class="rdr-refresh-row">'+
-          '<button class="rdr-reshuffle-cta" data-act="reshuffle-feed" title="'+L("Baraja otras del pool que ya tienes — gratis, sin scrape","Shuffle others from the pool you already have — free, no scrape")+'">'+IC.repeat+' '+L("Otras · gratis","Others · free")+'</button>'+
           '<button class="rdr-refresh-cta" data-act="refresh-radar" title="'+L("Trae lo nuevo de tus COMPETIDORES AHORA (scrape en vivo · cuesta créditos). El radar se renueva solo cada día gratis.","Pull your COMPETITORS\' latest NOW (live scrape · costs credits). The radar auto-refreshes daily for free.")+'">'+IC.repeat+' '+L("Refrescar competidores · 5 créditos","Refresh competitors · 5 credits")+'</button>'+
           // Reorganización 04/07: «Añadir/Analizar reel» SUBEN al hero como botones visibles
           // (antes links enterrados en la addbar a media página). Secundarios a propósito:
