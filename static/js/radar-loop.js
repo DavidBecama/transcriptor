@@ -5939,7 +5939,7 @@
     // Mata el house-tour si se coló por timing durante el onboarding/offer/carga (bug:
     // en incógnito el onboarding monta tarde y el auto-tour de 1500ms arranca encima).
     if(showOnboarding() || S._onbWaiting || S.onbStealOffer){
-      try{ var _tov=document.querySelector('.tour-overlay'); if(_tov && _tov.style.display!=='none' && typeof window.endTour==="function") window.endTour(); }catch(e){}
+      try{ var _tov=document.querySelector('.tour-overlay'); if(_tov && _tov.style.display!=='none' && typeof window.endTour==="function"){ window.endTour(); try{ localStorage.removeItem("onboarding_completed"); }catch(e){} } }catch(e){}
     }
     // A) Onboarding v2 = pantalla dedicada (sin rail/cmd/statbar): el radar vacío
     // (0 rivales · 0 reels) NO se ve detrás. Short-circuit antes de montar la isla.
@@ -6039,7 +6039,7 @@
     // House-tour: lo arranca la ISLA la 1ª vez que aterrizas en el dashboard SIN onboarding
     // (post-cofre, o un usuario que ya onboardeó y no lo ha visto). Robusto: re-chequea los
     // targets justo antes. Sustituye al auto-start de index.html (que se colaba por timing).
-    if(S.tab==="dashboard" && !_onbBusy && !S._tourArmed){
+    if(S.tab==="dashboard" && !_onbBusy && !S._tourArmed && Array.isArray(S.tracked)){   // Array.isArray: NO armar en la carga inicial (tracked aún undefined → showOnboarding falso-negativo → tour se colaba antes del onboarding). Bug Leo 09-jul.
       try{
         var _seen=false; try{ _seen=localStorage.getItem("onboarding_completed")==="true"; }catch(e){}
         if(S.user && S.user.onbV2Done && !S._justOnboarded) _seen=true;   // #4 (07/07): onboardeó en SERVIDOR → no re-disparar el tour del dashboard en otro device (localStorage es por-device; se veía «Paso 1 de 11 · Tu Radar» en móvil tras onboardear en desktop)
