@@ -10392,6 +10392,11 @@
     .rs .guic-badge.todo { background:var(--brand-50, rgba(47,91,255,.16)); color:var(--brand-500,#2F5BFF); }
     .rs .guic-badge.cook { background:rgba(255,138,61,.14); color:#FF8A3D; }
     .rs .guic-badge.done { background:var(--success-bg); color:var(--success-fg); }
+    /* aha del onboarding: el guion REAL aún se cocina en 2º plano — pulso sutil */
+    .rs .guic-badge.aha { background:rgba(79,124,255,.14); color:var(--brand-300,#97b2ff); animation:ahaPulse 1.6s ease-in-out infinite; }
+    .rs .guic-badge.aha svg { width:13px; height:13px; }
+    @keyframes ahaPulse { 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
+    @media (prefers-reduced-motion: reduce){ .rs .guic-badge.aha { animation:none; } }
     .rs .guic-metaR { display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--text-secondary); }
     .rs .guic-mult { font-family:var(--font-display); font-weight:700; color:var(--success-fg,#3FE0A0); }
     .rs .guic-src { font-family:var(--font-mono); font-size:11px; color:var(--text-tertiary); }

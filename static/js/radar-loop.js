@@ -2840,7 +2840,9 @@
     var metaR='<span class="guic-metaR">'+multTxt+src+'</span>';
     var badge=cooking
       ? '<span class="guic-badge cook">'+L("Cocinando…","Cooking…")+'</span>'
-      : rec
+      : g._ahaPending
+        ? '<span class="guic-badge aha">'+IC.spark+' '+L("Afinándose en tu voz…","Polishing in your voice…")+'</span>'
+        : rec
         ? '<span class="guic-badge done">'+IC.check+' '+L("Grabado","Recorded")+'</span>'
         : '<span class="guic-badge todo">'+L("Por grabar","To record")+'</span>';
     // estado «cocinando»: esqueleto shimmer + «Cocinando el guion ···»
@@ -3055,10 +3057,13 @@
     loadGroupSource(grp);
     var n=grp.guiones.length;
     var nDraft=grp.guiones.filter(function(g){return g.status!=="recorded";}).length;
-    var badge = n===0
+    var _pend=grp.guiones.some(function(g){return g._ahaPending;});   // aha del onboarding: el real aún se cocina
+    var badge = _pend
+      ? '<span class="guic-badge aha">'+IC.spark+' '+L("Afinándose en tu voz…","Polishing in your voice…")+'</span>'
+      : (n===0
       ? '<span class="guic-badge todo">'+L("Sin guion","No script")+'</span>'
       : (nDraft>0 ? '<span class="guic-badge todo">'+L("Por grabar","To record")+'</span>'
-                  : '<span class="guic-badge done">'+IC.check+' '+L("Grabado","Recorded")+'</span>');
+                  : '<span class="guic-badge done">'+IC.check+' '+L("Grabado","Recorded")+'</span>'));
     var mult=grp.mult?('<span class="guic-mult">'+ESC(String(grp.mult).replace(/×\s*$/,""))+'×</span>'):'';
     var src=grp.handle?('<span class="guic-src">'+ESC(grp.handle)+'</span>'):'';
     var thumb=grp.thumb?('<img src="'+ESC(grp.thumb)+'" alt="" loading="lazy">'):('<div class="igc-ph" style="background:'+_galGrad(grp.key)+'"></div>');
@@ -6554,6 +6559,11 @@
       from:"@"+r.creator.handle, type:"guión", thumb:r.thumb||null, url:r.url||null,
       srcViews:r.views||"", srcLikes:r.likes||"", reelId:r.id,
       genOptions:{options:r.options, pov_text:null, chosen:0}});
+    // Coordinación con el house tour (Leo 08-jul): la card en «Ideas robadas» muestra
+    // «Afinándose en tu voz…» mientras el guion REAL se cocina en 2º plano — cuando el
+    // tour llega al paso de Guiones el usuario ve un estado honesto, y la card se
+    // actualiza EN VIVO al terminar (_ahaSwap → bgRender).
+    var _gAha=guionById(gidNew); if(_gAha) _gAha._ahaPending=true;
     S._lastStealKey="r:"+r.id;
     S._stolenReels=S._stolenReels||{}; S._stolenReels[r.id]=r;
     removeStolenReel(id); brainEmitSignals(); startFlash();
@@ -6582,7 +6592,8 @@
     //    el real y _ahaSwap lo refleja en reveal + guion.
     _postGenerate(r, Date.now(), function(err){
       delete r._ahaReq; r._ahaPending=false;
-      if(err){ if(S.revealReel && S.revealReel.id===r.id){ S.revealReel._ahaPending=false; render(); } return; }
+      if(err){ var _ge=guionById(gidNew); if(_ge) _ge._ahaPending=false;   // error → la card deja de decir «afinándose» (queda el placeholder)
+        if(S.revealReel && S.revealReel.id===r.id){ S.revealReel._ahaPending=false; render(); } else { bgRender(); } return; }
       _ahaSwap(r, gidNew);
       refreshCredits().then(function(){ flashSpark(0); });   // el aha no cobra, pero refresca saldo real
     });
@@ -6593,11 +6604,16 @@
     var g=guionById(gid), s=r.script||{};
     if(g){ g.hook=s.hook||g.hook; g.title=s.hook||g.title; if(s.beats) g.beats=s.beats; if(s.close!=null) g.close=s.close;
       if(r.recFormat) g.recFormat=r.recFormat; g.genOptions={options:r.options||[], pov_text:r.povText||null, chosen:0};
-      if(r._sid) g._sid=r._sid; }
+      if(r._sid) g._sid=r._sid; g._ahaPending=false; }
     if(S.revealReel && S.revealReel.id===r.id){
       S.revealReel.script=r.script; S.revealReel.options=r.options; S.revealReel.optIdx=0; S.revealReel.hookIdx=0;
       S.revealReel.recFormat=r.recFormat; S.revealReel.povText=r.povText; S.revealReel._ahaPending=false; S.revealReel._sid=r._sid;
       render();   // swap en sitio: el guard anti-parpadeo (mismo r.id) evita re-animar el hero
+    } else {
+      // El usuario ya no está en el reveal (p.ej. el house tour lo llevó a «Ideas
+      // robadas»): refresca la lista EN VIVO para que la card pase de «Afinándose…»
+      // al guion real delante de sus ojos. bgRender = gateado + coalescido.
+      bgRender();
     }
   }
   /* Editor · "Regenerar guion" = re-tira del mismo material por COST.regen (1 cr),
