@@ -479,35 +479,19 @@ async function main() {
           exh.moreBtn && !exh.oldPay && !exh.deadEnd, JSON.stringify(exh));
   }
 
-  /* ═══ Feature David · «Guardar idea con datos» (de pago, junto a «Robar guion») ═══
-     Botón hermano de «Robar» que guarda el reel + datos sin generar guión. Rojo si no aparece
-     junto a «Robar» o si al pulsarlo no confirma el guardado. */
-  console.log("\n■ Guardar idea con datos (junto a «Robar»)");
+  /* ═══ Bucle robar→desarrollar (Fase 2) · el «Guardar · 1cr» quedó ABSORBIDO por ROBAR ═══
+     ROBAR pasa a coleccionar (1cr); DESARROLLAR el guion (3cr) es un paso aparte en Ideas
+     robadas. El viejo botón hermano «Guardar idea con datos» (save-idea-data) se RETIRA del
+     reel. (El flujo logueado collect→develop→cola se QAea en el túnel, no en demo: en demo
+     robar mantiene el reveal para no romper el contrato del harness.) */
+  console.log("\n■ Bucle robar→desarrollar (Fase 2)");
   await nav(`${BASE}/profile/radar?plan=creador`);
-  const siBtn = await evaluate(`(function(){
+  const loopBtns = await evaluate(`(function(){
     var root=document.querySelector('#radarRoot');
     return { hasSave: !!root.querySelector('[data-act="save-idea-data"]'),
              hasSteal: !!root.querySelector('[data-act="steal"]') };
   })()`);
-  check("«Guardar idea» aparece junto a «Robar guion»", siBtn.hasSave && siBtn.hasSteal, JSON.stringify(siBtn));
-  await click('#radarRoot [data-act="save-idea-data"]');
-  await sleep(400);
-  const saved = await evaluate(`(function(){
-    var t=document.getElementById('rsToast');
-    return { toast:(t&&t.textContent||'').trim().slice(0,70) };
-  })()`);
-  check("«Guardar idea» confirma el guardado con datos", /guardada|saved/i.test(saved.toast), JSON.stringify(saved));
-  // #2 (David): la idea guardada DEBE aparecer en su lista (Guiones → Ideas robadas). El bug
-  // era que la inserción optimista no llevaba _brand → invisible en marcas ≠ default. Navega a
-  // Guiones y comprueba que hay al menos un grupo de «Ideas robadas» (la que acabamos de guardar).
-  await click('#radarRoot [data-act="goto-saved-ideas"]');
-  await sleep(500);
-  const inList = await evaluate(`(function(){
-    var root=document.querySelector('#radarRoot');
-    return { tab: !!root.querySelector('.igc, .ws-canvas, .idea-group, [data-act="ws-open"]'),
-             groups: root.querySelectorAll('.igc, .idea-group').length };
-  })()`);
-  check("idea guardada APARECE en su lista (Guiones · Ideas robadas)", inList.tab || inList.groups > 0, JSON.stringify(inList));
+  check("«Robar» sigue presente y el viejo «Guardar · 1cr» está retirado del reel", loopBtns.hasSteal && !loopBtns.hasSave, JSON.stringify(loopBtns));
 
   /* ═══ #5 (David) · AISLAMIENTO POR MARCA — fuga entre clientes (crítico agencia) ═══
      El demo siembra una CANARY: un guion robado de OTRA marca (_brand ajeno). stolenGroups DEBE
