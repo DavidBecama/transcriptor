@@ -13754,14 +13754,18 @@ const _TOUR_EN = (document.documentElement.lang || "es").toLowerCase().indexOf("
 // tutorial de la página Radar se OMITE (el usuario ya vivió el robo en el cofre).
 // Paso 1 es ephemeral: si su ventana ya no existe (re-runs, ?tour=1 desde el dashboard),
 // renderTourStep lo salta solo y el tour empieza en Guiones.
+// Onboarding v2 (David 09/07): el robo del cofre NO abre reveal — aterriza en el Radar
+// limpio y el tour auto-arranca ahí. Por eso el 1er paso presenta el RADAR (no la vieja
+// ventana del guion, que ya no existe). El guion real se cocina en bg y aterriza en
+// Ideas robadas (paso 2) en segundos. Métricas cierra con el muro Pro (Bernat).
 const TOUR_STEPS = _TOUR_EN ? [
-  {                   target: '.script-side .belt', ephemeral: true, text: "Your first script is ready — and these are your two moves: «Record it now» opens the teleprompter so you read it straight to camera (free), or «Steal the next signal» chains the next script without leaving the loop." },
+  { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "This is your Radar: every day I bring you the reels blowing up in your niche, ready to steal and turn into your next script." },
   { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Your first script lands right here, in Stolen ideas — you'll have it in seconds, already in your voice. Everything you steal lives here, ready to record and reuse." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Your Brain: it learns your voice. The more you create, the more the next one sounds like you. That's the moat." },
   { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "The ranking: see how you stack up against other creators in your niche — and climb." },
   { tab: 'metrics',   target: '[data-tour="tab-metrics"]',   text: "Metrics: the hooks, hours and topics actually moving your account. Unlock them and double down — with Pro. 👉" },
 ] : [
-  {                   target: '.script-side .belt', ephemeral: true, text: "Tu primer guión ya está listo — y estos son tus dos caminos: «Grábalo ahora» abre el teleprónter y lo lees directo a cámara (gratis), o «Roba la siguiente señal» y encadenas el próximo guion sin salir del bucle." },
+  { tab: 'dashboard', target: '[data-tour="tab-dashboard"]', text: "Este es tu Radar: cada día te traigo los reels que están petando en tu nicho, listos para robar y convertir en tu próximo guion." },
   { tab: 'guiones',   target: '[data-tour="tab-guiones"]',   text: "Tu primer guion aterriza aquí, en Ideas robadas — en segundos lo tienes, ya en tu voz. Todo lo que robas vive aquí, listo para grabar y reutilizar." },
   { tab: 'brain',     target: '[data-tour="tab-brain"]',     text: "Tu Cerebro: aprende tu voz. Cuanto más creas, más tuyo suena lo siguiente. Ese es el moat." },
   { tab: 'leaderboard', target: '[data-tour="tab-leaderboard"]', text: "El ranking: mira cómo vas frente a otros creadores de tu nicho — y sube posiciones." },
