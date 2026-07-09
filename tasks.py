@@ -2599,6 +2599,173 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         _release_lock()
 
 
+@celery_app.task(bind=True, name="tasks.develop_idea")
+def develop_idea_task(self, idea_id, user_id, style_arg, custom_prompt, style_label,
+                      language=None, charge_mode="free", charge_units=3, charge_cents=0):
+    """DESARROLLAR (bucle robar→desarrollar): genera el guion de una idea ROBADA, async y
+    ENCOLABLE — el usuario desarrolla varias y salen una a una sin bloquear. El cobro (3 cr)
+    ya se hizo AL ENCOLAR en el endpoint; aquí SOLO se reembolsa si el desarrollo falla
+    (charge_mode/units/cents describen lo cobrado, para revertir simétrico a _charge_units_locked
+    cross-process). Parte del SNAPSHOT de la idea (transcript/raw guardados) → sobrevive aunque
+    el reel salga del pool. Persiste 2 opciones en `scripts` (idea_id link) y marca la idea
+    status='scripted'. El asistente ya viene resuelto por el endpoint (style_arg/custom/label)."""
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    COST_CENTS = 18
+
+    def _clear_mark():
+        # Limpia la marca «en vuelo» de Redis (misma clave que app._dev_mark_key) para que
+        # /develop-status deje de reportar 'developing'. Best-effort (si Redis cae, TTL 15min).
+        try:
+            import redis as _redis_lib
+            _r = _redis_lib.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
+                                     socket_connect_timeout=2, socket_timeout=2)
+            _r.delete("rs:dev:" + str(idea_id))
+        except Exception:
+            pass
+
+    def _refund_and_reset(reason):
+        # Reembolso simétrico a _charge_units_locked (cross-process) + limpia la marca. La idea
+        # se queda en 'draft' (nunca la movimos), así el front la vuelve a ofrecer desarrollable.
+        _clear_mark()
+        try:
+            if charge_mode == "paid":
+                pr = db.table("profiles").select("monthly_usage").eq("id", user_id).single().execute().data or {}
+                db.table("profiles").update(
+                    {"monthly_usage": max(0, (pr.get("monthly_usage") or 0) - int(charge_units or 0))}
+                ).eq("id", user_id).execute()
+            elif charge_mode == "free" and charge_cents:
+                pr = db.table("profiles").select("credits_cents").eq("id", user_id).single().execute().data or {}
+                db.table("profiles").update(
+                    {"credits_cents": (pr.get("credits_cents") or 0) + int(charge_cents)}
+                ).eq("id", user_id).execute()
+        except Exception as _e:
+            logger.error("develop_idea refund failed idea=%s user=%s err=%s", idea_id, user_id, _e)
+        try:
+            db.table("ideas").update({"status": "draft",
+                                      "updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", idea_id).execute()
+        except Exception:
+            pass
+
+    def _fail(error, message):
+        logger.warning("[develop_failed] cause=%s idea=%s user=%s", error, idea_id, user_id)
+        try:
+            from emails import track as _ph_track
+            _ph_track("develop_failed", user_id, {"cause": error, "idea_id": idea_id})
+        except Exception:
+            pass
+        _refund_and_reset(error)
+        return {"ok": False, "error": error, "message": message}
+
+    # 1. Cargar idea (del user).
+    try:
+        ir = db.table("ideas").select("*").eq("id", idea_id).eq("user_id", user_id).single().execute()
+        idea = ir.data
+    except Exception:
+        idea = None
+    if not idea:
+        return _fail("idea_not_found", "Idea no encontrada.")
+
+    # 2. Material de origen: SNAPSHOT de la idea (transcript preferente) + título/raw.
+    title = (idea.get("title") or "").strip()
+    raw_text = (idea.get("raw_text") or "").strip()
+    transcript = (idea.get("transcript_snapshot") or "").strip()
+    ig_username = idea.get("inspired_by_username") or ""
+    source_block = transcript or raw_text
+    user_content = (
+        "[Idea robada del usuario" + ((" — de @" + ig_username) if ig_username else "") + "]\n" +
+        (("[Título]\n" + title + "\n\n") if title else "") +
+        "[Material de origen — lo que hizo funcionar al reel]\n" + source_block + "\n\n" +
+        "Tarea: conviértelo en un guion COMPLETO de 30-45 s hablados para un reel, en la VOZ del "
+        "usuario. Reescribe la EJECUCIÓN (no copies palabra por palabra), pero PRESERVA lo específico "
+        "que lo hace funcionar (cifras, nombres, comparaciones, el ÁNGULO concreto y el REGISTRO/tono "
+        "del original — si es humor/sátira/diálogo, mantenlo). Prohibido inventar logros propios del "
+        "usuario. Total 100-140 palabras, mínimo 8 frases en el body."
+    )
+    try:
+        from app import _out_lang_instruction  # lazy (rompe circular)
+        user_content += _out_lang_instruction(language)
+    except Exception:
+        pass
+
+    if style_arg == "hooks":   # 'hooks' produce one-liners, no un guion → degrada a viral
+        style_arg = style_label = "viral"
+
+    # 3. Generar 2 OPCIONES (mismo generador que el robo de reel → mismo reveal con hook-picker).
+    try:
+        from app import _generate_script_options, _shape_script_option, GENERATION_LLM_TIMEOUT, ensure_recording_format
+        raw_opts = _generate_script_options(user_content, style_arg, custom_prompt, user_id,
+                                            idea.get("project_id"), n=2, timeout=GENERATION_LLM_TIMEOUT)
+    except Exception as e:
+        logger.exception("develop_idea LLM failed idea=%s: %s", idea_id, e)
+        if style_arg == "custom" and "empty content" in str(e).lower():
+            return _fail("assistant_empty_response",
+                         "El asistente '" + (style_label or "custom") + "' devolvió vacío. Edita sus instrucciones o usa otro estilo.")
+        return _fail("llm_error", "No se pudo generar el guion. Inténtalo de nuevo.")
+
+    options = [_shape_script_option(r) for r in raw_opts]
+    _pov_text = raw_opts[0].get("pov_text") or None
+    _rec_fmt = raw_opts[0].get("recording_format") or None
+    try:
+        _ms = idea.get("metrics_snapshot") or {}
+        _rec_fmt = ensure_recording_format(_rec_fmt, caption=raw_text, transcript=transcript,
+                                           duration_sec=_ms.get("video_duration_sec"),
+                                           cached_formato=_ms.get("formato"))
+    except Exception:
+        pass
+    _alt_hooks = (options[0]["hooks"][1:] or None)
+    llm_title = options[0]["title"]
+    result = options[0]["script"]
+    today_short = datetime.now(timezone.utc).strftime("%d %b %Y").lower()
+    script_title = llm_title or (title or ("Guion · " + today_short))
+
+    # 4. INSERT scripts (idea_id link). SIN cobro (ya cobrado al encolar).
+    script_id = None
+    try:
+        _TASK_LABELS = {"viral": "Viral", "divertido": "Divertido", "hooks": "Hooks",
+                        "storytelling": "Storytelling", "story": "Storytelling", "linkedin": "LinkedIn"}
+        _row = {
+            "user_id": user_id, "idea_id": idea_id, "transcription_id": None,
+            "title": script_title, "script": result, "project_id": idea.get("project_id"),
+            "from_competitor_reel_id": (idea.get("inspired_by_id") if idea.get("inspired_by_type") == "reel" else None),
+            "from_competitor_username": ig_username or None,
+            "assistant_name": (_TASK_LABELS.get(style_label, style_label) if style_label else None),
+            "alt_hooks": _alt_hooks,
+            "recording_format": _rec_fmt,
+            "gen_options": {"options": options, "pov_text": _pov_text, "chosen": None},
+        }
+        try:
+            ins = db.table("scripts").insert(_row).execute()
+        except Exception as _e1:
+            if "recording_format" in str(_e1).lower() or "gen_options" in str(_e1).lower():
+                _row.pop("recording_format", None)
+                _row.pop("gen_options", None)
+                ins = db.table("scripts").insert(_row).execute()
+            else:
+                raise
+        if ins.data:
+            script_id = ins.data[0].get("id")
+    except Exception as e:
+        logger.exception("develop_idea scripts insert failed idea=%s: %s", idea_id, e)
+        return _fail("insert_error", "Error guardando el guion.")
+
+    # 5. Marca la idea como desarrollada (guion aterrizado) + limpia la marca «en vuelo».
+    try:
+        db.table("ideas").update({"status": "scripted",
+                                  "updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", idea_id).execute()
+    except Exception:
+        pass
+    _clear_mark()
+
+    try:
+        from emails import track as _ph_track
+        _ph_track("idea_developed", user_id, {"idea_id": idea_id, "script_id": script_id})
+    except Exception:
+        pass
+    return {"ok": True, "idea_id": idea_id, "script_id": script_id, "title": script_title}
+
+
 # ── v0.15.8: sweeper periódico de recursos stale ─────────────────────────────
 @celery_app.task(bind=True, name="tasks.transcribe_reel")
 def transcribe_reel_task(self, reel_id):
