@@ -10018,6 +10018,29 @@
     @media (prefers-reduced-motion: reduce){ .rs .onbmr-skel { animation:none; } }
     .rs .onb-skip { display:block; margin:18px auto 0; background:none; border:none; color:var(--text-tertiary); font-size:13px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:8px; min-height:44px; }
     .rs .onb-skip:hover { color:var(--text-secondary); }
+    /* Vía «Descríbete con un prompt de IA» del paso Cerebro. SECUNDARIA (onb-ctx--sub) =
+       disclosure colapsable para no competir con «Alimentar el Cerebro»; PRIMARIA
+       (onb-ctx--solo, usuario sin Instagram) = card sólida abierta. */
+    .rs .onb-ctx { margin-top:16px; text-align:left; }
+    .rs .onb-ctx--sub { border-top:1px solid var(--border-subtle); }
+    .rs .onb-ctx-toggle { width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; background:none; border:none; padding:14px 2px; cursor:pointer; color:var(--text-secondary); font:inherit; font-size:13.5px; font-weight:600; text-align:left; min-height:44px; }
+    .rs .onb-ctx-toggle:hover { color:var(--text-primary); }
+    .rs .onb-ctx-chev { display:flex; color:var(--text-tertiary); transition:transform .2s ease; }
+    .rs .onb-ctx--sub.open .onb-ctx-chev { transform:rotate(180deg); }
+    .rs .onb-ctx--solo { border:1px solid var(--border-default); border-radius:16px; background:var(--surface-base); padding:18px; }
+    .rs .onb-ctx-t { font-family:var(--font-mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--brand-500); margin-bottom:12px; }
+    .rs .onb-ctx-body { padding-top:2px; }
+    .rs .onb-ctx-lead { font-size:13px; color:var(--text-secondary); line-height:1.5; margin:0 0 12px; }
+    .rs .onb-ctx-prompt { border:1px solid var(--border-default); border-radius:12px; background:var(--surface-sunken); overflow:hidden; margin-bottom:12px; }
+    .rs .onb-ctx-prompt-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 8px 7px 12px; border-bottom:1px solid var(--border-subtle); background:color-mix(in srgb, var(--surface-raised) 55%, transparent); }
+    .rs .onb-ctx-prompt-lbl { font-family:var(--font-mono); font-size:10.5px; letter-spacing:.16em; color:var(--text-tertiary); }
+    .rs .onb-ctx-copy { display:inline-flex; align-items:center; gap:6px; background:var(--surface-base); border:1px solid var(--border-default); border-radius:8px; padding:6px 11px; font:inherit; font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; min-height:34px; }
+    .rs .onb-ctx-copy:hover { border-color:var(--brand-500); color:var(--brand-500); }
+    .rs .onb-ctx-copy svg { width:13px; height:13px; }
+    .rs .onb-ctx-code { display:block; padding:13px 14px; font-family:var(--font-mono); font-size:12.5px; line-height:1.55; color:var(--text-primary); white-space:pre-wrap; word-break:break-word; }
+    .rs .onb-ctx-ta { display:block; width:100%; box-sizing:border-box; min-height:96px; resize:vertical; padding:12px 14px; border:1px solid var(--border-default); border-radius:12px; background:var(--surface-base); color:var(--text-primary); font:inherit; font-family:var(--font-body); font-size:14px; outline:none; margin:0 0 12px; }
+    .rs .onb-ctx-ta:focus { border-color:color-mix(in srgb, var(--brand-500) 50%, transparent); }
+    .rs .onb-ctx-save { width:100%; justify-content:center; margin:0; }
     .rs .onb-err { margin-top:14px; padding:11px 14px; border-radius:11px; background:color-mix(in srgb, var(--danger-fg, #ef4444) 12%, transparent); border:1px solid color-mix(in srgb, var(--danger-fg, #ef4444) 35%, transparent); color:var(--danger-fg, #ef4444); font-size:13.5px; }
     .rs .onb-cards { display:flex; flex-direction:column; gap:10px; margin-bottom:22px; }
     .rs .onb-card { display:flex; align-items:center; gap:13px; width:100%; text-align:left; padding:13px 15px; border:1.5px solid var(--border-default); border-radius:14px; background:var(--surface-base); cursor:pointer; transition:border-color .15s ease, background .15s ease; }
@@ -12378,6 +12401,9 @@
     .rs .reveal-hero-t { font-family:var(--font-accent); font-weight:800; font-size:clamp(22px,4.4vw,30px); line-height:1.05; letter-spacing:-.01em; color:var(--text-primary); }
     .rs .reveal-hero-proof { margin-top:8px; font-size:13.5px; color:var(--text-secondary); }
     .rs .reveal-hero-proof .num-hi { color:var(--success-fg); font-weight:800; }
+    /* Etiqueta «robo de prueba» (David 08/07): explica que este es instantáneo+gratis
+       porque es la prueba, y que los siguientes cuestan/tardan. */
+    .rs .reveal-hero-note { margin-top:10px; padding-top:10px; border-top:1px solid var(--border-subtle); font-size:12.5px; line-height:1.45; color:var(--text-tertiary); }
     @keyframes revealHeroIn { 0%{ opacity:0; transform:translateY(10px) scale(.98); } 100%{ opacity:1; transform:translateY(0) scale(1); } }
     @media (prefers-reduced-motion: reduce){ .rs .reveal-hero { animation:none; } }
     /* Anti-parpadeo: en re-renders de fondo del guion ya mostrado (.no-entry) NO reanimar

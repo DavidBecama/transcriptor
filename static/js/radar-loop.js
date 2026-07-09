@@ -784,13 +784,36 @@
   // ChatGPT/Claude (estilo/tono/temas) → se suma al Cerebro (POST /api/brain/instructions,
   // mismo saneado+guardarraíl que el campo permanente). Vía alternativa a leer tus reels.
   var ONB_CTX_PROMPT="Analiza mi estilo como creador de reels para pasárselo a otro guionista. En 6-8 líneas y sin relleno: mi tema, mi tono, mis muletillas, lo que EVITO, y mi estructura típica de reel.";
-  function onbCtxHTML(){
-    return '<div class="onb-ctx">'+
-      '<div class="onb-ctx-t">'+L("O descríbete tú en 1 minuto","Or describe yourself in 1 minute")+'</div>'+
-      '<p class="onb-ctx-lead">'+L("Copia esto en ChatGPT o Claude (pégale 2-3 de tus reels o su idea) y trae aquí lo que te devuelva. El Cerebro lo suma a tu estilo.","Paste this into ChatGPT or Claude (with 2-3 of your reels) and bring back what it returns. The Brain adds it to your style.")+'</p>'+
-      '<div class="onb-ctx-prompt"><code>'+ESC(ONB_CTX_PROMPT)+'</code><button class="onb-ctx-copy" data-act="onb-ctx-copy">'+L("Copiar","Copy")+'</button></div>'+
-      '<textarea id="rsOnbCtx" class="vc-ta" rows="4" maxlength="2000" placeholder="'+L("Pega aquí lo que te devuelva ChatGPT/Claude…","Paste what ChatGPT/Claude returns…")+'">'+ESC(S.onb.pastedCtx||"")+'</textarea>'+
-      '<button class="btn btn-md btn-secondary" data-act="onb-ctx-save">'+IC.spark+' '+L("Sumar mi estilo al Cerebro","Add my style to the Brain")+'</button>'+
+  // forceOpen=true → esta vía es la PRIMARIA (usuario sin Instagram, sin reels): card
+  // sólida abierta. Si no, es SECUNDARIA (ya tienes reels) → disclosure colapsable para
+  // que no compita con «Alimentar el Cerebro».
+  function onbCtxHTML(forceOpen){
+    var open = forceOpen || !!S.onb._ctxOpen;
+    var body =
+      '<div class="onb-ctx-body">'+
+        '<p class="onb-ctx-lead">'+L("Copia este prompt en ChatGPT o Claude (dale 2-3 de tus reels o su idea) y trae aquí lo que te devuelva. El Cerebro lo suma a tu estilo.","Copy this prompt into ChatGPT or Claude (give it 2-3 of your reels) and bring back what it returns. The Brain adds it to your style.")+'</p>'+
+        '<div class="onb-ctx-prompt">'+
+          '<div class="onb-ctx-prompt-head">'+
+            '<span class="onb-ctx-prompt-lbl">PROMPT</span>'+
+            '<button class="onb-ctx-copy" data-act="onb-ctx-copy">'+IC.doc+'<span>'+L("Copiar","Copy")+'</span></button>'+
+          '</div>'+
+          '<code class="onb-ctx-code">'+ESC(ONB_CTX_PROMPT)+'</code>'+
+        '</div>'+
+        '<textarea id="rsOnbCtx" class="onb-ctx-ta" rows="4" maxlength="2000" placeholder="'+L("Pega aquí lo que te devuelva ChatGPT/Claude…","Paste what ChatGPT/Claude returns…")+'">'+ESC(S.onb.pastedCtx||"")+'</textarea>'+
+        '<button class="btn btn-md btn-secondary onb-ctx-save" data-act="onb-ctx-save">'+IC.spark+' '+L("Sumar mi estilo al Cerebro","Add my style to the Brain")+'</button>'+
+      '</div>';
+    if(forceOpen){
+      return '<div class="onb-ctx onb-ctx--solo">'+
+        '<div class="onb-ctx-t">'+L("Descríbete en 1 minuto","Describe yourself in 1 minute")+'</div>'+
+        body+
+      '</div>';
+    }
+    return '<div class="onb-ctx onb-ctx--sub'+(open?' open':'')+'">'+
+      '<button class="onb-ctx-toggle" data-act="onb-ctx-toggle" aria-expanded="'+(open?'true':'false')+'">'+
+        '<span class="onb-ctx-toggle-t">'+L("¿No tienes reels tuyos? Descríbete →","No reels of your own? Describe yourself →")+'</span>'+
+        '<span class="onb-ctx-chev" aria-hidden="true">'+IC.chev+'</span>'+
+      '</button>'+
+      (open?body:'')+
     '</div>';
   }
   // «Tus vídeos» (David 24-jun): tras «este eres tú», enseña 3 reels suyos (del MISMO
@@ -825,7 +848,7 @@
       (_skipped?'':'<div class="onbmr-grid">'+cards+'</div>')+
       onbErr()+
       (_skipped?'':cta)+
-      onbCtxHTML()+
+      onbCtxHTML(_skipped)+
       '<button class="onb-skip" data-act="onb-feed-skip">'+(_skipped?L("Saltar — lo entreno luego","Skip — I'll train it later"):L("Saltar este paso","Skip this step"))+'</button>'+
     '</section>';
   }
@@ -1204,16 +1227,24 @@
              mk("cofre2","javi.fit",1100000,6,"Nadie te cuenta esto de las dominadas"),
              mk("cofre3","marta.ahorra",870000,3,"Ahorré 5.000€ sin enterarme") ];
   }
-  // Elige el top-3 de reels (recientes ≤3 sem por explosión; si no, top-3 a secas). En demo
-  // cae a reels de muestra. Devuelve true si hay al menos 1.
+  // Elige el top-3 de reels (recientes ≤3 sem por explosión; si no, top-3 a secas),
+  // DIVERSIFICANDO: máx 1 carta por creador → las 3 nunca son del mismo (requisito David:
+  // con pool=1 mezclamos el nicho, pero si el competidor añadido domina la explosión las 3
+  // cartas seguirían siendo suyas). Si no hay 3 creadores distintos, rellena con el resto.
+  // En demo cae a reels de muestra. Devuelve true si hay al menos 1.
   function _cofrePickReels(){
     var _pool=(S.reels||[]); var _now=Date.now(), _win=21*24*3600*1000;
     var _byExp=function(a,b){ return (b.explosion||0)-(a.explosion||0); };
     var _recent=_pool.filter(function(r){ return r.postedTs && (_now-r.postedTs)<=_win; }).sort(_byExp);
-    var three=(_recent.length>=3?_recent:_pool.slice().sort(_byExp)).slice(0,3);
+    var ranked=(_recent.length>=3?_recent:_pool.slice().sort(_byExp));
+    var seenH={}, three=[];
+    ranked.forEach(function(r){ if(three.length>=3) return;
+      var h=(((r.creator&&r.creator.handle)||"")+"").toLowerCase();
+      if(h&&seenH[h]) return; if(h) seenH[h]=1; three.push(r); });
+    if(three.length<3){ ranked.forEach(function(r){ if(three.length>=3) return; if(three.indexOf(r)<0) three.push(r); }); }
     if(three.length<3 && isDemo()){ three=_cofreDemoReels(); S.reels=three; }
-    S._cofreReels=three;
-    return three.length>0;
+    S._cofreReels=three.slice(0,3);
+    return S._cofreReels.length>0;
   }
   // El COFRE arranca YA: su avalancha ES la carga (Leo 26-jun: fuera la pantalla
   // «Preparando tu radar»). Los reels del nicho se cargan DURANTE la avalancha; al
@@ -1233,7 +1264,7 @@
     var _pq=(S.brandId&&S.brandId!=="default")?("?project_id="+encodeURIComponent(S.brandId)):"";
     (function loop(){
       if(!S.onbStealOffer || !S.onbCofre) return;
-      apiGet("/api/tracked-creators/reels"+(_pq?_pq+"&":"?")+"sort=explosion&limit=24").then(function(r){
+      apiGet("/api/tracked-creators/reels"+(_pq?_pq+"&":"?")+"sort=explosion&limit=24&pool=1").then(function(r){   // pool=1: variedad = competidor añadido + pool de nicho, no solo el añadido
         if(!S.onbStealOffer || !S.onbCofre) return;
         if(r&&r.ok&&r.d&&Array.isArray(r.d.reels)){ S.reels=r.d.reels.map(normReel); S.radarSeed=!!r.d.seed; }
         var n=(S.reels||[]).length, el=Date.now()-t0;
@@ -5450,10 +5481,12 @@
       var _views=r.views?('<b class="num-hi">'+ESC(r.views)+'</b> views'):'';
       var _mult=(r.explosionTxt!=null)?('<b class="num-hi">'+ESC(String(r.explosionTxt))+'×</b> '+L("su media","their average")):'';
       var _proof=[_views,_mult].filter(Boolean).join(' · ');
-      hero='<div class="reveal-hero">'+
-        '<div class="reveal-hero-badge">'+IC.bolt+' '+L("TU PRIMER GUION","YOUR FIRST SCRIPT")+'</div>'+
+      var _aha=!!r._ahaFree;   // robo de prueba del onboarding: gratis + instantáneo
+      hero='<div class="reveal-hero'+(_aha?' reveal-hero--trial':'')+'">'+
+        '<div class="reveal-hero-badge">'+IC.bolt+' '+(_aha?L("TU ROBO DE PRUEBA · GRATIS","YOUR TRIAL STEAL · FREE"):L("TU PRIMER GUION","YOUR FIRST SCRIPT"))+'</div>'+
         '<div class="reveal-hero-t">'+L("Y ya es tuyo.","And it’s already yours.")+'</div>'+
         (_proof?'<div class="reveal-hero-proof">'+L("Robado de un reel que hizo","Stolen from a reel that did")+' '+_proof+'</div>':'')+
+        (_aha?'<div class="reveal-hero-note">'+L("Instantáneo porque es tu prueba. Los siguientes cuestan 3 créditos y tardan unos segundos en generarse.","Instant because it's your trial. The next ones cost 3 credits and take a few seconds.")+'</div>':'')+
       '</div>';
     }
     // Switcher de OPCIONES de guion (2) — el usuario elige.
@@ -5481,7 +5514,7 @@
       ? '<span class="saved-tag">'+IC.check+' '+L("Guardado en Ideas robadas","Saved to Stolen ideas")+'</span>'
       : '<span class="saved-tag saved-tag--pending">'+IC.spark+' '+L("Elección sin guardar","Unsaved choice")+'</span>';
     var mainHTML = hero+
-      '<div class="reveal-aha">'+IC.spark+' <span>Manifestando viralidad</span></div>'+
+      '<div class="reveal-aha'+(r._ahaPending?' aha-pending':'')+'">'+IC.spark+' <span>'+(r._ahaPending?L("Afinando en tu voz…","Polishing it in your voice…"):L("Manifestando viralidad","Manifesting virality"))+'</span></div>'+
       '<div class="script-src"><span>Robado de <b style="color:var(--text-secondary)">@'+ESC(r.creator.handle)+'</b></span><span style="opacity:.4">·</span><span class="voice-tag">'+IC.spark+' En la voz de '+ESC(brand().name)+'</span><span style="opacity:.4">·</span>'+savedBadge+'</div>'+
       '<div class="script-acts">'+(r.url
         ? '<a class="script-act" href="'+ESC(r.url)+'" target="_blank" rel="noopener noreferrer">'+IC.eye+' '+L("Ver original","View original")+'</a>'
@@ -6499,6 +6532,74 @@
       else { refreshCredits().then(function(){ flashSpark(0); }); }
     });
   }
+  /* Tutorial · PRIMER robo (cofre) INSTANTÁNEO. La espera async de 40-90s en el orbe es
+     donde se caía el onboarding → aquí el reveal sale YA con un aha pre-horneado por nicho
+     (placeholder) y en 2º plano se genera el robo REAL (gratis, onboarding_aha) que
+     SUSTITUYE el placeholder cuando cuaja («afinado en tu voz»). Si el real no llega o
+     falla, el placeholder se queda como guion final: nunca hay espera. La House tour v2
+     (Leo) arranca sobre el reveal instantáneo vía S._tourAfterReveal, igual que en steal().
+     Solo prod — en demo el robo ya es síncrono y rápido, y no tocamos el harness. */
+  function onbAhaSteal(id){
+    if(isDemo()) return steal(id);   // demo: robo síncrono (~1.7s) — sin cambiar el harness
+    var r=reelById(id); if(!r) return;
+    // 1) Placeholder por nicho → 1 opción para que el reveal renderice al instante.
+    var ph=onbDemoAhaScript(r);
+    r._ahaReq=true; r._ahaPending=true;
+    r.options=[{ title:(ph.hook||"").slice(0,60), hooks:[ph.hook], body:ph.beats||[], closing:ph.close||"",
+      script:[ph.hook].concat(ph.beats||[]).concat(ph.close?[ph.close]:[]).join("\n") }];
+    r.optIdx=0; r.hookIdx=0; r.script={hook:ph.hook, beats:ph.beats||[], close:ph.close||""};
+    // 2) Guion ya creado (placeholder) → «Ideas robadas»/«Ver la idea» funcionan al instante;
+    //    _ahaSwap lo actualiza in-place con el guion real (mismo id, sin duplicar).
+    var s=r.script; var gidNew=addGuion({title:s.hook, hook:s.hook, beats:s.beats, close:s.close,
+      from:"@"+r.creator.handle, type:"guión", thumb:r.thumb||null, url:r.url||null,
+      srcViews:r.views||"", srcLikes:r.likes||"", reelId:r.id,
+      genOptions:{options:r.options, pov_text:null, chosen:0}});
+    S._lastStealKey="r:"+r.id;
+    S._stolenReels=S._stolenReels||{}; S._stolenReels[r.id]=r;
+    removeStolenReel(id); brainEmitSignals(); startFlash();
+    // 3) Reveal INSTANTÁNEO (snapshot, como steal()).
+    S.revealReel={ id:r.id, creator:r.creator, url:r.url, ig_url:r.ig_url, permalink:r.permalink,
+      ig_reel_id:r.ig_reel_id, views:r.views, likes:r.likes, explosionTxt:r.explosionTxt,
+      thumb:r.thumb, cap:r.cap, dur:r.dur, _sid:r._sid, _gid:gidNew,
+      script:r.script, options:r.options, optIdx:0, hookIdx:0,
+      recFormat:r.recFormat, povText:r.povText, _saved:true, _ahaPending:true, _ahaFree:true };
+    S.activeGuionId=gidNew; S.reel=r; S.genKind="script"; S.view="script";
+    var _firstSteal=firstStealPending();
+    S._firstStealCelebrate=_firstSteal; if(_firstSteal) markFirstSteal();
+    render();
+    if(_firstSteal){ try{ brainFeast(16); }catch(e){} }
+    // 4) House tour v2 sobre el reveal instantáneo (mismo mecanismo que steal(): el cofre
+    //    ya dejó S._tourAfterReveal=true). El belt del reveal (paso 1 del tour) ya existe.
+    if(S._tourAfterReveal){
+      S._tourAfterReveal=false;
+      var _tSeen=false; try{ _tSeen=localStorage.getItem("onboarding_completed")==="true"; }catch(e){}
+      if(!_tSeen && typeof window.startTour==="function"){
+        setTimeout(function(){ if(S.view==="script"){ try{ window.startTour(); }catch(e){} } }, 1400);
+      }
+    }
+    // 5) Robo REAL en 2º plano (gratis). Bypass del short-circuit de ensureScript (r.options
+    //    ya tiene el placeholder) → _postGenerate directo; _normScriptOptions sobrescribe con
+    //    el real y _ahaSwap lo refleja en reveal + guion.
+    _postGenerate(r, Date.now(), function(err){
+      delete r._ahaReq; r._ahaPending=false;
+      if(err){ if(S.revealReel && S.revealReel.id===r.id){ S.revealReel._ahaPending=false; render(); } return; }
+      _ahaSwap(r, gidNew);
+      refreshCredits().then(function(){ flashSpark(0); });   // el aha no cobra, pero refresca saldo real
+    });
+  }
+  // Sustituye el placeholder por el guion REAL (si el user sigue en ese reveal).
+  function _ahaSwap(r, gid){
+    applyScriptOption(r,0,0);
+    var g=guionById(gid), s=r.script||{};
+    if(g){ g.hook=s.hook||g.hook; g.title=s.hook||g.title; if(s.beats) g.beats=s.beats; if(s.close!=null) g.close=s.close;
+      if(r.recFormat) g.recFormat=r.recFormat; g.genOptions={options:r.options||[], pov_text:r.povText||null, chosen:0};
+      if(r._sid) g._sid=r._sid; }
+    if(S.revealReel && S.revealReel.id===r.id){
+      S.revealReel.script=r.script; S.revealReel.options=r.options; S.revealReel.optIdx=0; S.revealReel.hookIdx=0;
+      S.revealReel.recFormat=r.recFormat; S.revealReel.povText=r.povText; S.revealReel._ahaPending=false; S.revealReel._sid=r._sid;
+      render();   // swap en sitio: el guard anti-parpadeo (mismo r.id) evita re-animar el hero
+    }
+  }
   /* Editor · "Regenerar guion" = re-tira del mismo material por COST.regen (1 cr),
      más barato que un guión nuevo (3 cr). Demo: descuenta local y refresca. Prod:
      endpoint dedicado /scripts/<id>/regenerate (gap D1 cerrado) — cobra 1, no 3. */
@@ -6587,6 +6688,7 @@
   function _postGenerate(r, t0, cb, tries){
     var _b={language:(document.documentElement.lang||"es")}; var _p=_pidOf(S.brandId); if(_p) _b.project_id=_p;
     if(r&&r.suggestion) _b.no_follow=true;   // «Sugerencias de hoy»: roba el guion SIN seguir al creador
+    if(r&&r._ahaReq) _b.onboarding_aha=true;   // tutorial: 1er robo del cofre = gratis (backend gatea por 0 guiones)
     apiPost("/api/competitors/reels/"+encodeURIComponent(r.id)+"/generate-script", _b)
       .then(function(rr){ _handleGenResp(rr, r, t0, cb, tries); })
       .catch(function(){ r.script=r.script||{hook:r.cap,beats:[],close:""}; setTimeout(function(){cb();},800); });
@@ -7999,11 +8101,11 @@
     if(act==="onb-cofre-steal"){   // cofre: roba una de las 3 cartas → genera el guion (el «aha»)
       var _cof=S.onbCofre; if(!_cof || _cof.selected>=0) return;   // ya elegido
       var _idx=_cofreReels().map(function(x){return x.id;}).indexOf(id); if(_idx<0) return;
-      _cof.selected=_idx; render();   // muestra «Robando @X — generando…»
+      _cof.selected=_idx; render();   // muestra «Robado ⚡» en la carta
       // House tour v2 (Leo 05-jul): el onboarding termina EN el reveal del guion →
       // el tour arranca ahí (paso 1 = los dos botones de esa página), no en el radar.
       S._tourAfterReveal=true;
-      setTimeout(function(){ S.onbStealOffer=null; S.onbCofre=null; steal(id); }, 1100);
+      setTimeout(function(){ S.onbStealOffer=null; S.onbCofre=null; onbAhaSteal(id); }, 1100);   // reveal INSTANTÁNEO (placeholder) + real en 2º plano
       return;
     }
     if(act==="onb-steal-no"){ S.onbStealOffer=null; S.onbCofre=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
@@ -8195,6 +8297,11 @@
     if(act==="onb-confirm-edit") return onbGoto("handle");   // cambiar el @
     if(act==="onb-feed-myreels") return onbFeedMyReels();    // alimentar el Cerebro con tus reels
     if(act==="onb-handle-skip") return onbHandleSkip();       // (a) handle deja de bloquear
+    if(act==="onb-ctx-toggle"){                               // (b) desplegar la vía secundaria «Descríbete»
+      S.onb._ctxOpen=!S.onb._ctxOpen; render();
+      if(S.onb._ctxOpen) setTimeout(function(){ var t=document.getElementById("rsOnbCtx"); if(t){ try{ t.focus(); }catch(e){} } }, 30);
+      return;
+    }
     if(act==="onb-ctx-copy"){                                 // (b) copiar el prompt para ChatGPT/Claude
       try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(ONB_CTX_PROMPT); } showToast(L("Prompt copiado. Pégalo en ChatGPT o Claude.","Prompt copied. Paste it into ChatGPT or Claude.")); }catch(e){ showToast(ONB_CTX_PROMPT); }
       return;
