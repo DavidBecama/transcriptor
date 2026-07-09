@@ -10053,6 +10053,22 @@
     .rs .onb-ctx-ta { display:block; width:100%; box-sizing:border-box; min-height:96px; resize:vertical; padding:12px 14px; border:1px solid var(--border-default); border-radius:12px; background:var(--surface-base); color:var(--text-primary); font:inherit; font-family:var(--font-body); font-size:14px; outline:none; margin:0 0 12px; }
     .rs .onb-ctx-ta:focus { border-color:color-mix(in srgb, var(--brand-500) 50%, transparent); }
     .rs .onb-ctx-save { width:100%; justify-content:center; margin:0; }
+    /* Paso 3 «Descríbete con un prompt de IA» — el bloque prompt/textarea SIEMPRE oscuro
+       (código para copiar/pegar), no sigue el tema claro (se veía blanco y feo). David 09/07. */
+    .rs .onb-ctx--solo { background:#0c0e13; border-color:rgba(255,255,255,.09); }
+    .rs .onb-ctx-t { color:var(--brand-400,#7aa2ff); }
+    .rs .onb-ctx-lead { color:#aab2be; }
+    .rs .onb-ctx-prompt { background:#0a0c11; border-color:rgba(255,255,255,.1); }
+    .rs .onb-ctx-prompt-head { background:#14171e; border-bottom-color:rgba(255,255,255,.07); }
+    .rs .onb-ctx-prompt-lbl { color:#8a92a0; }
+    .rs .onb-ctx-code { color:#e7eaf0; }
+    .rs .onb-ctx-copy { background:#1b1f28; border-color:rgba(255,255,255,.13); color:#c7cdd6; }
+    .rs .onb-ctx-copy:hover { border-color:var(--brand-500); color:var(--brand-400,#7aa2ff); }
+    .rs .onb-ctx-ta { background:#0a0c11; border-color:rgba(255,255,255,.1); color:#f2f4f7; }
+    .rs .onb-ctx-ta::placeholder { color:#6b7280; }
+    .rs .onb-ctx-ta:focus { border-color:color-mix(in srgb, var(--brand-500) 55%, transparent); }
+    .rs .onb-ctx-toggle { color:#aab2be; }
+    .rs .onb-ctx-toggle:hover { color:#f2f4f7; }
     .rs .onb-err { margin-top:14px; padding:11px 14px; border-radius:11px; background:color-mix(in srgb, var(--danger-fg, #ef4444) 12%, transparent); border:1px solid color-mix(in srgb, var(--danger-fg, #ef4444) 35%, transparent); color:var(--danger-fg, #ef4444); font-size:13.5px; }
     .rs .onb-cards { display:flex; flex-direction:column; gap:10px; margin-bottom:22px; }
     .rs .onb-card { display:flex; align-items:center; gap:13px; width:100%; text-align:left; padding:13px 15px; border:1.5px solid var(--border-default); border-radius:14px; background:var(--surface-base); cursor:pointer; transition:border-color .15s ease, background .15s ease; }
@@ -10638,6 +10654,14 @@
     .rs .ed-rewrite svg { width:13px; height:13px; }
     .rs .ed-block-body { font-size:16px; line-height:1.65; color:var(--text-secondary); margin:0; outline:none; border-radius:8px; white-space:pre-wrap; }
     .rs .ed-doc-foot { display:flex; align-items:center; justify-content:space-between; gap:14px; padding-top:4px; flex-wrap:wrap; }
+    /* Editor · «Enseñar mi versión al Cerebro» — la corrección del usuario = señal de voz más fuerte. David 09/07. */
+    .rs .ed-voice-feed { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:20px 0 4px; padding:14px 16px; border:1px solid color-mix(in srgb, var(--brand-500) 32%, transparent); border-radius:14px; background:color-mix(in srgb, var(--brand-500) 8%, transparent); }
+    .rs .ed-voice-feed.fed { border-color:var(--border-default); background:var(--surface-raised); opacity:.72; }
+    .rs .ed-voice-feed-txt { display:flex; flex-direction:column; gap:3px; flex:1 1 240px; min-width:200px; }
+    .rs .ed-voice-feed-t { font-weight:700; font-size:14px; color:var(--text-primary); display:inline-flex; align-items:center; gap:7px; }
+    .rs .ed-voice-feed-t svg { width:15px; height:15px; color:var(--brand-400,#7aa2ff); }
+    .rs .ed-voice-feed-d { font-size:12.5px; color:var(--text-secondary); line-height:1.45; }
+    .rs .ed-voice-feed-btn { flex:0 0 auto; white-space:nowrap; }
     .rs .ed-count { font-family:var(--font-mono); font-size:12px; color:var(--text-tertiary); }
     /* rail */
     .rs .ed-rail { width:420px; flex:none; padding:26px 24px; display:flex; flex-direction:column; gap:22px; overflow-y:auto; }

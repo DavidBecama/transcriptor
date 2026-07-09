@@ -5554,7 +5554,8 @@
       '<div class="script-acts">'+(r.url
         ? '<a class="script-act" href="'+ESC(r.url)+'" target="_blank" rel="noopener noreferrer">'+IC.eye+' '+L("Ver original","View original")+'</a>'
         : '<button class="script-act" data-act="reel-original" data-id="'+ESC(r.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>')+
-        '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button></div>'+
+        '<button class="script-act" data-act="regen" data-id="'+ESC(r.id)+'">'+IC.repeat+' '+L("Regenerar guion","Regenerate script")+'</button>'+
+        ((S.activeGuionId||r._sid||isDemo())?'<button class="script-act script-act--edit" data-act="reveal-edit">'+IC.edit+' '+L("Editar mi versión","Edit my version")+'</button>':'')+'</div>'+
       optTabs+hooksH+
       '<h2 class="script-hook">'+ESC(s.hook)+'</h2><div class="script-body">'+beats+'</div>'+(s.close?'<div class="script-close">'+ESC(s.close)+'</div>':'')+
       // GUARDAR la opción/gancho/formato ELEGIDOS (antes solo se persistía la opción 0).
@@ -5604,6 +5605,16 @@
         '<p class="ed-block-body" contenteditable="true" spellcheck="false"'+(gid?' onblur="try{window.RadarLoop.editSave(\''+ESC(gid)+'\',\''+b[1]+'\',this.innerText)}catch(e){}"':'')+'>'+ESC(b[2]||"")+'</p>'+
       '</div>';
     }).join("");
+    // Feed al Cerebro: TU corrección (la versión editada) es la señal de voz más fuerte.
+    // El guion se auto-guarda al editar (editSave onblur); ed-brain-feed hace un PATCH final
+    // y alimenta el Cerebro de la marca con lo editado.
+    var _fsid=(g&&g._sid)||(isDemo()?gid:null);
+    var _fed=!!(_fsid&&_isFed("script",_fsid));
+    var brainFeedH=_fsid ? ('<div class="ed-voice-feed'+(_fed?' fed':'')+'">'+
+      '<div class="ed-voice-feed-txt"><span class="ed-voice-feed-t">'+IC.spark+' '+L("¿Lo afinaste a tu voz?","Tuned it to your voice?")+'</span>'+
+        '<span class="ed-voice-feed-d">'+L("Tu corrección es la señal de voz más fuerte que existe — enséñasela al Cerebro de "+brand().name+".","Your correction is the strongest voice signal there is — teach it to "+brand().name+"’s brain.")+'</span></div>'+
+      '<button class="btn btn-md btn-primary ed-voice-feed-btn" data-act="ed-brain-feed" data-id="'+ESC(String(_fsid))+'"'+(_fed?' disabled aria-disabled="true"':'')+'>'+IC.spark+' '+(_fed?L("En el Cerebro ✓","In the brain ✓"):L("Enseñar mi versión al Cerebro","Teach my version to the brain"))+'</button>'+
+    '</div>') : '';
     // barra IA
     var ai=[["Acortar",IC.arrL],["Más gancho",IC.spark],["Cambiar tono",IC.layers],["Más ejemplos",IC.plus]];
     var aiH=ai.map(function(a){ return '<button class="ed-ai" data-act="regen"'+(gid?' data-id="'+ESC(gid)+'"':'')+'>'+a[1]+' '+L(a[0],a[0])+'</button>'; }).join("");
@@ -5669,6 +5680,7 @@
           '<h1 class="ed-hook" contenteditable="true" spellcheck="false"'+(gid?' onblur="try{window.RadarLoop.editSave(\''+ESC(gid)+'\',\'title\',this.innerText)}catch(e){}"':'')+'>'+ESC(title)+'</h1>'+
           '<div class="ed-aitools">'+aiH+'</div>'+
           blocksH+
+          brainFeedH+
           '<div class="ed-doc-foot"><span class="ed-count">~'+secs+' s '+L("al hablar","spoken")+' · '+nWords+' '+L("palabras","words")+'</span>'+
             '<button class="btn btn-md btn-secondary" data-act="chain" data-k="record">'+IC.mic+' '+L("Modo teleprónter","Teleprompter mode")+'</button></div>'+
         '</div>'+
@@ -8122,6 +8134,20 @@
     if(act==="opt-pick"){ var _rv=S.revealReel||S.reel; if(_rv){ applyScriptOption(_rv, parseInt(k,10)||0, 0); _rv._saved=false; render(); } return; }   // elegir opción de guion → sin guardar
     if(act==="hook-pick"){ var _rh=S.revealReel||S.reel; if(_rh){ applyScriptOption(_rh, _rh.optIdx||0, parseInt(k,10)||0); _rh._saved=false; render(); } return; }   // elegir gancho → sin guardar
     if(act==="save-script-choice") return saveScriptChoice();
+    if(act==="reveal-edit"){   // reveal → editor inline (Gancho/Desarrollo/CTA) del guion recién robado
+      if(!S.activeGuionId && !isDemo()){ return; }
+      S._edFrom=null; S.view="editor"; return render();   // al cerrar → Ideas robadas con la versión editada
+    }
+    if(act==="ed-brain-feed"){   // Editor: enseña MI VERSIÓN (editada) al Cerebro de la marca — la señal más fuerte
+      var _g=(S.activeGuionId&&guionById(S.activeGuionId))||null;
+      if(_g && !isDemo() && _g._sid){
+        var _flat=[_g.hook].concat(_g.beats||[]).concat(_g.close?[_g.close]:[]).filter(Boolean).join("\n");
+        if(btn){ btn.disabled=true; }
+        apiPatch("/scripts/"+encodeURIComponent(_g._sid), {title:(_g.title||_g.hook||"").slice(0,80), script:_flat})
+          .then(function(){ brainFeedItem("script", _g._sid, btn); });   // feed lee de DB → la versión editada
+      } else { brainFeedItem("script", (btn&&btn.getAttribute("data-id"))||(_g&&_g.id), btn); }
+      return;
+    }
     if(act==="regen") return regenInEditor(id);   // Editor: regenerar guion (1 cr)
     if(act==="reel-original"){
       // En el reveal, «ver original» SIEMPRE es el reel del guion mostrado (S.revealReel),
