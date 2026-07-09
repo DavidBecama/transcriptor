@@ -2426,11 +2426,17 @@ def generate_script_competitor_task(self, reel_id, user_id, assistant_id, langua
         try:
             # 2 OPCIONES en paralelo (modelo de generación = pro), por MARCA. Timeout LARGO:
             # corre en el worker (sin gateway), así pro (40-90s) termina sin cortar ni caer a groq.
+            # AHA del onboarding (free=True): 1 opción + modelo FLASH → segundos, para que el
+            # «tu guion en Ideas robadas en <30 seg» sea honesto (el reveal ya no se muestra;
+            # aterriza en Ideas robadas mientras el usuario hace el house tour).
             from app import (_generate_script_options, _shape_script_option,  # lazy import (circular).
-                             GENERATION_LLM_TIMEOUT)
+                             GENERATION_LLM_TIMEOUT, OPENROUTER_MODEL)
+            _aha_fast = bool(free)
             _t_llm0 = time.time()
             raw_opts = _generate_script_options(user_content, style_arg, custom_prompt, user_id,
-                                                project_id, n=2, timeout=GENERATION_LLM_TIMEOUT)
+                                                project_id, n=(1 if _aha_fast else 2),
+                                                timeout=GENERATION_LLM_TIMEOUT,
+                                                model=(OPENROUTER_MODEL if _aha_fast else None))
             _t_llm1 = time.time()
         except Exception as e:
             logger.exception("gen_script_task LLM failed reel=%s: %s", reel_id, e)

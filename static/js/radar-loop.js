@@ -462,7 +462,7 @@
      contenido ingerido + el objetivo (STYLE_PROMPTS/PRESET_TONES intactos en
      backend + selector en Cerebro). Pantalla dedicada que oculta el radar vacío.
      Demo-funcional vía ?onb=1. ════════════════════════════════════════════════ */
-  var ONB_STEPS=["handle","confirm","myreels","niche","subniche","seed","goal","close"];   // «myreels» = tus 3 vídeos + Alimentar el Cerebro (David 24-jun)   // «confirm» (David 24-jun) = «este eres tú» con tu foto de IG → confianza + sensación de análisis personal. «seed» = el user añade UNA cuenta de su nicho a mano → scrapeamos sus relatedProfiles. La cuenta PROPIA (handle) se scrapea solo para métricas.
+  var ONB_STEPS=["handle","confirm","myreels","niche","subniche","competitors","goal","close"];   // «myreels» = tus 3 vídeos + Alimentar el Cerebro (David 24-jun)   // «confirm» (David 24-jun) = «este eres tú» con tu foto de IG → confianza + sensación de análisis personal. «seed» = el user añade UNA cuenta de su nicho a mano → scrapeamos sus relatedProfiles. La cuenta PROPIA (handle) se scrapea solo para métricas.
   function nicheChips(){ return rsLang()==="en"
     ? ["Fitness","Finance","Marketing","Cooking","Fashion","Beauty","Travel","Tech","Education","Real estate","Health","Business"]
     : ["Fitness","Finanzas","Marketing","Cocina","Moda","Belleza","Viajes","Tecnología","Educación","Inmobiliaria","Salud","Negocios"]; }
@@ -692,7 +692,9 @@
       L("Acabas de convertir un reel que petó en ","You just turned a reel that blew up in ")+(subs||L("tu subnicho","your subniche"))+L(" en un guión listo para grabar. Y cuando me enseñes tu voz, sonará clavado a ti."," into a script ready to record. And once you teach me your voice, it'll sound exactly like you."),
       inner+row, true);
   }
-  // Paso 5 — competidores (OBLIGATORIO 2), pre-sugeridos del subnicho.
+  // Paso 6 (v2) — competidores SUGERIDOS del subnicho: multi-select (elige varios o añade a
+  // mano). 3 gratis; el 4º = empujón «con Pro». Sustituye el «seed» de input único.
+  var ONB_FREE_COMPS=3;
   function onbCompsHTML(){
     var body;
     if(S.onb.compLoading){
@@ -710,12 +712,16 @@
         '<div class="onb-cards">'+list+'</div>';
     }
     var nPick=(S.onb.competitors||[]).filter(function(c){return c.picked;}).length;
+    // Paywall SUAVE: al intentar un 4º se muestra el empujón «con Pro» (no bloquea el avance).
+    var proNudge=(!S.onb.compLoading && S.onb._compProNudge)
+      ? '<button class="onb-skip" data-act="onb-comp-pro" style="color:var(--brand-500);text-decoration:none">'+IC.spark+' '+L("3 competidores en tu plan gratis. Sigue a más con Pro →","3 competitors on your free plan. Follow more with Pro →")+'</button>'
+      : '';
     // Cargando → SIN botón de avanzar (solo Atrás): no aparece antes que los resultados.
     var compCta=S.onb.compLoading ? ''
       : '<button class="btn btn-lg btn-primary onb-cta" data-act="onb-comps-next"'+(nPick<1?' disabled':'')+'>'+IC.arr+' '+L("Seguir a "+nPick,"Follow "+nPick)+'</button>';
-    return onbCardWrap(onbEyebrow(L("a quién vigilamos","who to watch")),L("Ya te puse 2 en el radar","I already added 2 to your radar"),
-      L("Los que más explotan en tu nicho. Quita o añade los que quieras.","I pre-picked 2 from your subniche. I'll track the reels that blow up so you can steal the first in your voice. Remove or add whoever you want."),
-      body+onbErr()+
+    return onbCardWrap(onbEyebrow(L("a quién vigilamos","who to watch")),L("Elige a quién vigilar","Pick who to watch"),
+      L("Los que más explotan en tu nicho. Te pre-elegí 3 — quita o añade los que quieras (3 gratis).","The ones blowing up in your niche. I pre-picked 3 — remove or add whoever you want (3 free)."),
+      body+proNudge+onbErr()+
       '<div class="onb-row">'+onbBackBtn()+compCta+'</div>');
   }
   // Paso 6 — objetivo (adapta tono+estructura).
@@ -872,7 +878,7 @@
       case "myreels": return onbMyReelsHTML();
       case "niche": return onbNicheHTML();
       case "subniche": return onbSubnicheHTML();
-      case "seed": return onbSeedHTML();
+      case "competitors": return onbCompsHTML();   // paso 6 v2: sugerencias multi-select (antes «seed» de input único)
       case "goal": return onbGoalHTML();
       case "close": return onbCloseHTML();
       default: return onbHandleHTML();
@@ -1036,7 +1042,9 @@
   }
   function onbSubNext(){
     if(!(S.onb.subniches||[]).length){ S.onb.error=L("Elige al menos una etiqueta — es la clave del match.","Pick at least one tag — it's the key to the match."); return render(); }
-    onbTrack("onb_step_completed"); onbGoto("seed");
+    onbTrack("onb_step_completed");
+    if(!(S.onb.competitors||[]).length) S.onb.compLoading=true;   // muestra la carga antes que los resultados
+    onbGoto("competitors"); onbLoadComps();
   }
   // Dispara EN 2º PLANO el descubrimiento (relatedProfiles del seed → gate Groq →
   // competidores+reels). Una sola vez por onboarding. seed opcional: vacío = fallback
@@ -1108,22 +1116,37 @@
   function onbLoadComps(){
     if((S.onb.competitors||[]).length){ return; }   // ya cargados (volver atrás)
     S.onb.compLoading=true;
-    var done=function(list){ S.onb.competitors=(list||[]).map(function(c,i){ return {handle:c.handle, reason:c.reason||"", picked:i<2}; }); S.onb.compLoading=false; if(S.onb.step==="competitors") render(); };
+    var done=function(list){ S.onb.competitors=(list||[]).map(function(c,i){ return {handle:c.handle, reason:c.reason||"", picked:i<ONB_FREE_COMPS}; }); S.onb.compLoading=false; if(S.onb.step==="competitors") render(); };
     if(isDemo()){ setTimeout(function(){ done(onbDemoComps()); }, 1100); return; }
     apiPost("/api/onboarding/suggest-competitors",{handle:S.onb.handle, platform:S.onb.platform, niche:S.onb.niche, subniches:S.onb.subniches}).then(function(r){
       done((r.ok&&r.d&&Array.isArray(r.d.creators))?r.d.creators:[]);
     });
   }
-  function onbCompToggle(h){ (S.onb.competitors||[]).forEach(function(c){ if(c.handle===h) c.picked=!c.picked; }); render(); }
+  // Paywall SUAVE (onboarding v2): 3 competidores gratis. Elegir un 4º NO bloquea el camino
+  // al aha — solo levanta un empujón «con Pro» (S.onb._compProNudge). El backend cierra el
+  // cap real (grace=3 / free base_slots_global=3).
+  function _onbNPicked(){ return (S.onb.competitors||[]).filter(function(c){return c.picked;}).length; }
+  function onbCompToggle(h){
+    var c=(S.onb.competitors||[]).filter(function(x){return x.handle===h;})[0]; if(!c) return;
+    if(!c.picked && _onbNPicked()>=ONB_FREE_COMPS){ S.onb._compProNudge=true; return render(); }
+    c.picked=!c.picked; S.onb._compProNudge=false; render();
+  }
   function onbCompAdd(){
     var inp=document.getElementById("rsOnbCompInput"); if(!inp) return;
     var h=inp.value.trim().replace(/^@+/,"").toLowerCase(); inp.value="";
     if(!/^[a-z0-9._]{1,30}$/.test(h)) return render();
-    if(!(S.onb.competitors||[]).some(function(c){return c.handle===h;})) (S.onb.competitors||(S.onb.competitors=[])).unshift({handle:h, reason:"añadido a mano", picked:true});
+    if((S.onb.competitors||[]).some(function(c){return c.handle===h;})) return render();
+    var _pick=_onbNPicked()<ONB_FREE_COMPS;   // se auto-elige solo si aún hay hueco gratis
+    if(!_pick) S.onb._compProNudge=true;
+    (S.onb.competitors||(S.onb.competitors=[])).unshift({handle:h, reason:L("añadido a mano","added by hand"), picked:_pick});
     render();
   }
   function onbCompsNext(){
-    if((S.onb.competitors||[]).filter(function(c){return c.picked;}).length<1){ S.onb.error=L("Elige al menos un competidor para llenar tu radar.","Pick at least one competitor to fill your radar."); return render(); }
+    var picked=(S.onb.competitors||[]).filter(function(c){return c.picked;});
+    if(picked.length<1){ S.onb.error=L("Elige al menos un competidor para llenar tu radar.","Pick at least one competitor to fill your radar."); return render(); }
+    // Enriquecer vía relatedProfiles: el 1er elegido = seed del discover (grafo IG → afines).
+    if(!S.onb.seed && picked[0]) S.onb.seed=picked[0].handle;
+    onbFireDiscover();
     onbNext();
   }
   function onbPickGoal(k){ S.onb.goal=k; render(); }
@@ -1163,6 +1186,18 @@
       '</div>'+
       '<div class="onbw-prog" aria-hidden="true"><div class="onbw-prog-fill"></div></div>'+
       '<div class="onbw-hint">'+L("Suele tardar menos de un minuto…","Usually under a minute…")+'</div>'+
+    '</div></div></div>';
+  }
+  // Onboarding v2: carga BREVE del robo de prueba (mensaje honesto <30s). Reusa el lienzo
+  // .onb-fs + clases onbwait/onbw-* (cero CSS nuevo). El robo real corre en 2º plano y el
+  // guion aterriza en Ideas robadas mientras el usuario hace el house tour.
+  function onbAhaLoadHTML(){
+    return '<div class="scroll"><div class="canvas"><div class="onbwait">'+
+      '<div class="onbw-core-wrap" style="margin-bottom:22px"><div class="onbw-core">'+IC.bolt+'</div></div>'+
+      '<div class="onbw-title">'+L("Robando tu primera idea…","Stealing your first idea…")+'</div>'+
+      '<div style="font-size:15px;color:var(--text-secondary);line-height:1.5;max-width:340px;margin:14px auto 0;text-align:center">'+L("Tu guion estará en <b>Ideas robadas</b> en menos de 30 seg.","Your script will be in <b>Stolen ideas</b> in under 30 sec.")+'</div>'+
+      '<div class="onbw-prog" aria-hidden="true"><div class="onbw-prog-fill"></div></div>'+
+      '<div class="onbw-hint">'+L("Te enseño la casa mientras tanto — el guion te espera al terminar.","I'll show you around meanwhile — the script will be waiting when you're done.")+'</div>'+
     '</div></div></div>';
   }
   function onbWaitForNiche(){
@@ -5912,9 +5947,9 @@
     }
     // v=137: carga post-onboarding y «¿quieres robar este?» a PANTALLA COMPLETA — sin rail
     // ni barra superior (short-circuit antes de montar la chrome, como el onboarding).
-    if(S._onbWaiting || S.onbStealOffer){
+    if(S._onbWaiting || S.onbStealOffer || S._ahaLoading){
       unmountOnbBrain();
-      view.innerHTML='<div class="onb-fs">'+(S._onbWaiting?onbWaitHTML():onbStealOfferHTML())+'</div>';
+      view.innerHTML='<div class="onb-fs">'+(S._ahaLoading?onbAhaLoadHTML():(S._onbWaiting?onbWaitHTML():onbStealOfferHTML()))+'</div>';
       if(S.onbStealOffer) try{ mountCofre(); }catch(e){}   // arranca la avalancha del cofre
       return;
     }
@@ -6542,63 +6577,35 @@
   function onbAhaSteal(id){
     if(isDemo()) return steal(id);   // demo: robo síncrono (~1.7s) — sin cambiar el harness
     var r=reelById(id); if(!r) return;
-    // 1) Placeholder por nicho → 1 opción para que el reveal renderice al instante.
-    var ph=onbDemoAhaScript(r);
-    r._ahaReq=true; r._ahaPending=true;
-    r.options=[{ title:(ph.hook||"").slice(0,60), hooks:[ph.hook], body:ph.beats||[], closing:ph.close||"",
-      script:[ph.hook].concat(ph.beats||[]).concat(ph.close?[ph.close]:[]).join("\n") }];
-    r.optIdx=0; r.hookIdx=0; r.script={hook:ph.hook, beats:ph.beats||[], close:ph.close||""};
-    // 2) Guion ya creado (placeholder) → «Ideas robadas»/«Ver la idea» funcionan al instante;
-    //    _ahaSwap lo actualiza in-place con el guion real (mismo id, sin duplicar).
-    var s=r.script; var gidNew=addGuion({title:s.hook, hook:s.hook, beats:s.beats, close:s.close,
-      from:"@"+r.creator.handle, type:"guión", thumb:r.thumb||null, url:r.url||null,
-      srcViews:r.views||"", srcLikes:r.likes||"", reelId:r.id,
-      genOptions:{options:r.options, pov_text:null, chosen:0}});
+    // Onboarding v2 (David 09/07): SIN placeholder ni reveal. Robo gratis (flash, segundos)
+    // en 2º plano → el backend lo guarda en Ideas robadas. Enseñamos una carga breve y honesta,
+    // aterrizamos en el dashboard limpio y el house tour arranca solo (auto-arranque del
+    // dashboard). Al acabar el tour, el guion le espera en Ideas robadas.
+    if(firstStealPending()) markFirstSteal();
+    S._tourAfterReveal=false;
+    r._ahaReq=true;
     S._lastStealKey="r:"+r.id;
     S._stolenReels=S._stolenReels||{}; S._stolenReels[r.id]=r;
     removeStolenReel(id); brainEmitSignals(); startFlash();
-    // 3) Reveal INSTANTÁNEO (snapshot, como steal()).
-    S.revealReel={ id:r.id, creator:r.creator, url:r.url, ig_url:r.ig_url, permalink:r.permalink,
-      ig_reel_id:r.ig_reel_id, views:r.views, likes:r.likes, explosionTxt:r.explosionTxt,
-      thumb:r.thumb, cap:r.cap, dur:r.dur, _sid:r._sid, _gid:gidNew,
-      script:r.script, options:r.options, optIdx:0, hookIdx:0,
-      recFormat:r.recFormat, povText:r.povText, _saved:true, _ahaPending:true, _ahaFree:true };
-    S.activeGuionId=gidNew; S.reel=r; S.genKind="script"; S.view="script";
-    var _firstSteal=firstStealPending();
-    S._firstStealCelebrate=_firstSteal; if(_firstSteal) markFirstSteal();
+    // 1) Carga BREVE y honesta (full-screen .onb-fs). El robo real ya corre en 2º plano.
+    S._ahaLoading=true; S.onbStealOffer=null; S.onbCofre=null;
+    S.view="feed"; S.tab="dashboard";
     render();
-    if(_firstSteal){ try{ brainFeast(16); }catch(e){} }
-    // 4) House tour v2 sobre el reveal instantáneo (mismo mecanismo que steal(): el cofre
-    //    ya dejó S._tourAfterReveal=true). El belt del reveal (paso 1 del tour) ya existe.
-    if(S._tourAfterReveal){
-      S._tourAfterReveal=false;
-      var _tSeen=false; try{ _tSeen=localStorage.getItem("onboarding_completed")==="true"; }catch(e){}
-      if(!_tSeen && typeof window.startTour==="function"){
-        setTimeout(function(){ if(S.view==="script"){ try{ window.startTour(); }catch(e){} } }, 1400);
-      }
-    }
-    // 5) Robo REAL en 2º plano (gratis). Bypass del short-circuit de ensureScript (r.options
-    //    ya tiene el placeholder) → _postGenerate directo; _normScriptOptions sobrescribe con
-    //    el real y _ahaSwap lo refleja en reveal + guion.
+    // 2) Robo REAL en 2º plano (gratis, flash n=1). El backend crea el guion en Ideas robadas;
+    //    reloadScripts lo trae al front cuando cuaja (durante o tras el tour). Sin reveal.
     _postGenerate(r, Date.now(), function(err){
-      delete r._ahaReq; r._ahaPending=false;
-      if(err){ if(S.revealReel && S.revealReel.id===r.id){ S.revealReel._ahaPending=false; render(); } return; }
-      _ahaSwap(r, gidNew);
-      refreshCredits().then(function(){ flashSpark(0); });   // el aha no cobra, pero refresca saldo real
+      delete r._ahaReq;
+      if(!err){ try{ if(typeof reloadScripts==="function") reloadScripts().then(function(){ if(!S._ahaLoading) render(); }); }catch(e){} }
+      try{ refreshCredits().then(function(){ flashSpark(0); }); }catch(e){}   // el aha no cobra, pero refresca saldo real
     });
-  }
-  // Sustituye el placeholder por el guion REAL (si el user sigue en ese reveal).
-  function _ahaSwap(r, gid){
-    applyScriptOption(r,0,0);
-    var g=guionById(gid), s=r.script||{};
-    if(g){ g.hook=s.hook||g.hook; g.title=s.hook||g.title; if(s.beats) g.beats=s.beats; if(s.close!=null) g.close=s.close;
-      if(r.recFormat) g.recFormat=r.recFormat; g.genOptions={options:r.options||[], pov_text:r.povText||null, chosen:0};
-      if(r._sid) g._sid=r._sid; }
-    if(S.revealReel && S.revealReel.id===r.id){
-      S.revealReel.script=r.script; S.revealReel.options=r.options; S.revealReel.optIdx=0; S.revealReel.hookIdx=0;
-      S.revealReel.recFormat=r.recFormat; S.revealReel.povText=r.povText; S.revealReel._ahaPending=false; S.revealReel._sid=r._sid;
-      render();   // swap en sitio: el guard anti-parpadeo (mismo r.id) evita re-animar el hero
-    }
+    // 3) Tras ~2.4s cerramos la carga → dashboard limpio → el house tour arranca solo (auto-arm,
+    //    ~900ms). El paso «belt» del reveal se auto-salta (renderTourStep: target ausente → siguiente).
+    setTimeout(function(){
+      S._ahaLoading=false;
+      S.view="feed"; S.tab="dashboard";
+      try{ brainFeast(16); }catch(e){}
+      render();
+    }, 2400);
   }
   /* Editor · "Regenerar guion" = re-tira del mismo material por COST.regen (1 cr),
      más barato que un guión nuevo (3 cr). Demo: descuenta local y refresca. Prod:
@@ -8330,6 +8337,7 @@
     if(act==="onb-value-reset") return onbValueReset();
     if(act==="onb-comp-toggle") return onbCompToggle(btn.getAttribute("data-h"));
     if(act==="onb-comp-add") return onbCompAdd();
+    if(act==="onb-comp-pro"){ try{ if(window.posthog) window.posthog.capture("paywall_cta_clicked",{wall:"onb_competitors"}); }catch(e){} onbTrack("onb_comp_pro_nudge"); if(typeof window.openUpgradeModal==="function"){ try{ window.openUpgradeModal("tracked_creators"); }catch(e){} } return; }
     if(act==="onb-comps-next") return onbCompsNext();
     if(act==="onb-pick-goal") return onbPickGoal(btn.getAttribute("data-k"));
     if(act==="onb-goal-next") return onbGoalNext();
