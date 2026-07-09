@@ -346,14 +346,14 @@
       {"@type": "Question", "name": "What exactly is Reelscript?", "acceptedAnswer": {"@type": "Answer", "text": "It's not a transcriber: it's the operating system for your content. Every day it shows what's already exploding in your niche, turns it into scripts in your voice ready to record, and learns from what you publish to sound more like you."}},
       {"@type": "Question", "name": "How is it different from just asking ChatGPT?", "acceptedAnswer": {"@type": "Answer", "text": "Reelscript doesn't write \"AI text\": it writes what you'd say. It learns your tone, structure and tics from your own reels, and sharpens with every script you record. \"Your voice at N%\" measures how well it knows you — and it only climbs."}},
       {"@type": "Question", "name": "Where do the ideas come from?", "acceptedAnswer": {"@type": "Answer", "text": "From the Radar: it watches your competitors and ranks their reels by what's exploding most versus their average. You don't start from a blank page, you start from what already works in your niche."}},
-      {"@type": "Question", "name": "Is there a free plan?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The full Radar and 12 lifetime «Make it mine», no card. Creator (€19.99/mo) brings 120 credits a month, Brain and metrics; Agency (€79/mo) adds multi-brand and team."}},
+      {"@type": "Question", "name": "Is there a free plan?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The full Radar and 12 lifetime «Make it mine», no card. Creator (€17.99/mo) brings 120 credits a month, Brain and metrics; Agency (€71.99/mo) adds multi-brand and team."}},
       {"@type": "Question", "name": "Can I cancel anytime?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Cancel from the Stripe portal in one click and keep access until the end of the billing period. No commitments."}},
       {"@type": "Question", "name": "Are my data and scripts safe?", "acceptedAnswer": {"@type": "Answer", "text": "Your transcriptions, ideas and scripts live on Supabase with row-level security: only you can access your own. Payments are processed by Stripe — we never see or store card data. You can export or delete everything whenever you want."}}
       {% else %}
       {"@type": "Question", "name": "¿Qué es Reelscript exactamente?", "acceptedAnswer": {"@type": "Answer", "text": "No es un transcriptor: es el sistema operativo de tu contenido. Cada día te muestra lo que ya explota en tu nicho, lo convierte en guiones con tu voz listos para grabar, y aprende de lo que publicas para sonar cada vez más a ti."}},
       {"@type": "Question", "name": "¿En qué se diferencia de pedírselo a ChatGPT?", "acceptedAnswer": {"@type": "Answer", "text": "Reelscript no escribe \"texto de IA\": escribe lo que dirías tú. Aprende tu tono, tu estructura y tus muletillas de tus propios reels, y se afina con cada guión que grabas. \"Tu voz al N%\" mide cuánto te conoce — y solo sube."}},
       {"@type": "Question", "name": "¿De dónde salen las ideas?", "acceptedAnswer": {"@type": "Answer", "text": "Del Radar: vigila a tus competidores y ordena sus reels por lo que más está explotando frente a su media. No partes de una página en blanco, partes de lo que ya funciona en tu nicho."}},
-      {"@type": "Question", "name": "¿Hay plan gratis?", "acceptedAnswer": {"@type": "Answer", "text": "Sí: gratis para siempre. Empiezas con 30 créditos de bienvenida (sin tarjeta) y recibes 15 créditos cada mes; máximo 3 robos de guion al día y 2 competidores en el radar. Robar un guion cuesta 3 créditos, analizar un reel 2. Creador (19,99€/mes) trae 120 créditos al mes sin tope diario, Cerebro y métricas; Agencia (79€/mes) añade multi-marca y equipo."}},
+      {"@type": "Question", "name": "¿Hay plan gratis?", "acceptedAnswer": {"@type": "Answer", "text": "Sí: gratis para siempre. Empiezas con 30 créditos de bienvenida (sin tarjeta) y recibes 15 créditos cada mes; máximo 3 robos de guion al día y 2 competidores en el radar. Robar un guion cuesta 3 créditos, analizar un reel 2. Creador (17,99€/mes) trae 120 créditos al mes sin tope diario, Cerebro y métricas; Agencia (71,99€/mes) añade multi-marca y equipo."}},
       {"@type": "Question", "name": "¿Puedo cancelar cuando quiera?", "acceptedAnswer": {"@type": "Answer", "text": "Sí. Cancelas desde el portal de Stripe en un click y mantienes el acceso hasta el final del periodo facturado. Sin permanencias."}},
       {"@type": "Question", "name": "¿Mis datos y mis guiones están seguros?", "acceptedAnswer": {"@type": "Answer", "text": "Tus transcripciones, ideas y guiones viven en Supabase con row-level security: solo tú accedes a lo tuyo. Los pagos los procesa Stripe — nunca vemos ni guardamos datos de tarjeta. Puedes exportar o borrar todos tus datos cuando quieras."}}
       {% endif %}
@@ -1039,8 +1039,8 @@
         <div class="rsl-plan rsl-rise">
           <h3>Creator</h3>
           <p class="rsl-for" data-i18n-en="For the creator who publishes weekly and wants to sound like themselves.">Para el creador que publica cada semana y quiere sonar a él.</p>
-          <p class="rsl-price" data-m="{% if lang == 'en' %}€19.99{% else %}€19,99{% endif %}" data-y="{% if lang == 'en' %}€15.08{% else %}€15,08{% endif %}"><span class="rsl-amt">{% if lang == 'en' %}€19.99{% else %}€19,99{% endif %}</span><small data-i18n-en="/mo">/mes</small></p>
-          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €180.96/yr{% else %}facturado €180,96/año{% endif %}">&nbsp;</p>
+          <p class="rsl-price" data-m="{% if lang == 'en' %}€17.99{% else %}€17,99{% endif %}" data-y="{% if lang == 'en' %}€14.99{% else %}€14,99{% endif %}"><span class="rsl-amt">{% if lang == 'en' %}€17.99{% else %}€17,99{% endif %}</span><small data-i18n-en="/mo">/mes</small></p>
+          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €179.88/yr{% else %}facturado €179,88/año{% endif %}">&nbsp;</p>
           <p class="rsl-day" data-m="{% if lang == 'en' %}under €1 a day · €0.15 per stolen reel{% else %}menos de €1 al día · €0,15 por reel robado{% endif %}" data-y="{% if lang == 'en' %}€0.50 a day · €0.12 per stolen reel{% else %}€0,50 al día · €0,12 por reel robado{% endif %}">{% if lang == 'en' %}under €1 a day · €0.15 per stolen reel{% else %}menos de €1 al día · €0,15 por reel robado{% endif %}</p>
           <ul>
             <li data-i18n-html-en="<strong>120 credits</strong> a month (~120 reels stolen into your voice)"><strong>120 créditos</strong> al mes (~120 reels robados a tu voz)</li>
@@ -1056,9 +1056,9 @@
           <span class="rsl-pop" data-i18n-en="Most popular">El más elegido</span>
           <h3>Estudio</h3>
           <p class="rsl-for" data-i18n-en="For the creator who already bills and runs a few brands.">Para el creador que ya factura y lleva varias marcas.</p>
-          <p class="rsl-price" data-m="{% if lang == 'en' %}€39.99{% else %}€39,99{% endif %}" data-y="{% if lang == 'en' %}€31.25{% else %}€31,25{% endif %}"><span class="rsl-amt">{% if lang == 'en' %}€39.99{% else %}€39,99{% endif %}</span><small data-i18n-en="/mo">/mes</small></p>
-          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €374.99/yr{% else %}facturado €374,99/año{% endif %}">&nbsp;</p>
-          <p class="rsl-day" data-m="{% if lang == 'en' %}3 brands · €13 per brand/mo{% else %}3 marcas · €13 por marca/mes{% endif %}" data-y="{% if lang == 'en' %}3 brands · €10 per brand/mo{% else %}3 marcas · €10 por marca/mes{% endif %}">{% if lang == 'en' %}3 brands · €13 per brand/mo{% else %}3 marcas · €13 por marca/mes{% endif %}</p>
+          <p class="rsl-price" data-m="{% if lang == 'en' %}€35.99{% else %}€35,99{% endif %}" data-y="{% if lang == 'en' %}€29.99{% else %}€29,99{% endif %}"><span class="rsl-amt">{% if lang == 'en' %}€35.99{% else %}€35,99{% endif %}</span><small data-i18n-en="/mo">/mes</small></p>
+          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €359.88/yr{% else %}facturado €359,88/año{% endif %}">&nbsp;</p>
+          <p class="rsl-day" data-m="{% if lang == 'en' %}3 brands · €12 per brand/mo{% else %}3 marcas · €12 por marca/mes{% endif %}" data-y="{% if lang == 'en' %}3 brands · €10 per brand/mo{% else %}3 marcas · €10 por marca/mes{% endif %}">{% if lang == 'en' %}3 brands · €12 per brand/mo{% else %}3 marcas · €12 por marca/mes{% endif %}</p>
           <ul>
             <li data-i18n-html-en="<strong>360 credits</strong> a month (triple Creator)"><strong>360 créditos</strong> al mes (el triple que Creator)</li>
             <li data-i18n-html-en="<strong>3 brands</strong>, each with its own brain"><strong>3 marcas</strong> con cerebro propio cada una</li>
@@ -1071,9 +1071,9 @@
         <div class="rsl-plan rsl-rise">
           <h3>Agency</h3>
           <p class="rsl-for" data-i18n-en="For brand portfolios and teams.">Para portfolios de marcas y equipos.</p>
-          <p class="rsl-price" data-m="€79" data-y="{% if lang == 'en' %}€63.17{% else %}€63,17{% endif %}"><span class="rsl-amt">€79</span><small data-i18n-en="/mo">/mes</small></p>
-          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €758/yr{% else %}facturado €758/año{% endif %}">&nbsp;</p>
-          <p class="rsl-day" data-m="{% if lang == 'en' %}10 brands · €8 per brand/mo{% else %}10 marcas · €8 por marca/mes{% endif %}" data-y="{% if lang == 'en' %}10 brands · €6 per brand/mo{% else %}10 marcas · €6 por marca/mes{% endif %}">{% if lang == 'en' %}10 brands · €8 per brand/mo{% else %}10 marcas · €8 por marca/mes{% endif %}</p>
+          <p class="rsl-price" data-m="{% if lang == 'en' %}€71.99{% else %}€71,99{% endif %}" data-y="{% if lang == 'en' %}€59.99{% else %}€59,99{% endif %}"><span class="rsl-amt">{% if lang == 'en' %}€71.99{% else %}€71,99{% endif %}</span><small data-i18n-en="/mo">/mes</small></p>
+          <p class="rsl-yr" data-m="" data-y="{% if lang == 'en' %}billed €719.88/yr{% else %}facturado €719,88/año{% endif %}">&nbsp;</p>
+          <p class="rsl-day" data-m="{% if lang == 'en' %}10 brands · €7 per brand/mo{% else %}10 marcas · €7 por marca/mes{% endif %}" data-y="{% if lang == 'en' %}10 brands · €6 per brand/mo{% else %}10 marcas · €6 por marca/mes{% endif %}">{% if lang == 'en' %}10 brands · €7 per brand/mo{% else %}10 marcas · €7 por marca/mes{% endif %}</p>
           <ul>
             <li data-i18n-html-en="<strong>Pool of 960 credits</strong> for the whole account"><strong>Pool de 960 créditos</strong> para toda la cuenta</li>
             <li data-i18n-html-en="<strong>10 brands</strong>, each with its own brain"><strong>10 marcas</strong> con cerebro propio cada una</li>
@@ -2783,7 +2783,7 @@
     <p id="topupSubtitle"></p>
     <!-- #5 conversión: empuje a suscripción (mejor €/crédito + sin límites) sobre el pack suelto. -->
     <div class="topup-sub-nudge">
-      <span data-i18n-html-en="💡 With <b>Creator (€19.99/mo)</b> you get 120 credits and <b>unlimited</b> scripts — better value than buying one-offs.">💡 Con <b>Creador (19,99€/mes)</b> tienes 120 créditos y guiones <b>sin límite</b> — sale más a cuenta que comprar sueltos.</span>
+      <span data-i18n-html-en="💡 With <b>Creator (€17.99/mo)</b> you get 120 credits and <b>unlimited</b> scripts — better value than buying one-offs.">💡 Con <b>Creador (17,99€/mes)</b> tienes 120 créditos y guiones <b>sin límite</b> — sale más a cuenta que comprar sueltos.</span>
       <button type="button" onclick="closeModal('topupOverlay'); if(typeof openUpgradeModal==='function') openUpgradeModal('topup_nudge');" data-i18n-en="See plans">Ver planes</button>
     </div>
     <!-- Packs dinámicos (GET /api/topups). Si falla o no hay packs configurados,
@@ -6688,9 +6688,9 @@ function settingsSaveVoice(){
 const SETTINGS_PLANS = [
   { key:"trial",   name:"Trial",          price:"0€",   feat:"3 días Pro · 30 créditos (~10 robos) · sin tarjeta" },
   { key:"free",    name:"Free",           price:"0€",   feat:"15 créditos/mes (~5 robos) · radar y métricas gratis" },
-  { key:"basic",   name:"Basic",          price:"19,99€",  feat:"120 créditos/mes (~40 robos) · voz · métricas", featured:true },
-  { key:"estudio", name:"Content Creator",price:"39,99€",  feat:"360 créditos/mes (~120 robos) · 3 marcas · prioridad" },
-  { key:"agency",  name:"Agency",         price:"79€",  feat:"960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra" },
+  { key:"basic",   name:"Basic",          price:"17,99€",  feat:"120 créditos/mes (~40 robos) · voz · métricas", featured:true },
+  { key:"estudio", name:"Content Creator",price:"35,99€",  feat:"360 créditos/mes (~120 robos) · 3 marcas · prioridad" },
+  { key:"agency",  name:"Agency",         price:"71,99€",  feat:"960 créditos/mes (~320 robos) · 10 marcas · +96 cr/extra" },
 ];
 function _curPlanKey(){ const p = (window.st && (st.plan)) || "free"; if (p==="creator"||p==="pro"||p==="basic") return "basic"; if (p==="estudio") return "estudio"; if (p==="agency") return "agency"; if (p==="trial") return "trial"; return "free"; }
 function fillSettingsPlan() {
@@ -13201,7 +13201,7 @@ const PLAN_META = {
   },
   creator: {
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>', label: "Basic",
-    price:    { monthEur: 1999, monthUsd: 2199, yearEur: 1508, yearUsd: 1717, billedEur: 18096, billedUsd: 20599 },
+    price:    { monthEur: 1799, monthUsd: 2399, yearEur: 1499, yearUsd: 1999, billedEur: 17988, billedUsd: 23988 },
     ideal:    { es: "Para creadores activos que viven del contenido.", en: "For active creators living off their content." },
     features: { es: ["120 créditos/mes","1 marca","Cerebro: aprende tu voz","Ideas, hooks y formatos","Métricas de Instagram","Teleprompter + grabación","Soporte por email"],
                 en: ["120 credits/mo","1 brand","Brain: learns your voice","Ideas, hooks & formats","Instagram metrics","Teleprompter + recording","Email support"] },
@@ -13209,7 +13209,7 @@ const PLAN_META = {
   },
   estudio: {
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>', label: "Content Creator",
-    price:    { monthEur: 3999, monthUsd: 4499, yearEur: 3125, yearUsd: 3583, billedEur: 37499, billedUsd: 43001 },
+    price:    { monthEur: 3599, monthUsd: 4199, yearEur: 2999, yearUsd: 3499, billedEur: 35988, billedUsd: 41988 },
     ideal:    { es: "Para el creador que ya factura y lleva varias marcas.", en: "For the creator who already bills and runs a few brands." },
     features: { es: ["360 créditos/mes (el triple)","3 marcas con cerebro propio","Todo lo de Creador + prioridad","El puente entre creador y agencia"],
                 en: ["360 credits/mo (triple)","3 brands, each with its own brain","Everything in Creator + priority","The bridge between solo and agency"] },
@@ -13219,7 +13219,7 @@ const PLAN_META = {
   },
   agency: {
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>', label: "Agency",
-    price:    { monthEur: 7900, monthUsd: 8900, yearEur: 6317, yearUsd: 7242, billedEur: 75800, billedUsd: 86900 },
+    price:    { monthEur: 7199, monthUsd: 7799, yearEur: 5999, yearUsd: 6499, billedEur: 71988, billedUsd: 77988 },
     ideal:    { es: "Para agencias que gestionan varias marcas.", en: "For agencies managing multiple brands." },
     features: { es: ["960 créditos/mes (pool)","10 marcas con cerebro propio","Asientos de equipo ilimitados","Informe white-label en PDF por marca","Marca extra €10/mes","Portfolio multi-marca"],
                 en: ["960 credits/mo (pool)","10 brands, each with its own brain","Unlimited team seats","White-label PDF report per brand","Extra brand €10/mo","Multi-brand portfolio"] },
