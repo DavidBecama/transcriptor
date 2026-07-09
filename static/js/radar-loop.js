@@ -1227,16 +1227,24 @@
              mk("cofre2","javi.fit",1100000,6,"Nadie te cuenta esto de las dominadas"),
              mk("cofre3","marta.ahorra",870000,3,"Ahorré 5.000€ sin enterarme") ];
   }
-  // Elige el top-3 de reels (recientes ≤3 sem por explosión; si no, top-3 a secas). En demo
-  // cae a reels de muestra. Devuelve true si hay al menos 1.
+  // Elige el top-3 de reels (recientes ≤3 sem por explosión; si no, top-3 a secas),
+  // DIVERSIFICANDO: máx 1 carta por creador → las 3 nunca son del mismo (requisito David:
+  // con pool=1 mezclamos el nicho, pero si el competidor añadido domina la explosión las 3
+  // cartas seguirían siendo suyas). Si no hay 3 creadores distintos, rellena con el resto.
+  // En demo cae a reels de muestra. Devuelve true si hay al menos 1.
   function _cofrePickReels(){
     var _pool=(S.reels||[]); var _now=Date.now(), _win=21*24*3600*1000;
     var _byExp=function(a,b){ return (b.explosion||0)-(a.explosion||0); };
     var _recent=_pool.filter(function(r){ return r.postedTs && (_now-r.postedTs)<=_win; }).sort(_byExp);
-    var three=(_recent.length>=3?_recent:_pool.slice().sort(_byExp)).slice(0,3);
+    var ranked=(_recent.length>=3?_recent:_pool.slice().sort(_byExp));
+    var seenH={}, three=[];
+    ranked.forEach(function(r){ if(three.length>=3) return;
+      var h=(((r.creator&&r.creator.handle)||"")+"").toLowerCase();
+      if(h&&seenH[h]) return; if(h) seenH[h]=1; three.push(r); });
+    if(three.length<3){ ranked.forEach(function(r){ if(three.length>=3) return; if(three.indexOf(r)<0) three.push(r); }); }
     if(three.length<3 && isDemo()){ three=_cofreDemoReels(); S.reels=three; }
-    S._cofreReels=three;
-    return three.length>0;
+    S._cofreReels=three.slice(0,3);
+    return S._cofreReels.length>0;
   }
   // El COFRE arranca YA: su avalancha ES la carga (Leo 26-jun: fuera la pantalla
   // «Preparando tu radar»). Los reels del nicho se cargan DURANTE la avalancha; al
