@@ -6599,6 +6599,19 @@
     });
   }
   // Sustituye el placeholder por el guion REAL (si el user sigue en ese reveal).
+  // Aviso «tu guion ya está listo» (aha del onboarding): banner a nivel de BODY, no un
+  // toast normal — el toast vive en #radarRoot (z:80) y el house tour dibuja ENCIMA
+  // (z:10002), así que durante el tour no se vería. Este va en body con z:10003 y arriba
+  // del todo (el tooltip del tour vive abajo → sin choque). Auto-oculta a los ~4s.
+  function ahaReadyNotice(){
+    try{
+      var n=document.getElementById("rsAhaReady");
+      if(!n){ n=document.createElement("div"); n.id="rsAhaReady"; n.className="rs-aha-ready"; document.body.appendChild(n); }
+      n.innerHTML=IC.spark+'<span>'+L("Tu guion ya está afinado en tu voz","Your script is now polished in your voice")+'</span>';
+      n.classList.add("on");
+      clearTimeout(S._ahaReadyT); S._ahaReadyT=setTimeout(function(){ n.classList.remove("on"); }, 4200);
+    }catch(e){}
+  }
   function _ahaSwap(r, gid){
     applyScriptOption(r,0,0);
     var g=guionById(gid), s=r.script||{};
@@ -6615,6 +6628,7 @@
       // al guion real delante de sus ojos. bgRender = gateado + coalescido.
       bgRender();
     }
+    ahaReadyNotice();   // aviso visible SIEMPRE (también durante el tour): el guion real llegó
   }
   /* Editor · "Regenerar guion" = re-tira del mismo material por COST.regen (1 cr),
      más barato que un guión nuevo (3 cr). Demo: descuenta local y refresca. Prod:

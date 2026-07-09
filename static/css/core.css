@@ -9896,6 +9896,18 @@
     /* toast */
     .rs .rs-toast { position:absolute; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); z-index:80; background:var(--text-primary); color:var(--surface-base); padding:13px 18px; border-radius:13px; font-size:13.5px; font-weight:600; box-shadow:var(--shadow-lg); opacity:0; pointer-events:none; transition: all .4s var(--ease-out); display:flex; align-items:center; gap:10px; max-width:90%; }
     .rs .rs-toast.show { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+    /* Aviso «guion listo» del aha — a nivel BODY (fuera de .rs) para pintar POR ENCIMA del
+       house tour (z:10002). Arriba centrado → no choca con el tooltip del tour (abajo).
+       Colores LITERALES: las --brand-* solo existen dentro de .rs. */
+    .rs-aha-ready { position:fixed; top:calc(16px + env(safe-area-inset-top,0px)); left:50%;
+      transform:translateX(-50%) translateY(-16px); z-index:10003; display:inline-flex; align-items:center; gap:9px;
+      padding:12px 18px; border-radius:99px; background:linear-gradient(120deg,#3a63ec,#4f7cff); color:#fff;
+      font-weight:700; font-size:13.5px; line-height:1.25; box-shadow:0 12px 34px rgba(79,124,255,.45);
+      opacity:0; pointer-events:none; max-width:92vw; text-align:left;
+      transition:opacity .35s ease, transform .35s cubic-bezier(.2,.9,.2,1); }
+    .rs-aha-ready.on { opacity:1; transform:translateX(-50%) translateY(0); }
+    .rs-aha-ready svg { width:16px; height:16px; flex:none; }
+    @media (prefers-reduced-motion: reduce){ .rs-aha-ready { transition:opacity .2s ease; } }
     .rs .rs-toast .tdot { width:8px; height:8px; border-radius:99px; background:var(--success); flex-shrink:0; }
     /* Fix review (T4/a11y): #rsView envuelve la vista re-renderizable sin afectar al
        layout (display:contents) — así #rsToast/#rsErr quedan FUERA del subárbol que
