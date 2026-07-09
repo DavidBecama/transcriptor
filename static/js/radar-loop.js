@@ -8798,6 +8798,12 @@
       S.user.presetTones=Array.isArray(me.preset_tones)&&me.preset_tones.length?me.preset_tones:[{key:"viral",label:"Polémico/Viral"},{key:"educacional",label:"Educacional"},{key:"divertido",label:"Cercano/Divertido"},{key:"informativo",label:"Informativo"},{key:"storytelling",label:"Storytelling"}];
       S.user.hasVoice=!!me.has_voice;
       S.user.onbV2Done=!!me.onb_v2_done;   // onboarding v2: gate de la pantalla dedicada (prod)
+      // El «tour visto» (onboarding_completed) vive en localStorage, NO en la cuenta → un
+      // reset de cuenta (onb_v2_done=false) no lo revertía y el tour no se re-mostraba. Si
+      // el servidor dice que el onboarding NO está hecho, la cuenta va a re-onboardear →
+      // limpiamos el flag local para que el house tour vuelva a salir. (Real: solo afecta a
+      // cuentas pre-onboarding; quien ya onboardeó tiene onb_v2_done=true y conserva su flag.)
+      if(!isDemo() && !me.onb_v2_done){ try{ localStorage.removeItem("onboarding_completed"); }catch(e){} }
       // reverse-trial: estado del trial (Pro capado sin tarjeta) + watermark en exports (free post-trial).
       S.user.trialActive=!!me.trial_active;
       S.user.trialDaysLeft=me.trial_days_left||0;
