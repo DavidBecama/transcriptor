@@ -1981,7 +1981,6 @@
         (r.why?'<div class="stday-why2"><b>'+L("Por qué robarlo","Why steal it")+':</b> '+ESC(r.why)+'</div>':'')+
         '<div class="stday-acts">'+
           '<button class="btn btn-sm btn-primary stday-rob" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Robar","Steal")+'</button>'+
-          saveIdeaBtnHTML(r.id)+
           '<button class="stday-x" data-act="sugg-dismiss-one" data-id="'+ESC(h)+'" aria-label="'+L("No me interesa","Not interested")+'" title="'+L("No me interesa","Not interested")+'">'+IC.x+'</button>'+
           follow+
         '</div>'+
@@ -2203,7 +2202,6 @@
       '</div>'+
       '<div class="crd-txwrap"><span class="crd-tx-lbl">'+L("TRANSCRIPCIÓN · DETECTADA","TRANSCRIPT · DETECTED")+'</span>'+txBody+'</div>'+
       '<button class="btn btn-md btn-primary crd-steal-full" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' '+L("Roba la idea","Steal the idea")+'</button>'+
-      saveIdeaBtnHTML(r.id)+
     '</div>';
   }
   // v3 (mockup David · «Competidores en el radar» + galería): fila de chips por
@@ -2370,7 +2368,6 @@
         '<h2 class="feature-cap">'+ESC(r.cap)+'</h2>'+
         '<div class="feature-why">'+IC.spark+'<span>'+ESC(why)+'</span></div>'+
         '<div class="feature-actions"><button class="btn btn-lg btn-primary" data-act="steal" data-id="'+ESC(r.id)+'">'+IC.bolt+' Roba la idea</button>'+
-          saveIdeaBtnHTML(r.id)+
           '<button class="iconbtn'+(S.favs[r.id]?" on":"")+'" data-act="fav" data-id="'+ESC(r.id)+'" title="Guardar">'+(S.favs[r.id]?IC.star:IC.starO)+'</button></div>'+
         scarce+
       '</div>'+
@@ -3101,14 +3098,23 @@
     var src=grp.handle?('<span class="guic-src">'+ESC(grp.handle)+'</span>'):'';
     var thumb=grp.thumb?('<img src="'+ESC(grp.thumb)+'" alt="" loading="lazy">'):('<div class="igc-ph" style="background:'+_galGrad(grp.key)+'"></div>');
     var notes=_groupNotesVal(grp.key);
-    var meta=(n===0?L("aún sin guion","no script yet"):(n+" "+(n===1?L("guion","script"):L("guiones","scripts"))+(nDraft?(" · "+nDraft+" "+L("por grabar","to record")):"")))+(notes?(" · "+L("con notas","has notes")):"")+(groupChoicePending(grp)?(" · ⚡ "+L("elige tu versión","pick your version")):"");
+    // Fase 2: idea robada SIN guion → CTA «Desarrollar · 3cr» (cola async). Con guion → «Abrir idea».
+    var _idea=(n===0)?_ideaOfGroup(grp):null;
+    var _dev=_idea&&_idea._developing;
+    var devMeta=_dev?(" · ⚡ "+L("desarrollando…","developing…")):"";
+    var meta=(n===0?L("aún sin guion","no script yet"):(n+" "+(n===1?L("guion","script"):L("guiones","scripts"))+(nDraft?(" · "+nDraft+" "+L("por grabar","to record")):"")))+devMeta+(notes?(" · "+L("con notas","has notes")):"")+(groupChoicePending(grp)?(" · ⚡ "+L("elige tu versión","pick your version")):"");
+    var devBtn = (n===0 && _idea)
+      ? (_dev
+          ? '<button class="btn btn-md btn-primary" disabled><span class="rs-ldr"></span> '+L("Desarrollando…","Developing…")+'</button>'
+          : '<button class="btn btn-md btn-primary" data-act="develop-idea" data-id="'+ESC(_idea.id)+'">'+IC.bolt+' '+L("Desarrollar · "+COST.script+" créd.","Develop · "+COST.script+" cr")+'</button>')
+      : '';
     return '<div class="guic-wrap"><div class="guic igc'+(n>0&&!nDraft?" is-rec":"")+'">'+
       '<div class="guic-top">'+badge+'<span class="guic-metaR">'+mult+src+'</span></div>'+
       '<div class="igc-row">'+
         '<div class="igc-thumb">'+thumb+'</div>'+
         '<div class="igc-main"><h3 class="guic-hook">'+ESC(grp.title)+'</h3><div class="igc-meta">'+ESC(meta)+'</div></div>'+
       '</div>'+
-      '<div class="guic-acts"><button class="btn btn-md btn-primary" data-act="ws-open" data-id="'+ESC(grp.key)+'">'+IC.edit+' '+L("Abrir idea","Open idea")+'</button></div>'+
+      '<div class="guic-acts">'+devBtn+'<button class="btn btn-md '+(n===0?'btn-secondary':'btn-primary')+'" data-act="ws-open" data-id="'+ESC(grp.key)+'">'+IC.edit+' '+L("Abrir idea","Open idea")+'</button></div>'+
     '</div></div>';
   }
   // Workspace de UNA idea robada (contenido del tab, no overlay): reel fuente +
@@ -3129,7 +3135,18 @@
     var origBtn=grp.url
       ? '<a class="btn btn-sm btn-secondary" href="'+ESC(grp.url)+'" target="_blank" rel="noopener noreferrer">'+IC.eye+' '+L("Ver original","View original")+'</a>'
       : (rSrc?'<button class="btn btn-sm btn-secondary" data-act="reel-original" data-id="'+ESC(grp.id)+'">'+IC.eye+' '+L("Ver original","View original")+'</button>':'');
-    var stealAgain=rSrc?('<button class="btn btn-md btn-secondary" data-act="ws-steal-again" data-id="'+ESC(grp.id)+'">'+IC.bolt+' '+L("Robar otro guion de este reel · "+COST.script+" créd.","Steal another script from this reel · "+COST.script+" cr.")+'</button>'):'';
+    // Fase 2: DESARROLLAR el guion de esta idea (3cr, cola). Primario si aún no hay guion;
+    // «otra versión» si ya hay. Demo mantiene el «robar otro» (steal) para no tocar el harness.
+    var _wsIdea=_ideaOfGroup(grp);
+    var _wsDev=_wsIdea&&_wsIdea._developing;
+    var stealAgain;
+    if(isDemo()){
+      stealAgain=rSrc?('<button class="btn btn-md btn-secondary" data-act="ws-steal-again" data-id="'+ESC(grp.id)+'">'+IC.bolt+' '+L("Robar otro guion de este reel · "+COST.script+" créd.","Steal another script from this reel · "+COST.script+" cr.")+'</button>'):'';
+    } else if(_wsDev){
+      stealAgain='<button class="btn btn-md btn-primary" disabled><span class="rs-ldr"></span> '+L("Desarrollando…","Developing…")+'</button>';
+    } else if(_wsIdea){
+      stealAgain='<button class="btn btn-md '+(n===0?'btn-primary':'btn-secondary')+'" data-act="ws-steal-again" data-id="'+ESC(grp.id)+'">'+IC.bolt+' '+(n===0?L("Desarrollar · "+COST.script+" créd.","Develop · "+COST.script+" cr"):L("Desarrollar otra versión · "+COST.script+" créd.","Develop another version · "+COST.script+" cr"))+'</button>';
+    } else { stealAgain=''; }
     // #8: métricas + transcripción del original (loadGroupDetail). Fallback a lo que el guion ya trae.
     var M=grp.srcMetrics||{};
     var _mv=(M.views!=null&&M.views!=="")?M.views:((grp.guiones[0]&&grp.guiones[0].srcViews)||null);
@@ -3220,7 +3237,7 @@
         '<span class="guiu-text">'+ESC(idea.text)+'</span>'+
         (saving
           ? '<span class="guiu-saving"><span class="rs-ldr"></span>'+L("Guardando…","Saving…")+'</span>'
-          : '<button class="btn btn-sm btn-secondary" data-act="gen5scripts" data-id="'+idea.id+'" title="'+L("Genera 5 guiones de esta idea ("+COST.scripts5+" créditos)","Generate 5 scripts from this idea ("+COST.scripts5+" credits)")+'">'+L("Desarrollar","Develop")+'</button>')+
+          : '<button class="btn btn-sm btn-secondary" data-act="gen5scripts" data-id="'+idea.id+'" title="'+L("Genera una SERIE de 5 guiones de esta idea ("+COST.scripts5+" créditos)","Generate a SERIES of 5 scripts from this idea ("+COST.scripts5+" credits)")+'">'+L("Serie de 5 · "+COST.scripts5+" créd.","Series of 5 · "+COST.scripts5+" cr")+'</button>')+
       '</div>';
     }).join("");
     return '<section class="guiu"><div class="guiu-head">'+
@@ -7059,6 +7076,82 @@
     });
   }
 
+  // ── Bucle robar→desarrollar (Fase 2) ─────────────────────────────────────────
+  // ROBAR = coleccionar la idea en Ideas robadas (1 cr). Rápido, en cadena, sin esperar
+  // guion. DESARROLLAR el guion (3 cr, async + cola) es un paso aparte desde Ideas robadas.
+  // Demo/harness: robar sigue abriendo el reveal (steal) — el contrato del harness no cambia
+  // en esta fase; el bucle nuevo se prueba LOGUEADO (túnel).
+  function collect(id){
+    if(isDemo()) return steal(id);   // demo/harness: robar = reveal (sin cambiar el contrato)
+    var r=reelById(id); if(!r) return;
+    var _pid=_pidOf(S.brandId);
+    // Optimista: fuera del radar YA + aparece en Ideas robadas (loop continuity, sin esperar).
+    S._stolenReels=S._stolenReels||{}; S._stolenReels[r.id]=r;
+    _optimisticSavedIdea(id, r.cap||"");
+    removeStolenReel(id); try{ brainEmitSignals(); }catch(e){} try{ startFlash(); }catch(e){}
+    if(firstStealPending()) markFirstSteal();
+    render();
+    apiPost("/api/competitors/reels/"+encodeURIComponent(id)+"/save-with-data", _pid?{project_id:_pid}:{}).then(function(rr){
+      if(rr.status===402){ return showPaywall("no_credits"); }
+      if(!rr.ok){ return showError((rr.d&&rr.d.message)||L("No pude robar la idea. Reinténtalo.","Couldn't collect the idea. Try again.")); }
+      // Refleja la idea REAL (su UUID) en la optimista → ya es desarrollable sin recargar todo.
+      var _rid=rr.d&&rr.d.idea_id;
+      if(_rid){ var _opt=(S.ideas||[]).filter(function(i){return i&&i.inspiredById===id&&i.inspiredByType==="reel";})[0];
+        if(_opt){ _opt.id=_rid; _opt._server=true; if(rr.d.title) _opt.title=rr.d.title; } }
+      try{ refreshCredits(); }catch(e){}
+      render();
+      var _already=rr.d&&rr.d.already_exists;
+      showToast(_already? L("Ya la tenías en Ideas robadas.","Already in your Stolen ideas.")
+                        : L("Robada · en Ideas robadas. Desarróllala cuando quieras.","Stolen · in Stolen ideas. Develop it whenever."),
+                L("Desarrollar","Develop"), "goto-saved-ideas");
+    });
+  }
+  // Idea (con su UUID) que ancla un grupo de «Ideas robadas» (para desarrollar desde la card/ws).
+  function _ideaOfGroup(grp){
+    if(!grp) return null;
+    var t=(grp.kind==="t")?"transcription":"reel";
+    return (S.ideas||[]).filter(function(x){return x&&x.inspiredById===grp.id&&x.inspiredByType===t;})[0]||null;
+  }
+  function develop(ideaId){
+    if(!ideaId) return;
+    if(String(ideaId).indexOf("tmp-")===0){ return showToast(L("Un momento, guardando la idea…","One sec, saving the idea…")); }
+    if(isDemo()) return;   // demo: las ideas ya traen guion; el botón no se muestra
+    var idea=findIdea(ideaId); if(!idea) return;
+    if(idea._developing) return;   // ya en cola
+    // Tope diario del FREE = DESARROLLOS (no robos). Pre-check; el backend es la verdad.
+    if(isFree() && S.user && S.user.dayLeft!=null && S.user.dayLeft<=0){ return showDailyLimit(); }
+    idea._developing=true; render();
+    var _pid=_pidOf(S.brandId);
+    apiPost("/ideas/"+encodeURIComponent(ideaId)+"/develop-script", _pid?{project_id:_pid}:{}).then(function(r){
+      if(r.status===402 || (r.d&&(r.d.error==="no_credits"||r.d.error==="daily_limit"))){
+        idea._developing=false; render();
+        if(r.d&&r.d.error==="daily_limit") return showDailyLimit();
+        return showPaywall("no_credits");
+      }
+      if(!(r.ok||(r.d&&r.d.queued))){ idea._developing=false; render(); return showError((r.d&&r.d.message)||L("No pude desarrollar. Reinténtalo.","Couldn't develop. Try again.")); }
+      try{ refreshCredits(); }catch(e){}
+      showToast(L("En cola · tu guion sale en un momento.","Queued · your script lands in a moment."));
+      _pollDevelop(ideaId, 0);
+    });
+  }
+  function _pollDevelop(ideaId, tries){
+    if(tries>60){ var i0=findIdea(ideaId); if(i0){ i0._developing=false; render(); } return; }   // ~2.5 min máx
+    apiGet("/ideas/"+encodeURIComponent(ideaId)+"/develop-status").then(function(r){
+      var st=(r.d&&r.d.status)||"";
+      if(st==="ready"){
+        var i=findIdea(ideaId); if(i) i._developing=false;
+        if(typeof reloadScripts==="function"){ reloadScripts().then(function(){ render(); showToast(L("Guion listo ✅","Script ready ✅"), L("Verlo","See it"), "goto-saved-ideas"); }); }
+        else { render(); }
+        return;
+      }
+      if(st==="developing"){ setTimeout(function(){ _pollDevelop(ideaId, tries+1); }, 2500); return; }
+      // idle → falló y se reembolsó (el backend devuelve créditos y deja la idea desarrollable).
+      var i2=findIdea(ideaId); if(i2){ i2._developing=false; render(); }
+      try{ refreshCredits(); }catch(e){}
+      showError(L("No pude desarrollar el guion (te devolví los créditos). Reinténtalo.","Couldn't develop the script (credits refunded). Try again."));
+    });
+  }
+
   /* ── fábrica de ideas ────────────────────────────────────────── */
   function seedIdea(inputId, jumpToIdeas){
     var inp=document.getElementById(inputId); var txt=inp?inp.value.trim():"";
@@ -8180,8 +8273,9 @@
       return;
     }
     if(act==="onb-steal-no"){ S.onbStealOffer=null; S.onbCofre=null; render(); return onbStartTour(); }   // #6: «¡Enséñame!» → tutorial
-    if(act==="steal") return steal(id);
-    if(act==="save-idea-data") return saveIdeaWithData(id);
+    if(act==="steal") return collect(id);   // Fase 2: ROBAR = coleccionar (1cr), no genera guion (demo→reveal)
+    if(act==="develop-idea") return develop(btn.getAttribute("data-id"));   // DESARROLLAR guion (3cr, cola)
+    if(act==="save-idea-data") return saveIdeaWithData(id);   // legacy (botón retirado; handler inerte)
     if(act==="goto-saved-ideas"){ S.tab="guiones"; if(typeof reloadScripts==="function"){ try{ reloadScripts(); }catch(e){} } render(); return; }   // #2: lleva a la idea guardada (Ideas robadas)
     if(act==="opt-pick"){ var _rv=S.revealReel||S.reel; if(_rv){ applyScriptOption(_rv, parseInt(k,10)||0, 0); _rv._saved=false; render(); } return; }   // elegir opción de guion → sin guardar
     if(act==="hook-pick"){ var _rh=S.revealReel||S.reel; if(_rh){ applyScriptOption(_rh, _rh.optIdx||0, parseInt(k,10)||0); _rh._saved=false; render(); } return; }   // elegir gancho → sin guardar
@@ -8374,7 +8468,10 @@
     if(act==="ws-open") return wsOpen(btn.getAttribute("data-id"));
     if(act==="ws-open-last") return S._lastStealKey?wsOpen(S._lastStealKey):switchTab("guiones");
     if(act==="ws-close") return wsClose();
-    if(act==="ws-steal-again"){ var _wr=reelById(id); if(_wr){ _wr.options=null; _wr.script=null; S.view="feed"; steal(id); } return; }
+    if(act==="ws-steal-again"){   // Fase 2: «Desarrollar otra versión» desde el workspace → desarrolla la idea (3cr)
+      if(isDemo()){ var _wr=reelById(id); if(_wr){ _wr.options=null; _wr.script=null; S.view="feed"; steal(id); } return; }
+      var _wi=_ideaOfGroup(_groupByKey(S._wsKey)); if(_wi) develop(_wi.id); return;
+    }
     // growth-2: onboarding de activación
     // onboarding v2 (7 pasos)
     if(act==="onb-handle-next") return onbHandleNext();
