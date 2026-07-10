@@ -10054,11 +10054,21 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
     exclude = set(exclude_creator_ids or [])
     uname = {}
     related_cids = set()   # CALIDAD (David 08/07): reels de related-source rankean por delante
+    # GATE DURO DE NICHO CANÓNICO (David 10/07, BLOQUEANTE relevancia): un creador solo entra
+    # si su nicho canónico == el de la marca. Antes Capa 1/2 seleccionaban por OVERLAP de
+    # subnichos sin mirar el nicho canónico → una subniche PUENTE (p.ej. «inteligencia
+    # artificial», compartida por marketing y tecnología) colaba a @mouredev (tecnología) en una
+    # marca de marketing, y related le daba boost 1.8×. Ahora el nicho manda; el subnicho refina
+    # DENTRO del nicho. Los NULL-niche (sin clasificar, p.ej. andybadilloo) quedan fuera hasta
+    # que se clasifiquen. La Capa 3 (fallback canon) ya aplicaba este criterio; lo unificamos.
+    brand_canon = _pool_niche_canon(niche or "")
+    def _canon_ok(c):
+        return (not brand_canon) or (_pool_niche_canon(c.get("niche") or "") == brand_canon)
     try:
-        for c in (db.table("creators_global").select("id, ig_username, subniches")
+        for c in (db.table("creators_global").select("id, ig_username, subniches, niche")
                     .overlaps("subniches", subs).limit(600).execute()).data or []:
             cid = c.get("id")
-            if not cid or cid in exclude:
+            if not cid or cid in exclude or not _canon_ok(c):
                 continue
             csubs = {_norm_tag(s) for s in (c.get("subniches") or []) if s}
             if len(csubs & subs_set) >= min_overlap:   # solape FUERTE → on-niche de verdad
@@ -10067,14 +10077,14 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
         logger.warning("[sugg] subniche overlap failed (¿migración subniches?)")
     # CALIDAD: los relatedProfiles (harvest_related — vecinos del grafo REAL de IG de los
     # competidores del user) son ORO on-niche. Entran al pool DIRECTO, SIN exigir ≥2 subnichos
-    # (el grafo ya garantiza relevancia; muchos vienen sin tags o con 1) — y con solape blando
-    # (≥1) para no colar related de OTRO nicho. Se les da boost en el score (_score_pool).
+    # (el grafo ya garantiza relevancia; muchos vienen sin tags o con 1) — pero SIEMPRE bajo el
+    # gate de nicho canónico de arriba (related de OTRO nicho NO entra). Boost en el score.
     try:
-        for c in (db.table("creators_global").select("id, ig_username, subniches")
+        for c in (db.table("creators_global").select("id, ig_username, subniches, niche")
                     .eq("niche_source", "related").overlaps("subniches", subs)
                     .limit(150).execute()).data or []:
             cid = c.get("id")
-            if not cid or cid in exclude:
+            if not cid or cid in exclude or not _canon_ok(c):
                 continue
             csubs = {_norm_tag(s) for s in (c.get("subniches") or []) if s}
             if not subs_set or (csubs & subs_set):   # solape BLANDO (≥1) — related ya es curado

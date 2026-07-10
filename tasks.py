@@ -1872,11 +1872,13 @@ def harvest_related_creators_task(handle, niche="", subniches=None, project_id=N
         resp.raise_for_status()
         items = resp.json() or []
         item = items[0] if items else {}
+        _rp_names = {}
         for rp in (item.get("relatedProfiles") or [])[:40]:
             u = ((rp.get("username") or rp.get("ownerUsername") or "")
                  .strip().lstrip("@").lower()) if isinstance(rp, dict) else ""
             if re.match(r"^[a-z0-9._]{1,30}$", u) and u != handle:
                 related.append(u)
+                _rp_names[u] = (rp.get("full_name") or rp.get("fullName") or "") if isinstance(rp, dict) else ""
     except Exception as e:
         logger.warning("[related] apify details failed handle=%s: %s", handle, e)
         return {"status": "apify_failed", "handle": handle}
@@ -1884,6 +1886,20 @@ def harvest_related_creators_task(handle, niche="", subniches=None, project_id=N
         return {"status": "no_related", "handle": handle}
     seen = set()
     related = [u for u in related if not (u in seen or seen.add(u))][:HARVEST_N]
+    # GATE DE NICHO (David 10/07, BLOQUEANTE relevancia): NO estampar el nicho de la marca sobre
+    # CUALQUIER relatedProfile. Los vecinos del grafo de IG CRUZAN nichos (un competidor de
+    # marketing tiene de related a finanzas/self-help/streetwear → así se colaba raydalio/hypebeast
+    # etiquetados «marketing»). Pasamos los related por el MISMO gate Groq que el discover: solo los
+    # del nicho se ETIQUETAN con él; el resto se upsertea SIN nicho (queda para clasificación real →
+    # el gate canónico de sugerencias los excluye hasta entonces). Best-effort: gate caído → no
+    # etiqueta ninguno (conservador: mejor sin etiqueta que mal etiquetado).
+    if os.environ.get("GROQ_API_KEY", ""):
+        try:
+            _kept_niche = set(_gate_creators_groq([{"u": u, "name": _rp_names.get(u, "")} for u in related], niche or ""))
+        except Exception:
+            _kept_niche = set()   # gate caído → no etiquetar (conservador: mejor sin etiqueta que mal)
+    else:
+        _kept_niche = set()   # sin Groq no verificamos nicho → no estampamos el de la marca
 
     # 2. Upsert + TAG con el nicho/subnichos de la marca (enriquece el foso) + scrape bg acotado.
     scraped = 0
@@ -1902,13 +1918,17 @@ def harvest_related_creators_task(handle, niche="", subniches=None, project_id=N
             cid = row["id"]
             added += 1
             upd = {}
-            cur_tags = set(row.get("subniches") or [])
-            if tags and (set(tags) - cur_tags):
-                upd["subniches"] = sorted(cur_tags | set(tags))
-            if pn and not (row.get("niche") or "").strip():
-                upd["niche"] = pn
-            if not row.get("niche_source"):
-                upd["niche_source"] = "related"   # NO pisar 'seed'/'user' (curados) → solo etiqueta lo nuevo
+            # Solo ETIQUETAMOS con el nicho/subnichos de la marca a los related que PASARON el gate
+            # de nicho (Groq). Los que no pasan se upsertean igual (entran al catálogo) pero SIN
+            # nicho de la marca → no se cuelan como on-niche en sugerencias hasta clasificación real.
+            if u in _kept_niche:
+                cur_tags = set(row.get("subniches") or [])
+                if tags and (set(tags) - cur_tags):
+                    upd["subniches"] = sorted(cur_tags | set(tags))
+                if pn and not (row.get("niche") or "").strip():
+                    upd["niche"] = pn
+                if not row.get("niche_source"):
+                    upd["niche_source"] = "related"   # NO pisar 'seed'/'user' (curados) → solo etiqueta lo nuevo
             if upd:
                 try:
                     db.table("creators_global").update(upd).eq("id", cid).execute()
