@@ -1733,6 +1733,45 @@ def _gate_creators_groq(cands: list, niche_ctx: str) -> list:
         return [c["u"] for c in cands]
 
 
+def _classify_niches_groq(cands: list) -> dict:
+    """Clasifica cuentas de IG en su NICHO CANÓNICO REAL (Groq barato). cands:[{"u","name"}].
+    Devuelve {username_lower: nicho_canonico}. Para REÚSO entre usuarios del mismo nicho: cada
+    related se cataloga por lo que ES, no por la marca que lo descubrió (David 10/07). Best-effort:
+    Groq caído → {} (quedan sin nicho hasta otro intento)."""
+    GROQ = os.environ.get("GROQ_API_KEY", "")
+    if not cands or not GROQ:
+        return {}
+    NICHES = ("marketing, negocios, finanzas, tecnologia, salud, "
+              "espiritualidad y mindfulness, moda, belleza, cocina, viajes, educacion, "
+              "fitness, lifestyle, entretenimiento, inmobiliaria, deportes")
+    prompt = (
+        "Clasificas cuentas de Instagram por su NICHO PRINCIPAL. Elige el más cercano de esta "
+        "lista (o \"otro\"): " + NICHES + ".\n"
+        "MARKETING (estricto) = marketing/copywriting/social media/ads/creación de contenido/"
+        "funnels/growth. NO es marketing: finanzas/inversión, negocio/emprendimiento GENERAL, "
+        "self-help/mindfulness, lifestyle, comedia.\n"
+        "Para CADA cuenta devuelve su nicho real. SOLO json: {\"r\":[{\"u\":username,\"niche\":\"...\"}]}\n\n"
+        "CUENTAS:\n" + json.dumps(cands, ensure_ascii=False))
+    try:
+        gr = requests.post("https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": "Bearer " + GROQ},
+            json={"model": os.environ.get("GROQ_GATE_MODEL", "llama-3.3-70b-versatile"),
+                  "temperature": 0, "response_format": {"type": "json_object"},
+                  "messages": [{"role": "user", "content": prompt}]}, timeout=60)
+        gr.raise_for_status()
+        out = json.loads(gr.json()["choices"][0]["message"]["content"])
+        res = {}
+        for x in (out.get("r") or []):
+            u = (x.get("u") or "").lower().lstrip("@")
+            n = pool_niche_canon(x.get("niche") or "")
+            if u and n and n != "otro":
+                res[u] = n
+        return res
+    except Exception as e:
+        logger.warning("[related] groq classify failed: %s", e)
+        return {}
+
+
 @celery_app.task(name="tasks.discover_niche_creators")
 def discover_niche_creators_task(user_id: str, niche: str, subniches: list,
                                  seed_handle: str = "", follow_top: int = 6) -> dict:
@@ -1886,22 +1925,27 @@ def harvest_related_creators_task(handle, niche="", subniches=None, project_id=N
         return {"status": "no_related", "handle": handle}
     seen = set()
     related = [u for u in related if not (u in seen or seen.add(u))][:HARVEST_N]
-    # GATE DE NICHO (David 10/07, BLOQUEANTE relevancia): NO estampar el nicho de la marca sobre
-    # CUALQUIER relatedProfile. Los vecinos del grafo de IG CRUZAN nichos (un competidor de
-    # marketing tiene de related a finanzas/self-help/streetwear → así se colaba raydalio/hypebeast
-    # etiquetados «marketing»). Pasamos los related por el MISMO gate Groq que el discover: solo los
-    # del nicho se ETIQUETAN con él; el resto se upsertea SIN nicho (queda para clasificación real →
-    # el gate canónico de sugerencias los excluye hasta entonces). Best-effort: gate caído → no
-    # etiqueta ninguno (conservador: mejor sin etiqueta que mal etiquetado).
-    if os.environ.get("GROQ_API_KEY", ""):
-        try:
-            _kept_niche = set(_gate_creators_groq([{"u": u, "name": _rp_names.get(u, "")} for u in related], niche or ""))
-        except Exception:
-            _kept_niche = set()   # gate caído → no etiquetar (conservador: mejor sin etiqueta que mal)
-    else:
-        _kept_niche = set()   # sin Groq no verificamos nicho → no estampamos el de la marca
+    # RE-ARQUITECTURA (David 10/07): estos relatedProfiles son la FUENTE PRIMARIA de sugerencias
+    # del user que sigue a @handle. NO estampamos el nicho de la marca (los vecinos del grafo IG
+    # cruzan nichos). En su lugar:
+    #  (1) guardamos la LISTA en la fila del competidor (edge competidor→related) → las sugerencias
+    #      la leen y muestran sus reels explosivos como TOP;
+    #  (2) catalogamos el nicho REAL de cada related vía Groq (para reúso entre usuarios del nicho).
+    _real_niche = _classify_niches_groq([{"u": u, "name": _rp_names.get(u, "")} for u in related])
 
-    # 2. Upsert + TAG con el nicho/subnichos de la marca (enriquece el foso) + scrape bg acotado.
+    # (1) edge competidor→relatedProfiles en la fila del COMPETIDOR (profile_data, sin migración).
+    try:
+        _comp = (db.table("creators_global").select("id, profile_data")
+                   .eq("ig_username", handle).single().execute()).data
+        if _comp:
+            _pd = _comp.get("profile_data") or {}
+            _pd["relatedProfiles"] = related
+            _pd["relatedProfiles_at"] = datetime.now(timezone.utc).isoformat()
+            db.table("creators_global").update({"profile_data": _pd}).eq("id", _comp["id"]).execute()
+    except Exception as e:
+        logger.warning("[related] store edge on @%s failed: %s", handle, e)
+
+    # (2) upsert cada related con su NICHO REAL (Groq), no el de la marca + scrape bg acotado.
     scraped = 0
     added = 0
     for u in related:
@@ -1918,22 +1962,18 @@ def harvest_related_creators_task(handle, niche="", subniches=None, project_id=N
             cid = row["id"]
             added += 1
             upd = {}
-            # Solo ETIQUETAMOS con el nicho/subnichos de la marca a los related que PASARON el gate
-            # de nicho (Groq). Los que no pasan se upsertean igual (entran al catálogo) pero SIN
-            # nicho de la marca → no se cuelan como on-niche en sugerencias hasta clasificación real.
-            if u in _kept_niche:
-                cur_tags = set(row.get("subniches") or [])
-                if tags and (set(tags) - cur_tags):
-                    upd["subniches"] = sorted(cur_tags | set(tags))
-                if pn and not (row.get("niche") or "").strip():
-                    upd["niche"] = pn
-                if not row.get("niche_source"):
-                    upd["niche_source"] = "related"   # NO pisar 'seed'/'user' (curados) → solo etiqueta lo nuevo
+            rn = _real_niche.get(u)   # nicho canónico REAL
+            # Etiqueta el nicho real si el creador no tiene fuente fiable (no pisar seed/user; related
+            # se puede refrescar). Si Groq no lo clasificó, queda sin nicho (fuera del pool hasta otro intento).
+            if rn and row.get("niche_source") not in ("seed", "user"):
+                if not (row.get("niche") or "").strip() or row.get("niche_source") in (None, "", "related"):
+                    upd["niche"] = rn
+                    upd["niche_source"] = "related"
             if upd:
                 try:
                     db.table("creators_global").update(upd).eq("id", cid).execute()
                 except Exception:
-                    logger.warning("[related] tag failed %s (¿migración subniches/niche?)", u, exc_info=True)
+                    logger.warning("[related] tag failed %s (¿migración niche?)", u, exc_info=True)
             # scrape bg SOLO si sin reels frescos (>7d o nunca) y estado no definitivo, acotado.
             if scraped < SCRAPE_N and row.get("scrape_status") not in ("private", "not_found", "scraping"):
                 last = row.get("last_scraped_at")

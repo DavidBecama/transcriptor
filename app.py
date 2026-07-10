@@ -172,6 +172,12 @@ RADAR_FEED_CACHE_TTL      = 26 * 3600
 RADAR_FEED_SERVED_N    = 24
 RADAR_FEED_SEEN_PENALTY = 0.45       # ×score a los reels servidos ayer (los desbanca)
 RADAR_FEED_SEEN_TTL     = 3 * 86400
+# Rotación DURA del carrusel «Oportunidad» (top-3): un reel que fue portada los últimos
+# ROTATE_DAYS días NO puede volver al top-3 hoy, por muy dominante que sea su explosión
+# (el jitter/penalización blanda no bastan con un viral que aplasta al resto). David: «nunca
+# el mismo 3 días». Se relega DEBAJO de la posición 3 (sigue en el feed, no de portada).
+RADAR_FEED_TOP_N       = 3
+RADAR_FEED_TOP_ROTATE_DAYS = 2
 # Frescura (#3 David): VENTANA MÓVIL de 14 días. «Sugerencias de hoy» sirve reels ≤14 días que el
 # user no haya visto — no hace falta contenido 100% nuevo; se dan ideas recientes igual. El
 # refresh-pool usa la misma ventana para decidir si reembolsar («no vender aire»). Env-configurable.
@@ -10020,9 +10026,50 @@ def _suggestion_reason(exp, formato, age_days):
     return " · ".join(parts)
 
 
+def _tracked_related_cids(uid, project_id, brand_canon, exclude):
+    """Creator-ids de los relatedProfiles de los competidores que el user SIGUE en esta marca
+    (fuente PRIMARIA de sugerencias, David 10/07). Lee el edge competidor→related
+    (creators_global.profile_data.relatedProfiles), resuelve a creator-ids, filtra al nicho
+    canónico de la marca (relevancia) y quita seguidos/descartados (`exclude`). Los competidores
+    añadidos a mano NO se filtran (son la fuente); el filtro de nicho aplica a SUS related."""
+    try:
+        q = (db.table("user_tracked_creators").select("creator_id, archived_at").eq("user_id", uid))
+        if project_id:
+            q = q.eq("project_id", project_id)
+        tc = q.execute().data or []
+    except Exception:
+        return []
+    comp_ids = [t.get("creator_id") for t in tc if t.get("creator_id") and not t.get("archived_at")]
+    if not comp_ids:
+        return []
+    handles = set()
+    try:
+        for c in (db.table("creators_global").select("profile_data").in_("id", comp_ids).execute()).data or []:
+            for h in ((c.get("profile_data") or {}).get("relatedProfiles") or []):
+                hh = (h or "").lower().lstrip("@")
+                if hh:
+                    handles.add(hh)
+    except Exception:
+        return []
+    if not handles:
+        return []
+    out = []
+    try:
+        for c in (db.table("creators_global").select("id, niche").in_("ig_username", list(handles)[:300]).execute()).data or []:
+            cid = c.get("id")
+            if not cid or cid in exclude:
+                continue
+            if brand_canon and _pool_niche_canon(c.get("niche") or "") != brand_canon:
+                continue   # related de OTRO nicho (o sin clasificar) → fuera (relevancia)
+            out.append(cid)
+    except Exception:
+        pass
+    return out
+
+
 def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, limit=15,
                             shuffle_seed=None, offset=0, day_seed=None, seen_ids=None,
-                            exclude_reel_ids=None):
+                            exclude_reel_ids=None, primary_cids=None):
     """«Sugerencias de hoy» orientado a REELS: reels que PETAN en el nicho de creadores que
     el user NO sigue ni descartó. Cada reel es ROBABLE sin seguir al creador. `worth_follow`
     marca a los creadores que MERECE seguir (listón alto) → la 2ª acción «+ Añadir competidor»
@@ -10092,8 +10139,23 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
                 related_cids.add(cid)
     except Exception:
         logger.warning("[sugg] related pool failed", exc_info=True)
+    # FUENTE PRIMARIA (David 10/07): relatedProfiles de los competidores que el user YA SIGUE
+    # (edge profile_data.relatedProfiles, ya filtrados por nicho por el caller _tracked_related_cids).
+    # Sus reels explosivos son las sugerencias TOP; el pool de nicho es SOLO relleno detrás.
+    primary_set = set()
+    if primary_cids:
+        try:
+            for c in (db.table("creators_global").select("id, ig_username")
+                        .in_("id", [p for p in primary_cids if p][:200]).execute()).data or []:
+                cid = c.get("id")
+                if cid and cid not in exclude:
+                    uname[cid] = c.get("ig_username") or uname.get(cid, "")
+                    primary_set.add(cid)
+        except Exception:
+            logger.warning("[sugg] primary (tracked-related) pool failed", exc_info=True)
     REEL_FLOOR = 1.2      # MÁS reels: umbral bajo para que un reel APAREZCA
     RELATED_BOOST = 1.8   # reels de competidores sugeridos (related) suben por delante de lo genérico
+    PRIMARY_BOOST = 6.0   # related de MIS competidores tracked → lo MÁS arriba (fuente primaria)
     FOLLOW_MIN_EXP = 2.0  # «petando» a efectos de seguir
     FOLLOW_MIN_HITS = 2   # CURACIÓN: «+ Añadir competidor» solo si el creador peta de FORMA
                           # CONSISTENTE (≥2 reels petando), no un único viral de chiripa.
@@ -10148,6 +10210,8 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
                             score *= 0.4 + 0.6 * _unit_hash("%s:%s" % (r.get("id"), day_seed))
                     if cid in related_cids:
                         score *= RELATED_BOOST   # competidor sugerido → arriba de las sugerencias
+                    if cid in primary_set:
+                        score *= PRIMARY_BOOST   # related de MIS competidores tracked → lo más arriba
                     picked.append((score, r, wf))
         return picked
 
@@ -10176,7 +10240,12 @@ def _niche_suggestion_reels(subniches, niche=None, exclude_creator_ids=None, lim
     # entran antes los no vistos ayer; dentro, explosión×jitter-del-día. Los servidos HOY y los
     # robados NO están aquí (exclusión dura arriba) → «Ver más» nunca repite en la sesión.
     _sy = seen_ids or set()
-    chosen.sort(key=lambda c: (1 if str(c[1].get("id")) in _sy else 0, -c[0]))
+    # PARTICIÓN DURA (David 10/07): los reels de la FUENTE PRIMARIA (related de los competidores
+    # que el user sigue) van SIEMPRE arriba del pool de nicho — el pool es solo relleno detrás, no
+    # compite por score (un garyvee muy explosivo NO desbanca a los related reales del user). Dentro
+    # de cada grupo: partición por servido-ayer (rotación) + explosión×jitter.
+    chosen.sort(key=lambda c: (0 if c[1].get("creator_id") in primary_set else 1,
+                               1 if str(c[1].get("id")) in _sy else 0, -c[0]))
     now = datetime.now(timezone.utc)
     out = []
     for _score, r, wf in chosen[offset:offset + limit]:
@@ -10401,12 +10470,16 @@ def radar_suggestions():
         # carga normal mantiene la exclusión dura de servidos-hoy (contrato «no repetir en sesión»).
         _is_shuffle = bool(request.args.get("shuffle"))
         excl_reels = _stolen_reel_ids(uid) if _is_shuffle else (_sugg_seen_today(uid, project_id) | _stolen_reel_ids(uid))
+        # FUENTE PRIMARIA (David 10/07): relatedProfiles de los competidores que el user sigue →
+        # sus reels explosivos son las sugerencias TOP; el pool de nicho es solo relleno detrás.
+        _brand_canon = _pool_niche_canon(niche or "")
+        primary_cids = _tracked_related_cids(uid, project_id, _brand_canon, exclude)
         # Pool amplio (hasta SUGG_MAX_TOTAL) en UNA llamada, ya SIN los excluidos: de ahí salen
         # la ventana gratis y los «posibles competidores» (mismo pool ya scoreado).
         pool = _niche_suggestion_reels(subs, niche, exclude, SUGG_MAX_TOTAL,
                                        day_seed=_sugg_day_seed(uid, project_id),
                                        seen_ids=_sugg_seen_yesterday(uid, project_id),
-                                       exclude_reel_ids=excl_reels)
+                                       exclude_reel_ids=excl_reels, primary_cids=primary_cids)
         batch = pool[:SUGG_FREE_N]
         # David 08/07: SUGERENCIAS 100% — NUNCA vacío donde el nicho tiene pool. Si lo fresco se
         # agotó (servido-hoy), RECICLAMOS: 1º el pool solo-sin-robados (repites vistos-hoy antes que
@@ -10417,7 +10490,8 @@ def radar_suggestions():
             for _fb_excl in (_stolen_reel_ids(uid), set()):
                 _pool2 = _niche_suggestion_reels(subs, niche, exclude, SUGG_MAX_TOTAL,
                                                  day_seed=_sugg_day_seed(uid, project_id),
-                                                 seen_ids=set(), exclude_reel_ids=_fb_excl)
+                                                 seen_ids=set(), exclude_reel_ids=_fb_excl,
+                                                 primary_cids=primary_cids)
                 if _pool2:
                     pool = _pool2; batch = _pool2[:SUGG_FREE_N]; recycled = True; break
         has_more = len(pool) > SUGG_FREE_N   # frescos REALES restantes (excluidos ya fuera)
@@ -12413,12 +12487,20 @@ def _radar_feed_order(uid, project_id, creator_ids, day_str=None, use_cache=True
     # Penaliza los reels SERVIDOS ayer → rotación real (suben los del siguiente tramo).
     yday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")
     seen = set()
+    recent_top = set()   # reels que fueron top-3 «Oportunidad» en los últimos RADAR_FEED_TOP_ROTATE_DAYS días
     if rds is not None:
         try:
             seen = {m.decode() if isinstance(m, bytes) else m
                     for m in (rds.smembers("feedserved:%s:%s:%s" % (uid, project_id or "_", yday)) or [])}
         except Exception:
             seen = set()
+        try:
+            for _d in range(1, RADAR_FEED_TOP_ROTATE_DAYS + 1):
+                _ds = (datetime.now(timezone.utc) - timedelta(days=_d)).strftime("%Y%m%d")
+                recent_top |= {m.decode() if isinstance(m, bytes) else m
+                               for m in (rds.smembers("feedtop:%s:%s:%s" % (uid, project_id or "_", _ds)) or [])}
+        except Exception:
+            recent_top = set()
     baselines = _creator_view_baselines(creator_ids)
     now = datetime.now(timezone.utc)
     scored = []
@@ -12437,6 +12519,17 @@ def _radar_feed_order(uid, project_id, creator_ids, day_str=None, use_cache=True
         scored.append((score, {"id": r.get("id"), "creator_id": r.get("creator_id")}))
     scored.sort(key=lambda s: s[0], reverse=True)
     order = [s[1] for s in scored]
+    # ROTACIÓN DURA de la «Oportunidad» (top-3): si el top-3 recién calculado incluye reels que
+    # ya fueron portada en los últimos días, se RELEGAN debajo de la posición 3 y suben los
+    # siguientes que NO han sido portada. Garantiza que el carrusel cambie a diario aunque un
+    # viral aplaste al resto (el jitter/penalización no lo lograban). Si TODO el pool es reciente
+    # (marca con pocos reels), no fuerza (mejor repetir que vaciar la portada).
+    if recent_top and len(order) > RADAR_FEED_TOP_N:
+        fresh_top, demoted = [], []
+        for o in order:
+            (demoted if str(o.get("id")) in recent_top else fresh_top).append(o)
+        if len(fresh_top) >= RADAR_FEED_TOP_N:
+            order = fresh_top[:RADAR_FEED_TOP_N] + demoted + fresh_top[RADAR_FEED_TOP_N:]
     # NO cachear orden vacío: si los competidores aún no tienen reels (scrape async en
     # curso), cachear [] fijaría el feed a SEED toda la TTL → el primer scrape no entraría.
     if use_cache and rds is not None and order:
@@ -12447,6 +12540,12 @@ def _radar_feed_order(uid, project_id, creator_ids, day_str=None, use_cache=True
                 tkey = "feedserved:%s:%s:%s" % (uid, project_id or "_", day_str)
                 rds.sadd(tkey, *served)
                 rds.expire(tkey, RADAR_FEED_SEEN_TTL)
+            # top-3 del día (para la rotación dura de mañana).
+            _top = [o["id"] for o in order[:RADAR_FEED_TOP_N] if o.get("id")]
+            if _top:
+                _tk = "feedtop:%s:%s:%s" % (uid, project_id or "_", day_str)
+                rds.sadd(_tk, *_top)
+                rds.expire(_tk, RADAR_FEED_SEEN_TTL)
         except Exception:
             pass
     return order
